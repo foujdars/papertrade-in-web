@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "https://papertrade-in-web.foujdaaars.chatgpt.site";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(productionUrl),
   title: {
     default: "PaperTrade IN",
     template: "%s · PaperTrade IN",
