@@ -30,17 +30,24 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, dashboard, chart, readme] = await Promise.all([
+  const [page, dashboard, chart, serverAdapter, quoteRoute, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/upstox-server.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/upstox/quotes/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /<TradingDashboard \/>/);
   assert.match(dashboard, /papertrade-orders/);
   assert.match(dashboard, /Fibonacci/);
+  assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /CandlestickSeries/);
+  assert.match(chart, /api\/upstox\/candles/);
+  assert.match(serverAdapter, /process\.env\.UPSTOX_ACCESS_TOKEN/);
+  assert.doesNotMatch(dashboard, /name="accessToken"/);
+  assert.match(quoteRoute, /Cache-Control.*no-store/);
   assert.match(readme, /Lightweight Charts/);
   await access(new URL("../public/papertrade-social.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));

@@ -10,7 +10,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ema, generateCandles, rsi, timeframes, type Candle, type Instrument } from "@/lib/market";
 
 export type DrawingTool =
@@ -24,6 +24,12 @@ export type DrawingTool =
   | "range"
   | "long"
   | "short";
+
+export type FeedStatus = {
+  mode: "loading" | "live" | "simulated" | "error";
+  message: string;
+  updatedAt?: string;
+};
 
 type Point = { x: number; y: number };
 type Drawing = { id: number; tool: DrawingTool; points: Point[] };
@@ -120,6 +126,7 @@ export function MarketChart({
   magnet,
   hiddenDrawings,
   onPrice,
+  onFeedStatus,
 }: {
   instrument: Instrument;
   timeframe: string;
@@ -127,6 +134,7 @@ export function MarketChart({
   magnet: boolean;
   hiddenDrawings: boolean;
   onPrice: (value: number) => void;
+  onFeedStatus: (status: FeedStatus) => void;
 }) {
   const chartHost = useRef<HTMLDivElement>(null);
   const rsiHost = useRef<HTMLDivElement>(null);
@@ -138,7 +146,8 @@ export function MarketChart({
   const dataRef = useRef<Candle[]>([]);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [draft, setDraft] = useState<Point[]>([]);
-  const chartData = useMemo(() => generateCandles(instrument, timeframe), [instrument, timeframe]);
+  const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
+  const [seriesData, setSeriesData] = useState<Candle[]>(() => generateCandles(instrument, timeframe));
 
   useEffect(() => {
     if (!chartHost.current || !rsiHost.current) return;
@@ -193,16 +202,61 @@ export function MarketChart({
   }, []);
 
   useEffect(() => {
-    dataRef.current = chartData;
-    candleSeries.current?.setData(chartData);
-    ema5Series.current?.setData(ema(chartData, 5));
-    ema21Series.current?.setData(ema(chartData, 21));
-    rsiSeries.current?.setData(rsi(chartData, 14));
+    dataRef.current = seriesData;
+    candleSeries.current?.setData(seriesData);
+    ema5Series.current?.setData(ema(seriesData, 5));
+    ema21Series.current?.setData(ema(seriesData, 21));
+    rsiSeries.current?.setData(rsi(seriesData, 14));
     chartApi.current?.timeScale().fitContent();
-    onPrice(chartData.at(-1)?.close ?? instrument.price);
-  }, [chartData, instrument.price, onPrice]);
+    onPrice(seriesData.at(-1)?.close ?? instrument.price);
+  }, [seriesData, instrument.price, onPrice]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    onFeedStatus({ mode: "loading", message: "Connecting to Upstox…" });
+
+    async function loadUpstoxCandles() {
+      try {
+        const params = new URLSearchParams({
+          instrumentKey: instrument.instrumentKey,
+          timeframe,
+        });
+        const response = await fetch(`/api/upstox/candles?${params}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json() as {
+          ok?: boolean;
+          candles?: Candle[];
+          fetchedAt?: string;
+          error?: { message?: string };
+        };
+        if (!response.ok || !payload.ok || !payload.candles?.length) {
+          throw new Error(payload.error?.message ?? "Upstox candles are unavailable.");
+        }
+        setSeriesData(payload.candles);
+        setFeedMode("live");
+        onFeedStatus({
+          mode: "live",
+          message: "Upstox market data",
+          updatedAt: payload.fetchedAt,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setFeedMode("simulated");
+        onFeedStatus({
+          mode: "simulated",
+          message: error instanceof Error ? `${error.message} Using simulation.` : "Using simulated market data.",
+        });
+      }
+    }
+
+    void loadUpstoxCandles();
+    return () => controller.abort();
+  }, [instrument.instrumentKey, onFeedStatus, timeframe]);
+
+  useEffect(() => {
+    if (feedMode !== "simulated") return;
     const interval = window.setInterval(() => {
       const source = dataRef.current;
       if (!source.length) return;
@@ -237,7 +291,83 @@ export function MarketChart({
       onPrice(live.at(-1)?.close ?? instrument.price);
     }, 1400);
     return () => window.clearInterval(interval);
-  }, [instrument.price, onPrice, timeframe]);
+  }, [feedMode, instrument.price, onPrice, timeframe]);
+
+  useEffect(() => {
+    if (feedMode !== "live") return;
+    const controller = new AbortController();
+
+    async function pollQuote() {
+      try {
+        const response = await fetch(
+          `/api/upstox/quotes?keys=${encodeURIComponent(instrument.instrumentKey)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        const payload = await response.json() as {
+          ok?: boolean;
+          fetchedAt?: string;
+          quotes?: Record<string, { lastPrice?: number; updatedAt?: string }>;
+          error?: { message?: string };
+        };
+        const quote = payload.quotes?.[instrument.symbol];
+        const price = Number(quote?.lastPrice);
+        if (!response.ok || !payload.ok || !Number.isFinite(price)) {
+          throw new Error(payload.error?.message ?? "Upstox quote refresh failed.");
+        }
+
+        const source = dataRef.current;
+        if (!source.length) return;
+        const last = source[source.length - 1];
+        const quoteTime = Math.floor(new Date(quote?.updatedAt ?? payload.fetchedAt ?? Date.now()).getTime() / 1000);
+        const step = timeframes[timeframe] ?? 300;
+        const bucket = Math.floor(quoteTime / step) * step;
+        let nextData: Candle[];
+        let updated: Candle;
+        if (bucket > Number(last.time)) {
+          updated = {
+            time: bucket as UTCTimestamp,
+            open: last.close,
+            high: Math.max(last.close, price),
+            low: Math.min(last.close, price),
+            close: price,
+          };
+          nextData = [...source, updated];
+        } else {
+          updated = {
+            ...last,
+            high: Math.max(last.high, price),
+            low: Math.min(last.low, price),
+            close: price,
+          };
+          nextData = [...source.slice(0, -1), updated];
+        }
+        dataRef.current = nextData;
+        candleSeries.current?.update(updated);
+        ema5Series.current?.setData(ema(nextData, 5));
+        ema21Series.current?.setData(ema(nextData, 21));
+        rsiSeries.current?.setData(rsi(nextData, 14));
+        onPrice(price);
+        onFeedStatus({
+          mode: "live",
+          message: "Upstox market data",
+          updatedAt: payload.fetchedAt,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        onFeedStatus({
+          mode: "error",
+          message: error instanceof Error ? error.message : "Upstox quote refresh failed.",
+        });
+      }
+    }
+
+    void pollQuote();
+    const interval = window.setInterval(() => void pollQuote(), 5_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [feedMode, instrument.instrumentKey, instrument.symbol, onFeedStatus, onPrice, timeframe]);
 
   function addPoint(event: React.PointerEvent<SVGSVGElement>) {
     if (activeTool === "cursor") return;
