@@ -1,14 +1,15 @@
 # PaperTrade IN
 
-A responsive Indian-market paper-trading simulator built with Next.js, vinext and TradingView Lightweight Charts.
+A responsive Indian-market paper-trading simulator built with Next.js, vinext and KLineChart.
 
 ## Features
 
-- Dynamic candlestick chart with pan, mouse-wheel/pinch zoom, crosshair, right-side INR price scale and bottom time scale
+- Dynamic KLineChart candlesticks with pan, mouse-wheel/pinch zoom, crosshair, right-side INR price scale and bottom time scale
+- Dedicated `/chart` workspace with symbol search, full-screen mode, ranges, live Indian time and quick paper buy/sell
 - Authenticated Upstox candles and quote snapshots for 1m, 5m, 15m, 1H, 3H, 4H and 1D intervals
 - EMA 5, EMA 21 and RSI 14 (no volume)
 - Trend line, horizontal line/ray, parallel channel, rectangle with midline, Fibonacci, price range and long/short drawing tools
-- Magnet, hide-drawings and delete-drawings controls
+- Native zoom-synchronised drawings with magnet, lock, hide, undo, redo and delete controls
 - NIFTY 50, BANK NIFTY, NIFTY 500 and demo All NSE watchlists
 - Local INR paper orders, cash balance and order book
 - Server-only Upstox access-token handling with visible live/fallback feed status
@@ -40,4 +41,4 @@ The server merges Upstox historical candles with the official current-trading-da
 
 ## Attribution
 
-Charts use the open-source [Lightweight Charts](https://github.com/tradingview/lightweight-charts) library by TradingView under its Apache 2.0 license.
+Charts use the open-source [KLineChart](https://github.com/klinecharts/KLineChart) library under its Apache 2.0 license.

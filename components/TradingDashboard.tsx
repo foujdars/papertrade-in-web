@@ -3,7 +3,7 @@
 import {
   Activity, BarChart3, Bell, Bot, BoxSelect, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
-  Magnet, Menu, Minus, MousePointer2, PanelLeftClose, Plus, Radio, Ruler,
+  Magnet, Maximize2, Menu, Minus, MousePointer2, PanelLeftClose, Plus, Radio, Ruler,
   Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
   TrendingDown, TrendingUp, UserRound, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -105,6 +105,7 @@ export function TradingDashboard() {
   const [timeframe, setTimeframe] = useState("5m");
   const [livePrice, setLivePrice] = useState(selected.price);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [toolSignal, setToolSignal] = useState(0);
   const [magnet, setMagnet] = useState(true);
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
   const [clearSignal, setClearSignal] = useState(0);
@@ -267,18 +268,22 @@ export function TradingDashboard() {
             <span className="control-divider" />
             <button className="control-button"><Activity size={16} /> Indicators <span className="pill-count">3</span></button>
             <button className="control-button"><BarChart3 size={16} /> Candles</button>
-            <div className="chart-right-controls"><button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button><button className="icon-button" aria-label="Chart settings"><Settings size={17} /></button></div>
+            <div className="chart-right-controls">
+              <a className="control-button advanced-chart-link" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} target="_blank" rel="noreferrer"><Maximize2 size={16} /> Advanced chart</a>
+              <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
+              <button className="icon-button" aria-label="Chart settings"><Settings size={17} /></button>
+            </div>
           </div>
 
           <div className="chart-body">
             <div className="drawing-toolbar" aria-label="Drawing tools">
-              {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => setActiveTool(id)} aria-label={label} title={label}><Icon size={18} /></button>)}
+              {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
               <span />
               <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
               <button className={hiddenDrawings ? "active" : ""} onClick={() => setHiddenDrawings((value) => !value)} aria-label="Hide drawings" title="Hide drawings">{hiddenDrawings ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
-            <MarketChart key={`${selected.symbol}-${timeframe}-${clearSignal}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} magnet={magnet} hiddenDrawings={hiddenDrawings} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>

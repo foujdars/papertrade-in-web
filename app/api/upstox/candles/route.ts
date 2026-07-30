@@ -1,4 +1,3 @@
-import type { UTCTimestamp } from "lightweight-charts";
 import { ALLOWED_UPSTOX_KEYS } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
@@ -11,7 +10,7 @@ type UpstoxCandlePayload = {
 };
 
 type ChartCandle = {
-  time: UTCTimestamp;
+  time: number;
   open: number;
   high: number;
   low: number;
@@ -43,7 +42,7 @@ function indiaDate(offsetDays = 0) {
 function normalizeCandles(payload: UpstoxCandlePayload): ChartCandle[] {
   return (payload.data?.candles ?? [])
     .map((item) => ({
-      time: Math.floor(new Date(item[0]).getTime() / 1000) as UTCTimestamp,
+      time: Math.floor(new Date(item[0]).getTime() / 1000),
       open: Number(item[1]),
       high: Number(item[2]),
       low: Number(item[3]),

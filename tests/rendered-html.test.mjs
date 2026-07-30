@@ -20,7 +20,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
 
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
-  assert.match(html, /Interactive candlestick chart/);
+  assert.match(html, /Interactive KLineChart candlestick chart/);
   assert.match(html, /EMA 5/);
   assert.match(html, /EMA 21/);
   assert.match(html, /RSI 14/);
@@ -44,7 +44,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /papertrade-orders/);
   assert.match(dashboard, /Fibonacci/);
   assert.match(dashboard, /Upstox market data/);
-  assert.match(chart, /CandlestickSeries/);
+  assert.match(chart, /import\("klinecharts"\)/);
+  assert.match(chart, /createOverlay/);
   assert.match(chart, /api\/upstox\/candles/);
   assert.match(chart, /scope: "intraday"/);
   assert.doesNotMatch(chart, /open: last\.close/);
@@ -53,7 +54,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(candleRoute, /Promise\.allSettled/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
-  assert.match(readme, /Lightweight Charts/);
+  assert.match(readme, /KLineChart/);
   await access(new URL("../public/papertrade-social.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });

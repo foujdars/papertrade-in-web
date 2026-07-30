@@ -1,19 +1,15 @@
 "use client";
 
-import {
-  CandlestickSeries,
-  ColorType,
-  createChart,
-  LineSeries,
-  LineStyle,
-  TickMarkType,
-  type IChartApi,
-  type ISeriesApi,
-  type Time,
-  type UTCTimestamp,
-} from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
-import { ema, generateCandles, rsi, timeframes, type Candle, type Instrument } from "@/lib/market";
+import type {
+  Chart,
+  DeepPartial,
+  KLineData,
+  OverlayCreate,
+  OverlayEvent,
+  Styles,
+} from "klinecharts";
+import { generateCandles, timeframes, type Candle, type Instrument } from "@/lib/market";
 
 export type DrawingTool =
   | "cursor"
@@ -33,49 +29,273 @@ export type FeedStatus = {
   updatedAt?: string;
 };
 
-type Point = { x: number; y: number };
-type Drawing = { id: number; tool: DrawingTool; points: Point[] };
+type KLineModule = typeof import("klinecharts");
 
-const twoPointTools: DrawingTool[] = ["trend", "ray", "rectangle", "fib", "range", "long", "short"];
+let paperOverlaysRegistered = false;
 
-function timeToDate(time: Time) {
-  if (typeof time === "number") return new Date(time * 1_000);
-  if (typeof time === "string") return new Date(time);
-  return new Date(Date.UTC(time.year, time.month - 1, time.day));
+const chartStyles: DeepPartial<Styles> = {
+  grid: {
+    show: true,
+    horizontal: { show: true, color: "#edf0f6", style: "dashed", size: 1, dashedValue: [3, 3] },
+    vertical: { show: true, color: "#edf0f6", style: "dashed", size: 1, dashedValue: [3, 3] },
+  },
+  candle: {
+    type: "candle_solid",
+    bar: {
+      upColor: "#00a67e",
+      downColor: "#f04458",
+      noChangeColor: "#8b93a6",
+      upBorderColor: "#00a67e",
+      downBorderColor: "#f04458",
+      noChangeBorderColor: "#8b93a6",
+      upWickColor: "#00a67e",
+      downWickColor: "#f04458",
+      noChangeWickColor: "#8b93a6",
+    },
+    priceMark: {
+      high: { show: true, color: "#6b748a", textOffset: 5, textSize: 10, textFamily: "Inter", textWeight: "500" },
+      low: { show: true, color: "#6b748a", textOffset: 5, textSize: 10, textFamily: "Inter", textWeight: "500" },
+      last: {
+        show: true,
+        line: { show: true, style: "dashed", size: 1, dashedValue: [4, 3] },
+        text: {
+          show: true,
+          color: "#ffffff",
+          size: 11,
+          family: "Inter",
+          weight: 700,
+          borderStyle: "solid",
+          borderDashedValue: [],
+          borderSize: 0,
+          borderColor: "transparent",
+          borderRadius: 2,
+        },
+      },
+    },
+    tooltip: {
+      showRule: "follow_cross",
+      showType: "standard",
+      title: { show: true, color: "#20263b", size: 12, family: "Inter", weight: 700, marginLeft: 0, marginTop: 0, marginRight: 12, marginBottom: 8, template: "{ticker} · {period}" },
+      legend: { color: "#65708a", size: 11, family: "Inter", weight: 600, marginLeft: 0, marginTop: 0, marginRight: 8, marginBottom: 0, defaultValue: "--", template: [] },
+      features: [],
+    },
+  },
+  indicator: {
+    lastValueMark: {
+      show: true,
+      text: {
+        show: true,
+        color: "#ffffff",
+        size: 10,
+        family: "Inter",
+        weight: 700,
+        borderStyle: "solid",
+        borderDashedValue: [],
+        borderSize: 0,
+        borderColor: "transparent",
+        borderRadius: 2,
+      },
+    },
+  },
+  xAxis: {
+    show: true,
+    size: "auto",
+    axisLine: { show: true, color: "#dfe3ec", size: 1 },
+    tickLine: { show: true, color: "#dfe3ec", size: 1, length: 3 },
+    tickText: { show: true, color: "#65708a", size: 11, family: "Inter", weight: 600, marginStart: 6, marginEnd: 4 },
+  },
+  yAxis: {
+    show: true,
+    size: "auto",
+    axisLine: { show: true, color: "#dfe3ec", size: 1 },
+    tickLine: { show: true, color: "#dfe3ec", size: 1, length: 3 },
+    tickText: { show: true, color: "#65708a", size: 11, family: "Inter", weight: 500, marginStart: 6, marginEnd: 6 },
+  },
+  separator: { size: 1, color: "#e5e8f0", fill: true, activeBackgroundColor: "#d9d4ff" },
+  crosshair: {
+    show: true,
+    horizontal: {
+      show: true,
+      line: { show: true, color: "#8c96aa", style: "dashed", size: 1, dashedValue: [4, 3] },
+      text: {
+        show: true,
+        color: "#ffffff",
+        size: 11,
+        family: "Inter",
+        weight: 650,
+        borderStyle: "solid",
+        borderDashedValue: [],
+        borderSize: 0,
+        borderColor: "#252b3d",
+        borderRadius: 2,
+        backgroundColor: "#252b3d",
+        paddingLeft: 5,
+        paddingTop: 3,
+        paddingRight: 5,
+        paddingBottom: 3,
+      },
+      features: [],
+    },
+    vertical: {
+      show: true,
+      line: { show: true, color: "#8c96aa", style: "dashed", size: 1, dashedValue: [4, 3] },
+      text: {
+        show: true,
+        color: "#ffffff",
+        size: 11,
+        family: "Inter",
+        weight: 650,
+        borderStyle: "solid",
+        borderDashedValue: [],
+        borderSize: 0,
+        borderColor: "#252b3d",
+        borderRadius: 2,
+        backgroundColor: "#252b3d",
+        paddingLeft: 5,
+        paddingTop: 3,
+        paddingRight: 5,
+        paddingBottom: 3,
+      },
+    },
+  },
+  overlay: {
+    point: {
+      color: "#ffffff",
+      borderColor: "#6b5cff",
+      borderSize: 2,
+      radius: 4,
+      activeColor: "#ffffff",
+      activeBorderColor: "#5b4be8",
+      activeBorderSize: 3,
+      activeRadius: 5,
+    },
+    line: { color: "#6b5cff", style: "solid", size: 2, dashedValue: [5, 4], smooth: false },
+    rect: { style: "stroke_fill", color: "#6b5cff16", borderColor: "#6b5cff", borderSize: 1, borderStyle: "solid", borderDashedValue: [], borderRadius: 0 },
+    text: {
+      style: "fill",
+      color: "#ffffff",
+      size: 11,
+      family: "Inter",
+      weight: 700,
+      borderStyle: "solid",
+      borderDashedValue: [],
+      borderSize: 0,
+      borderColor: "transparent",
+      borderRadius: 3,
+      backgroundColor: "#6b5cff",
+      paddingLeft: 5,
+      paddingTop: 3,
+      paddingRight: 5,
+      paddingBottom: 3,
+    },
+  },
+};
+
+function registerPaperOverlays(kline: KLineModule) {
+  if (paperOverlaysRegistered) return;
+
+  kline.registerOverlay({
+    name: "paperRectangle",
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    mode: "weak_magnet",
+    modeSensitivity: 8,
+    createPointFigures: ({ coordinates }) => {
+      if (coordinates.length < 2) return [];
+      const [a, b] = coordinates;
+      const x = Math.min(a.x, b.x);
+      const y = Math.min(a.y, b.y);
+      const width = Math.abs(a.x - b.x);
+      const height = Math.abs(a.y - b.y);
+      return [
+        { type: "rect", attrs: { x, y, width, height } },
+        {
+          type: "line",
+          attrs: { coordinates: [{ x, y: y + height / 2 }, { x: x + width, y: y + height / 2 }] },
+          styles: { style: "dashed", dashedValue: [5, 4], color: "#6b5cff", size: 1 },
+        },
+      ];
+    },
+  });
+
+  kline.registerOverlay({
+    name: "paperPriceRange",
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    mode: "weak_magnet",
+    modeSensitivity: 8,
+    createPointFigures: ({ coordinates, overlay }) => {
+      if (coordinates.length < 2) return [];
+      const [a, b] = coordinates;
+      const first = Number(overlay.points[0]?.value);
+      const second = Number(overlay.points[1]?.value);
+      const percent = Number.isFinite(first) && first !== 0 && Number.isFinite(second)
+        ? `${second >= first ? "+" : ""}${(((second - first) / first) * 100).toFixed(2)}%`
+        : "Price range";
+      return [
+        { type: "line", attrs: { coordinates: [a, b] }, styles: { color: "#6b5cff", size: 2 } },
+        { type: "line", attrs: { coordinates: [{ x: a.x - 7, y: a.y }, { x: a.x + 7, y: a.y }] }, styles: { color: "#6b5cff", size: 1 } },
+        { type: "line", attrs: { coordinates: [{ x: b.x - 7, y: b.y }, { x: b.x + 7, y: b.y }] }, styles: { color: "#6b5cff", size: 1 } },
+        { type: "text", attrs: { x: b.x + 9, y: (a.y + b.y) / 2, text: percent, baseline: "middle" } },
+      ];
+    },
+  });
+
+  const registerPosition = (name: string, label: string, color: string, long: boolean) => {
+    kline.registerOverlay({
+      name,
+      totalStep: 3,
+      needDefaultPointFigure: true,
+      needDefaultXAxisFigure: true,
+      needDefaultYAxisFigure: true,
+      mode: "weak_magnet",
+      modeSensitivity: 8,
+      createPointFigures: ({ coordinates }) => {
+        if (coordinates.length < 2) return [];
+        const [a, b] = coordinates;
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        const width = Math.abs(a.x - b.x);
+        const height = Math.abs(a.y - b.y);
+        const middleY = long ? y + height * 0.62 : y + height * 0.38;
+        return [
+          {
+            type: "rect",
+            attrs: { x, y, width, height },
+            styles: { style: "stroke_fill", color: `${color}18`, borderColor: color, borderSize: 1 },
+          },
+          {
+            type: "line",
+            attrs: { coordinates: [{ x, y: middleY }, { x: x + width, y: middleY }] },
+            styles: { color, size: 1, style: "dashed", dashedValue: [5, 3] },
+          },
+          {
+            type: "text",
+            attrs: { x: x + 6, y: y + 7, text: label, baseline: "top" },
+            styles: { backgroundColor: color, color: "#ffffff" },
+          },
+        ];
+      },
+    });
+  };
+
+  registerPosition("paperLongPosition", "LONG", "#00a67e", true);
+  registerPosition("paperShortPosition", "SHORT", "#f04458", false);
+  paperOverlaysRegistered = true;
 }
 
-function indiaChartTime(time: Time, daily: boolean) {
-  const date = timeToDate(time);
-  const day = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-  }).format(date).replace(/ (\d{2})$/, " '$1");
-  if (daily) return day;
-  const clock = new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-  return `${day} ${clock}`;
-}
-
-function indiaTickMark(time: Time, tickMarkType: TickMarkType, daily: boolean) {
-  if (daily || tickMarkType <= TickMarkType.DayOfMonth) {
-    return new Intl.DateTimeFormat("en-IN", {
-      timeZone: "Asia/Kolkata",
-      day: "2-digit",
-      month: "short",
-    }).format(timeToDate(time));
-  }
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(timeToDate(time));
+function toKLineData(candle: Candle): KLineData {
+  return {
+    timestamp: Number(candle.time) * 1_000,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+  };
 }
 
 function mergeSeries(existing: Candle[], incoming: Candle[]) {
@@ -86,203 +306,236 @@ function mergeSeries(existing: Candle[], incoming: Candle[]) {
     .slice(-1_600);
 }
 
-function DrawingShape({ drawing }: { drawing: Drawing }) {
-  const [a, b = a, c = b] = drawing.points;
-  const stroke = drawing.tool === "short" ? "#f04458" : drawing.tool === "long" ? "#00a67e" : "#6b5cff";
-  const x1 = `${a.x}%`;
-  const y1 = `${a.y}%`;
-  const x2 = `${b.x}%`;
-  const y2 = `${b.y}%`;
+function periodFor(timeframe: string) {
+  if (timeframe === "1D") return { type: "day" as const, span: 1 };
+  if (timeframe.endsWith("H")) return { type: "hour" as const, span: Number(timeframe.replace("H", "")) || 1 };
+  return { type: "minute" as const, span: Number(timeframe.replace("m", "")) || 5 };
+}
 
-  if (drawing.tool === "horizontal") {
-    return <line x1="0" y1={y1} x2="100%" y2={y1} stroke={stroke} strokeWidth="1.5" />;
-  }
-  if (drawing.tool === "ray") {
-    return <line x1={x1} y1={y1} x2="100%" y2={y2} stroke={stroke} strokeWidth="1.5" />;
-  }
-  if (drawing.tool === "trend") {
-    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth="2" />;
-  }
-  if (drawing.tool === "rectangle") {
-    const left = Math.min(a.x, b.x);
-    const top = Math.min(a.y, b.y);
-    const width = Math.abs(a.x - b.x);
-    const height = Math.abs(a.y - b.y);
-    return (
-      <>
-        <rect x={`${left}%`} y={`${top}%`} width={`${width}%`} height={`${height}%`} fill="#6b5cff18" stroke={stroke} strokeWidth="1.5" />
-        <line x1={`${left}%`} y1={`${top + height / 2}%`} x2={`${left + width}%`} y2={`${top + height / 2}%`} stroke={stroke} strokeDasharray="5 4" />
-      </>
-    );
-  }
-  if (drawing.tool === "channel") {
-    const dx = c.x - b.x;
-    const dy = c.y - b.y;
-    return (
-      <>
-        <polygon points={`${a.x},${a.y} ${b.x},${b.y} ${b.x + dx},${b.y + dy} ${a.x + dx},${a.y + dy}`} fill="#6b5cff12" stroke="none" vectorEffect="non-scaling-stroke" transform="scale(1)" />
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth="1.5" />
-        <line x1={`${a.x + dx}%`} y1={`${a.y + dy}%`} x2={`${b.x + dx}%`} y2={`${b.y + dy}%`} stroke={stroke} strokeWidth="1.5" />
-      </>
-    );
-  }
-  if (drawing.tool === "fib") {
-    const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
-    return (
-      <>
-        {levels.map((level) => {
-          const y = a.y + (b.y - a.y) * level;
-          return (
-            <g key={level}>
-              <line x1={x1} y1={`${y}%`} x2={x2} y2={`${y}%`} stroke={level === 0.618 ? "#f59e0b" : stroke} strokeWidth="1" />
-              <text x={`${Math.min(a.x, b.x) + 0.4}%`} y={`${y - 0.5}%`} fontSize="10" fill="#536079">{level}</text>
-            </g>
-          );
-        })}
-      </>
-    );
-  }
-  if (drawing.tool === "range") {
-    return (
-      <>
-        <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={stroke} strokeWidth="1.5" />
-        <line x1={`${a.x - 1}%`} y1={y1} x2={`${a.x + 1}%`} y2={y1} stroke={stroke} />
-        <line x1={`${a.x - 1}%`} y1={y2} x2={`${a.x + 1}%`} y2={y2} stroke={stroke} />
-        <text x={`${a.x + 1.2}%`} y={`${(a.y + b.y) / 2}%`} fontSize="11" fill={stroke}>{Math.abs(a.y - b.y).toFixed(1)}%</text>
-      </>
-    );
-  }
-  if (drawing.tool === "long" || drawing.tool === "short") {
-    const left = Math.min(a.x, b.x);
-    const top = Math.min(a.y, b.y);
-    const width = Math.abs(a.x - b.x);
-    const height = Math.abs(a.y - b.y);
-    const mid = drawing.tool === "long" ? top + height * 0.63 : top + height * 0.37;
-    return (
-      <>
-        <rect x={`${left}%`} y={`${top}%`} width={`${width}%`} height={`${height}%`} fill={`${stroke}14`} stroke={stroke} strokeWidth="1.5" />
-        <line x1={`${left}%`} y1={`${mid}%`} x2={`${left + width}%`} y2={`${mid}%`} stroke={stroke} strokeDasharray="5 3" />
-        <text x={`${left + 0.6}%`} y={`${top + 4}%`} fontSize="11" fontWeight="700" fill={stroke}>{drawing.tool === "long" ? "LONG" : "SHORT"}</text>
-      </>
-    );
-  }
-  return null;
+const overlayNames: Partial<Record<DrawingTool, string>> = {
+  trend: "segment",
+  horizontal: "horizontalStraightLine",
+  ray: "horizontalRayLine",
+  channel: "priceChannelLine",
+  rectangle: "paperRectangle",
+  fib: "fibonacciLine",
+  range: "paperPriceRange",
+  long: "paperLongPosition",
+  short: "paperShortPosition",
+};
+
+function snapshotOverlay(event: OverlayEvent<unknown>): OverlayCreate {
+  return {
+    name: event.overlay.name,
+    groupId: "papertrade",
+    points: event.overlay.points.map((point) => ({
+      timestamp: point.timestamp,
+      dataIndex: point.dataIndex,
+      value: point.value,
+    })),
+    mode: event.overlay.mode,
+    modeSensitivity: event.overlay.modeSensitivity,
+    visible: true,
+  };
 }
 
 export function MarketChart({
   instrument,
   timeframe,
   activeTool,
+  toolSignal = 0,
   magnet,
   hiddenDrawings,
+  lockedDrawings = false,
+  clearSignal = 0,
+  undoSignal = 0,
+  redoSignal = 0,
+  visibleBars = 155,
   onPrice,
   onFeedStatus,
 }: {
   instrument: Instrument;
   timeframe: string;
   activeTool: DrawingTool;
+  toolSignal?: number;
   magnet: boolean;
   hiddenDrawings: boolean;
+  lockedDrawings?: boolean;
+  clearSignal?: number;
+  undoSignal?: number;
+  redoSignal?: number;
+  visibleBars?: number;
   onPrice: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
   const chartHost = useRef<HTMLDivElement>(null);
-  const rsiHost = useRef<HTMLDivElement>(null);
-  const chartApi = useRef<IChartApi | null>(null);
-  const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const ema5Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema21Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const rsiSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const dataRef = useRef<Candle[]>([]);
-  const viewportInitialized = useRef(false);
-  const [drawings, setDrawings] = useState<Drawing[]>([]);
-  const [draft, setDraft] = useState<Point[]>([]);
+  const chartApi = useRef<Chart | null>(null);
+  const [initialCandles] = useState<Candle[]>(() => generateCandles(instrument, timeframe, 420));
+  const dataRef = useRef<Candle[]>(initialCandles);
+  const streamCallback = useRef<((data: KLineData) => void) | null>(null);
+  const historyRef = useRef<OverlayCreate[]>([]);
+  const redoRef = useRef<OverlayCreate[]>([]);
+  const previousClear = useRef(clearSignal);
+  const previousUndo = useRef(undoSignal);
+  const previousRedo = useRef(redoSignal);
+  const initialVisibleBars = useRef(visibleBars);
+  const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
-  const [seriesData, setSeriesData] = useState<Candle[]>(() => generateCandles(instrument, timeframe));
 
   useEffect(() => {
-    if (!chartHost.current || !rsiHost.current) return;
-    const common = {
-      layout: { background: { type: ColorType.Solid, color: "#ffffff" }, textColor: "#65708a", fontFamily: "Inter, Arial, sans-serif", fontSize: 11 },
-      localization: {
-        locale: "en-IN",
-        timeFormatter: (time: Time) => indiaChartTime(time, timeframe === "1D"),
-      },
-      grid: { vertLines: { color: "#eef1f7" }, horzLines: { color: "#eef1f7" } },
-      rightPriceScale: { borderColor: "#e6e9f2", minimumWidth: 64 },
-      timeScale: {
-        borderColor: "#e6e9f2",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 8,
-        barSpacing: 7,
-        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) => indiaTickMark(time, tickMarkType, timeframe === "1D"),
-      },
-      crosshair: { vertLine: { color: "#98a2b7", style: LineStyle.Dashed }, horzLine: { color: "#98a2b7", style: LineStyle.Dashed } },
-      handleScroll: true,
-      handleScale: true,
-    } as const;
-    const chart = createChart(chartHost.current, { ...common, height: chartHost.current.clientHeight });
-    const candles = chart.addSeries(CandlestickSeries, {
-      upColor: "#00a67e",
-      downColor: "#f04458",
-      wickUpColor: "#00a67e",
-      wickDownColor: "#f04458",
-      borderVisible: false,
-      priceLineColor: "#6b5cff",
-      lastValueVisible: true,
-    });
-    const fast = chart.addSeries(LineSeries, { color: "#ff6d00", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-    const slow = chart.addSeries(LineSeries, { color: "#4caf50", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-    const rsiChart = createChart(rsiHost.current, {
-      ...common,
-      height: rsiHost.current.clientHeight,
-      rightPriceScale: { ...common.rightPriceScale, scaleMargins: { top: 0.08, bottom: 0.08 } },
-    });
-    const momentum = rsiChart.addSeries(LineSeries, { color: "#7c4dff", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-    momentum.createPriceLine({ price: 70, color: "#f0445870", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "70" });
-    momentum.createPriceLine({ price: 30, color: "#00a67e70", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "30" });
-    chartApi.current = chart;
-    candleSeries.current = candles;
-    ema5Series.current = fast;
-    ema21Series.current = slow;
-    rsiSeries.current = momentum;
+    if (!chartHost.current) return;
+    const host = chartHost.current;
+    let cancelled = false;
+    let observer: ResizeObserver | null = null;
+    let klineModule: KLineModule | null = null;
 
-    const resize = () => {
-      if (!chartHost.current || !rsiHost.current) return;
-      chart.resize(chartHost.current.clientWidth, chartHost.current.clientHeight);
-      rsiChart.resize(rsiHost.current.clientWidth, rsiHost.current.clientHeight);
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(chartHost.current);
-    observer.observe(rsiHost.current);
-    return () => {
-      observer.disconnect();
-      chart.remove();
-      rsiChart.remove();
-    };
-  }, [timeframe]);
+    void import("klinecharts").then((kline) => {
+      if (cancelled) return;
+      klineModule = kline;
+      registerPaperOverlays(kline);
+      const chart = kline.init(host, {
+        locale: "en-US",
+        timezone: "Asia/Kolkata",
+        styles: chartStyles,
+        zoomAnchor: "cursor",
+        layout: {
+          barSpaceLimit: { min: 2, max: 40 },
+          pane: { minHeight: 86, dragEnabled: true },
+          yAxis: { position: "right", inside: false, scrollZoomEnabled: true, gap: { top: 0.12, bottom: 0.12 } },
+        },
+      });
+      if (!chart) return;
 
-  useEffect(() => {
-    dataRef.current = seriesData;
-    candleSeries.current?.setData(seriesData);
-    ema5Series.current?.setData(ema(seriesData, 5));
-    ema21Series.current?.setData(ema(seriesData, 21));
-    rsiSeries.current?.setData(rsi(seriesData, 14));
-    if (!viewportInitialized.current) {
-      const visibleBars = timeframe === "1D" ? 120 : timeframe.endsWith("H") ? 100 : 155;
-      if (seriesData.length > visibleBars) {
-        chartApi.current?.timeScale().setVisibleLogicalRange({
-          from: seriesData.length - visibleBars,
-          to: seriesData.length + 8,
-        });
-      } else {
-        chartApi.current?.timeScale().fitContent();
+      chartApi.current = chart;
+      chart.setOffsetRightDistance(78);
+      chart.setDataLoader({
+        getBars: ({ type, callback }) => {
+          if (type === "init") {
+            callback(dataRef.current.map(toKLineData), { forward: false, backward: false });
+          } else {
+            callback([], { forward: false, backward: false });
+          }
+        },
+        subscribeBar: ({ callback }) => {
+          streamCallback.current = callback;
+        },
+        unsubscribeBar: () => {
+          streamCallback.current = null;
+        },
+      });
+      chart.setSymbol({ ticker: `${instrument.symbol} · NSE`, pricePrecision: 2, volumePrecision: 0 });
+      chart.setPeriod(periodFor(timeframe));
+      chart.createIndicator({
+        name: "EMA",
+        shortName: "EMA 5 21",
+        paneId: "candle_pane",
+        calcParams: [5, 21],
+        precision: 2,
+        styles: {
+          lines: [
+            { color: "#0ea5e9", size: 2, style: "solid", dashedValue: [], smooth: false },
+            { color: "#ff8a00", size: 2, style: "solid", dashedValue: [], smooth: false },
+          ],
+        },
+      }, true);
+      const rsiId = chart.createIndicator({
+        name: "RSI",
+        shortName: "RSI 14",
+        calcParams: [14],
+        precision: 2,
+        minValue: 0,
+        maxValue: 100,
+        styles: {
+          lines: [{ color: "#7c4dff", size: 2, style: "solid", dashedValue: [], smooth: false }],
+        },
+      });
+      if (rsiId) {
+        const rsiIndicator = chart.getIndicators({ id: rsiId })[0];
+        if (rsiIndicator) chart.setPaneOptions({ id: rsiIndicator.paneId, height: 126, minHeight: 90, dragEnabled: true });
       }
-      viewportInitialized.current = true;
+
+      const width = Math.max(320, host.clientWidth - 86);
+      chart.setBarSpace(Math.max(2.4, Math.min(18, width / Math.max(30, initialVisibleBars.current))));
+      chart.scrollToRealTime();
+      observer = new ResizeObserver(() => chart.resize());
+      observer.observe(host);
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      streamCallback.current = null;
+      if (chartApi.current && klineModule) klineModule.dispose(chartApi.current);
+      chartApi.current = null;
+    };
+  }, [instrument.symbol, timeframe]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    const host = chartHost.current;
+    if (!chart || !host) return;
+    const width = Math.max(320, host.clientWidth - 86);
+    chart.setBarSpace(Math.max(2.4, Math.min(18, width / Math.max(30, visibleBars))));
+    chart.scrollToRealTime(180);
+  }, [visibleBars]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    const name = overlayNames[activeTool];
+    if (!chart || !name || activeTool === "cursor") return;
+    const onDrawEnd = (event: OverlayEvent<unknown>) => {
+      historyRef.current.push(snapshotOverlay(event));
+      redoRef.current = [];
+    };
+    chart.createOverlay({
+      name,
+      groupId: "papertrade",
+      mode: magnet ? "strong_magnet" : "normal",
+      modeSensitivity: 10,
+      visible: !hiddenDrawings,
+      lock: lockedDrawings,
+      onDrawEnd,
+    });
+  }, [activeTool, hiddenDrawings, lockedDrawings, magnet, toolSignal]);
+
+  useEffect(() => {
+    chartApi.current?.overrideOverlay({ groupId: "papertrade", visible: !hiddenDrawings });
+  }, [hiddenDrawings]);
+
+  useEffect(() => {
+    chartApi.current?.overrideOverlay({ groupId: "papertrade", lock: lockedDrawings });
+  }, [lockedDrawings]);
+
+  useEffect(() => {
+    if (clearSignal === previousClear.current) return;
+    previousClear.current = clearSignal;
+    chartApi.current?.removeOverlay({ groupId: "papertrade" });
+    historyRef.current = [];
+    redoRef.current = [];
+  }, [clearSignal]);
+
+  useEffect(() => {
+    if (undoSignal === previousUndo.current) return;
+    previousUndo.current = undoSignal;
+    const chart = chartApi.current;
+    const overlay = chart?.getOverlays({ groupId: "papertrade" }).at(-1);
+    const snapshot = historyRef.current.pop();
+    if (chart && overlay && snapshot) {
+      chart.removeOverlay({ id: overlay.id });
+      redoRef.current.push(snapshot);
     }
-    onPrice(seriesData.at(-1)?.close ?? instrument.price);
-  }, [seriesData, instrument.price, onPrice, timeframe]);
+  }, [undoSignal]);
+
+  useEffect(() => {
+    if (redoSignal === previousRedo.current) return;
+    previousRedo.current = redoSignal;
+    const chart = chartApi.current;
+    const snapshot = redoRef.current.pop();
+    if (chart && snapshot) {
+      chart.createOverlay(snapshot);
+      historyRef.current.push(snapshot);
+    }
+  }, [redoSignal]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -308,8 +561,12 @@ export function MarketChart({
         if (!response.ok || !payload.ok || !payload.candles?.length) {
           throw new Error(payload.error?.message ?? "Upstox candles are unavailable.");
         }
-        viewportInitialized.current = false;
-        setSeriesData(payload.candles);
+        dataRef.current = payload.candles;
+        const latest = payload.candles.at(-1);
+        setLatestCandle(latest);
+        if (latest) onPrice(latest.close);
+        chartApi.current?.resetData();
+        chartApi.current?.scrollToRealTime();
         setFeedMode("live");
         onFeedStatus({
           mode: "live",
@@ -330,7 +587,7 @@ export function MarketChart({
 
     void loadUpstoxCandles();
     return () => controller.abort();
-  }, [instrument.instrumentKey, onFeedStatus, timeframe]);
+  }, [instrument.instrumentKey, onFeedStatus, onPrice, timeframe]);
 
   useEffect(() => {
     if (feedMode !== "simulated") return;
@@ -345,30 +602,28 @@ export function MarketChart({
         high: Math.max(last.high, last.close + change),
         low: Math.min(last.low, last.close + change),
       };
-      const now = Math.floor(Date.now() / 1000);
+      const now = Math.floor(Date.now() / 1_000);
       const step = timeframes[timeframe] ?? 300;
       if (now >= Number(last.time) + step) {
-        const next: Candle = {
-          time: (Number(last.time) + step) as UTCTimestamp,
-          open: updated.close,
-          high: updated.close,
-          low: updated.close,
-          close: updated.close,
-        };
-        dataRef.current = [...source, next];
-        candleSeries.current?.update(next);
+        const close = updated.close;
+        dataRef.current = [...source, {
+          time: (Number(last.time) + step) as Candle["time"],
+          open: close,
+          high: close,
+          low: close,
+          close,
+        }];
       } else {
         dataRef.current = [...source.slice(0, -1), updated];
-        candleSeries.current?.update(updated);
       }
-      const live = dataRef.current;
-      ema5Series.current?.setData(ema(live, 5));
-      ema21Series.current?.setData(ema(live, 21));
-      rsiSeries.current?.setData(rsi(live, 14));
-      onPrice(live.at(-1)?.close ?? instrument.price);
-    }, 1400);
+      const latest = dataRef.current.at(-1);
+      if (!latest) return;
+      streamCallback.current?.(toKLineData(latest));
+      setLatestCandle(latest);
+      onPrice(latest.close);
+    }, 1_400);
     return () => window.clearInterval(interval);
-  }, [feedMode, instrument.price, onPrice, timeframe]);
+  }, [feedMode, onPrice, timeframe]);
 
   useEffect(() => {
     if (feedMode !== "live") return;
@@ -394,9 +649,13 @@ export function MarketChart({
         if (!response.ok || !payload.ok || !payload.candles?.length) {
           throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
         }
-
-        const merged = mergeSeries(dataRef.current, payload.candles);
-        setSeriesData(merged);
+        dataRef.current = mergeSeries(dataRef.current, payload.candles);
+        const latest = dataRef.current.at(-1);
+        if (latest) {
+          streamCallback.current?.(toKLineData(latest));
+          setLatestCandle(latest);
+          onPrice(latest.close);
+        }
         onFeedStatus({
           mode: "live",
           message: "Upstox historical + intraday candles",
@@ -416,7 +675,7 @@ export function MarketChart({
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [feedMode, instrument.instrumentKey, instrument.price, onFeedStatus, onPrice, timeframe]);
+  }, [feedMode, instrument.instrumentKey, onFeedStatus, onPrice, timeframe]);
 
   useEffect(() => {
     if (feedMode !== "live") return;
@@ -431,7 +690,7 @@ export function MarketChart({
         const payload = await response.json() as {
           ok?: boolean;
           fetchedAt?: string;
-          quotes?: Record<string, { lastPrice?: number; lastTradeAt?: string; updatedAt?: string }>;
+          quotes?: Record<string, { lastPrice?: number; lastTradeAt?: string }>;
           error?: { message?: string };
         };
         const quote = payload.quotes?.[instrument.symbol];
@@ -439,7 +698,6 @@ export function MarketChart({
         if (!response.ok || !payload.ok || !Number.isFinite(price)) {
           throw new Error(payload.error?.message ?? "Upstox quote refresh failed.");
         }
-
         onPrice(price);
         onFeedStatus({
           mode: "live",
@@ -463,43 +721,12 @@ export function MarketChart({
     };
   }, [feedMode, instrument.instrumentKey, instrument.symbol, onFeedStatus, onPrice]);
 
-  function addPoint(event: React.PointerEvent<SVGSVGElement>) {
-    if (activeTool === "cursor") return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    let x = ((event.clientX - rect.left) / rect.width) * 100;
-    let y = ((event.clientY - rect.top) / rect.height) * 100;
-    if (magnet) {
-      x = Math.round(x / 2) * 2;
-      y = Math.round(y / 2) * 2;
-    }
-    const next = [...draft, { x, y }];
-    const needed = activeTool === "horizontal" ? 1 : activeTool === "channel" ? 3 : twoPointTools.includes(activeTool) ? 2 : 2;
-    if (next.length >= needed) {
-      setDrawings((current) => [...current, { id: Date.now(), tool: activeTool, points: next }]);
-      setDraft([]);
-    } else {
-      setDraft(next);
-    }
-  }
-
-  const latestCandle = seriesData.at(-1);
-
   return (
-    <div className="chart-stack">
-      <div className="price-chart-wrap">
-        <div ref={chartHost} className="price-chart" aria-label="Interactive candlestick chart" />
-        <svg
-          className={`drawing-layer ${activeTool !== "cursor" ? "drawing-active" : ""}`}
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          onPointerDown={addPoint}
-          aria-label="Chart drawing layer"
-        >
-          {!hiddenDrawings && drawings.map((drawing) => <DrawingShape key={drawing.id} drawing={drawing} />)}
-          {draft.map((point, index) => <circle key={index} cx={`${point.x}%`} cy={`${point.y}%`} r="0.8" fill="#6b5cff" />)}
-        </svg>
-        <div className="chart-symbol-legend">
-          <b>{instrument.name.toUpperCase()} · {timeframe.replace("m", "")} · NSE</b>
+    <div className="chart-stack kline-stack">
+      <div className="price-chart-wrap kline-chart-wrap">
+        <div ref={chartHost} className="price-chart kline-chart" aria-label="Interactive KLineChart candlestick chart" />
+        <div className="chart-symbol-legend kline-symbol-legend">
+          <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
           {latestCandle && (
             <span>
               O <i>{latestCandle.open.toFixed(2)}</i>
@@ -509,14 +736,11 @@ export function MarketChart({
             </span>
           )}
         </div>
-        <div className="indicator-legend">
+        <div className="indicator-legend kline-indicator-legend">
           <span><i className="ema-fast" />EMA 5</span>
           <span><i className="ema-slow" />EMA 21</span>
+          <span><i className="rsi-color" />RSI 14</span>
         </div>
-      </div>
-      <div className="rsi-wrap">
-        <div className="rsi-label">RSI 14</div>
-        <div ref={rsiHost} className="rsi-chart" aria-label="RSI indicator" />
       </div>
     </div>
   );

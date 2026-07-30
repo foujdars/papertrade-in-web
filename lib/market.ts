@@ -1,8 +1,7 @@
-import type { UTCTimestamp } from "lightweight-charts";
 import { UPSTOX_INSTRUMENT_KEYS } from "@/lib/upstox";
 
 export type Candle = {
-  time: UTCTimestamp;
+  time: number;
   open: number;
   high: number;
   low: number;
@@ -75,7 +74,7 @@ export function generateCandles(
     close = Math.max(1, open + drift + noise * instrument.price * 0.008);
     const spread = Math.abs(noise) * instrument.price * 0.004 + instrument.price * 0.0016;
     data.push({
-      time: (end - index * interval) as UTCTimestamp,
+      time: end - index * interval,
       open,
       high: Math.max(open, close) + spread,
       low: Math.min(open, close) - spread * 0.84,
