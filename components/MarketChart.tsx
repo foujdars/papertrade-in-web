@@ -117,7 +117,6 @@ const chartStyles: DeepPartial<Styles> = {
         marginTop: 0,
         marginRight: 0,
         marginBottom: 0,
-        template: "",
       },
       legend: {
         color: "#65708a",
@@ -129,7 +128,6 @@ const chartStyles: DeepPartial<Styles> = {
         marginRight: 0,
         marginBottom: 0,
         defaultValue: "--",
-        template: [],
       },
       features: [],
     },
