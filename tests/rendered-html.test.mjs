@@ -21,9 +21,9 @@ test("server-renders the PaperTrade IN terminal", async () => {
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
   assert.match(html, /Interactive KLineChart candlestick chart/);
-  assert.match(html, /EMA 5/);
-  assert.match(html, /EMA 21/);
-  assert.match(html, /RSI 14/);
+  assert.match(html, /Indicators/);
+  assert.match(html, /pill-count">0</);
+  assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
   assert.match(html, /Broker API/);
   assert.match(html, /No real money/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
@@ -45,7 +45,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(page, /<TradingDashboard \/>/);
   assert.match(dashboard, /calculatePosition/);
   assert.match(advancedChart, /LIVE P&amp;L/);
-  assert.match(advancedChart, /closePosition/);
+  assert.match(advancedChart, /exitPosition/);
+  assert.match(advancedChart, /Exit quantity/);
+  assert.doesNotMatch(advancedChart, /> Candles</);
+  assert.match(dashboard, /INTRADAY CLOSED/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
   assert.match(dashboard, /Fibonacci/);

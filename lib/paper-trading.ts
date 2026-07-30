@@ -6,6 +6,7 @@ export type PaperOrder = {
   price: number;
   status: "COMPLETE";
   time: string;
+  product?: "INTRADAY" | "DELIVERY";
 };
 
 export type PaperPosition = {

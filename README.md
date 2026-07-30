@@ -7,12 +7,13 @@ A responsive Indian-market paper-trading simulator built with Next.js, vinext an
 - Dynamic KLineChart candlesticks with pan, mouse-wheel/pinch zoom, crosshair, right-side INR price scale and bottom time scale
 - Dedicated `/chart` workspace with symbol search, full-screen mode, ranges, live Indian time and quick paper buy/sell
 - Authenticated Upstox candles and quote snapshots for 1m, 5m, 15m, 1H, 3H, 4H and 1D intervals
-- EMA 5, EMA 21 and RSI 14 (no volume)
+- Clean candlestick-only default view with independent EMA 5, EMA 21 and RSI 14 switches (no volume)
 - Trend line, horizontal line/ray, parallel channel, rectangle with midline, Fibonacci, price range and long/short drawing tools
 - Native zoom-synchronised drawings with magnet, lock, hide, undo, redo and delete controls
 - NIFTY 50, BANK NIFTY, NIFTY 500 and demo All NSE watchlists
 - Local INR paper orders, cash balance and order book
-- Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage and one-tap market close
+- Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage, custom-quantity exits and exit-all
+- NSE intraday order lock outside the regular weekday 09:15–15:30 IST session; Delivery remains available from the main ticket
 - Server-only Upstox access-token handling with visible live/fallback feed status
 - Responsive desktop and mobile layouts
 - Capacitor 8 Android app project that opens the full-screen chart and uses the same local paper-order engine

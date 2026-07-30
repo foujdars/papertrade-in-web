@@ -9,7 +9,7 @@ import type {
   OverlayEvent,
   Styles,
 } from "klinecharts";
-import { generateCandles, timeframes, type Candle, type Instrument } from "@/lib/market";
+import { ema, generateCandles, timeframes, type Candle, type Instrument } from "@/lib/market";
 
 export type DrawingTool =
   | "cursor"
@@ -27,6 +27,12 @@ export type FeedStatus = {
   mode: "loading" | "live" | "simulated" | "error";
   message: string;
   updatedAt?: string;
+};
+
+export type ChartIndicators = {
+  ema5: boolean;
+  ema21: boolean;
+  rsi: boolean;
 };
 
 type KLineModule = typeof import("klinecharts");
@@ -73,7 +79,7 @@ const chartStyles: DeepPartial<Styles> = {
       },
     },
     tooltip: {
-      showRule: "follow_cross",
+      showRule: "none",
       showType: "standard",
       title: { show: true, color: "#20263b", size: 12, family: "Inter", weight: 700, marginLeft: 0, marginTop: 0, marginRight: 12, marginBottom: 8, template: "{ticker} · {period}" },
       legend: { color: "#65708a", size: 11, family: "Inter", weight: 600, marginLeft: 0, marginTop: 0, marginRight: 8, marginBottom: 0, defaultValue: "--", template: [] },
@@ -95,6 +101,37 @@ const chartStyles: DeepPartial<Styles> = {
         borderColor: "transparent",
         borderRadius: 2,
       },
+    },
+    tooltip: {
+      showRule: "none",
+      showType: "standard",
+      title: {
+        show: false,
+        showName: false,
+        showParams: false,
+        color: "#65708a",
+        size: 10,
+        family: "Inter",
+        weight: 600,
+        marginLeft: 0,
+        marginTop: 0,
+        marginRight: 0,
+        marginBottom: 0,
+        template: "",
+      },
+      legend: {
+        color: "#65708a",
+        size: 10,
+        family: "Inter",
+        weight: 600,
+        marginLeft: 0,
+        marginTop: 0,
+        marginRight: 0,
+        marginBottom: 0,
+        defaultValue: "--",
+        template: [],
+      },
+      features: [],
     },
   },
   xAxis: {
@@ -306,6 +343,13 @@ function mergeSeries(existing: Candle[], incoming: Candle[]) {
     .slice(-1_600);
 }
 
+function latestIndicatorValues(data: Candle[]) {
+  return {
+    ema5: ema(data, 5).at(-1)?.value ?? 0,
+    ema21: ema(data, 21).at(-1)?.value ?? 0,
+  };
+}
+
 function periodFor(timeframe: string) {
   if (timeframe === "1D") return { type: "day" as const, span: 1 };
   if (timeframe.endsWith("H")) return { type: "hour" as const, span: Number(timeframe.replace("H", "")) || 1 };
@@ -351,6 +395,7 @@ export function MarketChart({
   undoSignal = 0,
   redoSignal = 0,
   visibleBars = 155,
+  indicators,
   onPrice,
   onFeedStatus,
 }: {
@@ -365,6 +410,7 @@ export function MarketChart({
   undoSignal?: number;
   redoSignal?: number;
   visibleBars?: number;
+  indicators: ChartIndicators;
   onPrice: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -379,8 +425,68 @@ export function MarketChart({
   const previousUndo = useRef(undoSignal);
   const previousRedo = useRef(redoSignal);
   const initialVisibleBars = useRef(visibleBars);
+  const indicatorsRef = useRef(indicators);
+  const indicatorIds = useRef<Partial<Record<keyof ChartIndicators, string>>>({});
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
+  const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialCandles));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
+
+  useEffect(() => {
+    indicatorsRef.current = indicators;
+  }, [indicators]);
+
+  function syncIndicators(chart: Chart, next: ChartIndicators) {
+    const definitions: Record<keyof ChartIndicators, () => string | null> = {
+      ema5: () => chart.createIndicator({
+        name: "EMA",
+        shortName: "EMA 5",
+        paneId: "candle_pane",
+        calcParams: [5],
+        precision: 2,
+        styles: {
+          lines: [{ color: "#0ea5e9", size: 2, style: "solid", dashedValue: [], smooth: false }],
+        },
+      }, true),
+      ema21: () => chart.createIndicator({
+        name: "EMA",
+        shortName: "EMA 21",
+        paneId: "candle_pane",
+        calcParams: [21],
+        precision: 2,
+        styles: {
+          lines: [{ color: "#ff8a00", size: 2, style: "solid", dashedValue: [], smooth: false }],
+        },
+      }, true),
+      rsi: () => chart.createIndicator({
+        name: "RSI",
+        shortName: "RSI 14",
+        calcParams: [14],
+        precision: 2,
+        minValue: 0,
+        maxValue: 100,
+        styles: {
+          lines: [{ color: "#7c4dff", size: 2, style: "solid", dashedValue: [], smooth: false }],
+        },
+      }),
+    };
+
+    (Object.keys(next) as Array<keyof ChartIndicators>).forEach((key) => {
+      const existing = indicatorIds.current[key];
+      if (next[key] && !existing) {
+        const id = definitions[key]();
+        if (id) {
+          indicatorIds.current[key] = id;
+          if (key === "rsi") {
+            const indicator = chart.getIndicators({ id })[0];
+            if (indicator) chart.setPaneOptions({ id: indicator.paneId, height: 126, minHeight: 90, dragEnabled: true });
+          }
+        }
+      } else if (!next[key] && existing) {
+        chart.removeIndicator({ id: existing });
+        delete indicatorIds.current[key];
+      }
+    });
+  }
 
   useEffect(() => {
     if (!chartHost.current) return;
@@ -425,34 +531,8 @@ export function MarketChart({
       });
       chart.setSymbol({ ticker: `${instrument.symbol} · NSE`, pricePrecision: 2, volumePrecision: 0 });
       chart.setPeriod(periodFor(timeframe));
-      chart.createIndicator({
-        name: "EMA",
-        shortName: "EMA 5 21",
-        paneId: "candle_pane",
-        calcParams: [5, 21],
-        precision: 2,
-        styles: {
-          lines: [
-            { color: "#0ea5e9", size: 2, style: "solid", dashedValue: [], smooth: false },
-            { color: "#ff8a00", size: 2, style: "solid", dashedValue: [], smooth: false },
-          ],
-        },
-      }, true);
-      const rsiId = chart.createIndicator({
-        name: "RSI",
-        shortName: "RSI 14",
-        calcParams: [14],
-        precision: 2,
-        minValue: 0,
-        maxValue: 100,
-        styles: {
-          lines: [{ color: "#7c4dff", size: 2, style: "solid", dashedValue: [], smooth: false }],
-        },
-      });
-      if (rsiId) {
-        const rsiIndicator = chart.getIndicators({ id: rsiId })[0];
-        if (rsiIndicator) chart.setPaneOptions({ id: rsiIndicator.paneId, height: 126, minHeight: 90, dragEnabled: true });
-      }
+      indicatorIds.current = {};
+      syncIndicators(chart, indicatorsRef.current);
 
       const width = Math.max(320, host.clientWidth - 86);
       chart.setBarSpace(Math.max(2.4, Math.min(18, width / Math.max(30, initialVisibleBars.current))));
@@ -467,8 +547,14 @@ export function MarketChart({
       streamCallback.current = null;
       if (chartApi.current && klineModule) klineModule.dispose(chartApi.current);
       chartApi.current = null;
+      indicatorIds.current = {};
     };
   }, [instrument.symbol, timeframe]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    if (chart) syncIndicators(chart, indicators);
+  }, [indicators]);
 
   useEffect(() => {
     const chart = chartApi.current;
@@ -564,6 +650,7 @@ export function MarketChart({
         dataRef.current = payload.candles;
         const latest = payload.candles.at(-1);
         setLatestCandle(latest);
+        setIndicatorValues(latestIndicatorValues(payload.candles));
         if (latest) onPrice(latest.close);
         chartApi.current?.resetData();
         chartApi.current?.scrollToRealTime();
@@ -620,6 +707,7 @@ export function MarketChart({
       if (!latest) return;
       streamCallback.current?.(toKLineData(latest));
       setLatestCandle(latest);
+      setIndicatorValues(latestIndicatorValues(dataRef.current));
       onPrice(latest.close);
     }, 1_400);
     return () => window.clearInterval(interval);
@@ -654,6 +742,7 @@ export function MarketChart({
         if (latest) {
           streamCallback.current?.(toKLineData(latest));
           setLatestCandle(latest);
+          setIndicatorValues(latestIndicatorValues(dataRef.current));
           onPrice(latest.close);
         }
         onFeedStatus({
@@ -736,11 +825,13 @@ export function MarketChart({
             </span>
           )}
         </div>
-        <div className="indicator-legend kline-indicator-legend">
-          <span><i className="ema-fast" />EMA 5</span>
-          <span><i className="ema-slow" />EMA 21</span>
-          <span><i className="rsi-color" />RSI 14</span>
-        </div>
+        {(indicators.ema5 || indicators.ema21 || indicators.rsi) && (
+          <div className="indicator-legend kline-indicator-legend">
+            {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
+            {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
+            {indicators.rsi && <span><i className="rsi-color" />RSI 14</span>}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,15 +1,16 @@
 "use client";
 
 import {
-  Activity, BarChart3, Bell, Bot, BoxSelect, Cable, ChevronDown, ChevronRight,
+  Activity, Bell, Bot, BoxSelect, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
   Magnet, Maximize2, Menu, Minus, MousePointer2, PanelLeftClose, Plus, Radio, Ruler,
   Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
   TrendingDown, TrendingUp, UserRound, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MarketChart, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, type Instrument } from "@/lib/market";
+import { getNseMarketStatus } from "@/lib/market-hours";
 import { calculatePosition, readPaperOrders, writePaperOrders, type PaperOrder } from "@/lib/paper-trading";
 import type { NormalizedQuote } from "@/lib/upstox";
 
@@ -103,6 +104,10 @@ export function TradingDashboard() {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState("Market");
+  const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
+  const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
@@ -128,7 +133,7 @@ export function TradingDashboard() {
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
-    const interval = window.setInterval(() => setClock(new Date()), 30_000);
+    const interval = window.setInterval(() => setClock(new Date()), 1_000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(interval);
@@ -181,12 +186,25 @@ export function TradingDashboard() {
     () => calculatePosition(orders, selected.symbol, livePrice),
     [livePrice, orders, selected.symbol],
   );
+  const marketStatus = useMemo(
+    () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
+    [clock],
+  );
+  const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
+  const positionProduct = orders.find((order) => order.symbol === selected.symbol)?.product ?? "INTRADAY";
+  const safeExitQuantity = selectedPosition.quantity > 0 ? Math.min(Math.max(1, exitQuantity), selectedPosition.quantity) : 1;
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
+    if (product === "INTRADAY" && !marketStatus.isOpen) {
+      setToast(marketStatus.message);
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
     const order: PaperOrder = {
       id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: livePrice,
-      status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      product,
     };
     const nextOrders = [order, ...orders];
     const nextBalance = side === "BUY" ? balance - margin : balance + margin;
@@ -196,6 +214,40 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} at ${formatInr(livePrice)}`);
     window.setTimeout(() => setToast(""), 3200);
+  }
+
+  function exitPosition(requestedQuantity: number) {
+    if (selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
+    if (positionProduct === "INTRADAY" && !marketStatus.isOpen) {
+      setToast(marketStatus.message);
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
+    const closingQuantity = Math.min(selectedPosition.quantity, Math.max(1, Math.floor(requestedQuantity)));
+    const closingSide = selectedPosition.side === "LONG" ? "SELL" : "BUY";
+    const order: PaperOrder = {
+      id: `${Date.now()}`,
+      symbol: selected.symbol,
+      side: closingSide,
+      quantity: closingQuantity,
+      price: livePrice,
+      status: "COMPLETE",
+      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      product: positionProduct,
+    };
+    const nextOrders = [order, ...orders];
+    const exitMargin = livePrice * closingQuantity * 0.2;
+    const nextBalance = closingSide === "BUY" ? balance - exitMargin : balance + exitMargin;
+    setOrders(nextOrders);
+    setBalance(nextBalance);
+    writePaperOrders(nextOrders);
+    localStorage.setItem("papertrade-balance", String(nextBalance));
+    setToast(`Exited ${closingQuantity} ${selected.symbol} at ${formatInr(livePrice)}`);
+    window.setTimeout(() => setToast(""), 3_200);
+  }
+
+  function toggleIndicator(name: keyof ChartIndicators) {
+    setIndicators((current) => ({ ...current, [name]: !current[name] }));
   }
 
   return (
@@ -261,8 +313,15 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <div className="period-tabs">{periods.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => setTimeframe(period)}>{period}</button>)}</div>
             <span className="control-divider" />
-            <button className="control-button"><Activity size={16} /> Indicators <span className="pill-count">3</span></button>
-            <button className="control-button"><BarChart3 size={16} /> Candles</button>
+            <button className={`control-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
+            {showIndicators && (
+              <div className="dashboard-indicator-popover">
+                <b>Indicators</b>
+                <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
+                <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>
+                <label><input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator("rsi")} /><i className="rsi-color" /> RSI 14</label>
+              </div>
+            )}
             <div className="chart-right-controls">
               <a className="control-button advanced-chart-link" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} target="_blank" rel="noreferrer"><Maximize2 size={16} /> Advanced chart</a>
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
@@ -278,12 +337,12 @@ export function TradingDashboard() {
               <button className={hiddenDrawings ? "active" : ""} onClick={() => setHiddenDrawings((value) => !value)} aria-label="Hide drawings" title="Hide drawings">{hiddenDrawings ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
-            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
             <div>Click + drag to pan · Scroll/pinch to zoom</div>
-            <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST` : "India · IST"}</div>
+            <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
         </section>
 
@@ -295,15 +354,21 @@ export function TradingDashboard() {
             <label>Quantity<div className="stepper"><button onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus size={15} /></button><input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /><button onClick={() => setQuantity(quantity + 1)}><Plus size={15} /></button></div></label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={livePrice.toFixed(2)} readOnly /></label>}
           </div>
-          <div className="product-select"><label><input type="radio" name="product" defaultChecked /><span><b>Intraday</b><small>MIS · 5x leverage</small></span></label><label><input type="radio" name="product" /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
+          <div className="product-select"><label className={!marketStatus.isOpen ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!marketStatus.isOpen} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{marketStatus.isOpen ? "MIS · 5x leverage" : "Closed · 09:15–15:30 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
               <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
+              <div className="ticket-exit-controls">
+                <label>Exit qty<input type="number" min="1" max={selectedPosition.quantity} value={safeExitQuantity} onChange={(event) => setExitQuantity(Math.min(selectedPosition.quantity, Math.max(1, Number(event.target.value))))} /></label>
+                <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
+                <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
+              </div>
+              {positionProduct === "INTRADAY" && !marketStatus.isOpen && <small className="market-closed-note">{marketStatus.message}</small>}
             </div>
           )}
-          <button className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{side} {quantity} {selected.symbol}<ChevronRight size={18} /></button>
+          <button disabled={product === "INTRADAY" && !marketStatus.isOpen} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{product === "INTRADAY" && !marketStatus.isOpen ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>

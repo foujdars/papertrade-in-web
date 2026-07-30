@@ -3,7 +3,6 @@
 import {
   Activity,
   ArrowLeft,
-  BarChart3,
   BoxSelect,
   ChevronDown,
   Eye,
@@ -30,8 +29,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MarketChart, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, type Instrument } from "@/lib/market";
+import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
   readPaperOrders,
@@ -94,8 +94,10 @@ export function AdvancedChartWorkspace({
   const [showSymbols, setShowSymbols] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
   const [showIndicators, setShowIndicators] = useState(false);
+  const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL" | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
 
@@ -130,6 +132,12 @@ export function AdvancedChartWorkspace({
     () => calculatePosition(orders, instrument.symbol, livePrice),
     [instrument.symbol, livePrice, orders],
   );
+  const marketStatus = useMemo(
+    () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
+    [clock],
+  );
+  const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
+  const safeExitQuantity = position.quantity > 0 ? Math.min(Math.max(1, exitQuantity), position.quantity) : 1;
 
   function selectTool(tool: DrawingTool) {
     setActiveTool(tool);
@@ -160,6 +168,11 @@ export function AdvancedChartWorkspace({
 
   function placeQuickOrder() {
     if (!orderSide || quantity < 1) return;
+    if (!marketStatus.isOpen) {
+      setToast(marketStatus.message);
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
     const order: PaperOrder = {
       id: `${Date.now()}`,
       symbol: instrument.symbol,
@@ -167,7 +180,8 @@ export function AdvancedChartWorkspace({
       quantity,
       price: livePrice,
       status: "COMPLETE",
-      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      product: "INTRADAY",
     };
     const nextOrders = [order, ...orders];
     setOrders(nextOrders);
@@ -177,23 +191,34 @@ export function AdvancedChartWorkspace({
     window.setTimeout(() => setToast(""), 3_000);
   }
 
-  function closePosition() {
+  function exitPosition(requestedQuantity: number) {
     if (position.quantity <= 0 || position.side === "FLAT") return;
+    if (!marketStatus.isOpen) {
+      setToast(marketStatus.message);
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
+    const closingQuantity = Math.min(position.quantity, Math.max(1, Math.floor(requestedQuantity)));
     const closingSide = position.side === "LONG" ? "SELL" : "BUY";
     const order: PaperOrder = {
       id: `${Date.now()}`,
       symbol: instrument.symbol,
       side: closingSide,
-      quantity: position.quantity,
+      quantity: closingQuantity,
       price: livePrice,
       status: "COMPLETE",
-      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      product: "INTRADAY",
     };
     const nextOrders = [order, ...orders];
     setOrders(nextOrders);
     writePaperOrders(nextOrders);
-    setToast(`Closed ${instrument.symbol} at ${formatInr(livePrice)}`);
+    setToast(`Exited ${closingQuantity} ${instrument.symbol} at ${formatInr(livePrice)}`);
     window.setTimeout(() => setToast(""), 3_000);
+  }
+
+  function toggleIndicator(name: keyof ChartIndicators) {
+    setIndicators((current) => ({ ...current, [name]: !current[name] }));
   }
 
   function enterFullscreen() {
@@ -226,16 +251,15 @@ export function AdvancedChartWorkspace({
           <small className={instrument.change >= 0 ? "positive" : "negative"}>{instrument.change >= 0 ? "+" : ""}{instrument.change.toFixed(2)}%</small>
         </div>
         <div className="advanced-order-buttons">
-          <button className="advanced-sell" onClick={() => setOrderSide("SELL")}><small>Sell</small><b>{livePrice.toFixed(2)}</b></button>
-          <button className="advanced-buy" onClick={() => setOrderSide("BUY")}><small>Buy</small><b>{livePrice.toFixed(2)}</b></button>
+          <button className="advanced-sell" disabled={!marketStatus.isOpen} title={marketStatus.message} onClick={() => setOrderSide("SELL")}><small>Sell</small><b>{livePrice.toFixed(2)}</b></button>
+          <button className="advanced-buy" disabled={!marketStatus.isOpen} title={marketStatus.message} onClick={() => setOrderSide("BUY")}><small>Buy</small><b>{livePrice.toFixed(2)}</b></button>
         </div>
       </header>
 
       <nav className="advanced-commandbar" aria-label="Chart controls">
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
-        <button className={showIndicators ? "active" : ""} onClick={() => setShowIndicators((value) => !value)}><Activity size={18} /> Indicators <em>3</em></button>
-        <button><BarChart3 size={18} /> Candles</button>
+        <button className={`advanced-indicator-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={18} /> Indicators <em>{activeIndicatorCount}</em></button>
         <span />
         <button title="Undo last drawing" onClick={() => setUndoSignal((value) => value + 1)}><Undo2 size={18} /></button>
         <button title="Redo drawing" onClick={() => setRedoSignal((value) => value + 1)}><Redo2 size={18} /></button>
@@ -243,10 +267,10 @@ export function AdvancedChartWorkspace({
         <button title="Fullscreen" onClick={enterFullscreen}><Fullscreen size={18} /></button>
         {showIndicators && (
           <div className="advanced-indicator-popover">
-            <b>Active indicators</b>
-            <span><i className="ema-fast" /> EMA 5</span>
-            <span><i className="ema-slow" /> EMA 21</span>
-            <span><i className="rsi-color" /> RSI 14</span>
+            <b>Indicators</b>
+            <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
+            <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>
+            <label><input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator("rsi")} /><i className="rsi-color" /> RSI 14</label>
             <small>Volume is disabled.</small>
           </div>
         )}
@@ -277,6 +301,7 @@ export function AdvancedChartWorkspace({
             undoSignal={undoSignal}
             redoSignal={redoSignal}
             visibleBars={visibleBars}
+            indicators={indicators}
             onPrice={handlePrice}
             onFeedStatus={handleFeedStatus}
           />
@@ -297,7 +322,14 @@ export function AdvancedChartWorkspace({
                 <div><dt>Realized</dt><dd className={position.realizedPnl >= 0 ? "positive" : "negative"}>{formatInr(position.realizedPnl)}</dd></div>
                 <div><dt>Total P&amp;L</dt><dd className={position.totalPnl >= 0 ? "positive" : "negative"}>{formatInr(position.totalPnl)}</dd></div>
               </dl>
-              {position.quantity > 0 && <button onClick={closePosition}>Close position at market</button>}
+              {position.quantity > 0 && (
+                <div className="position-exit-controls">
+                  <label>Exit quantity<input type="number" min="1" max={position.quantity} value={safeExitQuantity} onChange={(event) => setExitQuantity(Math.min(position.quantity, Math.max(1, Number(event.target.value))))} /></label>
+                  <button disabled={!marketStatus.isOpen} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
+                  <button disabled={!marketStatus.isOpen} onClick={() => exitPosition(position.quantity)}>Exit all</button>
+                  {!marketStatus.isOpen && <small>{marketStatus.message}</small>}
+                </div>
+              )}
             </aside>
           )}
         </div>
@@ -306,7 +338,7 @@ export function AdvancedChartWorkspace({
       <footer className="advanced-statusbar">
         <div className="advanced-ranges">{ranges.map((range) => <button key={range.label} className={activeRange === range.label ? "active" : ""} onClick={() => chooseRange(range.label, range.bars)}>{range.label}</button>)}</div>
         <div className={`advanced-feed feed-${feedStatus.mode}`} title={feedStatus.message}><i /> {feedStatus.mode === "live" ? "Upstox live" : feedStatus.mode === "loading" ? "Connecting" : feedStatus.mode === "error" ? "Feed warning" : "Simulation"}</div>
-        <time>{clock ? `${clock.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} · ${clock.toLocaleTimeString("en-IN", { hour12: false })} UTC+5:30` : "India · UTC+5:30"}</time>
+        <time>{clock ? `${clock.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} UTC+5:30` : "India · UTC+5:30"}</time>
         <button>log</button><button>auto</button>
       </footer>
 
@@ -317,7 +349,9 @@ export function AdvancedChartWorkspace({
           <div><b>{instrument.symbol}</b><small>Market · Intraday · Paper order</small></div>
           <label>Qty <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /></label>
           <div><small>Order value</small><b>{formatInr(livePrice * quantity)}</b></div>
-          <button className={orderSide === "BUY" ? "dock-buy" : "dock-sell"} onClick={placeQuickOrder}>Confirm {orderSide}</button>
+          <button className="advanced-dock-cancel" onClick={() => setOrderSide(null)}>Cancel</button>
+          <button disabled={!marketStatus.isOpen} className={orderSide === "BUY" ? "dock-buy" : "dock-sell"} onClick={placeQuickOrder}>Confirm {orderSide}</button>
+          {!marketStatus.isOpen && <small className="advanced-market-closed">{marketStatus.message}</small>}
         </div>
       )}
       {toast && <div className="toast advanced-toast">{toast}</div>}
