@@ -30,7 +30,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, dashboard, chart, advancedChart, paperTrading, serverAdapter, candleRoute, quoteRoute, readme] = await Promise.all([
+  const [page, dashboard, chart, advancedChart, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
@@ -39,6 +39,7 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../lib/upstox-server.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/candles/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/quotes/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/upstox/instruments/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
 
@@ -57,10 +58,18 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /createOverlay/);
   assert.match(chart, /api\/upstox\/candles/);
   assert.match(chart, /scope: "intraday"/);
+  assert.match(chart, /timeframe === "1W"/);
   assert.doesNotMatch(chart, /open: last\.close/);
   assert.match(serverAdapter, /process\.env\.UPSTOX_ACCESS_TOKEN/);
   assert.match(candleRoute, /historical-candle\/intraday/);
   assert.match(candleRoute, /Promise\.allSettled/);
+  assert.match(candleRoute, /"1W".*weeks/);
+  assert.match(candleRoute, /"1M".*months/);
+  assert.match(candleRoute, /aggregateAnnualCandles/);
+  assert.match(instrumentRoute, /NSE\.json\.gz/);
+  assert.match(instrumentRoute, /ind_nifty500list\.csv/);
+  assert.match(dashboard, /Load 60 more/);
+  assert.match(dashboard, /mobile-indicator-control/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
   assert.match(readme, /KLineChart/);

@@ -9,13 +9,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
-import { formatInr, instruments, type Instrument } from "@/lib/market";
+import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import { calculatePosition, readPaperOrders, writePaperOrders, type PaperOrder } from "@/lib/paper-trading";
 import type { NormalizedQuote } from "@/lib/upstox";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
-const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D"];
+const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
   { id: "trend", label: "Trend line", icon: TrendingUp },
@@ -92,6 +92,9 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 
 export function TradingDashboard() {
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
+  const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
+  const [watchlistLimit, setWatchlistLimit] = useState(60);
   const [watchlist, setWatchlist] = useState<(typeof watchlistTabs)[number]>("NIFTY 50");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
@@ -142,11 +145,48 @@ export function TradingDashboard() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const keys = instruments.map((item) => item.instrumentKey).join(",");
+    async function loadInstrumentUniverse() {
+      try {
+        const response = await fetch("/api/upstox/instruments", { signal: controller.signal });
+        const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
+        if (!response.ok || !payload.ok || !payload.instruments?.length) return;
+        const merged = mergeInstrumentUniverse(payload.instruments);
+        setStockUniverse(merged);
+        setSelected((current) => merged.find((item) => item.symbol === current.symbol) ?? current);
+      } catch {
+        // Keep the built-in liquid-stock list available while the daily master is unavailable.
+      } finally {
+        if (!controller.signal.aborted) setWatchlistLoading(false);
+      }
+    }
+    void loadInstrumentUniverse();
+    return () => controller.abort();
+  }, []);
+
+  const filtered = useMemo(() => stockUniverse.filter((item) => {
+    const term = search.trim().toLowerCase();
+    const matchesList = Boolean(term) || watchlist === "ALL NSE" || item.categories.includes(watchlist);
+    return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
+  }), [search, stockUniverse, watchlist]);
+  const visibleInstruments = filtered.slice(0, watchlistLimit);
+  const quoteKeys = useMemo(
+    () => [...new Set([...visibleInstruments.map((item) => item.instrumentKey), selected.instrumentKey])].slice(0, 100).join(","),
+    [selected.instrumentKey, visibleInstruments],
+  );
+  const watchlistCounts = useMemo(() => ({
+    "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
+    "BANK NIFTY": stockUniverse.filter((item) => item.categories.includes("BANK NIFTY")).length,
+    "NIFTY 500": stockUniverse.filter((item) => item.categories.includes("NIFTY 500")).length,
+    "ALL NSE": stockUniverse.length,
+  }), [stockUniverse]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!quoteKeys) return;
 
     async function loadWatchlistQuotes() {
       try {
-        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(keys)}`, {
+        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -155,7 +195,7 @@ export function TradingDashboard() {
           quotes?: Record<string, NormalizedQuote>;
         };
         if (response.ok && payload.ok && payload.quotes) {
-          setMarketQuotes(payload.quotes);
+          setMarketQuotes((current) => ({ ...current, ...payload.quotes }));
         }
       } catch {
         // The chart reports the connection error; static watchlist values remain usable.
@@ -168,16 +208,10 @@ export function TradingDashboard() {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, []);
-
-  const filtered = useMemo(() => instruments.filter((item) => {
-    const matchesList = watchlist === "ALL NSE" || item.category === watchlist;
-    const term = search.trim().toLowerCase();
-    return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-  }), [search, watchlist]);
+  }, [quoteKeys]);
   const handlePrice = useCallback((value: number) => setLivePrice(value), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
-  const selectedQuote = marketQuotes[selected.symbol];
+  const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
   const selectedChange = selectedQuote?.changePercent ?? selected.change;
   const selectedNetChange = selectedQuote?.netChange ?? livePrice * selected.change / 100;
   const orderValue = livePrice * quantity;
@@ -276,27 +310,29 @@ export function TradingDashboard() {
             <div><span className="eyebrow">Watchlist</span><h2>Indian markets</h2></div>
             <button className="icon-button" aria-label="Watchlist options"><SlidersHorizontal size={17} /></button>
           </div>
-          <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search NSE stocks" /><kbd>/</kbd></div>
+          <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /><kbd>/</kbd></div>
           <div className="watchlist-tabs">
-            {watchlistTabs.map((tab) => <button key={tab} onClick={() => setWatchlist(tab)} className={watchlist === tab ? "active" : ""}>{tab}</button>)}
+            {watchlistTabs.map((tab) => <button key={tab} onClick={() => { setWatchlist(tab); setWatchlistLimit(60); }} className={watchlist === tab ? "active" : ""}><span>{tab}</span><small>{watchlistCounts[tab]}</small></button>)}
           </div>
           <div className="instrument-list">
-            {filtered.map((item) => {
-              const quote = marketQuotes[item.symbol];
+            {visibleInstruments.map((item) => {
+              const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
               const change = quote?.changePercent ?? item.change;
               return (
-                <button key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} onClick={() => { setSelected(item); setLivePrice(price); setSidebarOpen(false); }}>
+                <button key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} onClick={() => { setSelected({ ...item, price: price > 0 ? price : 1 }); setLivePrice(price > 0 ? price : 1); setSidebarOpen(false); }}>
                   <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
-                  <span className="instrument-price"><b>{price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</b><small className={change >= 0 ? "positive" : "negative"}>{change >= 0 ? "+" : ""}{change.toFixed(2)}%</small></span>
+                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={price > 0 ? change >= 0 ? "positive" : "negative" : ""}>{price > 0 ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Quote loading"}</small></span>
                   <Star size={15} />
                 </button>
               );
             })}
-            {!filtered.length && <div className="empty-list">No matching symbols in this demo list.</div>}
+            {watchlistLoading && <div className="watchlist-loading">Loading complete NSE lists…</div>}
+            {!watchlistLoading && !filtered.length && <div className="empty-list">No matching NSE stocks.</div>}
+            {visibleInstruments.length < filtered.length && <button className="load-more-stocks" onClick={() => setWatchlistLimit((value) => value + 60)}>Load 60 more <small>{visibleInstruments.length} of {filtered.length}</small></button>}
           </div>
-          <div className="demo-list-note"><Sparkles size={15} /> Supported NSE watchlist quotes refresh from Upstox every 10 seconds when the server token is valid.</div>
+          <div className="demo-list-note"><Sparkles size={15} /> Complete NSE list from Upstox; official index constituents refresh with the daily instrument master.</div>
         </aside>
 
         <section className="chart-area">
@@ -313,7 +349,7 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <div className="period-tabs">{periods.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => setTimeframe(period)}>{period}</button>)}</div>
             <span className="control-divider" />
-            <button className={`control-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
+            <button className={`control-button mobile-indicator-control ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
             {showIndicators && (
               <div className="dashboard-indicator-popover">
                 <b>Indicators</b>

@@ -1,4 +1,4 @@
-import { ALLOWED_UPSTOX_KEYS, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
+import { isSupportedNseInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       .filter(Boolean);
     const keys = [...new Set(requestedKeys)];
 
-    if (!keys.length || keys.length > 100 || keys.some((key) => !ALLOWED_UPSTOX_KEYS.has(key))) {
+    if (!keys.length || keys.length > 100 || keys.some((key) => !isSupportedNseInstrumentKey(key))) {
       return Response.json(
         { ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 100 supported instrument keys." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
     for (const quote of Object.values(payload.data ?? {})) {
       const instrumentKey = quote.instrument_token ?? "";
-      const symbol = UPSTOX_KEY_TO_SYMBOL[instrumentKey];
+      const symbol = quote.symbol?.trim().toUpperCase() || UPSTOX_KEY_TO_SYMBOL[instrumentKey] || instrumentKey;
       const lastPrice = Number(quote.last_price);
       const previousClose = Number(quote.ohlc?.close);
       const netChange = Number.isFinite(Number(quote.net_change))
@@ -50,8 +50,8 @@ export async function GET(request: Request) {
       const lastTradeAt = Number.isFinite(lastTradeMilliseconds)
         ? new Date(lastTradeMilliseconds).toISOString()
         : quote.timestamp ?? new Date().toISOString();
-      if (!symbol || !Number.isFinite(lastPrice)) continue;
-      quotes[symbol] = {
+      if (!Number.isFinite(lastPrice)) continue;
+      const normalized = {
         instrumentKey,
         symbol,
         lastPrice,
@@ -64,6 +64,8 @@ export async function GET(request: Request) {
         lastTradeAt,
         updatedAt: quote.timestamp ?? new Date().toISOString(),
       };
+      quotes[instrumentKey] = normalized;
+      quotes[symbol] = normalized;
     }
 
     return Response.json(

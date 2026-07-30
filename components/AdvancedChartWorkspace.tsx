@@ -30,7 +30,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
-import { formatInr, instruments, type Instrument } from "@/lib/market";
+import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
@@ -39,7 +39,7 @@ import {
   type PaperOrder,
 } from "@/lib/paper-trading";
 
-const timeframes = ["1m", "5m", "15m", "1H", "3H", "4H", "1D"] as const;
+const timeframes = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"] as const;
 const ranges = [
   { label: "1D", bars: 75 },
   { label: "5D", bars: 375 },
@@ -77,6 +77,7 @@ export function AdvancedChartWorkspace({
   initialTimeframe: string;
 }) {
   const [instrument, setInstrument] = useState<Instrument>(() => getInitialInstrument(initialSymbol));
+  const [availableInstruments, setAvailableInstruments] = useState<Instrument[]>(instruments);
   const [timeframe, setTimeframe] = useState(timeframes.includes(initialTimeframe as typeof timeframes[number]) ? initialTimeframe : "5m");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [toolSignal, setToolSignal] = useState(0);
@@ -122,12 +123,33 @@ export function AdvancedChartWorkspace({
     };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadInstrumentUniverse() {
+      try {
+        const response = await fetch("/api/upstox/instruments", { signal: controller.signal });
+        const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
+        if (!response.ok || !payload.ok || !payload.instruments?.length) return;
+        const merged = mergeInstrumentUniverse(payload.instruments);
+        setAvailableInstruments(merged);
+        const requested = merged.find((item) => item.symbol === initialSymbol);
+        if (requested) {
+          setInstrument((current) => current.symbol === getInitialInstrument(initialSymbol).symbol ? requested : current);
+        }
+      } catch {
+        // The built-in liquid-stock list remains available if the daily master cannot load.
+      }
+    }
+    void loadInstrumentUniverse();
+    return () => controller.abort();
+  }, [initialSymbol]);
+
   const handlePrice = useCallback((price: number) => setLivePrice(price), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const filteredSymbols = useMemo(() => {
     const term = symbolSearch.trim().toLowerCase();
-    return instruments.filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-  }, [symbolSearch]);
+    return availableInstruments.filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
+  }, [availableInstruments, symbolSearch]);
   const position = useMemo(
     () => calculatePosition(orders, instrument.symbol, livePrice),
     [instrument.symbol, livePrice, orders],
@@ -146,7 +168,7 @@ export function AdvancedChartWorkspace({
 
   function chooseInstrument(next: Instrument) {
     setInstrument(next);
-    setLivePrice(next.price);
+    setLivePrice(next.price > 0 ? next.price : 100);
     setShowSymbols(false);
     setSymbolSearch("");
     const url = new URL(window.location.href);
@@ -242,7 +264,7 @@ export function AdvancedChartWorkspace({
           {showSymbols && (
             <div className="advanced-symbol-menu">
               <label><Search size={15} /><input autoFocus value={symbolSearch} onChange={(event) => setSymbolSearch(event.target.value)} placeholder="Search NSE symbols" /></label>
-              <div>{filteredSymbols.map((item) => <button key={item.symbol} onClick={() => chooseInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>{item.price.toFixed(2)}</em></button>)}</div>
+              <div>{filteredSymbols.slice(0, 150).map((item) => <button key={item.symbol} onClick={() => chooseInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>{item.price > 0 ? item.price.toFixed(2) : "NSE"}</em></button>)}</div>
             </div>
           )}
         </div>

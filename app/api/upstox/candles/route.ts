@@ -1,4 +1,4 @@
-import { ALLOWED_UPSTOX_KEYS } from "@/lib/upstox";
+import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -17,7 +17,15 @@ type ChartCandle = {
   close: number;
 };
 
-const timeframeMap = {
+type TimeframeConfig = {
+  unit: "minutes" | "hours" | "days" | "weeks" | "months";
+  interval: string;
+  lookbackDays: number;
+  historicalOnly?: boolean;
+  aggregateYears?: boolean;
+};
+
+const timeframeMap: Record<string, TimeframeConfig> = {
   "1m": { unit: "minutes", interval: "1", lookbackDays: 7 },
   "5m": { unit: "minutes", interval: "5", lookbackDays: 14 },
   "15m": { unit: "minutes", interval: "15", lookbackDays: 30 },
@@ -25,7 +33,10 @@ const timeframeMap = {
   "3H": { unit: "hours", interval: "3", lookbackDays: 90 },
   "4H": { unit: "hours", interval: "4", lookbackDays: 90 },
   "1D": { unit: "days", interval: "1", lookbackDays: 365 },
-} as const;
+  "1W": { unit: "weeks", interval: "1", lookbackDays: 3_650, historicalOnly: true },
+  "1M": { unit: "months", interval: "1", lookbackDays: 7_300, historicalOnly: true },
+  "1Y": { unit: "months", interval: "1", lookbackDays: 10_950, historicalOnly: true, aggregateYears: true },
+};
 
 function indiaDate(offsetDays = 0) {
   const date = new Date(Date.now() + offsetDays * 86_400_000);
@@ -67,6 +78,22 @@ function mergeCandles(groups: ChartCandle[][]) {
     .slice(-1_600);
 }
 
+function aggregateAnnualCandles(candles: ChartCandle[]) {
+  const byYear = new Map<number, ChartCandle>();
+  for (const candle of candles.sort((a, b) => a.time - b.time)) {
+    const year = new Date(candle.time * 1_000).getUTCFullYear();
+    const existing = byYear.get(year);
+    if (!existing) {
+      byYear.set(year, { ...candle });
+    } else {
+      existing.high = Math.max(existing.high, candle.high);
+      existing.low = Math.min(existing.low, candle.low);
+      existing.close = candle.close;
+    }
+  }
+  return [...byYear.values()].sort((a, b) => a.time - b.time);
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -75,7 +102,7 @@ export async function GET(request: Request) {
     const scope = url.searchParams.get("scope") ?? "combined";
     const config = timeframeMap[timeframe as keyof typeof timeframeMap];
 
-    if (!ALLOWED_UPSTOX_KEYS.has(instrumentKey)) {
+    if (!isSupportedNseInstrumentKey(instrumentKey)) {
       return Response.json(
         { ok: false, error: { code: "INVALID_INSTRUMENT", message: "Unsupported instrument key." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },
@@ -102,7 +129,19 @@ export async function GET(request: Request) {
     let candles: ChartCandle[];
     let segments: string[];
 
-    if (scope === "intraday") {
+    if (config.historicalOnly && scope === "intraday") {
+      return Response.json(
+        { ok: false, error: { code: "INTRADAY_NOT_AVAILABLE", message: "Weekly, monthly and yearly candles use historical data." } },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    if (config.historicalOnly) {
+      const historical = await upstoxFetch<UpstoxCandlePayload>(historicalPath);
+      candles = mergeCandles([normalizeCandles(historical)]);
+      if (config.aggregateYears) candles = aggregateAnnualCandles(candles);
+      segments = ["historical"];
+    } else if (scope === "intraday") {
       const intraday = await upstoxFetch<UpstoxCandlePayload>(intradayPath);
       candles = mergeCandles([normalizeCandles(intraday)]);
       segments = ["intraday"];

@@ -349,6 +349,9 @@ function latestIndicatorValues(data: Candle[]) {
 }
 
 function periodFor(timeframe: string) {
+  if (timeframe === "1Y") return { type: "year" as const, span: 1 };
+  if (timeframe === "1M") return { type: "month" as const, span: 1 };
+  if (timeframe === "1W") return { type: "week" as const, span: 1 };
   if (timeframe === "1D") return { type: "day" as const, span: 1 };
   if (timeframe.endsWith("H")) return { type: "hour" as const, span: Number(timeframe.replace("H", "")) || 1 };
   return { type: "minute" as const, span: Number(timeframe.replace("m", "")) || 5 };
@@ -492,6 +495,8 @@ export function MarketChart({
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let klineModule: KLineModule | null = null;
+    let settleTimer: number | null = null;
+    let resizeChart: (() => void) | null = null;
 
     void import("klinecharts").then((kline) => {
       if (cancelled) return;
@@ -537,11 +542,24 @@ export function MarketChart({
       chart.scrollToRealTime();
       observer = new ResizeObserver(() => chart.resize());
       observer.observe(host);
+      resizeChart = () => chart.resize();
+      window.addEventListener("resize", resizeChart);
+      window.visualViewport?.addEventListener("resize", resizeChart);
+      settleTimer = window.setTimeout(() => {
+        chart.resize();
+        chart.resetData();
+        chart.scrollToRealTime();
+      }, 180);
     });
 
     return () => {
       cancelled = true;
       observer?.disconnect();
+      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      if (resizeChart) {
+        window.removeEventListener("resize", resizeChart);
+        window.visualViewport?.removeEventListener("resize", resizeChart);
+      }
       streamCallback.current = null;
       if (chartApi.current && klineModule) klineModule.dispose(chartApi.current);
       chartApi.current = null;
@@ -713,6 +731,7 @@ export function MarketChart({
 
   useEffect(() => {
     if (feedMode !== "live") return;
+    if (timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
     const controller = new AbortController();
 
     async function refreshIntradayCandles() {
@@ -780,7 +799,7 @@ export function MarketChart({
           quotes?: Record<string, { lastPrice?: number; lastTradeAt?: string }>;
           error?: { message?: string };
         };
-        const quote = payload.quotes?.[instrument.symbol];
+        const quote = payload.quotes?.[instrument.instrumentKey] ?? payload.quotes?.[instrument.symbol];
         const price = Number(quote?.lastPrice);
         if (!response.ok || !payload.ok || !Number.isFinite(price)) {
           throw new Error(payload.error?.message ?? "Upstox quote refresh failed.");

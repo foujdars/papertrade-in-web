@@ -29,6 +29,10 @@ export const UPSTOX_KEY_TO_SYMBOL = Object.fromEntries(
 
 export const ALLOWED_UPSTOX_KEYS = new Set<string>(Object.values(UPSTOX_INSTRUMENT_KEYS));
 
+export function isSupportedNseInstrumentKey(key: string) {
+  return ALLOWED_UPSTOX_KEYS.has(key) || /^NSE_EQ\|INE[A-Z0-9]+$/.test(key);
+}
+
 export type NormalizedQuote = {
   instrumentKey: string;
   symbol: string;

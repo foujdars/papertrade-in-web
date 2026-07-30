@@ -15,31 +15,46 @@ export type Instrument = {
   price: number;
   change: number;
   instrumentKey: string;
-  category: "NIFTY 50" | "BANK NIFTY" | "NIFTY 500";
+  categories: Array<"NIFTY 50" | "BANK NIFTY" | "NIFTY 500">;
 };
 
 export const instruments: Instrument[] = [
-  { symbol: "RELIANCE", name: "Reliance Industries", exchange: "NSE", price: 2987.4, change: 1.28, instrumentKey: UPSTOX_INSTRUMENT_KEYS.RELIANCE, category: "NIFTY 50" },
-  { symbol: "HDFCBANK", name: "HDFC Bank", exchange: "NSE", price: 1986.65, change: 0.64, instrumentKey: UPSTOX_INSTRUMENT_KEYS.HDFCBANK, category: "BANK NIFTY" },
-  { symbol: "ICICIBANK", name: "ICICI Bank", exchange: "NSE", price: 1461.2, change: -0.31, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ICICIBANK, category: "BANK NIFTY" },
-  { symbol: "INFY", name: "Infosys", exchange: "NSE", price: 1644.8, change: 1.92, instrumentKey: UPSTOX_INSTRUMENT_KEYS.INFY, category: "NIFTY 50" },
-  { symbol: "TCS", name: "Tata Consultancy Services", exchange: "NSE", price: 3318.5, change: -0.42, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TCS, category: "NIFTY 50" },
-  { symbol: "BHARTIARTL", name: "Bharti Airtel", exchange: "NSE", price: 2094.9, change: 1.05, instrumentKey: UPSTOX_INSTRUMENT_KEYS.BHARTIARTL, category: "NIFTY 50" },
-  { symbol: "SBIN", name: "State Bank of India", exchange: "NSE", price: 854.35, change: 0.83, instrumentKey: UPSTOX_INSTRUMENT_KEYS.SBIN, category: "BANK NIFTY" },
-  { symbol: "AXISBANK", name: "Axis Bank", exchange: "NSE", price: 1198.6, change: -0.72, instrumentKey: UPSTOX_INSTRUMENT_KEYS.AXISBANK, category: "BANK NIFTY" },
-  { symbol: "KOTAKBANK", name: "Kotak Mahindra Bank", exchange: "NSE", price: 2188.1, change: 0.22, instrumentKey: UPSTOX_INSTRUMENT_KEYS.KOTAKBANK, category: "BANK NIFTY" },
-  { symbol: "LT", name: "Larsen & Toubro", exchange: "NSE", price: 3642.8, change: 1.16, instrumentKey: UPSTOX_INSTRUMENT_KEYS.LT, category: "NIFTY 50" },
-  { symbol: "ITC", name: "ITC", exchange: "NSE", price: 421.5, change: -0.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ITC, category: "NIFTY 50" },
-  { symbol: "MARUTI", name: "Maruti Suzuki India", exchange: "NSE", price: 12694.0, change: 0.51, instrumentKey: UPSTOX_INSTRUMENT_KEYS.MARUTI, category: "NIFTY 50" },
-  { symbol: "SUNPHARMA", name: "Sun Pharmaceutical", exchange: "NSE", price: 1694.25, change: 1.34, instrumentKey: UPSTOX_INSTRUMENT_KEYS.SUNPHARMA, category: "NIFTY 50" },
-  { symbol: "TITAN", name: "Titan Company", exchange: "NSE", price: 3528.7, change: -0.56, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TITAN, category: "NIFTY 50" },
-  { symbol: "TATAMOTORS", name: "Tata Motors", exchange: "NSE", price: 688.4, change: 2.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TATAMOTORS, category: "NIFTY 500" },
-  { symbol: "ZOMATO", name: "Eternal", exchange: "NSE", price: 312.65, change: 2.72, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ZOMATO, category: "NIFTY 500" },
-  { symbol: "DMART", name: "Avenue Supermarts", exchange: "NSE", price: 4287.0, change: -1.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.DMART, category: "NIFTY 500" },
-  { symbol: "TRENT", name: "Trent", exchange: "NSE", price: 5486.3, change: 1.41, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TRENT, category: "NIFTY 500" },
-  { symbol: "IRCTC", name: "Indian Railway Catering", exchange: "NSE", price: 768.85, change: -0.93, instrumentKey: UPSTOX_INSTRUMENT_KEYS.IRCTC, category: "NIFTY 500" },
-  { symbol: "HAL", name: "Hindustan Aeronautics", exchange: "NSE", price: 4864.15, change: 0.88, instrumentKey: UPSTOX_INSTRUMENT_KEYS.HAL, category: "NIFTY 500" },
+  { symbol: "RELIANCE", name: "Reliance Industries", exchange: "NSE", price: 2987.4, change: 1.28, instrumentKey: UPSTOX_INSTRUMENT_KEYS.RELIANCE, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "HDFCBANK", name: "HDFC Bank", exchange: "NSE", price: 1986.65, change: 0.64, instrumentKey: UPSTOX_INSTRUMENT_KEYS.HDFCBANK, categories: ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] },
+  { symbol: "ICICIBANK", name: "ICICI Bank", exchange: "NSE", price: 1461.2, change: -0.31, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ICICIBANK, categories: ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] },
+  { symbol: "INFY", name: "Infosys", exchange: "NSE", price: 1644.8, change: 1.92, instrumentKey: UPSTOX_INSTRUMENT_KEYS.INFY, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "TCS", name: "Tata Consultancy Services", exchange: "NSE", price: 3318.5, change: -0.42, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TCS, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "BHARTIARTL", name: "Bharti Airtel", exchange: "NSE", price: 2094.9, change: 1.05, instrumentKey: UPSTOX_INSTRUMENT_KEYS.BHARTIARTL, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "SBIN", name: "State Bank of India", exchange: "NSE", price: 854.35, change: 0.83, instrumentKey: UPSTOX_INSTRUMENT_KEYS.SBIN, categories: ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] },
+  { symbol: "AXISBANK", name: "Axis Bank", exchange: "NSE", price: 1198.6, change: -0.72, instrumentKey: UPSTOX_INSTRUMENT_KEYS.AXISBANK, categories: ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] },
+  { symbol: "KOTAKBANK", name: "Kotak Mahindra Bank", exchange: "NSE", price: 2188.1, change: 0.22, instrumentKey: UPSTOX_INSTRUMENT_KEYS.KOTAKBANK, categories: ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] },
+  { symbol: "LT", name: "Larsen & Toubro", exchange: "NSE", price: 3642.8, change: 1.16, instrumentKey: UPSTOX_INSTRUMENT_KEYS.LT, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "ITC", name: "ITC", exchange: "NSE", price: 421.5, change: -0.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ITC, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "MARUTI", name: "Maruti Suzuki India", exchange: "NSE", price: 12694.0, change: 0.51, instrumentKey: UPSTOX_INSTRUMENT_KEYS.MARUTI, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "SUNPHARMA", name: "Sun Pharmaceutical", exchange: "NSE", price: 1694.25, change: 1.34, instrumentKey: UPSTOX_INSTRUMENT_KEYS.SUNPHARMA, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "TITAN", name: "Titan Company", exchange: "NSE", price: 3528.7, change: -0.56, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TITAN, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "TATAMOTORS", name: "Tata Motors", exchange: "NSE", price: 688.4, change: 2.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TATAMOTORS, categories: ["NIFTY 500"] },
+  { symbol: "ZOMATO", name: "Eternal", exchange: "NSE", price: 312.65, change: 2.72, instrumentKey: UPSTOX_INSTRUMENT_KEYS.ZOMATO, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "DMART", name: "Avenue Supermarts", exchange: "NSE", price: 4287.0, change: -1.18, instrumentKey: UPSTOX_INSTRUMENT_KEYS.DMART, categories: ["NIFTY 500"] },
+  { symbol: "TRENT", name: "Trent", exchange: "NSE", price: 5486.3, change: 1.41, instrumentKey: UPSTOX_INSTRUMENT_KEYS.TRENT, categories: ["NIFTY 50", "NIFTY 500"] },
+  { symbol: "IRCTC", name: "Indian Railway Catering", exchange: "NSE", price: 768.85, change: -0.93, instrumentKey: UPSTOX_INSTRUMENT_KEYS.IRCTC, categories: ["NIFTY 500"] },
+  { symbol: "HAL", name: "Hindustan Aeronautics", exchange: "NSE", price: 4864.15, change: 0.88, instrumentKey: UPSTOX_INSTRUMENT_KEYS.HAL, categories: ["NIFTY 500"] },
 ];
+
+export function mergeInstrumentUniverse(incoming: Instrument[]) {
+  const fallbackBySymbol = new Map(instruments.map((item) => [item.symbol, item]));
+  const merged = incoming.map((item) => {
+    const fallback = fallbackBySymbol.get(item.symbol);
+    return {
+      ...item,
+      name: item.name || fallback?.name || item.symbol,
+      price: fallback?.price ?? item.price,
+      change: fallback?.change ?? item.change,
+    };
+  });
+  const known = new Set(merged.map((item) => item.symbol));
+  return [...merged, ...instruments.filter((item) => !known.has(item.symbol))];
+}
 
 export const timeframes: Record<string, number> = {
   "1m": 60,
@@ -49,6 +64,9 @@ export const timeframes: Record<string, number> = {
   "3H": 10800,
   "4H": 14400,
   "1D": 86400,
+  "1W": 604800,
+  "1M": 2592000,
+  "1Y": 31536000,
 };
 
 function hash(value: string) {
@@ -62,17 +80,18 @@ export function generateCandles(
 ): Candle[] {
   const interval = timeframes[timeframe] ?? 300;
   const end = Math.floor(Date.now() / 1000 / interval) * interval;
+  const referencePrice = Number.isFinite(instrument.price) && instrument.price > 0 ? instrument.price : 100;
   let seed = hash(instrument.symbol) + interval;
-  let close = instrument.price * 0.92;
+  let close = referencePrice * 0.92;
   const data: Candle[] = [];
 
   for (let index = count - 1; index >= 0; index -= 1) {
     seed = (seed * 9301 + 49297) % 233280;
     const noise = seed / 233280 - 0.5;
-    const drift = (instrument.price - close) * 0.014;
+    const drift = (referencePrice - close) * 0.014;
     const open = close;
-    close = Math.max(1, open + drift + noise * instrument.price * 0.008);
-    const spread = Math.abs(noise) * instrument.price * 0.004 + instrument.price * 0.0016;
+    close = Math.max(1, open + drift + noise * referencePrice * 0.008);
+    const spread = Math.abs(noise) * referencePrice * 0.004 + referencePrice * 0.0016;
     data.push({
       time: end - index * interval,
       open,
@@ -82,7 +101,7 @@ export function generateCandles(
     });
   }
 
-  const scale = instrument.price / data[data.length - 1].close;
+  const scale = referencePrice / data[data.length - 1].close;
   return data.map((candle) => ({
     ...candle,
     open: candle.open * scale,
