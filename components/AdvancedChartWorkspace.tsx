@@ -114,6 +114,18 @@ export function AdvancedChartWorkspace({
   }, []);
 
   useEffect(() => {
+    const returnToTrade = () => {
+      const params = new URLSearchParams(window.location.search);
+      const symbol = params.get("symbol") ?? initialSymbol;
+      const period = params.get("timeframe") ?? initialTimeframe;
+      window.location.replace(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(period)}`);
+    };
+    window.history.pushState({ ...window.history.state, papertradeFullChartGuard: true }, "", window.location.href);
+    window.addEventListener("popstate", returnToTrade);
+    return () => window.removeEventListener("popstate", returnToTrade);
+  }, [initialSymbol, initialTimeframe]);
+
+  useEffect(() => {
     const restore = window.setTimeout(() => setOrders(readPaperOrders()), 0);
     const refresh = () => setOrders(readPaperOrders());
     window.addEventListener("storage", refresh);
@@ -268,7 +280,7 @@ export function AdvancedChartWorkspace({
   return (
     <main className="advanced-terminal">
       <header className="advanced-topbar">
-        <Link href="/" className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
+        <Link href={`/?symbol=${instrument.symbol}&timeframe=${timeframe}`} onClick={(event) => { event.preventDefault(); window.history.back(); }} className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
         <div className="advanced-brand"><span><TrendingUp size={18} strokeWidth={3} /></span><b>PaperTrade</b> IN</div>
         <div className="advanced-symbol-picker">
           <button onClick={() => setShowSymbols((value) => !value)}>
@@ -385,7 +397,7 @@ export function AdvancedChartWorkspace({
           <span className={orderSide === "BUY" ? "buy-tag" : "sell-tag"}>{orderSide}</span>
           <div><b>{instrument.symbol}</b><small>Market · Intraday · Paper order</small></div>
           <label>Qty <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /></label>
-          <div><small>Order value</small><b>{formatInr(livePrice * quantity)}</b></div>
+          <div><small>Estimated amount</small><b>{formatInr(livePrice * quantity)}</b></div>
           <button className="advanced-dock-cancel" onClick={() => setOrderSide(null)}>Cancel</button>
           <button disabled={!marketStatus.isOpen} className={orderSide === "BUY" ? "dock-buy" : "dock-sell"} onClick={placeQuickOrder}>Confirm {orderSide}</button>
           {!marketStatus.isOpen && <small className="advanced-market-closed">{marketStatus.message}</small>}

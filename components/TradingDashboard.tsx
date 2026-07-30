@@ -146,6 +146,22 @@ export function TradingDashboard() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSymbol = params.get("symbol")?.toUpperCase();
+    const requestedTimeframe = params.get("timeframe");
+    if (requestedTimeframe && periods.includes(requestedTimeframe)) {
+      setTimeframe(requestedTimeframe);
+    }
+    if (requestedSymbol) {
+      const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
+      if (fallbackInstrument) {
+        setSelected(fallbackInstrument);
+        setLivePrice(fallbackInstrument.price);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!showIndicators) return;
     const closeOnOutsideTap = (event: PointerEvent) => {
       const target = event.target as Node;
@@ -165,8 +181,9 @@ export function TradingDashboard() {
         const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
         if (!response.ok || !payload.ok || !payload.instruments?.length) return;
         const merged = mergeInstrumentUniverse(payload.instruments);
+        const requestedSymbol = new URLSearchParams(window.location.search).get("symbol")?.toUpperCase();
         setStockUniverse(merged);
-        setSelected((current) => merged.find((item) => item.symbol === current.symbol) ?? current);
+        setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol ?? current.symbol)) ?? current);
       } catch {
         // Keep the built-in liquid-stock list available while the daily master is unavailable.
       } finally {
@@ -374,7 +391,7 @@ export function TradingDashboard() {
               </div>
             )}
             <div className="chart-right-controls">
-              <a className="control-button advanced-chart-link" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} target="_blank" rel="noreferrer"><Maximize2 size={16} /> Advanced chart</a>
+              <a className="control-button advanced-chart-link" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`}><Maximize2 size={16} /> Advanced chart</a>
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
               <button className="icon-button" aria-label="Chart settings"><Settings size={17} /></button>
             </div>
@@ -389,6 +406,20 @@ export function TradingDashboard() {
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
             <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            {selectedPosition.quantity > 0 && (
+              <aside className="chart-position-banner" aria-live="polite">
+                <div className="chart-position-title">
+                  <span className={selectedPosition.side === "SHORT" ? "short" : "long"}>{selectedPosition.side}</span>
+                  <b>{selected.symbol} · {selectedPosition.quantity} shares</b>
+                </div>
+                <div className="chart-position-pnl">
+                  <small>LIVE P&amp;L</small>
+                  <strong className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</strong>
+                  <em className={selectedPosition.returnPercent >= 0 ? "positive" : "negative"}>{selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</em>
+                </div>
+                <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)}</small>
+              </aside>
+            )}
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
