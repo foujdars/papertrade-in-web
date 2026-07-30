@@ -32,6 +32,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketChart, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, type Instrument } from "@/lib/market";
+import {
+  calculatePosition,
+  readPaperOrders,
+  writePaperOrders,
+  type PaperOrder,
+} from "@/lib/paper-trading";
 
 const timeframes = ["1m", "5m", "15m", "1H", "3H", "4H", "1D"] as const;
 const ranges = [
@@ -58,16 +64,6 @@ const tools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "long", label: "Long position", icon: TrendingUp },
   { id: "short", label: "Short position", icon: TrendingDown },
 ];
-
-type QuickOrder = {
-  id: string;
-  symbol: string;
-  side: "BUY" | "SELL";
-  quantity: number;
-  price: number;
-  status: "COMPLETE";
-  time: string;
-};
 
 function getInitialInstrument(symbol: string) {
   return instruments.find((instrument) => instrument.symbol === symbol) ?? instruments[0];
@@ -100,6 +96,7 @@ export function AdvancedChartWorkspace({
   const [showIndicators, setShowIndicators] = useState(false);
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL" | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -111,12 +108,28 @@ export function AdvancedChartWorkspace({
     };
   }, []);
 
+  useEffect(() => {
+    const restore = window.setTimeout(() => setOrders(readPaperOrders()), 0);
+    const refresh = () => setOrders(readPaperOrders());
+    window.addEventListener("storage", refresh);
+    window.addEventListener("papertrade-orders-updated", refresh);
+    return () => {
+      window.clearTimeout(restore);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("papertrade-orders-updated", refresh);
+    };
+  }, []);
+
   const handlePrice = useCallback((price: number) => setLivePrice(price), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const filteredSymbols = useMemo(() => {
     const term = symbolSearch.trim().toLowerCase();
     return instruments.filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
   }, [symbolSearch]);
+  const position = useMemo(
+    () => calculatePosition(orders, instrument.symbol, livePrice),
+    [instrument.symbol, livePrice, orders],
+  );
 
   function selectTool(tool: DrawingTool) {
     setActiveTool(tool);
@@ -147,7 +160,7 @@ export function AdvancedChartWorkspace({
 
   function placeQuickOrder() {
     if (!orderSide || quantity < 1) return;
-    const order: QuickOrder = {
+    const order: PaperOrder = {
       id: `${Date.now()}`,
       symbol: instrument.symbol,
       side: orderSide,
@@ -156,14 +169,30 @@ export function AdvancedChartWorkspace({
       status: "COMPLETE",
       time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
     };
-    try {
-      const existing = JSON.parse(localStorage.getItem("papertrade-orders") ?? "[]") as QuickOrder[];
-      localStorage.setItem("papertrade-orders", JSON.stringify([order, ...existing]));
-    } catch {
-      localStorage.setItem("papertrade-orders", JSON.stringify([order]));
-    }
+    const nextOrders = [order, ...orders];
+    setOrders(nextOrders);
+    writePaperOrders(nextOrders);
     setToast(`${orderSide === "BUY" ? "Bought" : "Sold"} ${quantity} ${instrument.symbol} at ${formatInr(livePrice)}`);
     setOrderSide(null);
+    window.setTimeout(() => setToast(""), 3_000);
+  }
+
+  function closePosition() {
+    if (position.quantity <= 0 || position.side === "FLAT") return;
+    const closingSide = position.side === "LONG" ? "SELL" : "BUY";
+    const order: PaperOrder = {
+      id: `${Date.now()}`,
+      symbol: instrument.symbol,
+      side: closingSide,
+      quantity: position.quantity,
+      price: livePrice,
+      status: "COMPLETE",
+      time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+    };
+    const nextOrders = [order, ...orders];
+    setOrders(nextOrders);
+    writePaperOrders(nextOrders);
+    setToast(`Closed ${instrument.symbol} at ${formatInr(livePrice)}`);
     window.setTimeout(() => setToast(""), 3_000);
   }
 
@@ -251,6 +280,26 @@ export function AdvancedChartWorkspace({
             onPrice={handlePrice}
             onFeedStatus={handleFeedStatus}
           />
+          {(position.quantity > 0 || position.realizedPnl !== 0) && (
+            <aside className="live-position-card" aria-live="polite">
+              <div className="live-position-head">
+                <span className={position.side === "SHORT" ? "short" : position.side === "LONG" ? "long" : "flat"}>{position.side}</span>
+                <div><b>{instrument.symbol}</b><small>{position.quantity > 0 ? `${position.quantity} shares · Intraday` : "Position closed"}</small></div>
+                <em>LIVE P&amp;L</em>
+              </div>
+              <div className="live-position-pnl">
+                <strong className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</strong>
+                <small className={position.returnPercent >= 0 ? "positive" : "negative"}>{position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small>
+              </div>
+              <dl>
+                <div><dt>Average</dt><dd>{position.averagePrice > 0 ? formatInr(position.averagePrice) : "—"}</dd></div>
+                <div><dt>Live price</dt><dd>{formatInr(position.livePrice)}</dd></div>
+                <div><dt>Realized</dt><dd className={position.realizedPnl >= 0 ? "positive" : "negative"}>{formatInr(position.realizedPnl)}</dd></div>
+                <div><dt>Total P&amp;L</dt><dd className={position.totalPnl >= 0 ? "positive" : "negative"}>{formatInr(position.totalPnl)}</dd></div>
+              </dl>
+              {position.quantity > 0 && <button onClick={closePosition}>Close position at market</button>}
+            </aside>
+          )}
         </div>
       </section>
 

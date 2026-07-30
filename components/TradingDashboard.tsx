@@ -10,17 +10,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarketChart, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, type Instrument } from "@/lib/market";
+import { calculatePosition, readPaperOrders, writePaperOrders, type PaperOrder } from "@/lib/paper-trading";
 import type { NormalizedQuote } from "@/lib/upstox";
-
-type Order = {
-  id: string;
-  symbol: string;
-  side: "BUY" | "SELL";
-  quantity: number;
-  price: number;
-  status: "COMPLETE";
-  time: string;
-};
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D"];
@@ -112,7 +103,7 @@ export function TradingDashboard() {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState("Market");
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -128,7 +119,7 @@ export function TradingDashboard() {
   useEffect(() => {
     const restore = window.setTimeout(() => {
       try {
-        setOrders(JSON.parse(localStorage.getItem("papertrade-orders") ?? "[]") as Order[]);
+        setOrders(readPaperOrders());
         setBalance(Number(localStorage.getItem("papertrade-balance") ?? "1000000"));
       } catch { /* Ignore malformed local demo data. */ }
     }, 0);
@@ -186,10 +177,14 @@ export function TradingDashboard() {
   const selectedNetChange = selectedQuote?.netChange ?? livePrice * selected.change / 100;
   const orderValue = livePrice * quantity;
   const margin = orderValue * 0.2;
+  const selectedPosition = useMemo(
+    () => calculatePosition(orders, selected.symbol, livePrice),
+    [livePrice, orders, selected.symbol],
+  );
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
-    const order: Order = {
+    const order: PaperOrder = {
       id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: livePrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
     };
@@ -197,7 +192,7 @@ export function TradingDashboard() {
     const nextBalance = side === "BUY" ? balance - margin : balance + margin;
     setOrders(nextOrders);
     setBalance(nextBalance);
-    localStorage.setItem("papertrade-orders", JSON.stringify(nextOrders));
+    writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} at ${formatInr(livePrice)}`);
     window.setTimeout(() => setToast(""), 3200);
@@ -302,6 +297,12 @@ export function TradingDashboard() {
           </div>
           <div className="product-select"><label><input type="radio" name="product" defaultChecked /><span><b>Intraday</b><small>MIS · 5x leverage</small></span></label><label><input type="radio" name="product" /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
+          {selectedPosition.quantity > 0 && (
+            <div className="ticket-live-position">
+              <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
+              <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
+            </div>
+          )}
           <button className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{side} {quantity} {selected.symbol}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">

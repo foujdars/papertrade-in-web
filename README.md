@@ -12,8 +12,10 @@ A responsive Indian-market paper-trading simulator built with Next.js, vinext an
 - Native zoom-synchronised drawings with magnet, lock, hide, undo, redo and delete controls
 - NIFTY 50, BANK NIFTY, NIFTY 500 and demo All NSE watchlists
 - Local INR paper orders, cash balance and order book
+- Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage and one-tap market close
 - Server-only Upstox access-token handling with visible live/fallback feed status
 - Responsive desktop and mobile layouts
+- Capacitor 8 Android app project that opens the full-screen chart and uses the same local paper-order engine
 
 ## Run locally
 
@@ -30,6 +32,17 @@ Open `http://localhost:3000`.
 npm run build
 npm run start
 ```
+
+## Android APK
+
+The Android app uses the stable hosted web application so it can reach the secure Upstox server routes. It therefore requires an internet connection. Paper orders and positions remain local to the Android WebView storage.
+
+```bash
+npm run android:sync
+npm run android:apk
+```
+
+The debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. Set `PAPERTRADE_APP_URL` before syncing to point a personal build at another HTTPS deployment.
 
 ## Hosting
 

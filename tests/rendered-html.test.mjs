@@ -30,10 +30,12 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, dashboard, chart, serverAdapter, candleRoute, quoteRoute, readme] = await Promise.all([
+  const [page, dashboard, chart, advancedChart, paperTrading, serverAdapter, candleRoute, quoteRoute, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AdvancedChartWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/paper-trading.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/upstox-server.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/candles/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/quotes/route.ts", import.meta.url), "utf8"),
@@ -41,7 +43,11 @@ test("ships project assets and removes the starter preview", async () => {
   ]);
 
   assert.match(page, /<TradingDashboard \/>/);
-  assert.match(dashboard, /papertrade-orders/);
+  assert.match(dashboard, /calculatePosition/);
+  assert.match(advancedChart, /LIVE P&amp;L/);
+  assert.match(advancedChart, /closePosition/);
+  assert.match(paperTrading, /papertrade-orders/);
+  assert.match(paperTrading, /unrealizedPnl/);
   assert.match(dashboard, /Fibonacci/);
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("klinecharts"\)/);
