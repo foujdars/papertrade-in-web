@@ -101,6 +101,7 @@ export function AdvancedChartWorkspace({
   const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
+  const symbolPickerRef = useRef<HTMLDivElement>(null);
   const indicatorButtonRef = useRef<HTMLButtonElement>(null);
   const indicatorPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -148,6 +149,28 @@ export function AdvancedChartWorkspace({
     document.addEventListener("pointerdown", closeOnOutsideTap);
     return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
   }, [showIndicators]);
+
+  useEffect(() => {
+    if (!showSymbols) return;
+    const closeSymbolList = (event: PointerEvent) => {
+      if (!symbolPickerRef.current?.contains(event.target as Node)) {
+        setShowSymbols(false);
+        setSymbolSearch("");
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSymbols(false);
+        setSymbolSearch("");
+      }
+    };
+    document.addEventListener("pointerdown", closeSymbolList);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeSymbolList);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [showSymbols]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -282,7 +305,7 @@ export function AdvancedChartWorkspace({
       <header className="advanced-topbar">
         <Link href={`/?symbol=${instrument.symbol}&timeframe=${timeframe}`} onClick={(event) => { event.preventDefault(); window.history.back(); }} className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
         <div className="advanced-brand"><span><TrendingUp size={18} strokeWidth={3} /></span><b>PaperTrade</b> IN</div>
-        <div className="advanced-symbol-picker">
+        <div ref={symbolPickerRef} className="advanced-symbol-picker">
           <button onClick={() => setShowSymbols((value) => !value)}>
             <span><b>{instrument.symbol}</b><small>{instrument.name} · NSE</small></span>
             <ChevronDown size={16} />
