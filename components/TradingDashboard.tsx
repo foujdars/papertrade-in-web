@@ -7,7 +7,7 @@ import {
   Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
   TrendingDown, TrendingUp, UserRound, WalletCards, X, type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
@@ -123,6 +123,8 @@ export function TradingDashboard() {
     message: "Connecting to Upstox…",
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
+  const indicatorButtonRef = useRef<HTMLButtonElement>(null);
+  const indicatorPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
@@ -142,6 +144,18 @@ export function TradingDashboard() {
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showIndicators) return;
+    const closeOnOutsideTap = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!indicatorButtonRef.current?.contains(target) && !indicatorPopoverRef.current?.contains(target)) {
+        setShowIndicators(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideTap);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
+  }, [showIndicators]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -289,6 +303,7 @@ export function TradingDashboard() {
       <header className="topbar">
         <button className="mobile-menu icon-button" onClick={() => setSidebarOpen(true)} aria-label="Open watchlist"><Menu size={21} /></button>
         <Brand />
+        <a className="mobile-full-chart-top" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} aria-label="Open full chart"><Maximize2 size={17} /><span>Full chart</span></a>
         <nav className="main-nav" aria-label="Main navigation">
           <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button>Positions</button><button>Analytics</button>
         </nav>
@@ -349,9 +364,9 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <div className="period-tabs">{periods.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => setTimeframe(period)}>{period}</button>)}</div>
             <span className="control-divider" />
-            <button className={`control-button mobile-indicator-control ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
+            <button ref={indicatorButtonRef} className={`control-button mobile-indicator-control ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
             {showIndicators && (
-              <div className="dashboard-indicator-popover">
+              <div ref={indicatorPopoverRef} className="dashboard-indicator-popover">
                 <b>Indicators</b>
                 <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
                 <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>

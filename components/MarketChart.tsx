@@ -197,14 +197,14 @@ const chartStyles: DeepPartial<Styles> = {
     point: {
       color: "#ffffff",
       borderColor: "#6b5cff",
-      borderSize: 2,
+      borderSize: 1,
       radius: 4,
       activeColor: "#ffffff",
       activeBorderColor: "#5b4be8",
-      activeBorderSize: 3,
+      activeBorderSize: 2,
       activeRadius: 5,
     },
-    line: { color: "#6b5cff", style: "solid", size: 2, dashedValue: [5, 4], smooth: false },
+    line: { color: "#6b5cff", style: "solid", size: 1, dashedValue: [5, 4], smooth: false },
     rect: { style: "stroke_fill", color: "#6b5cff16", borderColor: "#6b5cff", borderSize: 1, borderStyle: "solid", borderDashedValue: [], borderRadius: 0 },
     text: {
       style: "fill",
@@ -272,7 +272,7 @@ function registerPaperOverlays(kline: KLineModule) {
         ? `${second >= first ? "+" : ""}${(((second - first) / first) * 100).toFixed(2)}%`
         : "Price range";
       return [
-        { type: "line", attrs: { coordinates: [a, b] }, styles: { color: "#6b5cff", size: 2 } },
+        { type: "line", attrs: { coordinates: [a, b] }, styles: { color: "#6b5cff", size: 1 } },
         { type: "line", attrs: { coordinates: [{ x: a.x - 7, y: a.y }, { x: a.x + 7, y: a.y }] }, styles: { color: "#6b5cff", size: 1 } },
         { type: "line", attrs: { coordinates: [{ x: b.x - 7, y: b.y }, { x: b.x + 7, y: b.y }] }, styles: { color: "#6b5cff", size: 1 } },
         { type: "text", attrs: { x: b.x + 9, y: (a.y + b.y) / 2, text: percent, baseline: "middle" } },
@@ -445,7 +445,7 @@ export function MarketChart({
         calcParams: [5],
         precision: 2,
         styles: {
-          lines: [{ color: "#0ea5e9", size: 2, style: "solid", dashedValue: [], smooth: false }],
+          lines: [{ color: "#0ea5e9", size: 1, style: "solid", dashedValue: [], smooth: false }],
         },
       }, true),
       ema21: () => chart.createIndicator({
@@ -455,7 +455,7 @@ export function MarketChart({
         calcParams: [21],
         precision: 2,
         styles: {
-          lines: [{ color: "#ff8a00", size: 2, style: "solid", dashedValue: [], smooth: false }],
+          lines: [{ color: "#ff8a00", size: 1, style: "solid", dashedValue: [], smooth: false }],
         },
       }, true),
       rsi: () => chart.createIndicator({
@@ -466,7 +466,7 @@ export function MarketChart({
         minValue: 0,
         maxValue: 100,
         styles: {
-          lines: [{ color: "#7c4dff", size: 2, style: "solid", dashedValue: [], smooth: false }],
+          lines: [{ color: "#7c4dff", size: 1, style: "solid", dashedValue: [], smooth: false }],
         },
       }),
     };

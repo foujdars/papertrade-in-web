@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
@@ -101,6 +101,8 @@ export function AdvancedChartWorkspace({
   const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
+  const indicatorButtonRef = useRef<HTMLButtonElement>(null);
+  const indicatorPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -122,6 +124,18 @@ export function AdvancedChartWorkspace({
       window.removeEventListener("papertrade-orders-updated", refresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showIndicators) return;
+    const closeOnOutsideTap = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!indicatorButtonRef.current?.contains(target) && !indicatorPopoverRef.current?.contains(target)) {
+        setShowIndicators(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideTap);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
+  }, [showIndicators]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -273,22 +287,22 @@ export function AdvancedChartWorkspace({
           <small className={instrument.change >= 0 ? "positive" : "negative"}>{instrument.change >= 0 ? "+" : ""}{instrument.change.toFixed(2)}%</small>
         </div>
         <div className="advanced-order-buttons">
-          <button className="advanced-sell" disabled={!marketStatus.isOpen} title={marketStatus.message} onClick={() => setOrderSide("SELL")}><small>Sell</small><b>{livePrice.toFixed(2)}</b></button>
-          <button className="advanced-buy" disabled={!marketStatus.isOpen} title={marketStatus.message} onClick={() => setOrderSide("BUY")}><small>Buy</small><b>{livePrice.toFixed(2)}</b></button>
+          <button className="advanced-sell" title="Open sell paper order" onClick={() => setOrderSide("SELL")}><small>Sell</small><b>{livePrice.toFixed(2)}</b></button>
+          <button className="advanced-buy" title="Open buy paper order" onClick={() => setOrderSide("BUY")}><small>Buy</small><b>{livePrice.toFixed(2)}</b></button>
         </div>
       </header>
 
       <nav className="advanced-commandbar" aria-label="Chart controls">
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
-        <button className={`advanced-indicator-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={18} /> Indicators <em>{activeIndicatorCount}</em></button>
+        <button ref={indicatorButtonRef} className={`advanced-indicator-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={18} /> Indicators <em>{activeIndicatorCount}</em></button>
         <span />
         <button title="Undo last drawing" onClick={() => setUndoSignal((value) => value + 1)}><Undo2 size={18} /></button>
         <button title="Redo drawing" onClick={() => setRedoSignal((value) => value + 1)}><Redo2 size={18} /></button>
         <button title="Chart settings"><Settings2 size={18} /></button>
         <button title="Fullscreen" onClick={enterFullscreen}><Fullscreen size={18} /></button>
         {showIndicators && (
-          <div className="advanced-indicator-popover">
+          <div ref={indicatorPopoverRef} className="advanced-indicator-popover">
             <b>Indicators</b>
             <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
             <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>
@@ -365,7 +379,8 @@ export function AdvancedChartWorkspace({
       </footer>
 
       {orderSide && (
-        <div className="advanced-order-dock">
+        <div className="advanced-order-backdrop" role="presentation" onPointerDown={() => setOrderSide(null)}>
+          <section className="advanced-order-dock" role="dialog" aria-modal="true" aria-label={`Place ${orderSide.toLowerCase()} paper order`} onPointerDown={(event) => event.stopPropagation()}>
           <button className="advanced-dock-close" onClick={() => setOrderSide(null)} aria-label="Close order"><X size={17} /></button>
           <span className={orderSide === "BUY" ? "buy-tag" : "sell-tag"}>{orderSide}</span>
           <div><b>{instrument.symbol}</b><small>Market · Intraday · Paper order</small></div>
@@ -374,6 +389,7 @@ export function AdvancedChartWorkspace({
           <button className="advanced-dock-cancel" onClick={() => setOrderSide(null)}>Cancel</button>
           <button disabled={!marketStatus.isOpen} className={orderSide === "BUY" ? "dock-buy" : "dock-sell"} onClick={placeQuickOrder}>Confirm {orderSide}</button>
           {!marketStatus.isOpen && <small className="advanced-market-closed">{marketStatus.message}</small>}
+          </section>
         </div>
       )}
       {toast && <div className="toast advanced-toast">{toast}</div>}
