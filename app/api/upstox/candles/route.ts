@@ -10,6 +10,14 @@ type UpstoxCandlePayload = {
   data?: { candles?: Array<[string | number, number, number, number, number, number?, number?]> };
 };
 
+type ChartCandle = {
+  time: UTCTimestamp;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
 const timeframeMap = {
   "1m": { unit: "minutes", interval: "1", lookbackDays: 7 },
   "5m": { unit: "minutes", interval: "5", lookbackDays: 14 },
@@ -32,11 +40,40 @@ function indiaDate(offsetDays = 0) {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
+function normalizeCandles(payload: UpstoxCandlePayload): ChartCandle[] {
+  return (payload.data?.candles ?? [])
+    .map((item) => ({
+      time: Math.floor(new Date(item[0]).getTime() / 1000) as UTCTimestamp,
+      open: Number(item[1]),
+      high: Number(item[2]),
+      low: Number(item[3]),
+      close: Number(item[4]),
+    }))
+    .filter((candle) =>
+      Number.isFinite(candle.time) &&
+      Number.isFinite(candle.open) &&
+      Number.isFinite(candle.high) &&
+      Number.isFinite(candle.low) &&
+      Number.isFinite(candle.close),
+    );
+}
+
+function mergeCandles(groups: ChartCandle[][]) {
+  const candlesByTime = new Map<number, ChartCandle>();
+  for (const candle of groups.flat()) {
+    candlesByTime.set(Number(candle.time), candle);
+  }
+  return [...candlesByTime.values()]
+    .sort((a, b) => Number(a.time) - Number(b.time))
+    .slice(-1_600);
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const instrumentKey = url.searchParams.get("instrumentKey") ?? "";
     const timeframe = url.searchParams.get("timeframe") ?? "5m";
+    const scope = url.searchParams.get("scope") ?? "combined";
     const config = timeframeMap[timeframe as keyof typeof timeframeMap];
 
     if (!ALLOWED_UPSTOX_KEYS.has(instrumentKey)) {
@@ -51,28 +88,42 @@ export async function GET(request: Request) {
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
+    if (scope !== "combined" && scope !== "intraday") {
+      return Response.json(
+        { ok: false, error: { code: "INVALID_SCOPE", message: "Unsupported candle scope." } },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
     const toDate = indiaDate();
     const fromDate = indiaDate(-config.lookbackDays);
-    const path = `/v3/historical-candle/${encodeURIComponent(instrumentKey)}/${config.unit}/${config.interval}/${toDate}/${fromDate}`;
-    const payload = await upstoxFetch<UpstoxCandlePayload>(path);
-    const candles = (payload.data?.candles ?? [])
-      .map((item) => ({
-        time: Math.floor(new Date(item[0]).getTime() / 1000) as UTCTimestamp,
-        open: Number(item[1]),
-        high: Number(item[2]),
-        low: Number(item[3]),
-        close: Number(item[4]),
-      }))
-      .filter((candle) =>
-        Number.isFinite(candle.time) &&
-        Number.isFinite(candle.open) &&
-        Number.isFinite(candle.high) &&
-        Number.isFinite(candle.low) &&
-        Number.isFinite(candle.close),
-      )
-      .sort((a, b) => Number(a.time) - Number(b.time))
-      .slice(-500);
+    const encodedKey = encodeURIComponent(instrumentKey);
+    const historicalPath = `/v3/historical-candle/${encodedKey}/${config.unit}/${config.interval}/${toDate}/${fromDate}`;
+    const intradayPath = `/v3/historical-candle/intraday/${encodedKey}/${config.unit}/${config.interval}`;
+    let candles: ChartCandle[];
+    let segments: string[];
+
+    if (scope === "intraday") {
+      const intraday = await upstoxFetch<UpstoxCandlePayload>(intradayPath);
+      candles = mergeCandles([normalizeCandles(intraday)]);
+      segments = ["intraday"];
+    } else {
+      const results = await Promise.allSettled([
+        upstoxFetch<UpstoxCandlePayload>(historicalPath),
+        upstoxFetch<UpstoxCandlePayload>(intradayPath),
+      ]);
+      const successful = results
+        .map((result, index) => result.status === "fulfilled"
+          ? { payload: result.value, segment: index === 0 ? "historical" : "intraday" }
+          : null)
+        .filter((result): result is { payload: UpstoxCandlePayload; segment: string } => Boolean(result));
+      if (!successful.length) {
+        const failure = results.find((result) => result.status === "rejected");
+        throw failure && failure.status === "rejected" ? failure.reason : new Error("Upstox candles are unavailable.");
+      }
+      candles = mergeCandles(successful.map((result) => normalizeCandles(result.payload)));
+      segments = successful.map((result) => result.segment);
+    }
 
     if (!candles.length) {
       return Response.json(
@@ -82,7 +133,7 @@ export async function GET(request: Request) {
     }
 
     return Response.json(
-      { ok: true, source: "upstox", instrumentKey, timeframe, candles, fetchedAt: new Date().toISOString() },
+      { ok: true, source: "upstox", segments, instrumentKey, timeframe, candles, fetchedAt: new Date().toISOString() },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

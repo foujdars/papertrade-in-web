@@ -10,6 +10,7 @@ type UpstoxQuote = {
   last_price?: number;
   net_change?: number;
   timestamp?: string;
+  last_trade_time?: string;
   ohlc?: { open?: number; high?: number; low?: number; close?: number };
 };
 
@@ -45,6 +46,10 @@ export async function GET(request: Request) {
       const netChange = Number.isFinite(Number(quote.net_change))
         ? Number(quote.net_change)
         : lastPrice - previousClose;
+      const lastTradeMilliseconds = Number(quote.last_trade_time);
+      const lastTradeAt = Number.isFinite(lastTradeMilliseconds)
+        ? new Date(lastTradeMilliseconds).toISOString()
+        : quote.timestamp ?? new Date().toISOString();
       if (!symbol || !Number.isFinite(lastPrice)) continue;
       quotes[symbol] = {
         instrumentKey,
@@ -56,6 +61,7 @@ export async function GET(request: Request) {
         high: Number(quote.ohlc?.high) || lastPrice,
         low: Number(quote.ohlc?.low) || lastPrice,
         previousClose: Number.isFinite(previousClose) ? previousClose : lastPrice,
+        lastTradeAt,
         updatedAt: quote.timestamp ?? new Date().toISOString(),
       };
     }

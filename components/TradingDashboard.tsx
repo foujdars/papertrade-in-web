@@ -117,6 +117,7 @@ export function TradingDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [clock, setClock] = useState<Date | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>({
     mode: "loading",
     message: "Connecting to Upstox…",
@@ -131,6 +132,15 @@ export function TradingDashboard() {
       } catch { /* Ignore malformed local demo data. */ }
     }, 0);
     return () => window.clearTimeout(restore);
+  }, []);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => setClock(new Date()), 0);
+    const interval = window.setInterval(() => setClock(new Date()), 30_000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -273,7 +283,7 @@ export function TradingDashboard() {
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
             <div>Click + drag to pan · Scroll/pinch to zoom</div>
-            <div>India · {new Date().toLocaleDateString("en-IN")} · {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST</div>
+            <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST` : "India · IST"}</div>
           </div>
         </section>
 

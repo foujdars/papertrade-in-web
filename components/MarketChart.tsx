@@ -6,8 +6,10 @@ import {
   createChart,
   LineSeries,
   LineStyle,
+  TickMarkType,
   type IChartApi,
   type ISeriesApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +37,54 @@ type Point = { x: number; y: number };
 type Drawing = { id: number; tool: DrawingTool; points: Point[] };
 
 const twoPointTools: DrawingTool[] = ["trend", "ray", "rectangle", "fib", "range", "long", "short"];
+
+function timeToDate(time: Time) {
+  if (typeof time === "number") return new Date(time * 1_000);
+  if (typeof time === "string") return new Date(time);
+  return new Date(Date.UTC(time.year, time.month - 1, time.day));
+}
+
+function indiaChartTime(time: Time, daily: boolean) {
+  const date = timeToDate(time);
+  const day = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  }).format(date).replace(/ (\d{2})$/, " '$1");
+  if (daily) return day;
+  const clock = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+  return `${day} ${clock}`;
+}
+
+function indiaTickMark(time: Time, tickMarkType: TickMarkType, daily: boolean) {
+  if (daily || tickMarkType <= TickMarkType.DayOfMonth) {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+    }).format(timeToDate(time));
+  }
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(timeToDate(time));
+}
+
+function mergeSeries(existing: Candle[], incoming: Candle[]) {
+  const byTime = new Map<number, Candle>();
+  for (const candle of [...existing, ...incoming]) byTime.set(Number(candle.time), candle);
+  return [...byTime.values()]
+    .sort((a, b) => Number(a.time) - Number(b.time))
+    .slice(-1_600);
+}
 
 function DrawingShape({ drawing }: { drawing: Drawing }) {
   const [a, b = a, c = b] = drawing.points;
@@ -144,6 +194,7 @@ export function MarketChart({
   const ema21Series = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const dataRef = useRef<Candle[]>([]);
+  const viewportInitialized = useRef(false);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [draft, setDraft] = useState<Point[]>([]);
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
@@ -153,9 +204,20 @@ export function MarketChart({
     if (!chartHost.current || !rsiHost.current) return;
     const common = {
       layout: { background: { type: ColorType.Solid, color: "#ffffff" }, textColor: "#65708a", fontFamily: "Inter, Arial, sans-serif", fontSize: 11 },
+      localization: {
+        locale: "en-IN",
+        timeFormatter: (time: Time) => indiaChartTime(time, timeframe === "1D"),
+      },
       grid: { vertLines: { color: "#eef1f7" }, horzLines: { color: "#eef1f7" } },
       rightPriceScale: { borderColor: "#e6e9f2", minimumWidth: 64 },
-      timeScale: { borderColor: "#e6e9f2", timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 8 },
+      timeScale: {
+        borderColor: "#e6e9f2",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 8,
+        barSpacing: 7,
+        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) => indiaTickMark(time, tickMarkType, timeframe === "1D"),
+      },
       crosshair: { vertLine: { color: "#98a2b7", style: LineStyle.Dashed }, horzLine: { color: "#98a2b7", style: LineStyle.Dashed } },
       handleScroll: true,
       handleScale: true,
@@ -170,8 +232,8 @@ export function MarketChart({
       priceLineColor: "#6b5cff",
       lastValueVisible: true,
     });
-    const fast = chart.addSeries(LineSeries, { color: "#0098e8", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-    const slow = chart.addSeries(LineSeries, { color: "#ff8a00", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+    const fast = chart.addSeries(LineSeries, { color: "#ff6d00", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+    const slow = chart.addSeries(LineSeries, { color: "#4caf50", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
     const rsiChart = createChart(rsiHost.current, {
       ...common,
       height: rsiHost.current.clientHeight,
@@ -199,7 +261,7 @@ export function MarketChart({
       chart.remove();
       rsiChart.remove();
     };
-  }, []);
+  }, [timeframe]);
 
   useEffect(() => {
     dataRef.current = seriesData;
@@ -207,9 +269,20 @@ export function MarketChart({
     ema5Series.current?.setData(ema(seriesData, 5));
     ema21Series.current?.setData(ema(seriesData, 21));
     rsiSeries.current?.setData(rsi(seriesData, 14));
-    chartApi.current?.timeScale().fitContent();
+    if (!viewportInitialized.current) {
+      const visibleBars = timeframe === "1D" ? 120 : timeframe.endsWith("H") ? 100 : 155;
+      if (seriesData.length > visibleBars) {
+        chartApi.current?.timeScale().setVisibleLogicalRange({
+          from: seriesData.length - visibleBars,
+          to: seriesData.length + 8,
+        });
+      } else {
+        chartApi.current?.timeScale().fitContent();
+      }
+      viewportInitialized.current = true;
+    }
     onPrice(seriesData.at(-1)?.close ?? instrument.price);
-  }, [seriesData, instrument.price, onPrice]);
+  }, [seriesData, instrument.price, onPrice, timeframe]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,17 +301,21 @@ export function MarketChart({
         const payload = await response.json() as {
           ok?: boolean;
           candles?: Candle[];
+          segments?: string[];
           fetchedAt?: string;
           error?: { message?: string };
         };
         if (!response.ok || !payload.ok || !payload.candles?.length) {
           throw new Error(payload.error?.message ?? "Upstox candles are unavailable.");
         }
+        viewportInitialized.current = false;
         setSeriesData(payload.candles);
         setFeedMode("live");
         onFeedStatus({
           mode: "live",
-          message: "Upstox market data",
+          message: payload.segments?.includes("intraday")
+            ? "Upstox historical + intraday candles"
+            : "Upstox historical candles",
           updatedAt: payload.fetchedAt,
         });
       } catch (error) {
@@ -297,6 +374,54 @@ export function MarketChart({
     if (feedMode !== "live") return;
     const controller = new AbortController();
 
+    async function refreshIntradayCandles() {
+      try {
+        const params = new URLSearchParams({
+          instrumentKey: instrument.instrumentKey,
+          timeframe,
+          scope: "intraday",
+        });
+        const response = await fetch(`/api/upstox/candles?${params}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json() as {
+          ok?: boolean;
+          candles?: Candle[];
+          fetchedAt?: string;
+          error?: { message?: string };
+        };
+        if (!response.ok || !payload.ok || !payload.candles?.length) {
+          throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
+        }
+
+        const merged = mergeSeries(dataRef.current, payload.candles);
+        setSeriesData(merged);
+        onFeedStatus({
+          mode: "live",
+          message: "Upstox historical + intraday candles",
+          updatedAt: payload.fetchedAt,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        onFeedStatus({
+          mode: "error",
+          message: error instanceof Error ? error.message : "Upstox candle refresh failed.",
+        });
+      }
+    }
+
+    const interval = window.setInterval(() => void refreshIntradayCandles(), 10_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [feedMode, instrument.instrumentKey, instrument.price, onFeedStatus, onPrice, timeframe]);
+
+  useEffect(() => {
+    if (feedMode !== "live") return;
+    const controller = new AbortController();
+
     async function pollQuote() {
       try {
         const response = await fetch(
@@ -306,7 +431,7 @@ export function MarketChart({
         const payload = await response.json() as {
           ok?: boolean;
           fetchedAt?: string;
-          quotes?: Record<string, { lastPrice?: number; updatedAt?: string }>;
+          quotes?: Record<string, { lastPrice?: number; lastTradeAt?: string; updatedAt?: string }>;
           error?: { message?: string };
         };
         const quote = payload.quotes?.[instrument.symbol];
@@ -315,42 +440,11 @@ export function MarketChart({
           throw new Error(payload.error?.message ?? "Upstox quote refresh failed.");
         }
 
-        const source = dataRef.current;
-        if (!source.length) return;
-        const last = source[source.length - 1];
-        const quoteTime = Math.floor(new Date(quote?.updatedAt ?? payload.fetchedAt ?? Date.now()).getTime() / 1000);
-        const step = timeframes[timeframe] ?? 300;
-        const bucket = Math.floor(quoteTime / step) * step;
-        let nextData: Candle[];
-        let updated: Candle;
-        if (bucket > Number(last.time)) {
-          updated = {
-            time: bucket as UTCTimestamp,
-            open: last.close,
-            high: Math.max(last.close, price),
-            low: Math.min(last.close, price),
-            close: price,
-          };
-          nextData = [...source, updated];
-        } else {
-          updated = {
-            ...last,
-            high: Math.max(last.high, price),
-            low: Math.min(last.low, price),
-            close: price,
-          };
-          nextData = [...source.slice(0, -1), updated];
-        }
-        dataRef.current = nextData;
-        candleSeries.current?.update(updated);
-        ema5Series.current?.setData(ema(nextData, 5));
-        ema21Series.current?.setData(ema(nextData, 21));
-        rsiSeries.current?.setData(rsi(nextData, 14));
         onPrice(price);
         onFeedStatus({
           mode: "live",
-          message: "Upstox market data",
-          updatedAt: payload.fetchedAt,
+          message: "Upstox historical + intraday candles",
+          updatedAt: quote?.lastTradeAt ?? payload.fetchedAt,
         });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -367,7 +461,7 @@ export function MarketChart({
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [feedMode, instrument.instrumentKey, instrument.symbol, onFeedStatus, onPrice, timeframe]);
+  }, [feedMode, instrument.instrumentKey, instrument.symbol, onFeedStatus, onPrice]);
 
   function addPoint(event: React.PointerEvent<SVGSVGElement>) {
     if (activeTool === "cursor") return;
@@ -388,6 +482,8 @@ export function MarketChart({
     }
   }
 
+  const latestCandle = seriesData.at(-1);
+
   return (
     <div className="chart-stack">
       <div className="price-chart-wrap">
@@ -402,6 +498,17 @@ export function MarketChart({
           {!hiddenDrawings && drawings.map((drawing) => <DrawingShape key={drawing.id} drawing={drawing} />)}
           {draft.map((point, index) => <circle key={index} cx={`${point.x}%`} cy={`${point.y}%`} r="0.8" fill="#6b5cff" />)}
         </svg>
+        <div className="chart-symbol-legend">
+          <b>{instrument.name.toUpperCase()} · {timeframe.replace("m", "")} · NSE</b>
+          {latestCandle && (
+            <span>
+              O <i>{latestCandle.open.toFixed(2)}</i>
+              H <i>{latestCandle.high.toFixed(2)}</i>
+              L <i>{latestCandle.low.toFixed(2)}</i>
+              C <i className={latestCandle.close >= latestCandle.open ? "positive" : "negative"}>{latestCandle.close.toFixed(2)}</i>
+            </span>
+          )}
+        </div>
         <div className="indicator-legend">
           <span><i className="ema-fast" />EMA 5</span>
           <span><i className="ema-slow" />EMA 21</span>

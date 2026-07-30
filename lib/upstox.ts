@@ -39,5 +39,6 @@ export type NormalizedQuote = {
   high: number;
   low: number;
   previousClose: number;
+  lastTradeAt: string;
   updatedAt: string;
 };

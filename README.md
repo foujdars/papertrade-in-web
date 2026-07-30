@@ -36,7 +36,7 @@ Vercel uses the native Next.js build configured in `vercel.json`. Add `UPSTOX_AC
 
 ## Data and safety
 
-The server loads historical candles from Upstox and polls authenticated quote snapshots every five seconds for the selected chart and every ten seconds for the watchlist. If the token is missing, expired or rejected, the chart visibly switches to simulated fallback data and shows the reason in its status bar. Paper orders stay in browser storage and are never submitted to Upstox or an exchange. This is an educational simulator, not investment advice.
+The server merges Upstox historical candles with the official current-trading-day intraday OHLC feed. It refreshes true intraday candles every ten seconds, polls the selected symbol's LTP every five seconds, and refreshes watchlist quotes every ten seconds. LTP values are never used to invent candle opens, highs or lows. If the token is missing, expired or rejected, the chart visibly switches to simulated fallback data and shows the reason in its status bar. Paper orders stay in browser storage and are never submitted to Upstox or an exchange. This is an educational simulator, not investment advice.
 
 ## Attribution
 
