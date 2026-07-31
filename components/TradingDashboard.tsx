@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Activity, Bell, Bot, BoxSelect, Cable, ChevronDown, ChevronRight,
+  Activity, Bell, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
   Magnet, Maximize2, Menu, Minus, MousePointer2, PanelLeftClose, Plus, Radio, Ruler,
   Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
@@ -116,6 +116,9 @@ export function TradingDashboard() {
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [positionsOpen, setPositionsOpen] = useState(false);
+  const [showTradeSymbols, setShowTradeSymbols] = useState(false);
+  const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
   const [toast, setToast] = useState("");
   const [clock, setClock] = useState<Date | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>({
@@ -125,6 +128,7 @@ export function TradingDashboard() {
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const indicatorButtonRef = useRef<HTMLButtonElement>(null);
   const indicatorPopoverRef = useRef<HTMLDivElement>(null);
+  const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
@@ -146,19 +150,22 @@ export function TradingDashboard() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedSymbol = params.get("symbol")?.toUpperCase();
-    const requestedTimeframe = params.get("timeframe");
-    if (requestedTimeframe && periods.includes(requestedTimeframe)) {
-      setTimeframe(requestedTimeframe);
-    }
-    if (requestedSymbol) {
-      const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
-      if (fallbackInstrument) {
-        setSelected(fallbackInstrument);
-        setLivePrice(fallbackInstrument.price);
+    const applyRequestedChart = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedSymbol = params.get("symbol")?.toUpperCase();
+      const requestedTimeframe = params.get("timeframe");
+      if (requestedTimeframe && periods.includes(requestedTimeframe)) {
+        setTimeframe(requestedTimeframe);
       }
-    }
+      if (requestedSymbol) {
+        const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
+        if (fallbackInstrument) {
+          setSelected(fallbackInstrument);
+          setLivePrice(fallbackInstrument.price);
+        }
+      }
+    }, 0);
+    return () => window.clearTimeout(applyRequestedChart);
   }, []);
 
   useEffect(() => {
@@ -172,6 +179,28 @@ export function TradingDashboard() {
     document.addEventListener("pointerdown", closeOnOutsideTap);
     return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
   }, [showIndicators]);
+
+  useEffect(() => {
+    if (!showTradeSymbols) return;
+    const closeSymbolSearch = (event: PointerEvent) => {
+      if (!tradeSymbolPickerRef.current?.contains(event.target as Node)) {
+        setShowTradeSymbols(false);
+        setTradeSymbolSearch("");
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowTradeSymbols(false);
+        setTradeSymbolSearch("");
+      }
+    };
+    document.addEventListener("pointerdown", closeSymbolSearch);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeSymbolSearch);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [showTradeSymbols]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -199,10 +228,24 @@ export function TradingDashboard() {
     const matchesList = Boolean(term) || watchlist === "ALL NSE" || item.categories.includes(watchlist);
     return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
   }), [search, stockUniverse, watchlist]);
+  const tradeSymbolMatches = useMemo(() => {
+    const term = tradeSymbolSearch.trim().toLowerCase();
+    return stockUniverse
+      .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
+      .slice(0, 120);
+  }, [stockUniverse, tradeSymbolSearch]);
+  const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
+    const lastFill = orders.find((order) => order.symbol === symbol);
+    return calculatePosition(orders, symbol, lastFill?.price ?? 0).quantity > 0;
+  }), [orders]);
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const quoteKeys = useMemo(
-    () => [...new Set([...visibleInstruments.map((item) => item.instrumentKey), selected.instrumentKey])].slice(0, 100).join(","),
-    [selected.instrumentKey, visibleInstruments],
+    () => [...new Set([
+      selected.instrumentKey,
+      ...positionSymbols.map((symbol) => stockUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
+      ...visibleInstruments.map((item) => item.instrumentKey),
+    ])].slice(0, 100).join(","),
+    [positionSymbols, selected.instrumentKey, stockUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -251,6 +294,19 @@ export function TradingDashboard() {
     () => calculatePosition(orders, selected.symbol, livePrice),
     [livePrice, orders, selected.symbol],
   );
+  const openPositions = useMemo(() => positionSymbols.map((symbol) => {
+    const instrument = stockUniverse.find((item) => item.symbol === symbol);
+    const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
+    const lastFill = orders.find((order) => order.symbol === symbol);
+    const positionLivePrice = symbol === selected.symbol
+      ? livePrice
+      : quote?.lastPrice ?? (instrument && instrument.price > 0 ? instrument.price : lastFill?.price ?? 0);
+    return {
+      ...calculatePosition(orders, symbol, positionLivePrice),
+      name: instrument?.name ?? symbol,
+    };
+  }).filter((position) => position.quantity > 0), [livePrice, marketQuotes, orders, positionSymbols, selected.symbol, stockUniverse]);
+  const totalOpenPnl = openPositions.reduce((total, position) => total + position.unrealizedPnl, 0);
   const marketStatus = useMemo(
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
     [clock],
@@ -315,6 +371,25 @@ export function TradingDashboard() {
     setIndicators((current) => ({ ...current, [name]: !current[name] }));
   }
 
+  function chooseTradeInstrument(item: Instrument) {
+    const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
+    const price = quote?.lastPrice ?? item.price;
+    setSelected({ ...item, price: price > 0 ? price : 1 });
+    setLivePrice(price > 0 ? price : 1);
+    setShowTradeSymbols(false);
+    setTradeSymbolSearch("");
+    setSidebarOpen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.set("symbol", item.symbol);
+    url.searchParams.set("timeframe", timeframe);
+    window.history.replaceState({}, "", url);
+  }
+
+  function openPositionChart(symbol: string) {
+    setPositionsOpen(false);
+    window.location.assign(`/chart?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+  }
+
   return (
     <main className="terminal-shell">
       <header className="topbar">
@@ -322,7 +397,7 @@ export function TradingDashboard() {
         <Brand />
         <a className="mobile-full-chart-top" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} aria-label="Open full chart"><Maximize2 size={17} /><span>Full chart</span></a>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button>Positions</button><button>Analytics</button>
+          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button>Analytics</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -336,6 +411,7 @@ export function TradingDashboard() {
       </header>
 
       <div className="workspace">
+        {sidebarOpen && <button className="mobile-drawer-backdrop" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist" />}
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><Brand /><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><PanelLeftClose size={20} /></button></div>
           <div className="watchlist-heading">
@@ -352,7 +428,7 @@ export function TradingDashboard() {
               const price = quote?.lastPrice ?? item.price;
               const change = quote?.changePercent ?? item.change;
               return (
-                <button key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} onClick={() => { setSelected({ ...item, price: price > 0 ? price : 1 }); setLivePrice(price > 0 ? price : 1); setSidebarOpen(false); }}>
+                <button key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} onClick={() => chooseTradeInstrument(item)}>
                   <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
                   <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={price > 0 ? change >= 0 ? "positive" : "negative" : ""}>{price > 0 ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Quote loading"}</small></span>
@@ -369,9 +445,25 @@ export function TradingDashboard() {
 
         <section className="chart-area">
           <div className="instrument-header">
-            <div className="instrument-title">
+            <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
               <button className="star-button" aria-label="Add to favorites"><Star size={17} /></button>
-              <div><div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div><p>{selected.name}</p></div>
+              <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
+                <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
+                <p>{selected.name}</p>
+              </button>
+              {showTradeSymbols && (
+                <div className="trade-symbol-menu">
+                  <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
+                  <div>
+                    {tradeSymbolMatches.map((item) => (
+                      <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
+                        <span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em>
+                      </button>
+                    ))}
+                    {!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="quote-block"><strong>{livePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedNetChange >= 0 ? "+" : ""}{selectedNetChange.toFixed(2)} ({selectedChange >= 0 ? "+" : ""}{selectedChange.toFixed(2)}%)</span></div>
             <div className="ohlc-strip"><span>O <b>{(selectedQuote?.open ?? livePrice * 0.995).toFixed(2)}</b></span><span>H <b>{(selectedQuote?.high ?? livePrice * 1.008).toFixed(2)}</b></span><span>L <b>{(selectedQuote?.low ?? livePrice * 0.988).toFixed(2)}</b></span><span>C <b>{(selectedQuote?.previousClose ?? livePrice).toFixed(2)}</b></span></div>
@@ -460,7 +552,7 @@ export function TradingDashboard() {
         </aside>
       </div>
 
-      <nav className="mobile-bottom-nav"><button className="active"><LineChart size={20} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={20} /><span>Watchlist</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={20} /><span>Orders</span></button><button onClick={() => setShowApi(true)}><Settings size={20} /><span>Settings</span></button></nav>
+      <nav className="mobile-bottom-nav"><button className="active"><LineChart size={20} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={20} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={20} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={20} /><span>Orders</span></button><button onClick={() => setShowApi(true)}><Settings size={20} /><span>Settings</span></button></nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
@@ -471,6 +563,25 @@ export function TradingDashboard() {
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Status</span></div>
               {orders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span className="complete-tag">Complete</span></div>)}
               {!orders.length && <div className="order-empty"><WalletCards size={28} /><b>No paper orders yet</b><span>Place a buy or sell simulation from the order ticket.</span></div>}
+            </div>
+          </section>
+        </div>
+      )}
+      {positionsOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPositionsOpen(false)}>
+          <section className="modal positions-modal" role="dialog" aria-modal="true" aria-label="Open positions" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Open positions</h2></div><button className="icon-button" onClick={() => setPositionsOpen(false)} aria-label="Close positions"><X size={20} /></button></div>
+            <div className="positions-summary"><span>{openPositions.length} open</span><div><small>Live P&amp;L</small><b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b></div></div>
+            <div className="positions-list">
+              {openPositions.map((position) => (
+                <button key={position.symbol} className="position-row" onClick={() => openPositionChart(position.symbol)}>
+                  <span className={position.side === "LONG" ? "buy-tag" : "sell-tag"}>{position.side}</span>
+                  <span><b>{position.symbol}</b><small>{position.name} · {position.quantity} shares</small></span>
+                  <span><b className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</b><small>{formatInr(position.livePrice)} · {position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small></span>
+                  <ChevronRight size={17} />
+                </button>
+              ))}
+              {!openPositions.length && <div className="positions-empty"><BriefcaseBusiness size={30} /><b>No open positions</b><span>Open a paper buy or sell order to track it here.</span></div>}
             </div>
           </section>
         </div>
