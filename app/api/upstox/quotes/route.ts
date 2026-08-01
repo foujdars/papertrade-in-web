@@ -27,9 +27,9 @@ export async function GET(request: Request) {
       .filter(Boolean);
     const keys = [...new Set(requestedKeys)];
 
-    if (!keys.length || keys.length > 100 || keys.some((key) => !isSupportedNseInstrumentKey(key))) {
+    if (!keys.length || keys.length > 500 || keys.some((key) => !isSupportedNseInstrumentKey(key))) {
       return Response.json(
-        { ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 100 supported instrument keys." } },
+        { ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 500 supported instrument keys." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -74,5 +74,25 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     return upstoxErrorResponse(error);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json() as { keys?: unknown };
+    if (!Array.isArray(body.keys) || body.keys.some((key) => typeof key !== "string")) {
+      return Response.json(
+        { ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide an array of supported instrument keys." } },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    const url = new URL(request.url);
+    url.searchParams.set("keys", body.keys.join(","));
+    return GET(new Request(url, { headers: request.headers }));
+  } catch {
+    return Response.json(
+      { ok: false, error: { code: "INVALID_REQUEST", message: "The quote request body must be valid JSON." } },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

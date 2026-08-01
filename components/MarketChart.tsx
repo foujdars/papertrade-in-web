@@ -427,6 +427,7 @@ export function MarketChart({
   const previousRedo = useRef(redoSignal);
   const initialVisibleBars = useRef(visibleBars);
   const indicatorsRef = useRef(indicators);
+  const activeToolRef = useRef(activeTool);
   const indicatorIds = useRef<Partial<Record<keyof ChartIndicators, string>>>({});
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialCandles));
@@ -435,6 +436,15 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
   }, [indicators]);
+
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+    const chart = chartApi.current;
+    if (!chart) return;
+    const navigationEnabled = activeTool === "cursor";
+    chart.setScrollEnabled(navigationEnabled);
+    chart.setZoomEnabled(navigationEnabled);
+  }, [activeTool]);
 
   function syncIndicators(chart: Chart, next: ChartIndicators) {
     const definitions: Record<keyof ChartIndicators, () => string | null> = {
@@ -516,6 +526,9 @@ export function MarketChart({
       if (!chart) return;
 
       chartApi.current = chart;
+      const navigationEnabled = activeToolRef.current === "cursor";
+      chart.setScrollEnabled(navigationEnabled);
+      chart.setZoomEnabled(navigationEnabled);
       chart.setOffsetRightDistance(78);
       chart.setDataLoader({
         getBars: ({ type, callback }) => {
@@ -828,7 +841,7 @@ export function MarketChart({
   }, [feedMode, instrument.instrumentKey, instrument.symbol, onFeedStatus, onPrice]);
 
   return (
-    <div className="chart-stack kline-stack">
+    <div className={`chart-stack kline-stack ${activeTool === "cursor" ? "chart-navigation-mode" : "chart-drawing-mode"}`}>
       <div className="price-chart-wrap kline-chart-wrap">
         <div ref={chartHost} className="price-chart kline-chart" aria-label="Interactive KLineChart candlestick chart" />
         <div className="chart-symbol-legend kline-symbol-legend">

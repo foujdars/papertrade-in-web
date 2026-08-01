@@ -26,8 +26,6 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type MarketTrend = "GAINERS" | "LOSERS" | "UNDER_500";
-
 function getPaperOrderTimestamp(order: PaperOrder) {
   const idTimestamp = Number(order.id);
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
@@ -139,7 +137,6 @@ export function TradingDashboard() {
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [gainersOpen, setGainersOpen] = useState(false);
   const [gainersLoading, setGainersLoading] = useState(false);
-  const [marketTrend, setMarketTrend] = useState<MarketTrend>("GAINERS");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -287,13 +284,17 @@ export function TradingDashboard() {
     "ALL NSE": stockUniverse.length,
   }), [stockUniverse]);
 
-  const marketTrendRows = useMemo(() => stockUniverse
-    .filter((item) => item.categories.includes("NIFTY 500"))
+  const intradayRecoveryRows = useMemo(() => stockUniverse
     .map((item) => ({ item, quote: marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol] }))
     .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote))
-    .filter(({ quote }) => marketTrend === "LOSERS" ? quote.changePercent < 0 : quote.changePercent > 0 && (marketTrend !== "UNDER_500" || quote.lastPrice < 500))
-    .sort((a, b) => marketTrend === "LOSERS" ? a.quote.changePercent - b.quote.changePercent : b.quote.changePercent - a.quote.changePercent)
-    .slice(0, 60), [marketQuotes, marketTrend, stockUniverse]);
+    .map(({ item, quote }) => ({
+      item,
+      quote,
+      recoveryPercent: quote.low > 0 ? ((quote.lastPrice - quote.low) / quote.low) * 100 : 0,
+    }))
+    .filter(({ recoveryPercent }) => recoveryPercent > 0)
+    .sort((a, b) => b.recoveryPercent - a.recoveryPercent)
+    .slice(0, 100), [marketQuotes, stockUniverse]);
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
 
   useEffect(() => {
@@ -330,16 +331,20 @@ export function TradingDashboard() {
     if (!gainersOpen) return;
     const controller = new AbortController();
     const candidateKeys = stockUniverse
-      .filter((item) => item.categories.includes("NIFTY 500"))
-      .slice(0, 500)
       .map((item) => item.instrumentKey);
-    const batches = Array.from({ length: Math.ceil(candidateKeys.length / 100) }, (_, index) => candidateKeys.slice(index * 100, index * 100 + 100));
+    const batches = Array.from({ length: Math.ceil(candidateKeys.length / 500) }, (_, index) => candidateKeys.slice(index * 500, index * 500 + 500));
 
-    async function loadTopGainers() {
+    async function loadIntradayRecovery() {
       setGainersLoading(true);
       try {
         const responses = await Promise.all(batches.map(async (keys) => {
-          const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(keys.join(","))}`, { cache: "no-store", signal: controller.signal });
+          const response = await fetch("/api/upstox/quotes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keys }),
+            cache: "no-store",
+            signal: controller.signal,
+          });
           const payload = await response.json() as { ok?: boolean; quotes?: Record<string, NormalizedQuote> };
           return response.ok && payload.ok && payload.quotes ? payload.quotes : {};
         }));
@@ -347,13 +352,13 @@ export function TradingDashboard() {
           setMarketQuotes((current) => Object.assign({}, current, ...responses));
         }
       } catch {
-        // The gainers panel explains when authenticated Upstox quotes are unavailable.
+        // The market panel explains when authenticated Upstox quotes are unavailable.
       } finally {
         if (!controller.signal.aborted) setGainersLoading(false);
       }
     }
 
-    if (batches.length) void loadTopGainers();
+    if (batches.length) void loadIntradayRecovery();
     return () => controller.abort();
   }, [gainersOpen, stockUniverse]);
 
@@ -400,6 +405,8 @@ export function TradingDashboard() {
 
     if (!automaticOrders.length) return;
     const nextOrders = [...automaticOrders, ...orders];
+    // Automatic square-off is intentionally synchronized with the live market clock.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrders(nextOrders);
     setBalance(nextBalance);
     writePaperOrders(nextOrders);
@@ -667,6 +674,14 @@ export function TradingDashboard() {
                 <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
                 <p>{selected.name}</p>
               </button>
+              <button
+                className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`}
+                onClick={() => openWatchlistPicker(selected)}
+                aria-label={`Add ${selected.symbol} to a custom watchlist`}
+                title="Add to custom watchlist"
+              >
+                <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
+              </button>
               {showTradeSymbols && (
                 <div className="trade-symbol-menu">
                   <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
@@ -715,7 +730,7 @@ export function TradingDashboard() {
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
-            <div>Click + drag to pan · Scroll/pinch to zoom</div>
+            <div>{activeTool === "cursor" ? "Drag to pan · Scroll/pinch to zoom" : "Drawing locked · drag the tool · select cursor to move chart"}</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
         </section>
@@ -787,19 +802,18 @@ export function TradingDashboard() {
         </div>
       )}
       {gainersOpen && (
-        <section className="market-discovery-panel" aria-label="Trending stocks from Upstox">
-          <div className="market-discovery-head"><div><span className="eyebrow">Upstox live market</span><h2>Trending stocks</h2></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
-          <div className="trend-tabs"><button className={marketTrend === "GAINERS" ? "active" : ""} onClick={() => setMarketTrend("GAINERS")}>Top gainers</button><button className={marketTrend === "LOSERS" ? "active" : ""} onClick={() => setMarketTrend("LOSERS")}>Top losers</button><button className={marketTrend === "UNDER_500" ? "active" : ""} onClick={() => setMarketTrend("UNDER_500")}>Trending under ₹500</button></div>
+        <section className="market-discovery-panel" aria-label="Intraday recovery stocks from Upstox">
+          <div className="market-discovery-head"><div><span className="eyebrow">Upstox · Stocks</span><h2>Intraday Recovery</h2><small>Stocks recovering the most from today&apos;s low</small></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
           <div className="market-discovery-list">
-            {marketTrendRows.map(({ item, quote }) => (
+            {intradayRecoveryRows.map(({ item, quote, recoveryPercent }) => (
               <button key={item.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
                 <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                 <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-                <span><b>{formatInr(quote.lastPrice)}</b><small className={quote.changePercent >= 0 ? "positive" : "negative"}>{quote.netChange >= 0 ? "+" : ""}{quote.netChange.toFixed(2)} ({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)</small></span>
+                <span><b>{formatInr(quote.lastPrice)}</b><small className="positive">+{recoveryPercent.toFixed(2)}% from low</small></span>
               </button>
             ))}
-            {gainersLoading && !marketTrendRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Upstox market trends</b><span>Fetching live NIFTY 500 quotes.</span></div>}
-            {!gainersLoading && !marketTrendRows.length && <div className="positions-empty"><Cable size={30} /><b>Live market trends unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
+            {gainersLoading && !intradayRecoveryRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Intraday Recovery</b><span>Scanning live quotes for all NSE stocks.</span></div>}
+            {!gainersLoading && !intradayRecoveryRows.length && <div className="positions-empty"><Cable size={30} /><b>Intraday Recovery unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
           </div>
         </section>
       )}
