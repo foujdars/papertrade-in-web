@@ -438,6 +438,11 @@ h1, h2, p { margin: 0; }
 .ohlc-snap-guide::after { width: 1px; height: 25px; }
 .ohlc-snap-guide i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
 .ohlc-snap-guide span { position: absolute; left: 10px; top: 9px; padding: 2px 5px; border: 1px solid #6b5cff55; border-radius: 4px; color: #5143c7; background: #fffffff2; box-shadow: 0 2px 8px #22223b1a; font-size: 9px; font-style: normal; font-weight: 800; white-space: nowrap; }
+.drawing-coach { position: absolute; z-index: 10; top: 58px; left: 50%; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 11px; border: 1px solid #6b5cff3d; border-radius: 10px; background: #fffffff2; box-shadow: 0 8px 24px #29234b1f; transform: translateX(-50%); pointer-events: auto; }
+.drawing-coach span { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
+.drawing-coach b { color: #3d356e; font-size: 10px; }
+.drawing-coach small { color: #7b8295; font-size: 8px; }
+.drawing-coach button { height: 26px; padding: 0 8px; border: 0; border-radius: 7px; color: #5b4be8; background: var(--purple-soft); font-size: 9px; font-weight: 800; cursor: pointer; }
 .kline-symbol-legend { z-index: 4; }
 .kline-indicator-legend { z-index: 4; }
 .rsi-color { background: #7c4dff; }

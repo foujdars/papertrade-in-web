@@ -407,6 +407,18 @@ const overlayNames: Partial<Record<DrawingTool, string>> = {
   short: "paperShortPosition",
 };
 
+const drawingToolNames: Partial<Record<DrawingTool, string>> = {
+  trend: "Trend line",
+  horizontal: "Horizontal line",
+  ray: "Horizontal ray",
+  channel: "Parallel channel",
+  rectangle: "Rectangle",
+  fib: "Fibonacci",
+  range: "Price range",
+  long: "Long position",
+  short: "Short position",
+};
+
 function snapshotOverlay(event: OverlayEvent<unknown>): OverlayCreate {
   return {
     name: event.overlay.name,
@@ -427,7 +439,6 @@ export function MarketChart({
   timeframe,
   activeTool,
   toolSignal = 0,
-  magnet,
   hiddenDrawings,
   lockedDrawings = false,
   clearSignal = 0,
@@ -437,12 +448,12 @@ export function MarketChart({
   indicators,
   onPrice,
   onFeedStatus,
+  onToolComplete,
 }: {
   instrument: Instrument;
   timeframe: string;
   activeTool: DrawingTool;
   toolSignal?: number;
-  magnet: boolean;
   hiddenDrawings: boolean;
   lockedDrawings?: boolean;
   clearSignal?: number;
@@ -452,6 +463,7 @@ export function MarketChart({
   indicators: ChartIndicators;
   onPrice: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
+  onToolComplete?: () => void;
 }) {
   const chartHost = useRef<HTMLDivElement>(null);
   const chartApi = useRef<Chart | null>(null);
@@ -460,12 +472,15 @@ export function MarketChart({
   const streamCallback = useRef<((data: KLineData) => void) | null>(null);
   const historyRef = useRef<OverlayCreate[]>([]);
   const redoRef = useRef<OverlayCreate[]>([]);
+  const selectedOverlayIdRef = useRef<string | null>(null);
+  const pendingOverlayIdRef = useRef<string | null>(null);
   const previousClear = useRef(clearSignal);
   const previousUndo = useRef(undoSignal);
   const previousRedo = useRef(redoSignal);
   const initialVisibleBars = useRef(visibleBars);
   const indicatorsRef = useRef(indicators);
   const activeToolRef = useRef(activeTool);
+  const onToolCompleteRef = useRef(onToolComplete);
   const indicatorIds = useRef<Partial<Record<keyof ChartIndicators, string>>>({});
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialCandles));
@@ -476,6 +491,10 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
   }, [indicators]);
+
+  useEffect(() => {
+    onToolCompleteRef.current = onToolComplete;
+  }, [onToolComplete]);
 
   useEffect(() => {
     activeToolRef.current = activeTool;
@@ -507,7 +526,7 @@ export function MarketChart({
       { label: "L", value: Number(candle.low) },
       { label: "C", value: Number(candle.close) },
     ].filter((entry) => Number.isFinite(entry.value));
-    const snapped = magnet && ohlc.length
+    const snapped = ohlc.length
       ? ohlc.reduce((nearest, entry) => Math.abs(entry.value - rawValue) < Math.abs(nearest.value - rawValue) ? entry : nearest)
       : { label: "P", value: rawValue };
     const convertedBack = chart.convertToPixel({
@@ -671,21 +690,44 @@ export function MarketChart({
   useEffect(() => {
     const chart = chartApi.current;
     const name = overlayNames[activeTool];
-    if (!chart || !name || activeTool === "cursor") return;
+    if (!chart) return;
+    if (pendingOverlayIdRef.current) {
+      chart.removeOverlay({ id: pendingOverlayIdRef.current });
+      pendingOverlayIdRef.current = null;
+    }
+    if (!name || activeTool === "cursor") return;
+    const onSelected = (event: OverlayEvent<unknown>) => {
+      selectedOverlayIdRef.current = event.overlay.id ?? null;
+      chart.setScrollEnabled(false);
+      chart.setZoomEnabled(false);
+    };
+    const onDeselected = () => {
+      selectedOverlayIdRef.current = null;
+      if (activeToolRef.current === "cursor") {
+        chart.setScrollEnabled(true);
+        chart.setZoomEnabled(true);
+      }
+    };
     const onDrawEnd = (event: OverlayEvent<unknown>) => {
       historyRef.current.push(snapshotOverlay(event));
       redoRef.current = [];
+      selectedOverlayIdRef.current = null;
+      pendingOverlayIdRef.current = null;
+      onToolCompleteRef.current?.();
     };
-    chart.createOverlay({
+    const createdId = chart.createOverlay({
       name,
       groupId: "papertrade",
-      mode: magnet ? "strong_magnet" : "normal",
+      mode: "strong_magnet",
       modeSensitivity: 10,
       visible: !hiddenDrawings,
       lock: lockedDrawings,
       onDrawEnd,
+      onSelected,
+      onDeselected,
     });
-  }, [activeTool, hiddenDrawings, lockedDrawings, magnet, toolSignal]);
+    pendingOverlayIdRef.current = typeof createdId === "string" ? createdId : null;
+  }, [activeTool, hiddenDrawings, lockedDrawings, toolSignal]);
 
   useEffect(() => {
     chartApi.current?.overrideOverlay({ groupId: "papertrade", visible: !hiddenDrawings });
@@ -699,6 +741,8 @@ export function MarketChart({
     if (clearSignal === previousClear.current) return;
     previousClear.current = clearSignal;
     chartApi.current?.removeOverlay({ groupId: "papertrade" });
+    selectedOverlayIdRef.current = null;
+    pendingOverlayIdRef.current = null;
     historyRef.current = [];
     redoRef.current = [];
   }, [clearSignal]);
@@ -922,6 +966,12 @@ export function MarketChart({
           <div className="ohlc-snap-guide" style={{ left: snapGuide.x, top: snapGuide.y }} aria-hidden="true">
             <i />
             <span>{snapGuide.label} {snapGuide.value.toFixed(2)}</span>
+          </div>
+        )}
+        {activeTool !== "cursor" && (
+          <div className="drawing-coach">
+            <span><b>{drawingToolNames[activeTool]}</b><small>Tap the required points · smart OHLC snap</small></span>
+            <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => onToolCompleteRef.current?.()}>Cancel</button>
           </div>
         )}
         <div className="chart-symbol-legend kline-symbol-legend">
