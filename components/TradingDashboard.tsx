@@ -3,7 +3,7 @@
 import {
   Activity, Bell, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
-  Magnet, Maximize2, Menu, Minus, MousePointer2, PanelLeftClose, Plus, Radio, Ruler,
+  Magnet, Minus, MousePointer2, Plus, Radio, Ruler,
   Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
   TrendingDown, TrendingUp, UserRound, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -16,6 +16,13 @@ import type { NormalizedQuote } from "@/lib/upstox";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
+const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
+
+type CustomWatchlist = {
+  id: string;
+  name: string;
+  symbols: string[];
+};
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
   { id: "trend", label: "Trend line", icon: TrendingUp },
@@ -95,7 +102,11 @@ export function TradingDashboard() {
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistLimit, setWatchlistLimit] = useState(60);
-  const [watchlist, setWatchlist] = useState<(typeof watchlistTabs)[number]>("NIFTY 50");
+  const [watchlist, setWatchlist] = useState<string>("NIFTY 50");
+  const [customWatchlists, setCustomWatchlists] = useState<CustomWatchlist[]>([]);
+  const [watchlistPickerOpen, setWatchlistPickerOpen] = useState(false);
+  const [watchlistTarget, setWatchlistTarget] = useState<Instrument | null>(null);
+  const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
   const [livePrice, setLivePrice] = useState(selected.price);
@@ -110,13 +121,15 @@ export function TradingDashboard() {
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
   const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
   const [showIndicators, setShowIndicators] = useState(false);
-  const [exitQuantity, setExitQuantity] = useState(1);
+  const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
+  const [gainersOpen, setGainersOpen] = useState(false);
+  const [gainersLoading, setGainersLoading] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
   const [toast, setToast] = useState("");
@@ -135,6 +148,10 @@ export function TradingDashboard() {
       try {
         setOrders(readPaperOrders());
         setBalance(Number(localStorage.getItem("papertrade-balance") ?? "1000000"));
+        const savedWatchlists = JSON.parse(localStorage.getItem(CUSTOM_WATCHLIST_STORAGE_KEY) ?? "[]") as CustomWatchlist[];
+        if (Array.isArray(savedWatchlists)) {
+          setCustomWatchlists(savedWatchlists.slice(0, 5).filter((list) => list?.id && list?.name && Array.isArray(list.symbols)));
+        }
       } catch { /* Ignore malformed local demo data. */ }
     }, 0);
     return () => window.clearTimeout(restore);
@@ -225,9 +242,14 @@ export function TradingDashboard() {
 
   const filtered = useMemo(() => stockUniverse.filter((item) => {
     const term = search.trim().toLowerCase();
-    const matchesList = Boolean(term) || watchlist === "ALL NSE" || item.categories.includes(watchlist);
+    const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
+    const standardList = watchlistTabs.find((tab) => tab === watchlist);
+    const matchesList = Boolean(term)
+      || customList?.symbols.includes(item.symbol)
+      || standardList === "ALL NSE"
+      || (standardList !== undefined && item.categories.includes(standardList));
     return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-  }), [search, stockUniverse, watchlist]);
+  }), [customWatchlists, search, stockUniverse, watchlist]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
     return stockUniverse
@@ -253,6 +275,13 @@ export function TradingDashboard() {
     "NIFTY 500": stockUniverse.filter((item) => item.categories.includes("NIFTY 500")).length,
     "ALL NSE": stockUniverse.length,
   }), [stockUniverse]);
+
+  const topGainers = useMemo(() => stockUniverse
+    .filter((item) => item.categories.includes("NIFTY 500"))
+    .map((item) => ({ item, quote: marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol] }))
+    .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote) && entry.quote.changePercent > 0)
+    .sort((a, b) => b.quote.changePercent - a.quote.changePercent)
+    .slice(0, 50), [marketQuotes, stockUniverse]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -283,6 +312,37 @@ export function TradingDashboard() {
       window.clearInterval(interval);
     };
   }, [quoteKeys]);
+
+  useEffect(() => {
+    if (!gainersOpen) return;
+    const controller = new AbortController();
+    const candidateKeys = stockUniverse
+      .filter((item) => item.categories.includes("NIFTY 500"))
+      .slice(0, 500)
+      .map((item) => item.instrumentKey);
+    const batches = Array.from({ length: Math.ceil(candidateKeys.length / 100) }, (_, index) => candidateKeys.slice(index * 100, index * 100 + 100));
+
+    async function loadTopGainers() {
+      setGainersLoading(true);
+      try {
+        const responses = await Promise.all(batches.map(async (keys) => {
+          const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(keys.join(","))}`, { cache: "no-store", signal: controller.signal });
+          const payload = await response.json() as { ok?: boolean; quotes?: Record<string, NormalizedQuote> };
+          return response.ok && payload.ok && payload.quotes ? payload.quotes : {};
+        }));
+        if (!controller.signal.aborted) {
+          setMarketQuotes((current) => Object.assign({}, current, ...responses));
+        }
+      } catch {
+        // The gainers panel explains when authenticated Upstox quotes are unavailable.
+      } finally {
+        if (!controller.signal.aborted) setGainersLoading(false);
+      }
+    }
+
+    if (batches.length) void loadTopGainers();
+    return () => controller.abort();
+  }, [gainersOpen, stockUniverse]);
   const handlePrice = useCallback((value: number) => setLivePrice(value), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
@@ -313,7 +373,10 @@ export function TradingDashboard() {
   );
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const positionProduct = orders.find((order) => order.symbol === selected.symbol)?.product ?? "INTRADAY";
-  const safeExitQuantity = selectedPosition.quantity > 0 ? Math.min(Math.max(1, exitQuantity), selectedPosition.quantity) : 1;
+  const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
+  const safeExitQuantity = selectedPosition.quantity > 0
+    ? Math.min(Math.max(1, Number.isFinite(requestedExitQuantity) ? requestedExitQuantity : 1), selectedPosition.quantity)
+    : 1;
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
@@ -361,6 +424,7 @@ export function TradingDashboard() {
     const nextBalance = closingSide === "BUY" ? balance - exitMargin : balance + exitMargin;
     setOrders(nextOrders);
     setBalance(nextBalance);
+    setExitQuantity("1");
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setToast(`Exited ${closingQuantity} ${selected.symbol} at ${formatInr(livePrice)}`);
@@ -385,19 +449,60 @@ export function TradingDashboard() {
     window.history.replaceState({}, "", url);
   }
 
+  function saveCustomWatchlists(nextLists: CustomWatchlist[]) {
+    setCustomWatchlists(nextLists);
+    localStorage.setItem(CUSTOM_WATCHLIST_STORAGE_KEY, JSON.stringify(nextLists));
+  }
+
+  function openWatchlistPicker(item: Instrument | null) {
+    setWatchlistTarget(item);
+    setNewWatchlistName("");
+    setWatchlistPickerOpen(true);
+  }
+
+  function toggleWatchlistMembership(listId: string) {
+    if (!watchlistTarget) return;
+    const nextLists = customWatchlists.map((list) => list.id !== listId ? list : {
+      ...list,
+      symbols: list.symbols.includes(watchlistTarget.symbol)
+        ? list.symbols.filter((symbol) => symbol !== watchlistTarget.symbol)
+        : [...list.symbols, watchlistTarget.symbol],
+    });
+    saveCustomWatchlists(nextLists);
+  }
+
+  function createCustomWatchlist() {
+    const name = newWatchlistName.trim();
+    if (!name || customWatchlists.length >= 5) return;
+    if (customWatchlists.some((list) => list.name.toLowerCase() === name.toLowerCase())) {
+      setToast("A watchlist with this name already exists");
+      window.setTimeout(() => setToast(""), 3_000);
+      return;
+    }
+    const list: CustomWatchlist = {
+      id: `${Date.now()}`,
+      name,
+      symbols: watchlistTarget ? [watchlistTarget.symbol] : [],
+    };
+    saveCustomWatchlists([...customWatchlists, list]);
+    setWatchlist(`custom:${list.id}`);
+    setWatchlistLimit(60);
+    setWatchlistPickerOpen(false);
+    setToast(watchlistTarget ? `${watchlistTarget.symbol} added to ${name}` : `${name} created`);
+    window.setTimeout(() => setToast(""), 3_000);
+  }
+
   function openPositionChart(symbol: string) {
     setPositionsOpen(false);
-    window.location.assign(`/chart?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+    window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
   }
 
   return (
     <main className="terminal-shell">
       <header className="topbar">
-        <button className="mobile-menu icon-button" onClick={() => setSidebarOpen(true)} aria-label="Open watchlist"><Menu size={21} /></button>
         <Brand />
-        <a className="mobile-full-chart-top" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`} aria-label="Open full chart"><Maximize2 size={17} /><span>Full chart</span></a>
         <nav className="main-nav" aria-label="Main navigation">
-          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button>Analytics</button>
+          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setGainersOpen(true)}>Top gainers</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button>Analytics</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -411,9 +516,8 @@ export function TradingDashboard() {
       </header>
 
       <div className="workspace">
-        {sidebarOpen && <button className="mobile-drawer-backdrop" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist" />}
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
-          <div className="mobile-panel-head"><Brand /><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><PanelLeftClose size={20} /></button></div>
+          <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
           <div className="watchlist-heading">
             <div><span className="eyebrow">Watchlist</span><h2>Indian markets</h2></div>
             <button className="icon-button" aria-label="Watchlist options"><SlidersHorizontal size={17} /></button>
@@ -421,19 +525,22 @@ export function TradingDashboard() {
           <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /><kbd>/</kbd></div>
           <div className="watchlist-tabs">
             {watchlistTabs.map((tab) => <button key={tab} onClick={() => { setWatchlist(tab); setWatchlistLimit(60); }} className={watchlist === tab ? "active" : ""}><span>{tab}</span><small>{watchlistCounts[tab]}</small></button>)}
+            {customWatchlists.map((list) => <button key={list.id} onClick={() => { setWatchlist(`custom:${list.id}`); setWatchlistLimit(60); }} className={watchlist === `custom:${list.id}` ? "active" : ""}><span>{list.name}</span><small>{list.symbols.length}</small></button>)}
+            {customWatchlists.length < 5 && <button className="new-watchlist-tab" onClick={() => openWatchlistPicker(null)}><Plus size={12} /><span>New list</span></button>}
           </div>
           <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
               const change = quote?.changePercent ?? item.change;
+              const saved = customWatchlists.some((list) => list.symbols.includes(item.symbol));
               return (
-                <button key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} onClick={() => chooseTradeInstrument(item)}>
+                <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
                   <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
                   <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={price > 0 ? change >= 0 ? "positive" : "negative" : ""}>{price > 0 ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Quote loading"}</small></span>
-                  <Star size={15} />
-                </button>
+                  <button className={`watchlist-star ${saved ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); openWatchlistPicker(item); }} aria-label={`Add ${item.symbol} to a custom watchlist`}><Star size={15} fill={saved ? "currentColor" : "none"} /></button>
+                </div>
               );
             })}
             {watchlistLoading && <div className="watchlist-loading">Loading complete NSE lists…</div>}
@@ -483,7 +590,6 @@ export function TradingDashboard() {
               </div>
             )}
             <div className="chart-right-controls">
-              <a className="control-button advanced-chart-link" href={`/chart?symbol=${selected.symbol}&timeframe=${timeframe}`}><Maximize2 size={16} /> Advanced chart</a>
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
               <button className="icon-button" aria-label="Chart settings"><Settings size={17} /></button>
             </div>
@@ -498,20 +604,6 @@ export function TradingDashboard() {
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
             <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
-            {selectedPosition.quantity > 0 && (
-              <aside className="chart-position-banner" aria-live="polite">
-                <div className="chart-position-title">
-                  <span className={selectedPosition.side === "SHORT" ? "short" : "long"}>{selectedPosition.side}</span>
-                  <b>{selected.symbol} · {selectedPosition.quantity} shares</b>
-                </div>
-                <div className="chart-position-pnl">
-                  <small>LIVE P&amp;L</small>
-                  <strong className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</strong>
-                  <em className={selectedPosition.returnPercent >= 0 ? "positive" : "negative"}>{selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</em>
-                </div>
-                <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)}</small>
-              </aside>
-            )}
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
@@ -535,7 +627,7 @@ export function TradingDashboard() {
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
               <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
               <div className="ticket-exit-controls">
-                <label>Exit qty<input type="number" min="1" max={selectedPosition.quantity} value={safeExitQuantity} onChange={(event) => setExitQuantity(Math.min(selectedPosition.quantity, Math.max(1, Number(event.target.value))))} /></label>
+                <label>Exit qty<input type="text" inputMode="numeric" value={exitQuantity} onFocus={() => setExitQuantity("")} onChange={(event) => setExitQuantity(event.target.value.replace(/\D/g, ""))} onBlur={() => setExitQuantity(String(safeExitQuantity))} /></label>
                 <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
                 <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
               </div>
@@ -552,7 +644,7 @@ export function TradingDashboard() {
         </aside>
       </div>
 
-      <nav className="mobile-bottom-nav"><button className="active"><LineChart size={20} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={20} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={20} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={20} /><span>Orders</span></button><button onClick={() => setShowApi(true)}><Settings size={20} /><span>Settings</span></button></nav>
+      <nav className="mobile-bottom-nav"><button className="active" onClick={() => setSidebarOpen(false)}><LineChart size={20} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={20} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={20} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={20} /><span>Orders</span></button><button onClick={() => setGainersOpen(true)}><TrendingUp size={20} /><span>Gainers</span></button></nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
@@ -583,6 +675,48 @@ export function TradingDashboard() {
               ))}
               {!openPositions.length && <div className="positions-empty"><BriefcaseBusiness size={30} /><b>No open positions</b><span>Open a paper buy or sell order to track it here.</span></div>}
             </div>
+          </section>
+        </div>
+      )}
+      {gainersOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setGainersOpen(false)}>
+          <section className="modal gainers-modal" role="dialog" aria-modal="true" aria-label="Top gainers from Upstox" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Upstox live market</span><h2>Top gainers</h2></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close top gainers"><X size={20} /></button></div>
+            <p className="gainers-note">NIFTY 500 stocks ranked by live percentage change.</p>
+            <div className="gainers-list">
+              {topGainers.map(({ item, quote }, index) => (
+                <button key={item.symbol} className="gainer-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
+                  <span>{index + 1}</span>
+                  <span><b>{item.symbol}</b><small>{item.name}</small></span>
+                  <span><b>{formatInr(quote.lastPrice)}</b><small className="positive">+{quote.changePercent.toFixed(2)}%</small></span>
+                  <ChevronRight size={17} />
+                </button>
+              ))}
+              {gainersLoading && !topGainers.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Upstox gainers</b><span>Fetching live NIFTY 500 quotes.</span></div>}
+              {!gainersLoading && !topGainers.length && <div className="positions-empty"><Cable size={30} /><b>Live gainers unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
+            </div>
+          </section>
+        </div>
+      )}
+      {watchlistPickerOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setWatchlistPickerOpen(false)}>
+          <section className="modal watchlist-picker-modal" role="dialog" aria-modal="true" aria-label="Custom watchlists" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Custom watchlists</span><h2>{watchlistTarget ? `Add ${watchlistTarget.symbol}` : "Create a watchlist"}</h2></div><button className="icon-button" onClick={() => setWatchlistPickerOpen(false)} aria-label="Close custom watchlists"><X size={20} /></button></div>
+            {watchlistTarget && customWatchlists.length > 0 && (
+              <div className="custom-watchlist-choices">
+                {customWatchlists.map((list) => {
+                  const included = list.symbols.includes(watchlistTarget.symbol);
+                  return <button key={list.id} onClick={() => toggleWatchlistMembership(list.id)}><span className={included ? "checked" : ""}>{included ? "✓" : ""}</span><span><b>{list.name}</b><small>{list.symbols.length} stocks</small></span><em>{included ? "Added" : "Add"}</em></button>;
+                })}
+              </div>
+            )}
+            {customWatchlists.length < 5 ? (
+              <div className="new-watchlist-form">
+                <label>New watchlist name<input value={newWatchlistName} maxLength={24} onChange={(event) => setNewWatchlistName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createCustomWatchlist(); }} placeholder="Example: Swing trades" autoFocus={!watchlistTarget || !customWatchlists.length} /></label>
+                <button className="primary-button" type="button" disabled={!newWatchlistName.trim()} onClick={createCustomWatchlist}><Plus size={17} /> Create {watchlistTarget ? "and add" : "watchlist"}</button>
+              </div>
+            ) : <p className="watchlist-limit-note">You have created the maximum of 5 custom watchlists.</p>}
+            {watchlistTarget && customWatchlists.length > 0 && <button className="watchlist-done" onClick={() => setWatchlistPickerOpen(false)}>Done</button>}
           </section>
         </div>
       )}

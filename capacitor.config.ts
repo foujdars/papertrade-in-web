@@ -11,7 +11,7 @@ const config: CapacitorConfig = {
   loggingBehavior: "debug",
   server: {
     url: appUrl,
-    appStartPath: "/chart?symbol=RELIANCE&timeframe=5m",
+    appStartPath: "/",
     cleartext: false,
     errorPath: "offline.html",
   },
