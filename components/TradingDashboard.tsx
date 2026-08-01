@@ -26,6 +26,8 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
+type MarketTrend = "RECOVERY" | "GAINERS" | "LOSERS" | "UNDER_500";
+
 function getPaperOrderTimestamp(order: PaperOrder) {
   const idTimestamp = Number(order.id);
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
@@ -137,6 +139,7 @@ export function TradingDashboard() {
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [gainersOpen, setGainersOpen] = useState(false);
   const [gainersLoading, setGainersLoading] = useState(false);
+  const [marketTrend, setMarketTrend] = useState<MarketTrend>("RECOVERY");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -295,6 +298,21 @@ export function TradingDashboard() {
     .filter(({ recoveryPercent }) => recoveryPercent > 0)
     .sort((a, b) => b.recoveryPercent - a.recoveryPercent)
     .slice(0, 100), [marketQuotes, stockUniverse]);
+  const marketTrendRows = useMemo(() => {
+    if (marketTrend === "RECOVERY") return intradayRecoveryRows;
+    return stockUniverse
+      .filter((item) => item.categories.includes("NIFTY 500"))
+      .map((item) => ({ item, quote: marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol] }))
+      .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote))
+      .filter(({ quote }) => marketTrend === "LOSERS"
+        ? quote.changePercent < 0
+        : quote.changePercent > 0 && (marketTrend !== "UNDER_500" || quote.lastPrice < 500))
+      .sort((a, b) => marketTrend === "LOSERS"
+        ? a.quote.changePercent - b.quote.changePercent
+        : b.quote.changePercent - a.quote.changePercent)
+      .slice(0, 100)
+      .map(({ item, quote }) => ({ item, quote, recoveryPercent: 0 }));
+  }, [intradayRecoveryRows, marketQuotes, marketTrend, stockUniverse]);
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
 
   useEffect(() => {
@@ -730,7 +748,7 @@ export function TradingDashboard() {
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
-            <div>{activeTool === "cursor" ? "Drag to pan · Scroll/pinch to zoom" : "Drawing locked · drag the tool · select cursor to move chart"}</div>
+            <div>{activeTool === "cursor" ? "Drag to pan · Scroll/pinch to zoom" : magnet ? "OHLC magnet · move cross, tap to anchor · cursor moves chart" : "Free drawing · tap to anchor · cursor moves chart"}</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
         </section>
@@ -802,18 +820,19 @@ export function TradingDashboard() {
         </div>
       )}
       {gainersOpen && (
-        <section className="market-discovery-panel" aria-label="Intraday recovery stocks from Upstox">
-          <div className="market-discovery-head"><div><span className="eyebrow">Upstox · Stocks</span><h2>Intraday Recovery</h2><small>Stocks recovering the most from today&apos;s low</small></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
+        <section className="market-discovery-panel" aria-label="Upstox market lists">
+          <div className="market-discovery-head"><div><span className="eyebrow">Upstox · Stocks</span><h2>{marketTrend === "RECOVERY" ? "Intraday Recovery" : "Market Lists"}</h2><small>{marketTrend === "RECOVERY" ? "Stocks recovering the most from today's low" : "Live NIFTY 500 market movement"}</small></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
+          <div className="trend-tabs"><button className={marketTrend === "RECOVERY" ? "active" : ""} onClick={() => setMarketTrend("RECOVERY")}>Intraday recovery</button><button className={marketTrend === "GAINERS" ? "active" : ""} onClick={() => setMarketTrend("GAINERS")}>Top gainers</button><button className={marketTrend === "LOSERS" ? "active" : ""} onClick={() => setMarketTrend("LOSERS")}>Top losers</button><button className={marketTrend === "UNDER_500" ? "active" : ""} onClick={() => setMarketTrend("UNDER_500")}>Trending under ₹500</button></div>
           <div className="market-discovery-list">
-            {intradayRecoveryRows.map(({ item, quote, recoveryPercent }) => (
+            {marketTrendRows.map(({ item, quote, recoveryPercent }) => (
               <button key={item.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
                 <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                 <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-                <span><b>{formatInr(quote.lastPrice)}</b><small className="positive">+{recoveryPercent.toFixed(2)}% from low</small></span>
+                <span><b>{formatInr(quote.lastPrice)}</b>{marketTrend === "RECOVERY" ? <small className="positive">+{recoveryPercent.toFixed(2)}% from low</small> : <small className={quote.changePercent >= 0 ? "positive" : "negative"}>{quote.netChange >= 0 ? "+" : ""}{quote.netChange.toFixed(2)} ({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)</small>}</span>
               </button>
             ))}
-            {gainersLoading && !intradayRecoveryRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Intraday Recovery</b><span>Scanning live quotes for all NSE stocks.</span></div>}
-            {!gainersLoading && !intradayRecoveryRows.length && <div className="positions-empty"><Cable size={30} /><b>Intraday Recovery unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
+            {gainersLoading && !marketTrendRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Upstox market lists</b><span>Scanning live NSE stock quotes.</span></div>}
+            {!gainersLoading && !marketTrendRows.length && <div className="positions-empty"><Cable size={30} /><b>Market list unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
           </div>
         </section>
       )}

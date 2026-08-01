@@ -432,6 +432,12 @@ h1, h2, p { margin: 0; }
 .kline-stack, .kline-chart-wrap { width: 100%; height: 100%; min-height: 0; }
 .kline-chart { width: 100%; height: 100%; overflow: hidden; }
 .chart-drawing-mode .kline-chart { touch-action: none; cursor: crosshair; }
+.ohlc-snap-guide { position: absolute; z-index: 8; width: 0; height: 0; pointer-events: none; color: var(--purple); }
+.ohlc-snap-guide::before, .ohlc-snap-guide::after { content: ""; position: absolute; left: 50%; top: 50%; background: currentColor; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #ffffffcc; }
+.ohlc-snap-guide::before { width: 25px; height: 1px; }
+.ohlc-snap-guide::after { width: 1px; height: 25px; }
+.ohlc-snap-guide i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
+.ohlc-snap-guide span { position: absolute; left: 10px; top: 9px; padding: 2px 5px; border: 1px solid #6b5cff55; border-radius: 4px; color: #5143c7; background: #fffffff2; box-shadow: 0 2px 8px #22223b1a; font-size: 9px; font-style: normal; font-weight: 800; white-space: nowrap; }
 .kline-symbol-legend { z-index: 4; }
 .kline-indicator-legend { z-index: 4; }
 .rsi-color { background: #7c4dff; }

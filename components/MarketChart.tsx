@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   Chart,
   DeepPartial,
@@ -230,6 +230,44 @@ function registerPaperOverlays(kline: KLineModule) {
   if (paperOverlaysRegistered) return;
 
   kline.registerOverlay({
+    name: "paperFibonacciLine",
+    totalStep: 3,
+    needDefaultPointFigure: true,
+    needDefaultXAxisFigure: true,
+    needDefaultYAxisFigure: true,
+    mode: "strong_magnet",
+    createPointFigures: ({ coordinates, bounding }) => {
+      if (coordinates.length < 2) return [];
+      const [a, b] = coordinates;
+      const levels = [
+        { ratio: 1, label: "100" },
+        { ratio: 0.786, label: "78.6" },
+        { ratio: 0.618, label: "61.8" },
+        { ratio: 0.5, label: "50" },
+        { ratio: 0.382, label: "38.2" },
+        { ratio: 0.236, label: "23.6" },
+        { ratio: 0, label: "0" },
+      ];
+      const yDifference = a.y - b.y;
+      return [
+        {
+          type: "line",
+          attrs: levels.map(({ ratio }) => ({
+            coordinates: [{ x: 0, y: b.y + yDifference * ratio }, { x: bounding.width, y: b.y + yDifference * ratio }],
+          })),
+          styles: { color: "#6b5cff", size: 1, style: "solid" },
+        },
+        {
+          type: "text",
+          isCheckEvent: false,
+          attrs: levels.map(({ ratio, label }) => ({ x: 5, y: b.y + yDifference * ratio, text: label, baseline: "bottom" })),
+          styles: { color: "#6b5cff", backgroundColor: "#ffffffd9", borderColor: "transparent", size: 10 },
+        },
+      ];
+    },
+  });
+
+  kline.registerOverlay({
     name: "paperRectangle",
     totalStep: 3,
     needDefaultPointFigure: true,
@@ -363,7 +401,7 @@ const overlayNames: Partial<Record<DrawingTool, string>> = {
   ray: "horizontalRayLine",
   channel: "priceChannelLine",
   rectangle: "paperRectangle",
-  fib: "fibonacciLine",
+  fib: "paperFibonacciLine",
   range: "paperPriceRange",
   long: "paperLongPosition",
   short: "paperShortPosition",
@@ -432,6 +470,8 @@ export function MarketChart({
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialCandles));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
+  const snapContext = `${instrument.symbol}-${timeframe}-${activeTool}-${toolSignal}`;
+  const [snapGuide, setSnapGuide] = useState<{ x: number; y: number; label: string; value: number; context: string } | null>(null);
 
   useEffect(() => {
     indicatorsRef.current = indicators;
@@ -445,6 +485,40 @@ export function MarketChart({
     chart.setScrollEnabled(navigationEnabled);
     chart.setZoomEnabled(navigationEnabled);
   }, [activeTool]);
+
+  function updateSnapGuide(event: ReactPointerEvent<HTMLDivElement>) {
+    const chart = chartApi.current;
+    const host = chartHost.current;
+    if (!chart || !host || activeTool === "cursor") return;
+    const bounds = host.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+    const converted = chart.convertFromPixel([{ x, y }], { paneId: "candle_pane" });
+    const point = Array.isArray(converted) ? converted[0] : converted;
+    const data = chart.getDataList();
+    const dataIndex = Math.max(0, Math.min(data.length - 1, Math.round(Number(point?.dataIndex))));
+    const candle = data[dataIndex];
+    if (!candle || !Number.isFinite(Number(point?.value))) return;
+
+    const rawValue = Number(point.value);
+    const ohlc = [
+      { label: "O", value: Number(candle.open) },
+      { label: "H", value: Number(candle.high) },
+      { label: "L", value: Number(candle.low) },
+      { label: "C", value: Number(candle.close) },
+    ].filter((entry) => Number.isFinite(entry.value));
+    const snapped = magnet && ohlc.length
+      ? ohlc.reduce((nearest, entry) => Math.abs(entry.value - rawValue) < Math.abs(nearest.value - rawValue) ? entry : nearest)
+      : { label: "P", value: rawValue };
+    const convertedBack = chart.convertToPixel({
+      dataIndex,
+      timestamp: candle.timestamp,
+      value: snapped.value,
+    }, { paneId: "candle_pane" });
+    const coordinate = Array.isArray(convertedBack) ? convertedBack[0] : convertedBack;
+    if (!Number.isFinite(Number(coordinate?.x)) || !Number.isFinite(Number(coordinate?.y))) return;
+    setSnapGuide({ x: Number(coordinate.x), y: Number(coordinate.y), label: snapped.label, value: snapped.value, context: snapContext });
+  }
 
   function syncIndicators(chart: Chart, next: ChartIndicators) {
     const definitions: Record<keyof ChartIndicators, () => string | null> = {
@@ -843,7 +917,13 @@ export function MarketChart({
   return (
     <div className={`chart-stack kline-stack ${activeTool === "cursor" ? "chart-navigation-mode" : "chart-drawing-mode"}`}>
       <div className="price-chart-wrap kline-chart-wrap">
-        <div ref={chartHost} className="price-chart kline-chart" aria-label="Interactive KLineChart candlestick chart" />
+        <div ref={chartHost} className="price-chart kline-chart" aria-label="Interactive KLineChart candlestick chart" onPointerDown={updateSnapGuide} onPointerMove={updateSnapGuide} />
+        {snapGuide && snapGuide.context === snapContext && activeTool !== "cursor" && (
+          <div className="ohlc-snap-guide" style={{ left: snapGuide.x, top: snapGuide.y }} aria-hidden="true">
+            <i />
+            <span>{snapGuide.label} {snapGuide.value.toFixed(2)}</span>
+          </div>
+        )}
         <div className="chart-symbol-legend kline-symbol-legend">
           <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
           {latestCandle && (
