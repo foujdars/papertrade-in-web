@@ -1,0 +1,97 @@
+import type { PaperOrder } from "@/lib/paper-trading";
+import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
+
+export type ClosedPaperTrade = {
+  id: string;
+  symbol: string;
+  product: "INTRADAY" | "DELIVERY";
+  quantity: number;
+  entryPrice: number;
+  exitPrice: number;
+  grossPnl: number;
+  charges: number;
+  netPnl: number;
+  closedAt: number;
+};
+
+type OpenLeg = {
+  signedQuantity: number;
+  averagePrice: number;
+  entryCharges: number;
+};
+
+function orderTimestamp(order: PaperOrder) {
+  const idTimestamp = Number(order.id);
+  return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
+}
+
+export function getOrderCharges(order: PaperOrder) {
+  return order.charges ?? calculateUpstoxEquityCharges({
+    side: order.side,
+    product: order.product ?? "INTRADAY",
+    quantity: order.quantity,
+    price: order.price,
+  });
+}
+
+export function buildClosedTrades(orders: PaperOrder[]) {
+  const positions = new Map<string, OpenLeg>();
+  const trades: ClosedPaperTrade[] = [];
+  const chronological = [...orders].sort((a, b) => orderTimestamp(a) - orderTimestamp(b) || Number(a.id) - Number(b.id));
+
+  for (const order of chronological) {
+    const direction = order.side === "BUY" ? 1 : -1;
+    const quantity = Math.max(0, order.quantity);
+    if (!quantity || !Number.isFinite(order.price)) continue;
+    const key = `${order.symbol}:${order.product ?? "INTRADAY"}`;
+    const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0 };
+    const orderCharges = getOrderCharges(order).total;
+
+    if (leg.signedQuantity === 0 || Math.sign(leg.signedQuantity) === direction) {
+      const previousQuantity = Math.abs(leg.signedQuantity);
+      const combinedQuantity = previousQuantity + quantity;
+      leg.averagePrice = combinedQuantity ? (leg.averagePrice * previousQuantity + order.price * quantity) / combinedQuantity : 0;
+      leg.signedQuantity += direction * quantity;
+      leg.entryCharges += orderCharges;
+      positions.set(key, leg);
+      continue;
+    }
+
+    const positionDirection = Math.sign(leg.signedQuantity);
+    const openQuantity = Math.abs(leg.signedQuantity);
+    const closingQuantity = Math.min(openQuantity, quantity);
+    const allocatedEntryCharges = openQuantity ? leg.entryCharges * (closingQuantity / openQuantity) : 0;
+    const allocatedExitCharges = orderCharges * (closingQuantity / quantity);
+    const grossPnl = (order.price - leg.averagePrice) * closingQuantity * positionDirection;
+    const charges = allocatedEntryCharges + allocatedExitCharges;
+    trades.push({
+      id: order.id,
+      symbol: order.symbol,
+      product: order.product ?? "INTRADAY",
+      quantity: closingQuantity,
+      entryPrice: leg.averagePrice,
+      exitPrice: order.price,
+      grossPnl,
+      charges,
+      netPnl: grossPnl - charges,
+      closedAt: orderTimestamp(order),
+    });
+
+    leg.entryCharges -= allocatedEntryCharges;
+    const nextQuantity = leg.signedQuantity + direction * quantity;
+    if (nextQuantity === 0) {
+      positions.delete(key);
+    } else if (Math.sign(nextQuantity) !== positionDirection) {
+      const reversingQuantity = Math.abs(nextQuantity);
+      leg.signedQuantity = nextQuantity;
+      leg.averagePrice = order.price;
+      leg.entryCharges = orderCharges * (reversingQuantity / quantity);
+      positions.set(key, leg);
+    } else {
+      leg.signedQuantity = nextQuantity;
+      positions.set(key, leg);
+    }
+  }
+
+  return trades.sort((a, b) => b.closedAt - a.closedAt);
+}

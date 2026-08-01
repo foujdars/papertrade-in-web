@@ -1,3 +1,5 @@
+import type { EquityChargeBreakdown } from "@/lib/trading-charges";
+
 export type PaperOrder = {
   id: string;
   symbol: string;
@@ -7,6 +9,9 @@ export type PaperOrder = {
   status: "COMPLETE";
   time: string;
   product?: "INTRADAY" | "DELIVERY";
+  createdAt?: number;
+  charges?: EquityChargeBreakdown;
+  autoSquareOff?: boolean;
 };
 
 export type PaperPosition = {
@@ -40,10 +45,12 @@ export function calculatePosition(
   orders: PaperOrder[],
   symbol: string,
   livePrice: number,
+  product?: "INTRADAY" | "DELIVERY",
 ): PaperPosition {
   const fills = orders
     .filter((order) =>
       order.symbol === symbol &&
+      (!product || (order.product ?? "INTRADAY") === product) &&
       order.status === "COMPLETE" &&
       Number.isFinite(order.quantity) &&
       order.quantity > 0 &&

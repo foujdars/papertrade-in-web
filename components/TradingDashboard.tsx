@@ -1,17 +1,19 @@
 "use client";
 
 import {
-  Activity, Bell, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
+  Activity, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
   Magnet, Minus, MousePointer2, Plus, Radio, Ruler,
-  Search, Settings, SlidersHorizontal, Sparkles, Star, Target, Trash2,
-  TrendingDown, TrendingUp, UserRound, WalletCards, X, type LucideIcon,
+  Search, Star, Target, Trash2,
+  TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import { calculatePosition, readPaperOrders, writePaperOrders, type PaperOrder } from "@/lib/paper-trading";
+import { buildClosedTrades, getOrderCharges } from "@/lib/trade-analytics";
+import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
@@ -23,6 +25,13 @@ type CustomWatchlist = {
   name: string;
   symbols: string[];
 };
+
+type MarketTrend = "GAINERS" | "LOSERS" | "UNDER_500";
+
+function getPaperOrderTimestamp(order: PaperOrder) {
+  const idTimestamp = Number(order.id);
+  return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
+}
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
   { id: "trend", label: "Trend line", icon: TrendingUp },
@@ -130,6 +139,8 @@ export function TradingDashboard() {
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [gainersOpen, setGainersOpen] = useState(false);
   const [gainersLoading, setGainersLoading] = useState(false);
+  const [marketTrend, setMarketTrend] = useState<MarketTrend>("GAINERS");
+  const [pnlOpen, setPnlOpen] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
   const [toast, setToast] = useState("");
@@ -258,7 +269,7 @@ export function TradingDashboard() {
   }, [stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
     const lastFill = orders.find((order) => order.symbol === symbol);
-    return calculatePosition(orders, symbol, lastFill?.price ?? 0).quantity > 0;
+    return calculatePosition(orders, symbol, lastFill?.price ?? 0, "INTRADAY").quantity > 0 || calculatePosition(orders, symbol, lastFill?.price ?? 0, "DELIVERY").quantity > 0;
   }), [orders]);
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const quoteKeys = useMemo(
@@ -276,12 +287,14 @@ export function TradingDashboard() {
     "ALL NSE": stockUniverse.length,
   }), [stockUniverse]);
 
-  const topGainers = useMemo(() => stockUniverse
+  const marketTrendRows = useMemo(() => stockUniverse
     .filter((item) => item.categories.includes("NIFTY 500"))
     .map((item) => ({ item, quote: marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol] }))
-    .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote) && entry.quote.changePercent > 0)
-    .sort((a, b) => b.quote.changePercent - a.quote.changePercent)
-    .slice(0, 50), [marketQuotes, stockUniverse]);
+    .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote))
+    .filter(({ quote }) => marketTrend === "LOSERS" ? quote.changePercent < 0 : quote.changePercent > 0 && (marketTrend !== "UNDER_500" || quote.lastPrice < 500))
+    .sort((a, b) => marketTrend === "LOSERS" ? a.quote.changePercent - b.quote.changePercent : b.quote.changePercent - a.quote.changePercent)
+    .slice(0, 60), [marketQuotes, marketTrend, stockUniverse]);
+  const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -343,6 +356,57 @@ export function TradingDashboard() {
     if (batches.length) void loadTopGainers();
     return () => controller.abort();
   }, [gainersOpen, stockUniverse]);
+
+  useEffect(() => {
+    if (!clock || !orders.length) return;
+    const todayStart = new Date(clock);
+    todayStart.setHours(0, 0, 0, 0);
+    const weekday = clock.getDay() >= 1 && clock.getDay() <= 5;
+    const afterSquareOff = weekday && (clock.getHours() > 15 || (clock.getHours() === 15 && clock.getMinutes() >= 20));
+    const symbols = [...new Set(orders.map((order) => order.symbol))];
+    const automaticOrders: PaperOrder[] = [];
+    let nextBalance = balance;
+
+    symbols.forEach((symbol, index) => {
+      const symbolOrders = orders.filter((order) => order.symbol === symbol && (order.product ?? "INTRADAY") === "INTRADAY").sort((a, b) => getPaperOrderTimestamp(b) - getPaperOrderTimestamp(a));
+      const latestOrder = symbolOrders[0];
+      if (!latestOrder) return;
+      const position = calculatePosition(orders, symbol, latestOrder.price, "INTRADAY");
+      if (!position.quantity || position.side === "FLAT") return;
+      const carriedOver = getPaperOrderTimestamp(latestOrder) < todayStart.getTime();
+      if (!carriedOver && !afterSquareOff) return;
+      const instrument = stockUniverse.find((item) => item.symbol === symbol);
+      const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
+      const squareOffPrice = quote?.lastPrice ?? latestOrder.price;
+      const closingSide = position.side === "LONG" ? "SELL" : "BUY";
+      const charges = calculateUpstoxEquityCharges({ side: closingSide, product: "INTRADAY", quantity: position.quantity, price: squareOffPrice });
+      const order: PaperOrder = {
+        id: `${clock.getTime() + index}`,
+        symbol,
+        side: closingSide,
+        quantity: position.quantity,
+        price: squareOffPrice,
+        status: "COMPLETE",
+        time: clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        product: "INTRADAY",
+        createdAt: clock.getTime(),
+        charges,
+        autoSquareOff: true,
+      };
+      automaticOrders.push(order);
+      const releasedMargin = squareOffPrice * position.quantity * 0.2;
+      nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+    });
+
+    if (!automaticOrders.length) return;
+    const nextOrders = [...automaticOrders, ...orders];
+    setOrders(nextOrders);
+    setBalance(nextBalance);
+    writePaperOrders(nextOrders);
+    localStorage.setItem("papertrade-balance", String(nextBalance));
+    setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off at 3:20 PM`);
+    window.setTimeout(() => setToast(""), 4_000);
+  }, [balance, clock, marketQuotes, orders, stockUniverse]);
   const handlePrice = useCallback((value: number) => setLivePrice(value), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
@@ -350,29 +414,57 @@ export function TradingDashboard() {
   const selectedNetChange = selectedQuote?.netChange ?? livePrice * selected.change / 100;
   const orderValue = livePrice * quantity;
   const margin = orderValue * 0.2;
-  const selectedPosition = useMemo(
-    () => calculatePosition(orders, selected.symbol, livePrice),
+  const estimatedOrderCharges = useMemo(() => calculateUpstoxEquityCharges({ side, product, quantity, price: livePrice }), [livePrice, product, quantity, side]);
+  const selectedPositions = useMemo(
+    () => ({
+      intraday: calculatePosition(orders, selected.symbol, livePrice, "INTRADAY"),
+      delivery: calculatePosition(orders, selected.symbol, livePrice, "DELIVERY"),
+    }),
     [livePrice, orders, selected.symbol],
   );
-  const openPositions = useMemo(() => positionSymbols.map((symbol) => {
+  const selectedPosition = selectedPositions.intraday.quantity > 0 ? selectedPositions.intraday : selectedPositions.delivery;
+  const positionProduct: "INTRADAY" | "DELIVERY" = selectedPositions.intraday.quantity > 0 ? "INTRADAY" : "DELIVERY";
+  const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = stockUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
     const lastFill = orders.find((order) => order.symbol === symbol);
     const positionLivePrice = symbol === selected.symbol
       ? livePrice
       : quote?.lastPrice ?? (instrument && instrument.price > 0 ? instrument.price : lastFill?.price ?? 0);
-    return {
-      ...calculatePosition(orders, symbol, positionLivePrice),
+    return (["INTRADAY", "DELIVERY"] as const).map((positionProductName) => ({
+      ...calculatePosition(orders, symbol, positionLivePrice, positionProductName),
       name: instrument?.name ?? symbol,
-    };
-  }).filter((position) => position.quantity > 0), [livePrice, marketQuotes, orders, positionSymbols, selected.symbol, stockUniverse]);
+      product: positionProductName,
+    })).filter((position) => position.quantity > 0);
+  }), [livePrice, marketQuotes, orders, positionSymbols, selected.symbol, stockUniverse]);
   const totalOpenPnl = openPositions.reduce((total, position) => total + position.unrealizedPnl, 0);
   const marketStatus = useMemo(
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
     [clock],
   );
+  const todayOrders = useMemo(() => {
+    if (!clock) return [];
+    const start = new Date(clock);
+    start.setHours(0, 0, 0, 0);
+    return orders.filter((order) => getPaperOrderTimestamp(order) >= start.getTime());
+  }, [clock, orders]);
+  const closedTrades = useMemo(() => buildClosedTrades(orders), [orders]);
+  const pnlStats = useMemo(() => {
+    const totalProfit = closedTrades.filter((trade) => trade.netPnl > 0).reduce((sum, trade) => sum + trade.netPnl, 0);
+    const totalLoss = Math.abs(closedTrades.filter((trade) => trade.netPnl < 0).reduce((sum, trade) => sum + trade.netPnl, 0));
+    const totalCharges = closedTrades.reduce((sum, trade) => sum + trade.charges, 0);
+    const wins = closedTrades.filter((trade) => trade.netPnl > 0).length;
+    return {
+      totalProfit,
+      totalLoss,
+      totalCharges,
+      netPnl: totalProfit - totalLoss,
+      winRate: closedTrades.length ? wins / closedTrades.length * 100 : 0,
+    };
+  }, [closedTrades]);
+  const pnlChartTrades = closedTrades.slice(0, 14).reverse();
+  const pnlChartMaximum = Math.max(1, ...pnlChartTrades.map((trade) => Math.abs(trade.netPnl)));
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
-  const positionProduct = orders.find((order) => order.symbol === selected.symbol)?.product ?? "INTRADAY";
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
     ? Math.min(Math.max(1, Number.isFinite(requestedExitQuantity) ? requestedExitQuantity : 1), selectedPosition.quantity)
@@ -388,15 +480,15 @@ export function TradingDashboard() {
     const order: PaperOrder = {
       id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: livePrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      product,
+      product, createdAt: Date.now(), charges: estimatedOrderCharges,
     };
     const nextOrders = [order, ...orders];
-    const nextBalance = side === "BUY" ? balance - margin : balance + margin;
+    const nextBalance = (side === "BUY" ? balance - margin : balance + margin) - estimatedOrderCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
-    setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} at ${formatInr(livePrice)}`);
+    setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(estimatedOrderCharges.total)}`);
     window.setTimeout(() => setToast(""), 3200);
   }
 
@@ -409,6 +501,7 @@ export function TradingDashboard() {
     }
     const closingQuantity = Math.min(selectedPosition.quantity, Math.max(1, Math.floor(requestedQuantity)));
     const closingSide = selectedPosition.side === "LONG" ? "SELL" : "BUY";
+    const exitCharges = calculateUpstoxEquityCharges({ side: closingSide, product: positionProduct, quantity: closingQuantity, price: livePrice });
     const order: PaperOrder = {
       id: `${Date.now()}`,
       symbol: selected.symbol,
@@ -418,16 +511,18 @@ export function TradingDashboard() {
       status: "COMPLETE",
       time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       product: positionProduct,
+      createdAt: Date.now(),
+      charges: exitCharges,
     };
     const nextOrders = [order, ...orders];
     const exitMargin = livePrice * closingQuantity * 0.2;
-    const nextBalance = closingSide === "BUY" ? balance - exitMargin : balance + exitMargin;
+    const nextBalance = (closingSide === "BUY" ? balance - exitMargin : balance + exitMargin) - exitCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
     setExitQuantity("1");
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
-    setToast(`Exited ${closingQuantity} ${selected.symbol} at ${formatInr(livePrice)}`);
+    setToast(`Exited ${closingQuantity} ${selected.symbol} · charges ${formatInr(exitCharges.total)}`);
     window.setTimeout(() => setToast(""), 3_200);
   }
 
@@ -492,6 +587,23 @@ export function TradingDashboard() {
     window.setTimeout(() => setToast(""), 3_000);
   }
 
+  function renameCustomWatchlist(listId: string, name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    saveCustomWatchlists(customWatchlists.map((list) => list.id === listId ? { ...list, name: trimmedName.slice(0, 24) } : list));
+  }
+
+  function deleteCustomWatchlist(listId: string) {
+    saveCustomWatchlists(customWatchlists.filter((list) => list.id !== listId));
+    if (watchlist === `custom:${listId}`) setWatchlist("NIFTY 50");
+  }
+
+  function removeStockFromCustomWatchlist(listId: string, symbol: string) {
+    saveCustomWatchlists(customWatchlists.map((list) => list.id === listId ? { ...list, symbols: list.symbols.filter((item) => item !== symbol) } : list));
+    setToast(`${symbol} removed from watchlist`);
+    window.setTimeout(() => setToast(""), 2_500);
+  }
+
   function openPositionChart(symbol: string) {
     setPositionsOpen(false);
     window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
@@ -502,32 +614,27 @@ export function TradingDashboard() {
       <header className="topbar">
         <Brand />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setGainersOpen(true)}>Top gainers</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button>Analytics</button>
+          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setGainersOpen(true)}>Markets</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button onClick={() => setPnlOpen(true)}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
             <span /> {feedStatus.mode === "live" ? "Upstox data" : feedStatus.mode === "loading" ? "Connecting" : "Fallback data"}
           </div>
-          <button className="funds-button"><WalletCards size={16} /> {formatInr(balance)}</button>
+          <div className="funds-button"><WalletCards size={16} /> {formatInr(balance)}</div>
           <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
-          <button className="icon-button" aria-label="Notifications"><Bell size={19} /></button>
-          <button className="profile-button" aria-label="Profile"><UserRound size={18} /></button>
         </div>
       </header>
 
       <div className="workspace">
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
-          <div className="watchlist-heading">
-            <div><span className="eyebrow">Watchlist</span><h2>Indian markets</h2></div>
-            <button className="icon-button" aria-label="Watchlist options"><SlidersHorizontal size={17} /></button>
-          </div>
-          <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /><kbd>/</kbd></div>
+          <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
           <div className="watchlist-tabs">
             {watchlistTabs.map((tab) => <button key={tab} onClick={() => { setWatchlist(tab); setWatchlistLimit(60); }} className={watchlist === tab ? "active" : ""}><span>{tab}</span><small>{watchlistCounts[tab]}</small></button>)}
             {customWatchlists.map((list) => <button key={list.id} onClick={() => { setWatchlist(`custom:${list.id}`); setWatchlistLimit(60); }} className={watchlist === `custom:${list.id}` ? "active" : ""}><span>{list.name}</span><small>{list.symbols.length}</small></button>)}
             {customWatchlists.length < 5 && <button className="new-watchlist-tab" onClick={() => openWatchlistPicker(null)}><Plus size={12} /><span>New list</span></button>}
           </div>
+          {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
           <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
@@ -539,7 +646,11 @@ export function TradingDashboard() {
                   <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
                   <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={price > 0 ? change >= 0 ? "positive" : "negative" : ""}>{price > 0 ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Quote loading"}</small></span>
-                  <button className={`watchlist-star ${saved ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); openWatchlistPicker(item); }} aria-label={`Add ${item.symbol} to a custom watchlist`}><Star size={15} fill={saved ? "currentColor" : "none"} /></button>
+                  {activeCustomList?.symbols.includes(item.symbol) ? (
+                    <button className="watchlist-star remove" onClick={(event) => { event.stopPropagation(); removeStockFromCustomWatchlist(activeCustomList.id, item.symbol); }} aria-label={`Remove ${item.symbol} from ${activeCustomList.name}`}><X size={15} /></button>
+                  ) : (
+                    <button className={`watchlist-star ${saved ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); openWatchlistPicker(item); }} aria-label={`Add ${item.symbol} to a custom watchlist`}><Star size={15} fill={saved ? "currentColor" : "none"} /></button>
+                  )}
                 </div>
               );
             })}
@@ -547,13 +658,11 @@ export function TradingDashboard() {
             {!watchlistLoading && !filtered.length && <div className="empty-list">No matching NSE stocks.</div>}
             {visibleInstruments.length < filtered.length && <button className="load-more-stocks" onClick={() => setWatchlistLimit((value) => value + 60)}>Load 60 more <small>{visibleInstruments.length} of {filtered.length}</small></button>}
           </div>
-          <div className="demo-list-note"><Sparkles size={15} /> Complete NSE list from Upstox; official index constituents refresh with the daily instrument master.</div>
         </aside>
 
         <section className="chart-area">
           <div className="instrument-header">
             <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
-              <button className="star-button" aria-label="Add to favorites"><Star size={17} /></button>
               <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
                 <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
                 <p>{selected.name}</p>
@@ -591,7 +700,6 @@ export function TradingDashboard() {
             )}
             <div className="chart-right-controls">
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
-              <button className="icon-button" aria-label="Chart settings"><Settings size={17} /></button>
             </div>
           </div>
 
@@ -621,7 +729,7 @@ export function TradingDashboard() {
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={livePrice.toFixed(2)} readOnly /></label>}
           </div>
           <div className="product-select"><label className={!marketStatus.isOpen ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!marketStatus.isOpen} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{marketStatus.isOpen ? "MIS · 5x leverage" : "Closed · 09:15–15:30 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
-          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
+          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Est. taxes &amp; charges</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -638,13 +746,13 @@ export function TradingDashboard() {
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
-            {orders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span><small>{order.time}</small></div>)}
-            {!orders.length && <div className="no-orders">Your first simulated trade will appear here.</div>}
+            {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span><small>{order.time}</small></div>)}
+            {!todayOrders.length && <div className="no-orders">Today&apos;s simulated trades will appear here.</div>}
           </div>
         </aside>
       </div>
 
-      <nav className="mobile-bottom-nav"><button className="active" onClick={() => setSidebarOpen(false)}><LineChart size={20} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={20} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={20} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={20} /><span>Orders</span></button><button onClick={() => setGainersOpen(true)}><TrendingUp size={20} /><span>Gainers</span></button></nav>
+      <nav className="mobile-bottom-nav"><button className="active" onClick={() => setSidebarOpen(false)}><LineChart size={19} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={19} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={19} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={19} /><span>Orders</span></button><button onClick={() => setGainersOpen(true)}><TrendingUp size={19} /><span>Markets</span></button><button onClick={() => setPnlOpen(true)}><Activity size={19} /><span>P&amp;L</span></button></nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
@@ -652,9 +760,9 @@ export function TradingDashboard() {
           <section className="modal orders-modal" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
-              <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Status</span></div>
-              {orders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span className="complete-tag">Complete</span></div>)}
-              {!orders.length && <div className="order-empty"><WalletCards size={28} /><b>No paper orders yet</b><span>Place a buy or sell simulation from the order ticket.</span></div>}
+              <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
+              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.autoSquareOff ? "Auto 3:20" : "Complete"}</span></div>)}
+              {!todayOrders.length && <div className="order-empty"><WalletCards size={28} /><b>No orders today</b><span>The daily order book resets at midnight; completed trades remain in P&amp;L.</span></div>}
             </div>
           </section>
         </div>
@@ -666,9 +774,9 @@ export function TradingDashboard() {
             <div className="positions-summary"><span>{openPositions.length} open</span><div><small>Live P&amp;L</small><b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b></div></div>
             <div className="positions-list">
               {openPositions.map((position) => (
-                <button key={position.symbol} className="position-row" onClick={() => openPositionChart(position.symbol)}>
+                <button key={`${position.symbol}-${position.product}`} className="position-row" onClick={() => openPositionChart(position.symbol)}>
                   <span className={position.side === "LONG" ? "buy-tag" : "sell-tag"}>{position.side}</span>
-                  <span><b>{position.symbol}</b><small>{position.name} · {position.quantity} shares</small></span>
+                  <span><b>{position.symbol}</b><small>{position.name} · {position.product} · {position.quantity} shares</small></span>
                   <span><b className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</b><small>{formatInr(position.livePrice)} · {position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small></span>
                   <ChevronRight size={17} />
                 </button>
@@ -679,29 +787,31 @@ export function TradingDashboard() {
         </div>
       )}
       {gainersOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setGainersOpen(false)}>
-          <section className="modal gainers-modal" role="dialog" aria-modal="true" aria-label="Top gainers from Upstox" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Upstox live market</span><h2>Top gainers</h2></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close top gainers"><X size={20} /></button></div>
-            <p className="gainers-note">NIFTY 500 stocks ranked by live percentage change.</p>
-            <div className="gainers-list">
-              {topGainers.map(({ item, quote }, index) => (
-                <button key={item.symbol} className="gainer-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
-                  <span>{index + 1}</span>
-                  <span><b>{item.symbol}</b><small>{item.name}</small></span>
-                  <span><b>{formatInr(quote.lastPrice)}</b><small className="positive">+{quote.changePercent.toFixed(2)}%</small></span>
-                  <ChevronRight size={17} />
-                </button>
-              ))}
-              {gainersLoading && !topGainers.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Upstox gainers</b><span>Fetching live NIFTY 500 quotes.</span></div>}
-              {!gainersLoading && !topGainers.length && <div className="positions-empty"><Cable size={30} /><b>Live gainers unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
-            </div>
-          </section>
-        </div>
+        <section className="market-discovery-panel" aria-label="Trending stocks from Upstox">
+          <div className="market-discovery-head"><div><span className="eyebrow">Upstox live market</span><h2>Trending stocks</h2></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
+          <div className="trend-tabs"><button className={marketTrend === "GAINERS" ? "active" : ""} onClick={() => setMarketTrend("GAINERS")}>Top gainers</button><button className={marketTrend === "LOSERS" ? "active" : ""} onClick={() => setMarketTrend("LOSERS")}>Top losers</button><button className={marketTrend === "UNDER_500" ? "active" : ""} onClick={() => setMarketTrend("UNDER_500")}>Trending under ₹500</button></div>
+          <div className="market-discovery-list">
+            {marketTrendRows.map(({ item, quote }) => (
+              <button key={item.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
+                <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
+                <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
+                <span><b>{formatInr(quote.lastPrice)}</b><small className={quote.changePercent >= 0 ? "positive" : "negative"}>{quote.netChange >= 0 ? "+" : ""}{quote.netChange.toFixed(2)} ({quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%)</small></span>
+              </button>
+            ))}
+            {gainersLoading && !marketTrendRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Upstox market trends</b><span>Fetching live NIFTY 500 quotes.</span></div>}
+            {!gainersLoading && !marketTrendRows.length && <div className="positions-empty"><Cable size={30} /><b>Live market trends unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
+          </div>
+        </section>
       )}
       {watchlistPickerOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setWatchlistPickerOpen(false)}>
           <section className="modal watchlist-picker-modal" role="dialog" aria-modal="true" aria-label="Custom watchlists" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Custom watchlists</span><h2>{watchlistTarget ? `Add ${watchlistTarget.symbol}` : "Create a watchlist"}</h2></div><button className="icon-button" onClick={() => setWatchlistPickerOpen(false)} aria-label="Close custom watchlists"><X size={20} /></button></div>
+            <div className="modal-head"><div><span className="eyebrow">Custom watchlists</span><h2>{watchlistTarget ? `Add ${watchlistTarget.symbol}` : "Manage watchlists"}</h2></div><button className="icon-button" onClick={() => setWatchlistPickerOpen(false)} aria-label="Close custom watchlists"><X size={20} /></button></div>
+            {!watchlistTarget && customWatchlists.length > 0 && (
+              <div className="custom-list-editor">
+                {customWatchlists.map((list) => <div key={list.id}><input defaultValue={list.name} maxLength={24} aria-label={`Rename ${list.name}`} onBlur={(event) => renameCustomWatchlist(list.id, event.target.value)} /><small>{list.symbols.length} stocks</small><button onClick={() => deleteCustomWatchlist(list.id)} aria-label={`Delete ${list.name}`}><Trash2 size={16} /></button></div>)}
+              </div>
+            )}
             {watchlistTarget && customWatchlists.length > 0 && (
               <div className="custom-watchlist-choices">
                 {customWatchlists.map((list) => {
@@ -717,6 +827,27 @@ export function TradingDashboard() {
               </div>
             ) : <p className="watchlist-limit-note">You have created the maximum of 5 custom watchlists.</p>}
             {watchlistTarget && customWatchlists.length > 0 && <button className="watchlist-done" onClick={() => setWatchlistPickerOpen(false)}>Done</button>}
+          </section>
+        </div>
+      )}
+      {pnlOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPnlOpen(false)}>
+          <section className="modal pnl-modal" role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
+            <div className="pnl-stat-grid">
+              <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
+              <div><span>Total trades</span><b>{closedTrades.length}</b></div>
+              <div><span>Win rate</span><b>{pnlStats.winRate.toFixed(1)}%</b></div>
+              <div><span>Total profit</span><b className="positive">{formatInr(pnlStats.totalProfit)}</b></div>
+              <div><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b></div>
+              <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
+            </div>
+            <div className="pnl-chart-card"><div><b>Recent trade results</b><small>Net after estimated charges</small></div><div className="pnl-bars">{pnlChartTrades.map((trade) => <span key={trade.id} title={`${trade.symbol}: ${formatInr(trade.netPnl)}`} className={trade.netPnl >= 0 ? "profit" : "loss"} style={{ height: `${Math.max(8, Math.abs(trade.netPnl) / pnlChartMaximum * 100)}%` }} />)}</div></div>
+            <div className="pnl-trade-list">
+              {closedTrades.map((trade) => <div key={`${trade.id}-${trade.symbol}`} className="pnl-trade-row"><span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} shares · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span><span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span></div>)}
+              {!closedTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades yet</b><span>Close a paper position to build your P&amp;L history.</span></div>}
+            </div>
+            <p className="pnl-disclaimer">Charges are estimates using current Upstox equity rates; actual contract-note rounding can differ.</p>
           </section>
         </div>
       )}
