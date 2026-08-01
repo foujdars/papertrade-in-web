@@ -347,10 +347,19 @@ h1, h2, p { margin: 0; }
 .pnl-chart-card > div:first-child { display: flex; align-items: center; justify-content: space-between; }
 .pnl-chart-card b { font-size: 10px; }
 .pnl-chart-card small { color: #858da0; font-size: 8px; }
-.pnl-bars { height: 115px; display: flex; align-items: center; gap: 5px; margin-top: 12px; border-bottom: 1px solid #d8d4ef; }
-.pnl-bars span { flex: 1; max-width: 36px; min-height: 8px; border-radius: 4px 4px 0 0; }
-.pnl-bars span.profit { background: linear-gradient(#32d5ac, #00a67e); }
-.pnl-bars span.loss { align-self: flex-end; background: linear-gradient(#ff8997, #f04458); }
+.pnl-bars { height: 148px; display: flex; align-items: stretch; gap: 8px; margin-top: 12px; overflow-x: auto; overflow-y: hidden; }
+.pnl-bar-slot { flex: 1 0 54px; min-width: 54px; max-width: 72px; display: grid; grid-template-rows: 56px 56px 36px; }
+.pnl-bar-half { display: flex; justify-content: center; }
+.pnl-bar-half.profit-half { align-items: flex-end; border-bottom: 1px solid #cbc6e8; }
+.pnl-bar-half.loss-half { align-items: flex-start; }
+.pnl-bar-half i { width: min(36px, 72%); min-height: 3px; display: block; }
+.pnl-bar-slot.profit .profit-half i { border-radius: 4px 4px 0 0; background: linear-gradient(#32d5ac, #00a67e); }
+.pnl-bar-slot.loss .loss-half i { border-radius: 0 0 4px 4px; background: linear-gradient(#f04458, #ff8997); }
+.pnl-bar-caption { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 5px; text-align: center; }
+.pnl-bar-caption b { width: 100%; overflow: hidden; color: #576077; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.pnl-bar-caption small { font-size: 7px; font-weight: 800; white-space: nowrap; }
+.pnl-bar-slot.profit .pnl-bar-caption small { color: var(--green); }
+.pnl-bar-slot.loss .pnl-bar-caption small { color: var(--red); }
 .pnl-trade-list { max-height: 300px; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; overflow: auto; }
 .pnl-trade-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .pnl-trade-row > span:first-child { padding: 4px; border-radius: 5px; font-size: 7px; font-weight: 900; text-align: center; }
@@ -431,18 +440,6 @@ h1, h2, p { margin: 0; }
 .advanced-chart-link { text-decoration: none; }
 .kline-stack, .kline-chart-wrap { width: 100%; height: 100%; min-height: 0; }
 .kline-chart { width: 100%; height: 100%; overflow: hidden; }
-.chart-drawing-mode .kline-chart { touch-action: none; cursor: crosshair; }
-.ohlc-snap-guide { position: absolute; z-index: 8; width: 0; height: 0; pointer-events: none; color: var(--purple); }
-.ohlc-snap-guide::before, .ohlc-snap-guide::after { content: ""; position: absolute; left: 50%; top: 50%; background: currentColor; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #ffffffcc; }
-.ohlc-snap-guide::before { width: 25px; height: 1px; }
-.ohlc-snap-guide::after { width: 1px; height: 25px; }
-.ohlc-snap-guide i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); }
-.ohlc-snap-guide span { position: absolute; left: 10px; top: 9px; padding: 2px 5px; border: 1px solid #6b5cff55; border-radius: 4px; color: #5143c7; background: #fffffff2; box-shadow: 0 2px 8px #22223b1a; font-size: 9px; font-style: normal; font-weight: 800; white-space: nowrap; }
-.drawing-coach { position: absolute; z-index: 10; top: 58px; left: 50%; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 11px; border: 1px solid #6b5cff3d; border-radius: 10px; background: #fffffff2; box-shadow: 0 8px 24px #29234b1f; transform: translateX(-50%); pointer-events: auto; }
-.drawing-coach span { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
-.drawing-coach b { color: #3d356e; font-size: 10px; }
-.drawing-coach small { color: #7b8295; font-size: 8px; }
-.drawing-coach button { height: 26px; padding: 0 8px; border: 0; border-radius: 7px; color: #5b4be8; background: var(--purple-soft); font-size: 9px; font-weight: 800; cursor: pointer; }
 .kline-symbol-legend { z-index: 4; }
 .kline-indicator-legend { z-index: 4; }
 .rsi-color { background: #7c4dff; }

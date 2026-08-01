@@ -12,6 +12,7 @@ import {
   ListFilter,
   Lock,
   LockOpen,
+  Magnet,
   Minus,
   MousePointer2,
   Radio,
@@ -83,6 +84,7 @@ export function AdvancedChartWorkspace({
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
+  const [magnet, setMagnet] = useState(true);
   const [drawingsHidden, setDrawingsHidden] = useState(false);
   const [drawingsLocked, setDrawingsLocked] = useState(false);
   const [visibleBars, setVisibleBars] = useState(375);
@@ -351,6 +353,7 @@ export function AdvancedChartWorkspace({
             <button key={id} className={activeTool === id ? "active" : ""} onClick={() => selectTool(id)} title={label} aria-label={label}><Icon size={19} /></button>
           ))}
           <span />
+          <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} title="Magnet mode"><Magnet size={19} /></button>
           <button className={drawingsLocked ? "active" : ""} onClick={() => setDrawingsLocked((value) => !value)} title={drawingsLocked ? "Unlock drawings" : "Lock drawings"}>{drawingsLocked ? <Lock size={19} /> : <LockOpen size={19} />}</button>
           <button className={drawingsHidden ? "active" : ""} onClick={() => setDrawingsHidden((value) => !value)} title={drawingsHidden ? "Show drawings" : "Hide drawings"}>{drawingsHidden ? <EyeOff size={19} /> : <Eye size={19} />}</button>
           <button className="danger" onClick={() => setClearSignal((value) => value + 1)} title="Delete all drawings"><Trash2 size={19} /></button>
@@ -362,6 +365,7 @@ export function AdvancedChartWorkspace({
             timeframe={timeframe}
             activeTool={activeTool}
             toolSignal={toolSignal}
+            magnet={magnet}
             hiddenDrawings={drawingsHidden}
             lockedDrawings={drawingsLocked}
             clearSignal={clearSignal}
@@ -371,7 +375,6 @@ export function AdvancedChartWorkspace({
             indicators={indicators}
             onPrice={handlePrice}
             onFeedStatus={handleFeedStatus}
-            onToolComplete={() => setActiveTool("cursor")}
           />
           {(position.quantity > 0 || position.realizedPnl !== 0) && (
             <aside className="live-position-card" aria-live="polite">

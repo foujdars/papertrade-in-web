@@ -3,7 +3,7 @@
 import {
   Activity, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
-  Minus, MousePointer2, Plus, Radio, Ruler,
+  Magnet, Minus, MousePointer2, Plus, Radio, Ruler,
   Search, Star, Target, Trash2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -119,6 +119,7 @@ export function TradingDashboard() {
   const [livePrice, setLivePrice] = useState(selected.price);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [toolSignal, setToolSignal] = useState(0);
+  const [magnet, setMagnet] = useState(true);
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
@@ -718,14 +719,15 @@ export function TradingDashboard() {
             <div className="drawing-toolbar" aria-label="Drawing tools">
               {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
               <span />
+              <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
               <button className={hiddenDrawings ? "active" : ""} onClick={() => setHiddenDrawings((value) => !value)} aria-label="Hide drawings" title="Hide drawings">{hiddenDrawings ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
-            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} onToolComplete={() => setActiveTool("cursor")} />
+            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
-            <div>{activeTool === "cursor" ? "Navigate: drag chart · pinch or scroll to zoom · tap a drawing to edit" : "Draw once: tap each point · smart snap is automatic · chart unlocks when finished"}</div>
+            <div>Click + drag to pan · Scroll/pinch to zoom</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
         </section>
@@ -762,7 +764,14 @@ export function TradingDashboard() {
         </aside>
       </div>
 
-      <nav className="mobile-bottom-nav"><button className="active" onClick={() => setSidebarOpen(false)}><LineChart size={19} /><span>Trade</span></button><button onClick={() => setSidebarOpen(true)}><Layers3 size={19} /><span>Watchlist</span></button><button onClick={() => setPositionsOpen(true)}><BriefcaseBusiness size={19} /><span>Positions</span></button><button onClick={() => setOrdersOpen(true)}><WalletCards size={19} /><span>Orders</span></button><button onClick={() => setGainersOpen(true)}><TrendingUp size={19} /><span>Markets</span></button><button onClick={() => setPnlOpen(true)}><Activity size={19} /><span>P&amp;L</span></button></nav>
+      <nav className="mobile-bottom-nav">
+        <button className="active" onClick={() => { setGainersOpen(false); setSidebarOpen(false); }}><LineChart size={19} /><span>Trade</span></button>
+        <button onClick={() => { setGainersOpen(false); setSidebarOpen(true); }}><Layers3 size={19} /><span>Watchlist</span></button>
+        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setPositionsOpen(true); }}><BriefcaseBusiness size={19} /><span>Positions</span></button>
+        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setOrdersOpen(true); }}><WalletCards size={19} /><span>Orders</span></button>
+        <button onClick={() => { setSidebarOpen(false); setGainersOpen(true); }}><TrendingUp size={19} /><span>Markets</span></button>
+        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setPnlOpen(true); }}><Activity size={19} /><span>P&amp;L</span></button>
+      </nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
@@ -851,7 +860,22 @@ export function TradingDashboard() {
               <div><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b></div>
               <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
             </div>
-            <div className="pnl-chart-card"><div><b>Recent trade results</b><small>Net after estimated charges</small></div><div className="pnl-bars">{pnlChartTrades.map((trade) => <span key={trade.id} title={`${trade.symbol}: ${formatInr(trade.netPnl)}`} className={trade.netPnl >= 0 ? "profit" : "loss"} style={{ height: `${Math.max(8, Math.abs(trade.netPnl) / pnlChartMaximum * 100)}%` }} />)}</div></div>
+            <div className="pnl-chart-card">
+              <div><b>Recent trade results</b><small>Oldest to newest · net after charges</small></div>
+              <div className="pnl-bars" aria-label="Recent completed trade profit and loss chart">
+                {pnlChartTrades.map((trade) => {
+                  const barHeight = `${Math.max(5, Math.abs(trade.netPnl) / pnlChartMaximum * 100)}%`;
+                  const resultClass = trade.netPnl >= 0 ? "profit" : "loss";
+                  return (
+                    <div className={`pnl-bar-slot ${resultClass}`} key={trade.id} title={`${trade.symbol}: ${formatInr(trade.netPnl)}`}>
+                      <div className="pnl-bar-half profit-half">{trade.netPnl >= 0 && <i style={{ height: barHeight }} />}</div>
+                      <div className="pnl-bar-half loss-half">{trade.netPnl < 0 && <i style={{ height: barHeight }} />}</div>
+                      <span className="pnl-bar-caption"><b>{trade.symbol}</b><small>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</small></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="pnl-trade-list">
               {closedTrades.map((trade) => <div key={`${trade.id}-${trade.symbol}`} className="pnl-trade-row"><span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} shares · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span><span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span></div>)}
               {!closedTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades yet</b><span>Close a paper position to build your P&amp;L history.</span></div>}
