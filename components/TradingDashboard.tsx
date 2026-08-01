@@ -26,6 +26,8 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
+type NavigationSection = "trade" | "watchlist" | "positions" | "orders" | "markets" | "pnl";
+
 function getPaperOrderTimestamp(order: PaperOrder) {
   const idTimestamp = Number(order.id);
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
@@ -613,12 +615,32 @@ export function TradingDashboard() {
     window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
   }
 
+  function openNavigationSection(section: NavigationSection) {
+    setSidebarOpen(section === "watchlist");
+    setPositionsOpen(section === "positions");
+    setOrdersOpen(section === "orders");
+    setGainersOpen(section === "markets");
+    setPnlOpen(section === "pnl");
+  }
+
+  const activeNavigationSection: NavigationSection = sidebarOpen
+    ? "watchlist"
+    : positionsOpen
+      ? "positions"
+      : ordersOpen
+        ? "orders"
+        : gainersOpen
+          ? "markets"
+          : pnlOpen
+            ? "pnl"
+            : "trade";
+
   return (
     <main className="terminal-shell">
       <header className="topbar">
         <Brand />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className="nav-active">Trade</button><button onClick={() => setOrdersOpen(true)}>Orders</button><button onClick={() => setGainersOpen(true)}>Markets</button><button onClick={() => setPositionsOpen(true)}>Positions</button><button onClick={() => setPnlOpen(true)}>P&amp;L</button>
+          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "positions" ? "nav-active" : ""} onClick={() => openNavigationSection("positions")}>Positions</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -765,12 +787,12 @@ export function TradingDashboard() {
       </div>
 
       <nav className="mobile-bottom-nav">
-        <button className="active" onClick={() => { setGainersOpen(false); setSidebarOpen(false); }}><LineChart size={19} /><span>Trade</span></button>
-        <button onClick={() => { setGainersOpen(false); setSidebarOpen(true); }}><Layers3 size={19} /><span>Watchlist</span></button>
-        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setPositionsOpen(true); }}><BriefcaseBusiness size={19} /><span>Positions</span></button>
-        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setOrdersOpen(true); }}><WalletCards size={19} /><span>Orders</span></button>
-        <button onClick={() => { setSidebarOpen(false); setGainersOpen(true); }}><TrendingUp size={19} /><span>Markets</span></button>
-        <button onClick={() => { setGainersOpen(false); setSidebarOpen(false); setPnlOpen(true); }}><Activity size={19} /><span>P&amp;L</span></button>
+        <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
+        <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
+        <button className={activeNavigationSection === "positions" ? "active" : ""} onClick={() => openNavigationSection("positions")}><BriefcaseBusiness size={19} /><span>Positions</span></button>
+        <button className={activeNavigationSection === "orders" ? "active" : ""} onClick={() => openNavigationSection("orders")}><WalletCards size={19} /><span>Orders</span></button>
+        <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
+        <button className={activeNavigationSection === "pnl" ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>P&amp;L</span></button>
       </nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}

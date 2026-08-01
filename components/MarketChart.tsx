@@ -465,6 +465,8 @@ export function MarketChart({
   const previousRedo = useRef(redoSignal);
   const initialVisibleBars = useRef(visibleBars);
   const indicatorsRef = useRef(indicators);
+  const activeToolRef = useRef(activeTool);
+  const overlaySelectedRef = useRef(false);
   const indicatorIds = useRef<Partial<Record<keyof ChartIndicators, string>>>({});
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialCandles.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialCandles));
@@ -473,6 +475,13 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
   }, [indicators]);
+
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+    const chart = chartApi.current;
+    if (!chart) return;
+    chart.setScrollEnabled(activeTool === "cursor" && !overlaySelectedRef.current);
+  }, [activeTool]);
 
   function syncIndicators(chart: Chart, next: ChartIndicators) {
     const definitions: Record<keyof ChartIndicators, () => string | null> = {
@@ -554,6 +563,7 @@ export function MarketChart({
       if (!chart) return;
 
       chartApi.current = chart;
+      chart.setScrollEnabled(activeToolRef.current === "cursor");
       chart.setOffsetRightDistance(78);
       chart.setDataLoader({
         getBars: ({ type, callback }) => {
@@ -627,6 +637,14 @@ export function MarketChart({
       historyRef.current.push(snapshotOverlay(event));
       redoRef.current = [];
     };
+    const onSelected = () => {
+      overlaySelectedRef.current = true;
+      chart.setScrollEnabled(false);
+    };
+    const onDeselected = () => {
+      overlaySelectedRef.current = false;
+      chart.setScrollEnabled(activeToolRef.current === "cursor");
+    };
     chart.createOverlay({
       name,
       groupId: "papertrade",
@@ -635,6 +653,9 @@ export function MarketChart({
       visible: !hiddenDrawings,
       lock: lockedDrawings,
       onDrawEnd,
+      onSelected,
+      onDeselected,
+      onPressedMoveStart: onSelected,
     });
   }, [activeTool, hiddenDrawings, lockedDrawings, magnet, toolSignal]);
 
