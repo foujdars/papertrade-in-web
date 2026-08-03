@@ -34,8 +34,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
+import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -91,6 +92,8 @@ export function AdvancedChartWorkspace({
   const [timeframe, setTimeframe] = useState(timeframes.includes(initialTimeframe as typeof timeframes[number]) ? initialTimeframe : "5m");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
+  const [showChartFunctions, setShowChartFunctions] = useState(false);
+  const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [toolSignal, setToolSignal] = useState(0);
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
@@ -345,7 +348,7 @@ export function AdvancedChartWorkspace({
         <span />
         <button title="Undo last drawing" onClick={() => setUndoSignal((value) => value + 1)}><Undo2 size={18} /></button>
         <button title="Redo drawing" onClick={() => setRedoSignal((value) => value + 1)}><Redo2 size={18} /></button>
-        <button title="Chart settings"><Settings2 size={18} /></button>
+        <button title="Chart functions" onClick={() => setShowChartFunctions(true)}><Settings2 size={18} /></button>
         <button title="Fullscreen" onClick={enterFullscreen}><Fullscreen size={18} /></button>
         {showIndicators && (
           <div ref={indicatorPopoverRef} className="advanced-indicator-popover">
@@ -372,6 +375,7 @@ export function AdvancedChartWorkspace({
         </aside>
         <div className="advanced-chart-canvas">
           {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={selectTool} onClose={() => setShowDrawingLibrary(false)} />}
+          {showChartFunctions && <ChartFunctionMenu onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
           <MarketChart
             key={`${instrument.symbol}-${timeframe}`}
             instrument={instrument}
@@ -386,6 +390,7 @@ export function AdvancedChartWorkspace({
             redoSignal={redoSignal}
             visibleBars={visibleBars}
             indicators={indicators}
+            chartAction={chartAction}
             onPrice={handlePrice}
             onFeedStatus={handleFeedStatus}
           />

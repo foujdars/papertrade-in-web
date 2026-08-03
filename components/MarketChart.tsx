@@ -103,6 +103,22 @@ export type ChartIndicators = {
   rsi: boolean;
 };
 
+export type ChartAction =
+  | "fit"
+  | "reset"
+  | "live"
+  | "zoom-in"
+  | "zoom-out"
+  | "screenshot"
+  | "toggle-grid"
+  | "toggle-crosshair"
+  | "scale-normal"
+  | "scale-log"
+  | "scale-percent"
+  | "scale-indexed";
+
+export type ChartActionRequest = { type: ChartAction; token: number };
+
 type DraftDrawing = {
   toolType: DrawingToolId;
   requiredAnchors: number;
@@ -246,6 +262,7 @@ export function MarketChart({
   redoSignal = 0,
   visibleBars = 155,
   indicators,
+  chartAction,
   onPrice,
   onFeedStatus,
 }: {
@@ -261,6 +278,7 @@ export function MarketChart({
   redoSignal?: number;
   visibleBars?: number;
   indicators: ChartIndicators;
+  chartAction?: ChartActionRequest;
   onPrice: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -288,6 +306,8 @@ export function MarketChart({
   const visibleBarsRef = useRef(visibleBars);
   const indicatorsRef = useRef(indicators);
   const storageKeyRef = useRef(drawingStorageKey(instrument, timeframe));
+  const gridVisibleRef = useRef(true);
+  const crosshairVisibleRef = useRef(true);
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => dataRef.current.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(dataRef.current));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
@@ -507,16 +527,72 @@ export function MarketChart({
   }, [hiddenDrawings]);
 
   useEffect(() => {
+    const chart = chartApi.current;
+    if (!chartAction || !chart) return;
+    if (chartAction.type === "fit") chart.timeScale().fitContent();
+    if (chartAction.type === "reset") {
+      applyVisibleRange();
+      chart.timeScale().scrollToRealTime();
+    }
+    if (chartAction.type === "live") chart.timeScale().scrollToRealTime();
+    if (chartAction.type === "zoom-in" || chartAction.type === "zoom-out") {
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (range) {
+        const middle = (range.from + range.to) / 2;
+        const half = ((range.to - range.from) / 2) * (chartAction.type === "zoom-in" ? 0.72 : 1.38);
+        chart.timeScale().setVisibleLogicalRange({ from: middle - half, to: middle + half });
+      }
+    }
+    if (chartAction.type === "screenshot") {
+      const canvas = chart.takeScreenshot(true, true);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${instrument.symbol}-${timeframe}-chart.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    }
+    if (chartAction.type === "toggle-grid") {
+      gridVisibleRef.current = !gridVisibleRef.current;
+      const color = gridVisibleRef.current ? "#edf0f6" : "rgba(0,0,0,0)";
+      chart.applyOptions({ grid: { vertLines: { color }, horzLines: { color } } });
+    }
+    if (chartAction.type === "toggle-crosshair") {
+      crosshairVisibleRef.current = !crosshairVisibleRef.current;
+      chart.applyOptions({ crosshair: { vertLine: { visible: crosshairVisibleRef.current }, horzLine: { visible: crosshairVisibleRef.current } } });
+    }
+    if (chartAction.type.startsWith("scale-")) {
+      void import("lightweight-charts").then(({ PriceScaleMode }) => {
+        const modes = {
+          "scale-normal": PriceScaleMode.Normal,
+          "scale-log": PriceScaleMode.Logarithmic,
+          "scale-percent": PriceScaleMode.Percentage,
+          "scale-indexed": PriceScaleMode.IndexedTo100,
+        } as const;
+        const mode = modes[chartAction.type as keyof typeof modes];
+        if (mode !== undefined) chart.priceScale("right").applyOptions({ mode });
+      });
+    }
+  }, [chartAction, instrument.symbol, timeframe]);
+
+  useEffect(() => {
     if (!chartHost.current) return;
     const host = chartHost.current;
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let manager: DrawingManager | null = null;
+    let resizeChart: (() => void) | null = null;
+    let resizeFrame = 0;
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
       if (cancelled) return;
       const chart = lwc.createChart(host, {
-        autoSize: true,
+        autoSize: false,
+        width: Math.max(1, Math.floor(host.clientWidth)),
+        height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
           background: { type: lwc.ColorType.Solid, color: "#ffffff" },
           textColor: "#65708a",
@@ -759,8 +835,22 @@ export function MarketChart({
 
       syncIndicators(indicatorsRef.current);
       applyVisibleRange();
-      observer = new ResizeObserver(() => applyVisibleRange());
+      resizeChart = () => {
+        window.cancelAnimationFrame(resizeFrame);
+        resizeFrame = window.requestAnimationFrame(() => {
+          if (!chartApi.current || chartApi.current !== chart) return;
+          const width = Math.max(1, Math.floor(host.clientWidth));
+          const height = Math.max(1, Math.floor(host.clientHeight));
+          chart.resize(width, height, true);
+          applyVisibleRange();
+        });
+      };
+      observer = new ResizeObserver(resizeChart);
       observer.observe(host);
+      window.addEventListener("resize", resizeChart);
+      window.visualViewport?.addEventListener("resize", resizeChart);
+      resizeChart();
+      window.setTimeout(resizeChart, 180);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
       chart.applyOptions({ handleScroll: activeTool === "cursor", handleScale: activeTool === "cursor" });
@@ -770,6 +860,11 @@ export function MarketChart({
     return () => {
       cancelled = true;
       observer?.disconnect();
+      window.cancelAnimationFrame(resizeFrame);
+      if (resizeChart) {
+        window.removeEventListener("resize", resizeChart);
+        window.visualViewport?.removeEventListener("resize", resizeChart);
+      }
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup?.();
       cancelDraft();
       editRef.current = null;

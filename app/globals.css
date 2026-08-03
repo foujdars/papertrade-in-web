@@ -435,7 +435,9 @@ h1, h2, p { margin: 0; }
   .drawing-toolbar { width: 39px; flex-basis: 39px; }
   .drawing-toolbar button { width: 29px; height: 29px; }
   .drawing-library-backdrop { position: fixed; z-index: 130; inset: 0 0 64px; padding: 10px; }
+  .chart-function-backdrop { position: fixed; z-index: 130; inset: 0 0 64px; padding: 10px; }
   .drawing-library { max-height: calc(100% - 10px); border-radius: 12px; }
+  .chart-function-menu { max-height: calc(100% - 10px); border-radius: 12px; }
   .drawing-library-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .drawing-library > footer { font-size: 7px; }
   .chart-placement-hint { bottom: 31px; max-width: calc(100% - 70px); overflow: hidden; font-size: 8px; text-overflow: ellipsis; }
@@ -454,6 +456,9 @@ h1, h2, p { margin: 0; }
 .advanced-chart-link { text-decoration: none; }
 .kline-stack, .kline-chart-wrap, .lightweight-stack, .lightweight-chart-wrap { width: 100%; height: 100%; min-height: 0; }
 .kline-chart, .lightweight-chart { width: 100%; height: 100%; overflow: hidden; }
+.chart-body { align-items: stretch; }
+.chart-body > .lightweight-stack { height: auto; min-height: 0; align-self: stretch; }
+.advanced-chart-canvas > .lightweight-stack { height: 100%; min-height: 0; }
 .lightweight-chart.is-drawing { cursor: crosshair; touch-action: none; }
 .kline-symbol-legend { z-index: 4; }
 .kline-indicator-legend { z-index: 4; }
@@ -488,6 +493,26 @@ h1, h2, p { margin: 0; }
 .drawing-library-grid small { color: #929aab; font-size: 7px; }
 .drawing-library-grid > p { grid-column: 1 / -1; padding: 24px; color: #8b93a6; font-size: 10px; text-align: center; }
 .drawing-library > footer { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border-top: 1px solid #eceef4; color: #7c8598; background: #fafbfe; font-size: 8px; text-align: center; }
+
+.chart-function-backdrop { position: absolute; z-index: 56; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(28,34,52,.34); backdrop-filter: blur(2px); }
+.chart-function-menu { width: min(560px, 100%); max-height: calc(100% - 10px); overflow-y: auto; border: 1px solid #ddd9ff; border-radius: 14px; background: #fff; box-shadow: 0 24px 70px #20263b38; }
+.chart-function-menu > header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 10px 13px 8px 16px; border-bottom: 1px solid #eceef4; }
+.chart-function-menu > header > div { display: flex; align-items: center; gap: 10px; color: var(--purple); }
+.chart-function-menu > header span { display: flex; flex-direction: column; gap: 2px; }
+.chart-function-menu > header b { color: #20263b; font-size: 13px; }
+.chart-function-menu > header small { color: #8b93a6; font-size: 8px; }
+.chart-function-menu > header button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #e0e3eb; border-radius: 9px; color: #6c7589; background: #fff; cursor: pointer; }
+.chart-function-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 13px; }
+.chart-function-grid > button { min-width: 0; min-height: 53px; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e4e7ee; border-radius: 9px; color: #65708a; background: #fff; text-align: left; cursor: pointer; }
+.chart-function-grid > button:hover, .chart-function-grid > button.active { border-color: #bdb5ff; color: var(--purple); background: var(--purple-soft); }
+.chart-function-grid span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.chart-function-grid b { color: #30384d; font-size: 9px; }
+.chart-function-grid small { color: #9098aa; font-size: 7px; }
+.chart-scale-options { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 0 13px 13px; scrollbar-width: none; }
+.chart-scale-options > b { flex: none; margin-right: 3px; color: #5a6377; font-size: 9px; }
+.chart-scale-options > button { flex: none; height: 29px; padding: 0 10px; border: 1px solid #e0e3eb; border-radius: 15px; color: #677187; background: #fff; font-size: 8px; font-weight: 750; cursor: pointer; }
+.chart-scale-options > button.active { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+.chart-function-menu > footer { padding: 9px 13px; border-top: 1px solid #eceef4; color: #838b9d; background: #fafbfe; font-size: 8px; text-align: center; }
 
 .advanced-terminal {
   --advanced-line: #e2e5ed;

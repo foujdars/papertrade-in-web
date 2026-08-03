@@ -4,12 +4,13 @@ import {
   Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
   Magnet, Minus, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler,
-  Redo2, Search, Star, Target, Trash2, Undo2,
+  Redo2, Search, Settings2, Star, Target, Trash2, Undo2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
+import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -135,6 +136,8 @@ export function TradingDashboard() {
   const [livePrice, setLivePrice] = useState(selected.price);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
+  const [showChartFunctions, setShowChartFunctions] = useState(false);
+  const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [drawingsLocked, setDrawingsLocked] = useState(false);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
@@ -906,6 +909,7 @@ export function TradingDashboard() {
             <div className="drawing-toolbar" aria-label="Drawing tools">
               {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
               <button className="all-drawing-tools" onClick={() => setShowDrawingLibrary(true)} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
+              <button onClick={() => setShowChartFunctions(true)} aria-label="Chart functions" title="Chart functions"><Settings2 size={18} /></button>
               <span />
               <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
               <button onClick={() => setUndoSignal((value) => value + 1)} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
@@ -915,7 +919,8 @@ export function TradingDashboard() {
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
-            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} lockedDrawings={drawingsLocked} clearSignal={clearSignal} undoSignal={undoSignal} redoSignal={redoSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            {showChartFunctions && <ChartFunctionMenu onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} lockedDrawings={drawingsLocked} clearSignal={clearSignal} undoSignal={undoSignal} redoSignal={redoSignal} indicators={indicators} chartAction={chartAction} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
