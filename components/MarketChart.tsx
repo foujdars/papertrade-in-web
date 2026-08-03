@@ -175,6 +175,12 @@ const LEGACY_TOOL_ALIASES: Record<string, DrawingToolId> = {
   short: "short-position",
 };
 const CONTINUOUS_TOOLS = new Set<DrawingToolId>(["brush", "highlighter", "path"]);
+const CURSOR_SCROLL_OPTIONS = {
+  mouseWheel: true,
+  pressedMouseMove: true,
+  horzTouchDrag: true,
+  vertTouchDrag: false,
+} as const;
 
 const DEFAULT_DRAWING_STYLE: Partial<DrawingStyle> = {
   lineColor: "#6657ee",
@@ -646,7 +652,7 @@ export function MarketChart({
     const drawingType = normalizeTool(activeTool);
     manager?.setActiveTool(drawingType);
     chart?.applyOptions({
-      handleScroll: activeTool === "cursor",
+      handleScroll: activeTool === "cursor" ? CURSOR_SCROLL_OPTIONS : false,
       handleScale: activeTool === "cursor",
     });
     chartHost.current?.classList.toggle("is-drawing", activeTool !== "cursor");
@@ -770,7 +776,7 @@ export function MarketChart({
           vertLine: { color: "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: "#252b3d" },
           horzLine: { color: "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: "#252b3d" },
         },
-        handleScroll: true,
+        handleScroll: CURSOR_SCROLL_OPTIONS,
         handleScale: true,
         kineticScroll: { mouse: true, touch: true },
         localization: {
@@ -931,7 +937,7 @@ export function MarketChart({
         if (editRef.current) {
           editRef.current.drawing.setState("selected");
           editRef.current = null;
-          chart.applyOptions({ handleScroll: true, handleScale: true });
+          chart.applyOptions({ handleScroll: CURSOR_SCROLL_OPTIONS, handleScale: true });
           persistDrawings(true);
           host.releasePointerCapture?.(event.pointerId);
           event.preventDefault();
@@ -998,7 +1004,7 @@ export function MarketChart({
       window.setTimeout(resizeChart, 180);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
-      chart.applyOptions({ handleScroll: activeTool === "cursor", handleScale: activeTool === "cursor" });
+      chart.applyOptions({ handleScroll: activeTool === "cursor" ? CURSOR_SCROLL_OPTIONS : false, handleScale: activeTool === "cursor" });
       host.classList.toggle("is-drawing", activeTool !== "cursor");
     });
 

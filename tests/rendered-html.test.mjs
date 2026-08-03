@@ -62,6 +62,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /DrawingManager/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
+  assert.match(chart, /vertTouchDrag: false/);
   assert.match(functionMenu, /EMA 200/);
   assert.match(functionMenu, /VWAP/);
   assert.match(functionMenu, /MACD/);
