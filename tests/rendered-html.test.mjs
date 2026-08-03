@@ -30,8 +30,9 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
+  const [page, styles, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/ChartFunctionMenu.tsx", import.meta.url), "utf8"),
@@ -62,7 +63,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /DrawingManager/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
-  assert.match(chart, /vertTouchDrag: false/);
+  assert.match(styles, /height: calc\(100svh - 122px/);
   assert.match(functionMenu, /EMA 200/);
   assert.match(functionMenu, /VWAP/);
   assert.match(functionMenu, /MACD/);

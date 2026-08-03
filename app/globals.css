@@ -401,7 +401,7 @@ h1, h2, p { margin: 0; }
   .watchlist-panel { position: fixed; z-index: 80; inset: 58px 0 64px; width: auto; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(100%); transition: transform .2s ease, opacity .15s ease; border-right: 0; box-shadow: 0 -16px 42px #151a2d24; }
   .watchlist-panel.mobile-open { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); }
   .mobile-panel-head { height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); }
-  .chart-area { min-height: 720px; }
+  .chart-area { height: calc(100svh - 122px - env(safe-area-inset-bottom, 0px)); min-height: 0; }
   .order-ticket { border: 0; border-top: 8px solid var(--soft); padding: 20px; }
   .instrument-header { min-height: 70px; gap: 10px; padding-inline: 12px; }
   .instrument-title { min-width: 0; flex: 1; }
@@ -411,8 +411,8 @@ h1, h2, p { margin: 0; }
   .header-order-buttons { display: none; }
   .chart-controls { overflow-x: auto; }
   .chart-right-controls { display: none; }
-  .chart-body { min-height: 540px; }
-  .chart-body > .kline-stack, .chart-body > .lightweight-stack { min-height: 540px; }
+  .chart-body { min-height: 0; }
+  .chart-body > .kline-stack, .chart-body > .lightweight-stack { min-height: 0; }
   .chart-statusbar { padding-left: 53px; }
   .chart-statusbar div:nth-child(2) { display: none; }
   .market-discovery-panel { inset: 58px 0 64px; padding: 16px 18px 10px; }
@@ -429,14 +429,14 @@ h1, h2, p { margin: 0; }
   .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
   .instrument-header { align-items: flex-start; }
   .instrument-title p { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chart-area { min-height: 680px; }
+  .chart-area { height: calc(100svh - 122px - env(safe-area-inset-bottom, 0px)); min-height: 0; }
   .chart-controls { padding-inline: 5px; }
   .period-tabs button { padding-inline: 7px; }
   .control-divider, .control-button { display: none; }
   .control-button.mobile-indicator-control { position: sticky; z-index: 5; left: 0; order: -1; display: flex; flex: none; background: #fff; }
   .dashboard-indicator-popover { position: fixed; z-index: 120; top: 116px; left: 12px; right: 12px; width: auto; }
-  .chart-body { min-height: 505px; }
-  .chart-body > .kline-stack, .chart-body > .lightweight-stack { min-height: 505px; }
+  .chart-body { min-height: 0; }
+  .chart-body > .kline-stack, .chart-body > .lightweight-stack { min-height: 0; }
   .drawing-toolbar { width: 39px; flex-basis: 39px; }
   .drawing-toolbar button { width: 29px; height: 29px; }
   .drawing-library-backdrop { position: fixed; z-index: 130; inset: 0 0 64px; padding: 10px; }
@@ -461,7 +461,6 @@ h1, h2, p { margin: 0; }
 .advanced-chart-link { text-decoration: none; }
 .kline-stack, .kline-chart-wrap, .lightweight-stack, .lightweight-chart-wrap { width: 100%; height: 100%; min-height: 0; }
 .kline-chart, .lightweight-chart { width: 100%; height: 100%; overflow: hidden; }
-.lightweight-chart:not(.is-drawing), .lightweight-chart:not(.is-drawing) canvas { touch-action: pan-y pinch-zoom !important; }
 .chart-body { align-items: stretch; }
 .chart-body > .lightweight-stack { height: auto; min-height: 0; align-self: stretch; }
 .advanced-chart-canvas > .lightweight-stack { height: 100%; min-height: 0; }
