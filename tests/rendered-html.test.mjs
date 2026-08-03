@@ -60,6 +60,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
   assert.match(chart, /DrawingManager/);
+  assert.match(chart, /function fitStudyPanes/);
+  assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
   assert.match(functionMenu, /EMA 200/);
   assert.match(functionMenu, /VWAP/);
   assert.match(functionMenu, /MACD/);
@@ -86,6 +88,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(instrumentRoute, /ind_nifty500list\.csv/);
   assert.match(dashboard, /Load 60 more/);
   assert.match(dashboard, /mobile-indicator-control/);
+  assert.match(dashboard, /mobile-scroll-tail/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
   assert.match(readme, /TradingView Lightweight Charts/);

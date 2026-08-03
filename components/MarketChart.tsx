@@ -332,6 +332,7 @@ export function MarketChart({
   const macdSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const macdSignalSeries = useRef<ISeriesApi<"Line"> | null>(null);
   const macdHistogramSeries = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const macdPaneIndexRef = useRef(1);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ToolRegistry | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
@@ -365,6 +366,26 @@ export function MarketChart({
     chart.timeScale().setVisibleLogicalRange({
       from: Math.max(-0.5, count - bars - 0.5),
       to: count - 1 + Math.max(5, Math.min(12, bars * 0.06)),
+    });
+  }
+
+  function fitStudyPanes(next = indicatorsRef.current) {
+    const chart = chartApi.current;
+    const host = chartHost.current;
+    if (!chart || !host) return;
+    window.requestAnimationFrame(() => {
+      if (chartApi.current !== chart) return;
+      const panes = chart.panes();
+      const lowerPaneCount = Number(next.rsi) + Number(next.macd);
+      const totalHeight = Math.max(280, host.clientHeight);
+      if (!lowerPaneCount) {
+        panes[0]?.setHeight(totalHeight);
+        return;
+      }
+      const lowerHeight = Math.max(92, Math.min(128, Math.floor(totalHeight * (lowerPaneCount === 1 ? 0.27 : 0.2))));
+      panes[0]?.setHeight(Math.max(210, totalHeight - lowerHeight * lowerPaneCount));
+      if (next.rsi) panes[1]?.setHeight(lowerHeight);
+      if (next.macd) panes[next.rsi ? 2 : 1]?.setHeight(lowerHeight);
     });
   }
 
@@ -479,11 +500,20 @@ export function MarketChart({
         chart.removeSeries(rsiSeries.current);
         rsiSeries.current = null;
       }
+      const requestedMacdPane = next.rsi ? 2 : 1;
+      if (next.macd && macdSeries.current && macdPaneIndexRef.current !== requestedMacdPane) {
+        chart.removeSeries(macdSeries.current);
+        if (macdSignalSeries.current) chart.removeSeries(macdSignalSeries.current);
+        if (macdHistogramSeries.current) chart.removeSeries(macdHistogramSeries.current);
+        macdSeries.current = null;
+        macdSignalSeries.current = null;
+        macdHistogramSeries.current = null;
+      }
       if (next.macd && !macdSeries.current) {
-        macdSeries.current = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "MACD" }, 1);
-        macdSignalSeries.current = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "Signal" }, 1);
-        macdHistogramSeries.current = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceScaleId: "macd", title: "Histogram" }, 1);
-        chart.panes()[1]?.setHeight(116);
+        macdPaneIndexRef.current = requestedMacdPane;
+        macdSeries.current = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "MACD" }, requestedMacdPane);
+        macdSignalSeries.current = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "Signal" }, requestedMacdPane);
+        macdHistogramSeries.current = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceScaleId: "macd", title: "Histogram" }, requestedMacdPane);
       } else if (!next.macd && macdSeries.current) {
         chart.removeSeries(macdSeries.current);
         if (macdSignalSeries.current) chart.removeSeries(macdSignalSeries.current);
@@ -493,6 +523,7 @@ export function MarketChart({
         macdHistogramSeries.current = null;
       }
       syncIndicatorData();
+      fitStudyPanes(next);
     });
   }
 
@@ -955,6 +986,7 @@ export function MarketChart({
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
           chart.resize(width, height, true);
+          fitStudyPanes(indicatorsRef.current);
           applyVisibleRange();
         });
       };

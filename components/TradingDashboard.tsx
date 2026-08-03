@@ -950,6 +950,8 @@ export function TradingDashboard() {
         </aside>
       </div>
 
+      <div className="mobile-scroll-tail" aria-hidden="true"><span /><small>Swipe here to scroll</small></div>
+
       <nav className="mobile-bottom-nav">
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
