@@ -21,7 +21,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
   assert.match(html, /Interactive TradingView Lightweight Charts candlestick chart/);
-  assert.match(html, /Indicators/);
+  assert.match(html, /Functions/);
   assert.match(html, /pill-count">0</);
   assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
   assert.match(html, /Broker API/);
@@ -30,11 +30,13 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, dashboard, chart, advancedChart, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
+  const [page, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ChartFunctionMenu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/AdvancedChartWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/market.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/paper-trading.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/upstox-server.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/candles/route.ts", import.meta.url), "utf8"),
@@ -58,6 +60,15 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
   assert.match(chart, /DrawingManager/);
+  assert.match(functionMenu, /EMA 200/);
+  assert.match(functionMenu, /VWAP/);
+  assert.match(functionMenu, /MACD/);
+  assert.match(functionMenu, /Supertrend/);
+  assert.match(functionMenu, /Classic Pivots/);
+  assert.match(market, /function vwap/);
+  assert.match(market, /function macd/);
+  assert.match(market, /function supertrend/);
+  assert.match(market, /function classicPivotPoints/);
   const catalogSource = chart.slice(chart.indexOf("export const DRAWING_TOOL_CATALOG"), chart.indexOf("] as const;"));
   assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 67);
   assert.match(chart, /api\/upstox\/candles/);
@@ -70,6 +81,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(candleRoute, /"1W".*weeks/);
   assert.match(candleRoute, /"1M".*months/);
   assert.match(candleRoute, /aggregateAnnualCandles/);
+  assert.match(candleRoute, /volume: Number\(item\[5\]/);
   assert.match(instrumentRoute, /NSE\.json\.gz/);
   assert.match(instrumentRoute, /ind_nifty500list\.csv/);
   assert.match(dashboard, /Load 60 more/);

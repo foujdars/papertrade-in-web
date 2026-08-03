@@ -4,11 +4,11 @@ import {
   Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
   Magnet, Minus, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler,
-  Redo2, Search, Settings2, Star, Target, Trash2, Undo2,
+  Redo2, Search, Star, Target, Trash2, Undo2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
@@ -151,8 +151,7 @@ export function TradingDashboard() {
   const [stopLossPrice, setStopLossPrice] = useState("");
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
-  const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
-  const [showIndicators, setShowIndicators] = useState(false);
+  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [protections, setProtections] = useState<PaperProtection[]>([]);
@@ -173,8 +172,6 @@ export function TradingDashboard() {
     message: "Connecting to Upstox…",
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
-  const indicatorButtonRef = useRef<HTMLButtonElement>(null);
-  const indicatorPopoverRef = useRef<HTMLDivElement>(null);
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -219,18 +216,6 @@ export function TradingDashboard() {
     }, 0);
     return () => window.clearTimeout(applyRequestedChart);
   }, []);
-
-  useEffect(() => {
-    if (!showIndicators) return;
-    const closeOnOutsideTap = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!indicatorButtonRef.current?.contains(target) && !indicatorPopoverRef.current?.contains(target)) {
-        setShowIndicators(false);
-      }
-    };
-    document.addEventListener("pointerdown", closeOnOutsideTap);
-    return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
-  }, [showIndicators]);
 
   useEffect(() => {
     if (!showTradeSymbols) return;
@@ -891,15 +876,7 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <div className="period-tabs">{periods.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => setTimeframe(period)}>{period}</button>)}</div>
             <span className="control-divider" />
-            <button ref={indicatorButtonRef} className={`control-button mobile-indicator-control ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={16} /> Indicators <span className="pill-count">{activeIndicatorCount}</span></button>
-            {showIndicators && (
-              <div ref={indicatorPopoverRef} className="dashboard-indicator-popover">
-                <b>Indicators</b>
-                <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
-                <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>
-                <label><input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator("rsi")} /><i className="rsi-color" /> RSI 14</label>
-              </div>
-            )}
+            <button className={`control-button mobile-indicator-control ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={16} /> Functions <span className="pill-count">{activeIndicatorCount}</span></button>
             <div className="chart-right-controls">
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
             </div>
@@ -909,7 +886,6 @@ export function TradingDashboard() {
             <div className="drawing-toolbar" aria-label="Drawing tools">
               {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
               <button className="all-drawing-tools" onClick={() => setShowDrawingLibrary(true)} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
-              <button onClick={() => setShowChartFunctions(true)} aria-label="Chart functions" title="Chart functions"><Settings2 size={18} /></button>
               <span />
               <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
               <button onClick={() => setUndoSignal((value) => value + 1)} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
@@ -919,7 +895,7 @@ export function TradingDashboard() {
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
-            {showChartFunctions && <ChartFunctionMenu onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
             <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} lockedDrawings={drawingsLocked} clearSignal={clearSignal} undoSignal={undoSignal} redoSignal={redoSignal} indicators={indicators} chartAction={chartAction} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>

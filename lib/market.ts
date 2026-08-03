@@ -6,6 +6,7 @@ export type Candle = {
   high: number;
   low: number;
   close: number;
+  volume: number;
 };
 
 export type Instrument = {
@@ -98,6 +99,7 @@ export function generateCandles(
       high: Math.max(open, close) + spread,
       low: Math.min(open, close) - spread * 0.84,
       close,
+      volume: Math.round(20_000 + Math.abs(noise) * 180_000 + (count - index) * 110),
     });
   }
 
@@ -118,6 +120,121 @@ export function ema(data: Candle[], period: number) {
     current = (candle.close - current) * multiplier + current;
     return { time: candle.time, value: current };
   });
+}
+
+export function sma(data: Candle[], period: number) {
+  let total = 0;
+  return data.map((candle, index) => {
+    total += candle.close;
+    if (index >= period) total -= data[index - period].close;
+    return { time: candle.time, value: total / Math.min(index + 1, period) };
+  });
+}
+
+export function bollingerBands(data: Candle[], period = 20, deviation = 2) {
+  return data.map((candle, index) => {
+    const start = Math.max(0, index - period + 1);
+    const window = data.slice(start, index + 1).map((item) => item.close);
+    const middle = window.reduce((sum, value) => sum + value, 0) / window.length;
+    const variance = window.reduce((sum, value) => sum + (value - middle) ** 2, 0) / window.length;
+    const width = Math.sqrt(variance) * deviation;
+    return { time: candle.time, upper: middle + width, middle, lower: middle - width };
+  });
+}
+
+export function vwap(data: Candle[]) {
+  let session = "";
+  let cumulativePriceVolume = 0;
+  let cumulativeVolume = 0;
+  return data.map((candle) => {
+    const nextSession = new Date((candle.time + 19_800) * 1_000).toISOString().slice(0, 10);
+    if (nextSession !== session) {
+      session = nextSession;
+      cumulativePriceVolume = 0;
+      cumulativeVolume = 0;
+    }
+    const volume = Math.max(0, Number(candle.volume) || 0);
+    const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+    cumulativePriceVolume += typicalPrice * volume;
+    cumulativeVolume += volume;
+    return { time: candle.time, value: cumulativeVolume ? cumulativePriceVolume / cumulativeVolume : typicalPrice };
+  });
+}
+
+export function macd(data: Candle[], fast = 12, slow = 26, signalPeriod = 9) {
+  const fastValues = ema(data, fast);
+  const slowValues = ema(data, slow);
+  const macdValues = data.map((candle, index) => ({ ...candle, close: fastValues[index].value - slowValues[index].value }));
+  const signalValues = ema(macdValues, signalPeriod);
+  return data.map((candle, index) => ({
+    time: candle.time,
+    macd: macdValues[index].close,
+    signal: signalValues[index].value,
+    histogram: macdValues[index].close - signalValues[index].value,
+  }));
+}
+
+export function atr(data: Candle[], period = 14) {
+  let current = 0;
+  return data.map((candle, index) => {
+    const previousClose = data[index - 1]?.close ?? candle.close;
+    const trueRange = Math.max(candle.high - candle.low, Math.abs(candle.high - previousClose), Math.abs(candle.low - previousClose));
+    current = index === 0 ? trueRange : index < period ? (current * index + trueRange) / (index + 1) : (current * (period - 1) + trueRange) / period;
+    return { time: candle.time, value: current };
+  });
+}
+
+export function supertrend(data: Candle[], period = 10, multiplier = 3) {
+  const atrValues = atr(data, period);
+  let finalUpper = 0;
+  let finalLower = 0;
+  let direction: "up" | "down" = "up";
+  return data.map((candle, index) => {
+    const middle = (candle.high + candle.low) / 2;
+    const basicUpper = middle + multiplier * atrValues[index].value;
+    const basicLower = middle - multiplier * atrValues[index].value;
+    const previous = data[index - 1];
+    finalUpper = index === 0 || basicUpper < finalUpper || (previous?.close ?? candle.close) > finalUpper ? basicUpper : finalUpper;
+    finalLower = index === 0 || basicLower > finalLower || (previous?.close ?? candle.close) < finalLower ? basicLower : finalLower;
+    if (index > 0) {
+      if (direction === "down" && candle.close > finalUpper) direction = "up";
+      else if (direction === "up" && candle.close < finalLower) direction = "down";
+    }
+    return { time: candle.time, value: direction === "up" ? finalLower : finalUpper, direction };
+  });
+}
+
+export type PivotLevel = "r3" | "r2" | "r1" | "pivot" | "s1" | "s2" | "s3";
+
+export function classicPivotPoints(data: Candle[]) {
+  const sessionKey = (time: number) => new Date((time + 19_800) * 1_000).toISOString().slice(0, 10);
+  const sessions: Array<{ key: string; high: number; low: number; close: number }> = [];
+  for (const candle of data) {
+    const key = sessionKey(candle.time);
+    const current = sessions.at(-1);
+    if (!current || current.key !== key) sessions.push({ key, high: candle.high, low: candle.low, close: candle.close });
+    else {
+      current.high = Math.max(current.high, candle.high);
+      current.low = Math.min(current.low, candle.low);
+      current.close = candle.close;
+    }
+  }
+  const levels = new Map<string, Record<PivotLevel, number>>();
+  for (let index = 1; index < sessions.length; index += 1) {
+    const previous = sessions[index - 1];
+    const pivot = (previous.high + previous.low + previous.close) / 3;
+    const range = previous.high - previous.low;
+    levels.set(sessions[index].key, {
+      pivot,
+      r1: 2 * pivot - previous.low,
+      s1: 2 * pivot - previous.high,
+      r2: pivot + range,
+      s2: pivot - range,
+      r3: previous.high + 2 * (pivot - previous.low),
+      s3: previous.low - 2 * (previous.high - pivot),
+    });
+  }
+  return data.map((candle) => ({ time: candle.time, levels: levels.get(sessionKey(candle.time)) })).filter((item) => item.levels);
 }
 
 export function rsi(data: Candle[], period = 14) {

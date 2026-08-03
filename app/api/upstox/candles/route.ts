@@ -15,6 +15,7 @@ type ChartCandle = {
   high: number;
   low: number;
   close: number;
+  volume: number;
 };
 
 type TimeframeConfig = {
@@ -58,13 +59,15 @@ function normalizeCandles(payload: UpstoxCandlePayload): ChartCandle[] {
       high: Number(item[2]),
       low: Number(item[3]),
       close: Number(item[4]),
+      volume: Number(item[5] ?? 0),
     }))
     .filter((candle) =>
       Number.isFinite(candle.time) &&
       Number.isFinite(candle.open) &&
       Number.isFinite(candle.high) &&
       Number.isFinite(candle.low) &&
-      Number.isFinite(candle.close),
+      Number.isFinite(candle.close) &&
+      Number.isFinite(candle.volume),
     );
 }
 
@@ -89,6 +92,7 @@ function aggregateAnnualCandles(candles: ChartCandle[]) {
       existing.high = Math.max(existing.high, candle.high);
       existing.low = Math.min(existing.low, candle.low);
       existing.close = candle.close;
+      existing.volume += candle.volume;
     }
   }
   return [...byYear.values()].sort((a, b) => a.time - b.time);

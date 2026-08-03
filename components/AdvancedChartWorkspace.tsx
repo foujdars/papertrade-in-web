@@ -24,7 +24,6 @@ import {
   Redo2,
   Ruler,
   Search,
-  Settings2,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -34,7 +33,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
@@ -108,16 +107,13 @@ export function AdvancedChartWorkspace({
   const [clock, setClock] = useState<Date | null>(null);
   const [showSymbols, setShowSymbols] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
-  const [showIndicators, setShowIndicators] = useState(false);
-  const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
+  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL" | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
   const symbolPickerRef = useRef<HTMLDivElement>(null);
-  const indicatorButtonRef = useRef<HTMLButtonElement>(null);
-  const indicatorPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -151,18 +147,6 @@ export function AdvancedChartWorkspace({
       window.removeEventListener("papertrade-orders-updated", refresh);
     };
   }, []);
-
-  useEffect(() => {
-    if (!showIndicators) return;
-    const closeOnOutsideTap = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!indicatorButtonRef.current?.contains(target) && !indicatorPopoverRef.current?.contains(target)) {
-        setShowIndicators(false);
-      }
-    };
-    document.addEventListener("pointerdown", closeOnOutsideTap);
-    return () => document.removeEventListener("pointerdown", closeOnOutsideTap);
-  }, [showIndicators]);
 
   useEffect(() => {
     if (!showSymbols) return;
@@ -344,21 +328,11 @@ export function AdvancedChartWorkspace({
       <nav className="advanced-commandbar" aria-label="Chart controls">
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
-        <button ref={indicatorButtonRef} className={`advanced-indicator-button ${showIndicators ? "active" : ""}`} onClick={() => setShowIndicators((value) => !value)}><Activity size={18} /> Indicators <em>{activeIndicatorCount}</em></button>
+        <button className={`advanced-indicator-button ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={18} /> Functions <em>{activeIndicatorCount}</em></button>
         <span />
         <button title="Undo last drawing" onClick={() => setUndoSignal((value) => value + 1)}><Undo2 size={18} /></button>
         <button title="Redo drawing" onClick={() => setRedoSignal((value) => value + 1)}><Redo2 size={18} /></button>
-        <button title="Chart functions" onClick={() => setShowChartFunctions(true)}><Settings2 size={18} /></button>
         <button title="Fullscreen" onClick={enterFullscreen}><Fullscreen size={18} /></button>
-        {showIndicators && (
-          <div ref={indicatorPopoverRef} className="advanced-indicator-popover">
-            <b>Indicators</b>
-            <label><input type="checkbox" checked={indicators.ema5} onChange={() => toggleIndicator("ema5")} /><i className="ema-five" /> EMA 5</label>
-            <label><input type="checkbox" checked={indicators.ema21} onChange={() => toggleIndicator("ema21")} /><i className="ema-twenty-one" /> EMA 21</label>
-            <label><input type="checkbox" checked={indicators.rsi} onChange={() => toggleIndicator("rsi")} /><i className="rsi-color" /> RSI 14</label>
-            <small>Volume is disabled.</small>
-          </div>
-        )}
       </nav>
 
       <section className="advanced-chart-shell">
@@ -375,7 +349,7 @@ export function AdvancedChartWorkspace({
         </aside>
         <div className="advanced-chart-canvas">
           {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={selectTool} onClose={() => setShowDrawingLibrary(false)} />}
-          {showChartFunctions && <ChartFunctionMenu onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+          {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
           <MarketChart
             key={`${instrument.symbol}-${timeframe}`}
             instrument={instrument}

@@ -16,7 +16,7 @@ import type {
   SerializedDrawing,
   ToolRegistry,
 } from "lightweight-charts-drawing";
-import { ema, generateCandles, rsi, timeframes, type Candle, type Instrument } from "@/lib/market";
+import { bollingerBands, classicPivotPoints, ema, generateCandles, macd, rsi, sma, supertrend, timeframes, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
 
 export const DRAWING_TOOL_CATALOG = [
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
@@ -100,7 +100,33 @@ export type FeedStatus = {
 export type ChartIndicators = {
   ema5: boolean;
   ema21: boolean;
+  ema50: boolean;
+  ema200: boolean;
+  sma20: boolean;
+  sma50: boolean;
+  sma200: boolean;
+  bollinger: boolean;
+  vwap: boolean;
+  supertrend: boolean;
   rsi: boolean;
+  macd: boolean;
+  pivots: boolean;
+};
+
+export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
+  ema5: false,
+  ema21: false,
+  ema50: false,
+  ema200: false,
+  sma20: false,
+  sma50: false,
+  sma200: false,
+  bollinger: false,
+  vwap: false,
+  supertrend: false,
+  rsi: false,
+  macd: false,
+  pivots: false,
 };
 
 export type ChartAction =
@@ -215,6 +241,12 @@ function latestIndicatorValues(data: Candle[]) {
   return {
     ema5: ema(data, 5).at(-1)?.value ?? 0,
     ema21: ema(data, 21).at(-1)?.value ?? 0,
+    ema50: ema(data, 50).at(-1)?.value ?? 0,
+    ema200: ema(data, 200).at(-1)?.value ?? 0,
+    sma20: sma(data, 20).at(-1)?.value ?? 0,
+    sma50: sma(data, 50).at(-1)?.value ?? 0,
+    sma200: sma(data, 200).at(-1)?.value ?? 0,
+    vwap: vwap(data).at(-1)?.value ?? 0,
     rsi: rsi(data, 14).at(-1)?.value ?? 50,
   };
 }
@@ -287,7 +319,19 @@ export function MarketChart({
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const ema5Series = useRef<ISeriesApi<"Line"> | null>(null);
   const ema21Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema50Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema200Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma20Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma50Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma200Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const vwapSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const supertrendSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const bollingerSeries = useRef<Array<ISeriesApi<"Line">>>([]);
+  const pivotSeries = useRef<Partial<Record<PivotLevel, ISeriesApi<"Line">>>>({});
   const rsiSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const macdSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const macdSignalSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const macdHistogramSeries = useRef<ISeriesApi<"Histogram"> | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ToolRegistry | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
@@ -327,14 +371,33 @@ export function MarketChart({
   function syncIndicatorData(data = dataRef.current) {
     ema5Series.current?.setData(ema(data, 5).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
     ema21Series.current?.setData(ema(data, 21).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    ema50Series.current?.setData(ema(data, 50).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    ema200Series.current?.setData(ema(data, 200).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    sma20Series.current?.setData(sma(data, 20).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    sma50Series.current?.setData(sma(data, 50).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    sma200Series.current?.setData(sma(data, 200).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    vwapSeries.current?.setData(vwap(data).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    supertrendSeries.current?.setData(supertrend(data).map((point) => ({ time: point.time as UTCTimestamp, value: point.value, color: point.direction === "up" ? "#00a67e" : "#f04458" })));
+    const bands = bollingerBands(data);
+    bollingerSeries.current[0]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.upper })));
+    bollingerSeries.current[1]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.middle })));
+    bollingerSeries.current[2]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.lower })));
+    const pivots = classicPivotPoints(data);
+    for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
+      pivotSeries.current[level]?.setData(pivots.map((point) => ({ time: point.time as UTCTimestamp, value: point.levels![level] })));
+    }
     rsiSeries.current?.setData(rsi(data, 14).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    const macdValues = macd(data);
+    macdSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.macd })));
+    macdSignalSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.signal })));
+    macdHistogramSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.histogram, color: point.histogram >= 0 ? "#00a67e80" : "#f0445880" })));
     setIndicatorValues(latestIndicatorValues(data));
   }
 
   function syncIndicators(next: ChartIndicators) {
     const chart = chartApi.current;
     if (!chart) return;
-    void import("lightweight-charts").then(({ LineSeries, LineStyle }) => {
+    void import("lightweight-charts").then(({ HistogramSeries, LineSeries, LineStyle }) => {
       if (!chartApi.current || chartApi.current !== chart) return;
       if (next.ema5 && !ema5Series.current) {
         ema5Series.current = chart.addSeries(LineSeries, {
@@ -362,6 +425,43 @@ export function MarketChart({
         chart.removeSeries(ema21Series.current);
         ema21Series.current = null;
       }
+      const overlayDefinitions = [
+        ["ema50", ema50Series, ema(dataRef.current, 50), "#8b5cf6", "EMA 50"],
+        ["ema200", ema200Series, ema(dataRef.current, 200), "#e11d48", "EMA 200"],
+        ["sma20", sma20Series, sma(dataRef.current, 20), "#14b8a6", "SMA 20"],
+        ["sma50", sma50Series, sma(dataRef.current, 50), "#64748b", "SMA 50"],
+        ["sma200", sma200Series, sma(dataRef.current, 200), "#111827", "SMA 200"],
+        ["vwap", vwapSeries, vwap(dataRef.current), "#d946ef", "VWAP"],
+        ["supertrend", supertrendSeries, supertrend(dataRef.current), "#00a67e", "Supertrend 10 3"],
+      ] as const;
+      for (const [key, reference, points, color, title] of overlayDefinitions) {
+        if (next[key] && !reference.current) {
+          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title });
+          reference.current.setData(points.map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+        } else if (!next[key] && reference.current) {
+          chart.removeSeries(reference.current);
+          reference.current = null;
+        }
+      }
+      if (next.bollinger && !bollingerSeries.current.length) {
+        bollingerSeries.current = [
+          chart.addSeries(LineSeries, { color: "#6366f1", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB Upper" }),
+          chart.addSeries(LineSeries, { color: "#a5b4fc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB 20" }),
+          chart.addSeries(LineSeries, { color: "#6366f1", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB Lower" }),
+        ];
+      } else if (!next.bollinger && bollingerSeries.current.length) {
+        for (const series of bollingerSeries.current) chart.removeSeries(series);
+        bollingerSeries.current = [];
+      }
+      if (next.pivots && !Object.keys(pivotSeries.current).length) {
+        const colors: Record<PivotLevel, string> = { r3: "#dc2626", r2: "#ef4444", r1: "#fb7185", pivot: "#7c3aed", s1: "#34d399", s2: "#10b981", s3: "#047857" };
+        for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
+          pivotSeries.current[level] = chart.addSeries(LineSeries, { color: colors[level], lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: level === "pivot" ? "P" : level.toUpperCase() });
+        }
+      } else if (!next.pivots && Object.keys(pivotSeries.current).length) {
+        for (const series of Object.values(pivotSeries.current)) if (series) chart.removeSeries(series);
+        pivotSeries.current = {};
+      }
       if (next.rsi && !rsiSeries.current) {
         rsiSeries.current = chart.addSeries(LineSeries, {
           color: "#7c4dff",
@@ -378,6 +478,19 @@ export function MarketChart({
       } else if (!next.rsi && rsiSeries.current) {
         chart.removeSeries(rsiSeries.current);
         rsiSeries.current = null;
+      }
+      if (next.macd && !macdSeries.current) {
+        macdSeries.current = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "MACD" }, 1);
+        macdSignalSeries.current = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "Signal" }, 1);
+        macdHistogramSeries.current = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceScaleId: "macd", title: "Histogram" }, 1);
+        chart.panes()[1]?.setHeight(116);
+      } else if (!next.macd && macdSeries.current) {
+        chart.removeSeries(macdSeries.current);
+        if (macdSignalSeries.current) chart.removeSeries(macdSignalSeries.current);
+        if (macdHistogramSeries.current) chart.removeSeries(macdHistogramSeries.current);
+        macdSeries.current = null;
+        macdSignalSeries.current = null;
+        macdHistogramSeries.current = null;
       }
       syncIndicatorData();
     });
@@ -958,12 +1071,13 @@ export function MarketChart({
         close: Math.max(1, last.close + change),
         high: Math.max(last.high, last.close + change),
         low: Math.min(last.low, last.close + change),
+        volume: last.volume + Math.round(80 + Math.random() * 900),
       };
       const now = Math.floor(Date.now() / 1_000);
       const step = timeframes[timeframe] ?? 300;
       if (now >= Number(last.time) + step) {
         const close = updated.close;
-        dataRef.current = [...source, { time: Number(last.time) + step, open: close, high: close, low: close, close }];
+        dataRef.current = [...source, { time: Number(last.time) + step, open: close, high: close, low: close, close, volume: Math.round(500 + Math.random() * 2_500) }];
       } else {
         dataRef.current = [...source.slice(0, -1), updated];
       }
@@ -1056,11 +1170,21 @@ export function MarketChart({
             </span>
           )}
         </div>
-        {(indicators.ema5 || indicators.ema21 || indicators.rsi) && (
+        {Object.values(indicators).some(Boolean) && (
           <div className="indicator-legend lightweight-indicator-legend">
             {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
             {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
+            {indicators.ema50 && <span><i style={{ background: "#8b5cf6" }} />EMA 50 <b>{indicatorValues.ema50.toFixed(2)}</b></span>}
+            {indicators.ema200 && <span><i style={{ background: "#e11d48" }} />EMA 200 <b>{indicatorValues.ema200.toFixed(2)}</b></span>}
+            {indicators.sma20 && <span><i style={{ background: "#14b8a6" }} />SMA 20 <b>{indicatorValues.sma20.toFixed(2)}</b></span>}
+            {indicators.sma50 && <span><i style={{ background: "#64748b" }} />SMA 50 <b>{indicatorValues.sma50.toFixed(2)}</b></span>}
+            {indicators.sma200 && <span><i style={{ background: "#111827" }} />SMA 200 <b>{indicatorValues.sma200.toFixed(2)}</b></span>}
+            {indicators.vwap && <span><i style={{ background: "#d946ef" }} />VWAP <b>{indicatorValues.vwap.toFixed(2)}</b></span>}
+            {indicators.supertrend && <span><i style={{ background: "#00a67e" }} />Supertrend</span>}
+            {indicators.bollinger && <span><i style={{ background: "#6366f1" }} />Bollinger 20</span>}
+            {indicators.pivots && <span><i style={{ background: "#7c3aed" }} />Classic Pivots</span>}
             {indicators.rsi && <span><i className="rsi-color" />RSI 14 <b>{indicatorValues.rsi.toFixed(2)}</b></span>}
+            {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
           </div>
         )}
         {placementHint && <div className="chart-placement-hint">{placementHint}</div>}
