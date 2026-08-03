@@ -12,6 +12,7 @@ export type PaperOrder = {
   createdAt?: number;
   charges?: EquityChargeBreakdown;
   autoSquareOff?: boolean;
+  exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF";
 };
 
 export type PaperPosition = {
@@ -27,6 +28,18 @@ export type PaperPosition = {
   returnPercent: number;
 };
 
+export type PaperProtection = {
+  id: string;
+  symbol: string;
+  product: "INTRADAY" | "DELIVERY";
+  side: "LONG" | "SHORT";
+  targetPrice?: number;
+  stopLossPrice?: number;
+  createdAt: number;
+};
+
+const PAPER_PROTECTIONS_STORAGE_KEY = "papertrade-protections";
+
 export function readPaperOrders(): PaperOrder[] {
   try {
     const value = JSON.parse(localStorage.getItem("papertrade-orders") ?? "[]") as PaperOrder[];
@@ -39,6 +52,31 @@ export function readPaperOrders(): PaperOrder[] {
 export function writePaperOrders(orders: PaperOrder[]) {
   localStorage.setItem("papertrade-orders", JSON.stringify(orders));
   window.dispatchEvent(new CustomEvent("papertrade-orders-updated", { detail: orders }));
+}
+
+export function readPaperProtections(): PaperProtection[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(PAPER_PROTECTIONS_STORAGE_KEY) ?? "[]") as PaperProtection[];
+    return Array.isArray(value) ? value.filter((item) => item?.id && item?.symbol && item?.product && item?.side) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writePaperProtections(protections: PaperProtection[]) {
+  localStorage.setItem(PAPER_PROTECTIONS_STORAGE_KEY, JSON.stringify(protections));
+}
+
+export function getProtectionTrigger(protection: PaperProtection, livePrice: number): "TARGET" | "STOP_LOSS" | null {
+  if (!Number.isFinite(livePrice) || livePrice <= 0) return null;
+  if (protection.side === "LONG") {
+    if (protection.targetPrice && livePrice >= protection.targetPrice) return "TARGET";
+    if (protection.stopLossPrice && livePrice <= protection.stopLossPrice) return "STOP_LOSS";
+  } else {
+    if (protection.targetPrice && livePrice <= protection.targetPrice) return "TARGET";
+    if (protection.stopLossPrice && livePrice >= protection.stopLossPrice) return "STOP_LOSS";
+  }
+  return null;
 }
 
 export function calculatePosition(

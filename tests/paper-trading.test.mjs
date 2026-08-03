@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition } from "../lib/paper-trading.ts";
+import { calculatePosition, getProtectionTrigger } from "../lib/paper-trading.ts";
 
 function order(id, side, quantity, price) {
   return {
@@ -50,4 +50,16 @@ test("supports short positions and direction reversals", () => {
   assert.equal(position.realizedPnl, 50);
   assert.equal(position.unrealizedPnl, 15);
   assert.equal(position.totalPnl, 65);
+});
+
+test("triggers target and stop loss correctly for long and short positions", () => {
+  const base = { id: "risk-1", symbol: "RELIANCE", product: "INTRADAY", createdAt: 1 };
+  const longProtection = { ...base, side: "LONG", targetPrice: 110, stopLossPrice: 95 };
+  const shortProtection = { ...base, side: "SHORT", targetPrice: 90, stopLossPrice: 105 };
+
+  assert.equal(getProtectionTrigger(longProtection, 110), "TARGET");
+  assert.equal(getProtectionTrigger(longProtection, 94), "STOP_LOSS");
+  assert.equal(getProtectionTrigger(shortProtection, 90), "TARGET");
+  assert.equal(getProtectionTrigger(shortProtection, 106), "STOP_LOSS");
+  assert.equal(getProtectionTrigger(longProtection, 100), null);
 });

@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  Activity, Bot, BoxSelect, BriefcaseBusiness, Cable, ChevronDown, ChevronRight,
+  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
-  Magnet, Minus, MousePointer2, Plus, Radio, Ruler,
+  Magnet, Minus, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler,
   Search, Star, Target, Trash2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -11,7 +11,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
-import { calculatePosition, readPaperOrders, writePaperOrders, type PaperOrder } from "@/lib/paper-trading";
+import {
+  calculatePosition,
+  getProtectionTrigger,
+  readPaperOrders,
+  readPaperProtections,
+  writePaperOrders,
+  writePaperProtections,
+  type PaperOrder,
+  type PaperProtection,
+} from "@/lib/paper-trading";
 import { buildClosedTrades, getOrderCharges } from "@/lib/trade-analytics";
 import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
@@ -35,9 +44,13 @@ function getPaperOrderTimestamp(order: PaperOrder) {
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
   { id: "trend", label: "Trend line", icon: TrendingUp },
+  { id: "straight", label: "Extended line", icon: MoveDiagonal2 },
+  { id: "diagonalRay", label: "Diagonal ray", icon: ArrowUpRight },
   { id: "horizontal", label: "Horizontal line", icon: Minus },
   { id: "ray", label: "Horizontal ray", icon: Radio },
+  { id: "vertical", label: "Vertical line", icon: MoveVertical },
   { id: "channel", label: "Parallel channel", icon: FlipHorizontal2 },
+  { id: "brush", label: "Brush", icon: Brush },
   { id: "rectangle", label: "Rectangle + mid", icon: BoxSelect },
   { id: "fib", label: "Fibonacci", icon: ListFilter },
   { id: "range", label: "Price range", icon: Ruler },
@@ -126,12 +139,15 @@ export function TradingDashboard() {
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [quantity, setQuantity] = useState(1);
+  const [targetPrice, setTargetPrice] = useState("");
+  const [stopLossPrice, setStopLossPrice] = useState("");
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
   const [indicators, setIndicators] = useState<ChartIndicators>({ ema5: false, ema21: false, rsi: false });
   const [showIndicators, setShowIndicators] = useState(false);
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
+  const [protections, setProtections] = useState<PaperProtection[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -157,6 +173,7 @@ export function TradingDashboard() {
     const restore = window.setTimeout(() => {
       try {
         setOrders(readPaperOrders());
+        setProtections(readPaperProtections());
         setBalance(Number(localStorage.getItem("papertrade-balance") ?? "1000000"));
         const savedWatchlists = JSON.parse(localStorage.getItem(CUSTOM_WATCHLIST_STORAGE_KEY) ?? "[]") as CustomWatchlist[];
         if (Array.isArray(savedWatchlists)) {
@@ -396,6 +413,7 @@ export function TradingDashboard() {
         createdAt: clock.getTime(),
         charges,
         autoSquareOff: true,
+        exitReason: "AUTO_SQUARE_OFF",
       };
       automaticOrders.push(order);
       const releasedMargin = squareOffPrice * position.quantity * 0.2;
@@ -410,9 +428,73 @@ export function TradingDashboard() {
     setBalance(nextBalance);
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
+    setProtections((current) => {
+      const automaticallyClosed = new Set(automaticOrders.map((order) => `${order.symbol}:INTRADAY`));
+      const remaining = current.filter((item) => !automaticallyClosed.has(`${item.symbol}:${item.product}`));
+      writePaperProtections(remaining);
+      return remaining;
+    });
     setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off at 3:20 PM`);
     window.setTimeout(() => setToast(""), 4_000);
   }, [balance, clock, marketQuotes, orders, stockUniverse]);
+
+  useEffect(() => {
+    if (!clock || !orders.length || !protections.length || !getNseMarketStatus(clock).isOpen) return;
+    const afterIntradaySquareOff = clock.getHours() > 15 || (clock.getHours() === 15 && clock.getMinutes() >= 20);
+    const triggeredOrders: PaperOrder[] = [];
+    const clearedProtectionIds = new Set<string>();
+    let nextBalance = balance;
+
+    protections.forEach((protection, index) => {
+      if (protection.product === "INTRADAY" && afterIntradaySquareOff) return;
+      const instrument = stockUniverse.find((item) => item.symbol === protection.symbol);
+      const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[protection.symbol] : marketQuotes[protection.symbol];
+      const price = protection.symbol === selected.symbol ? livePrice : quote?.lastPrice;
+      const position = calculatePosition(orders, protection.symbol, price ?? 0, protection.product);
+      if (!position.quantity || position.side === "FLAT" || position.side !== protection.side) {
+        clearedProtectionIds.add(protection.id);
+        return;
+      }
+      if (!price || !Number.isFinite(price)) return;
+      const trigger = getProtectionTrigger(protection, price);
+      if (!trigger) return;
+      const closingSide = position.side === "LONG" ? "SELL" : "BUY";
+      const charges = calculateUpstoxEquityCharges({ side: closingSide, product: protection.product, quantity: position.quantity, price });
+      const order: PaperOrder = {
+        id: `${clock.getTime() + 10_000 + index}`,
+        symbol: protection.symbol,
+        side: closingSide,
+        quantity: position.quantity,
+        price,
+        status: "COMPLETE",
+        time: clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        product: protection.product,
+        createdAt: clock.getTime(),
+        charges,
+        exitReason: trigger,
+      };
+      triggeredOrders.push(order);
+      clearedProtectionIds.add(protection.id);
+      const releasedMargin = price * position.quantity * 0.2;
+      nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+    });
+
+    if (!triggeredOrders.length && !clearedProtectionIds.size) return;
+    const remainingProtections = protections.filter((item) => !clearedProtectionIds.has(item.id));
+    // Protective exits are synchronized with the latest live quote.
+    setProtections(remainingProtections);
+    writePaperProtections(remainingProtections);
+    if (!triggeredOrders.length) return;
+    const nextOrders = [...triggeredOrders, ...orders];
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOrders(nextOrders);
+    setBalance(nextBalance);
+    writePaperOrders(nextOrders);
+    localStorage.setItem("papertrade-balance", String(nextBalance));
+    const reasons = triggeredOrders.map((order) => order.exitReason === "TARGET" ? "target" : "stop loss");
+    setToast(`${triggeredOrders.length} position${triggeredOrders.length > 1 ? "s" : ""} exited by ${[...new Set(reasons)].join(" / ")}`);
+    window.setTimeout(() => setToast(""), 4_000);
+  }, [balance, clock, livePrice, marketQuotes, orders, protections, selected.symbol, stockUniverse]);
   const handlePrice = useCallback((value: number) => setLivePrice(value), []);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
@@ -430,6 +512,7 @@ export function TradingDashboard() {
   );
   const selectedPosition = selectedPositions.intraday.quantity > 0 ? selectedPositions.intraday : selectedPositions.delivery;
   const positionProduct: "INTRADAY" | "DELIVERY" = selectedPositions.intraday.quantity > 0 ? "INTRADAY" : "DELIVERY";
+  const selectedProtection = protections.find((item) => item.symbol === selected.symbol && item.product === positionProduct);
   const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = stockUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
@@ -476,11 +559,69 @@ export function TradingDashboard() {
     ? Math.min(Math.max(1, Number.isFinite(requestedExitQuantity) ? requestedExitQuantity : 1), selectedPosition.quantity)
     : 1;
 
+  function protectionValues() {
+    const target = targetPrice.trim() ? Number(targetPrice) : undefined;
+    const stopLoss = stopLossPrice.trim() ? Number(stopLossPrice) : undefined;
+    return { target, stopLoss };
+  }
+
+  function protectionError(direction: "LONG" | "SHORT", referencePrice: number) {
+    const { target, stopLoss } = protectionValues();
+    if (target !== undefined && (!Number.isFinite(target) || target <= 0)) return "Enter a valid target price";
+    if (stopLoss !== undefined && (!Number.isFinite(stopLoss) || stopLoss <= 0)) return "Enter a valid stop-loss price";
+    if (direction === "LONG" && target !== undefined && target <= referencePrice) return "Long target must be above the live price";
+    if (direction === "LONG" && stopLoss !== undefined && stopLoss >= referencePrice) return "Long stop loss must be below the live price";
+    if (direction === "SHORT" && target !== undefined && target >= referencePrice) return "Short target must be below the live price";
+    if (direction === "SHORT" && stopLoss !== undefined && stopLoss <= referencePrice) return "Short stop loss must be above the live price";
+    return null;
+  }
+
+  function saveProtection(protection: PaperProtection | null, symbol: string, protectionProduct: "INTRADAY" | "DELIVERY") {
+    const remaining = protections.filter((item) => !(item.symbol === symbol && item.product === protectionProduct));
+    const next = protection ? [protection, ...remaining] : remaining;
+    setProtections(next);
+    writePaperProtections(next);
+  }
+
+  function applyProtectionToOpenPosition() {
+    if (!selectedPosition.quantity || selectedPosition.side === "FLAT") return;
+    const error = protectionError(selectedPosition.side, livePrice);
+    if (error) {
+      setToast(error);
+      window.setTimeout(() => setToast(""), 3_200);
+      return;
+    }
+    const { target, stopLoss } = protectionValues();
+    if (target === undefined && stopLoss === undefined) {
+      saveProtection(null, selected.symbol, positionProduct);
+      setToast("Target and stop loss removed");
+    } else {
+      saveProtection({
+        id: `${Date.now()}`,
+        symbol: selected.symbol,
+        product: positionProduct,
+        side: selectedPosition.side,
+        targetPrice: target,
+        stopLossPrice: stopLoss,
+        createdAt: Date.now(),
+      }, selected.symbol, positionProduct);
+      setToast("Target and stop loss updated");
+    }
+    window.setTimeout(() => setToast(""), 3_000);
+  }
+
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
     if (product === "INTRADAY" && !marketStatus.isOpen) {
       setToast(marketStatus.message);
       window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
+    const intendedDirection = side === "BUY" ? "LONG" : "SHORT";
+    const riskError = protectionError(intendedDirection, livePrice);
+    if (riskError) {
+      setToast(riskError);
+      window.setTimeout(() => setToast(""), 3_200);
       return;
     }
     const order: PaperOrder = {
@@ -490,10 +631,27 @@ export function TradingDashboard() {
     };
     const nextOrders = [order, ...orders];
     const nextBalance = (side === "BUY" ? balance - margin : balance + margin) - estimatedOrderCharges.total;
+    const nextPosition = calculatePosition(nextOrders, selected.symbol, livePrice, product);
+    const { target, stopLoss } = protectionValues();
+    if ((target !== undefined || stopLoss !== undefined) && nextPosition.quantity > 0 && nextPosition.side === intendedDirection) {
+      saveProtection({
+        id: `${Date.now()}-risk`,
+        symbol: selected.symbol,
+        product,
+        side: intendedDirection,
+        targetPrice: target,
+        stopLossPrice: stopLoss,
+        createdAt: Date.now(),
+      }, selected.symbol, product);
+    } else if (!nextPosition.quantity || nextPosition.side !== intendedDirection) {
+      saveProtection(null, selected.symbol, product);
+    }
     setOrders(nextOrders);
     setBalance(nextBalance);
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
+    setTargetPrice("");
+    setStopLossPrice("");
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(estimatedOrderCharges.total)}`);
     window.setTimeout(() => setToast(""), 3200);
   }
@@ -519,6 +677,7 @@ export function TradingDashboard() {
       product: positionProduct,
       createdAt: Date.now(),
       charges: exitCharges,
+      exitReason: "MANUAL",
     };
     const nextOrders = [order, ...orders];
     const exitMargin = livePrice * closingQuantity * 0.2;
@@ -528,6 +687,7 @@ export function TradingDashboard() {
     setExitQuantity("1");
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
+    if (closingQuantity >= selectedPosition.quantity) saveProtection(null, selected.symbol, positionProduct);
     setToast(`Exited ${closingQuantity} ${selected.symbol} · charges ${formatInr(exitCharges.total)}`);
     window.setTimeout(() => setToast(""), 3_200);
   }
@@ -762,12 +922,25 @@ export function TradingDashboard() {
             <label>Quantity<div className="stepper"><button onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus size={15} /></button><input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /><button onClick={() => setQuantity(quantity + 1)}><Plus size={15} /></button></div></label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={livePrice.toFixed(2)} readOnly /></label>}
           </div>
+          <div className="protection-grid">
+            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} placeholder={side === "BUY" ? `Above ${livePrice.toFixed(2)}` : `Below ${livePrice.toFixed(2)}`} /></label>
+            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onChange={(event) => setStopLossPrice(event.target.value)} placeholder={side === "BUY" ? `Below ${livePrice.toFixed(2)}` : `Above ${livePrice.toFixed(2)}`} /></label>
+            {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
+          </div>
           <div className="product-select"><label className={!marketStatus.isOpen ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!marketStatus.isOpen} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{marketStatus.isOpen ? "MIS · 5x leverage" : "Closed · 09:15–15:30 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Est. taxes &amp; charges</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
               <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
+              {selectedProtection && (
+                <div className="active-protection">
+                  <span>Active exits</span>
+                  <b>{selectedProtection.targetPrice ? `Target ${formatInr(selectedProtection.targetPrice)}` : "No target"}</b>
+                  <b>{selectedProtection.stopLossPrice ? `SL ${formatInr(selectedProtection.stopLossPrice)}` : "No SL"}</b>
+                  <button type="button" onClick={() => saveProtection(null, selected.symbol, positionProduct)}>Remove</button>
+                </div>
+              )}
               <div className="ticket-exit-controls">
                 <label>Exit qty<input type="text" inputMode="numeric" value={exitQuantity} onFocus={() => setExitQuantity("")} onChange={(event) => setExitQuantity(event.target.value.replace(/\D/g, ""))} onBlur={() => setExitQuantity(String(safeExitQuantity))} /></label>
                 <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
@@ -802,7 +975,7 @@ export function TradingDashboard() {
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
-              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.autoSquareOff ? "Auto 3:20" : "Complete"}</span></div>)}
+              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.exitReason === "TARGET" ? "Target hit" : order.exitReason === "STOP_LOSS" ? "SL hit" : order.autoSquareOff ? "Auto 3:20" : "Complete"}</span></div>)}
               {!todayOrders.length && <div className="order-empty"><WalletCards size={28} /><b>No orders today</b><span>The daily order book resets at midnight; completed trades remain in P&amp;L.</span></div>}
             </div>
           </section>

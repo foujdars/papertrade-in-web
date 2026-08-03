@@ -14,9 +14,13 @@ import { ema, generateCandles, timeframes, type Candle, type Instrument } from "
 export type DrawingTool =
   | "cursor"
   | "trend"
+  | "straight"
+  | "diagonalRay"
   | "horizontal"
   | "ray"
+  | "vertical"
   | "channel"
+  | "brush"
   | "rectangle"
   | "fib"
   | "range"
@@ -397,9 +401,13 @@ function periodFor(timeframe: string) {
 
 const overlayNames: Partial<Record<DrawingTool, string>> = {
   trend: "segment",
+  straight: "straightLine",
+  diagonalRay: "rayLine",
   horizontal: "horizontalStraightLine",
   ray: "horizontalRayLine",
+  vertical: "verticalStraightLine",
   channel: "priceChannelLine",
+  brush: "brush",
   rectangle: "paperRectangle",
   fib: "paperFibonacciLine",
   range: "paperPriceRange",

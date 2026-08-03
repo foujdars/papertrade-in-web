@@ -214,6 +214,11 @@ h1, h2, p { margin: 0; }
 .order-type-tabs button.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--purple); }
 .input-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 13px; }
 .input-grid label, .modal form label, .connection-settings label { display: flex; flex-direction: column; gap: 6px; color: #6b748a; font-size: 10px; font-weight: 650; }
+.protection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; padding: 9px; border: 1px solid #e5e1ff; border-radius: 9px; background: #faf9ff; }
+.protection-grid label { min-width: 0; display: flex; flex-direction: column; gap: 5px; color: #6b748a; font-size: 9px; font-weight: 700; }
+.protection-grid input { width: 100%; min-width: 0; height: 34px; border: 1px solid #dce0ee; border-radius: 7px; padding: 0 8px; outline: 0; color: #30384d; background: #fff; font-size: 10px; font-weight: 750; }
+.protection-grid input:focus { border-color: #6b50f280; box-shadow: 0 0 0 3px #6b50f212; }
+.protection-grid > button { grid-column: 1 / -1; height: 31px; border: 0; border-radius: 7px; color: #fff; background: var(--purple); font-size: 9px; font-weight: 800; cursor: pointer; }
 .stepper { height: 40px; display: grid; grid-template-columns: 36px 1fr 36px; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; }
 .stepper button { border: 0; background: #fafbfe; display: grid; place-items: center; cursor: pointer; }
 .stepper input { width: 100%; border: 0; border-inline: 1px solid var(--line); outline: 0; text-align: center; font-weight: 800; appearance: textfield; }
@@ -231,6 +236,10 @@ h1, h2, p { margin: 0; }
 .margin-card b { color: #424b61; }
 .ticket-live-position { display: flex; flex-direction: column; gap: 6px; margin: -2px 0 12px; padding: 10px 11px; border: 1px solid #dcd7ff; border-radius: 9px; background: linear-gradient(135deg, #faf9ff, #f2efff); }
 .ticket-live-position > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ticket-live-position > .active-protection { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 5px; padding: 6px; border: 1px solid #d8d2ff; border-radius: 7px; background: #fff; }
+.active-protection span { color: var(--purple); }
+.active-protection b { color: #495269; font-size: 8px; text-align: center; }
+.active-protection button { border: 0; padding: 3px 5px; border-radius: 5px; color: var(--red); background: #fff0f2; font-size: 7px; font-weight: 850; cursor: pointer; }
 .ticket-live-position span { color: #5f6680; font-size: 9px; font-weight: 800; }
 .ticket-live-position b { font-size: 12px; }
 .ticket-live-position small { color: #7d8598; font-size: 8px; }
