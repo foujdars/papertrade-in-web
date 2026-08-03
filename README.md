@@ -1,15 +1,15 @@
 # PaperTrade IN
 
-A responsive Indian-market paper-trading simulator built with Next.js, vinext and KLineChart.
+A responsive Indian-market paper-trading simulator built with Next.js, vinext and TradingView Lightweight Charts.
 
 ## Features
 
-- Dynamic KLineChart candlesticks with pan, mouse-wheel/pinch zoom, crosshair, right-side INR price scale and bottom time scale
+- Dynamic TradingView Lightweight Charts candlesticks with pan, mouse-wheel/pinch zoom, OHLC crosshair magnet, right-side INR price scale and bottom time scale
 - Dedicated `/chart` workspace with symbol search, full-screen mode, ranges, live Indian time and quick paper buy/sell
 - Authenticated Upstox candles and quote snapshots for 1m, 5m, 15m, 1H, 3H, 4H, 1D, 1W, 1M and 1Y intervals
 - Clean candlestick-only default view with independent EMA 5, EMA 21 and RSI 14 switches (no volume)
-- Trend line, horizontal line/ray, parallel channel, rectangle with midline, Fibonacci, price range and long/short drawing tools
-- Native zoom-synchronised drawings with magnet, lock, hide, undo, redo and delete controls
+- All 67 tools registered by the current drawing extension, covering lines, channels, Fibonacci, Gann, pitchforks, measurements, shapes, annotations and long/short position planning
+- Mobile-first tap-to-place drawings with OHLC magnet snapping, touch selection, anchor/whole-drawing movement, lock, hide, undo, redo, delete and per-symbol persistence
 - Complete daily Upstox NSE equity master with official NIFTY 50, BANK NIFTY and NIFTY 500 constituent membership, search and paged watchlists
 - Local INR paper orders, cash balance and order book
 - Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage, custom-quantity exits and exit-all
@@ -55,4 +55,4 @@ The server merges Upstox historical candles with the official current-trading-da
 
 ## Attribution
 
-Charts use the open-source [KLineChart](https://github.com/klinecharts/KLineChart) library under its Apache 2.0 license.
+Charts use the open-source [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) library under Apache 2.0 and the MIT-licensed [lightweight-charts-drawing](https://github.com/deepentropy/lightweight-charts-drawing) extension. TradingView attribution remains visible in the chart.

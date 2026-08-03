@@ -11,6 +11,7 @@ import {
   EyeOff,
   FlipHorizontal2,
   Fullscreen,
+  Layers3,
   ListFilter,
   Lock,
   LockOpen,
@@ -34,6 +35,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -58,19 +60,19 @@ const ranges = [
 
 const tools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
-  { id: "trend", label: "Trend line", icon: TrendingUp },
-  { id: "straight", label: "Extended line", icon: MoveDiagonal2 },
-  { id: "diagonalRay", label: "Diagonal ray", icon: ArrowUpRight },
-  { id: "horizontal", label: "Horizontal line", icon: Minus },
-  { id: "ray", label: "Horizontal ray", icon: Radio },
-  { id: "vertical", label: "Vertical line", icon: MoveVertical },
-  { id: "channel", label: "Parallel channel", icon: FlipHorizontal2 },
+  { id: "trend-line", label: "Trend line", icon: TrendingUp },
+  { id: "extended-line", label: "Extended line", icon: MoveDiagonal2 },
+  { id: "ray", label: "Diagonal ray", icon: ArrowUpRight },
+  { id: "horizontal-line", label: "Horizontal line", icon: Minus },
+  { id: "horizontal-ray", label: "Horizontal ray", icon: Radio },
+  { id: "vertical-line", label: "Vertical line", icon: MoveVertical },
+  { id: "parallel-channel", label: "Parallel channel", icon: FlipHorizontal2 },
   { id: "brush", label: "Brush", icon: Brush },
   { id: "rectangle", label: "Rectangle with midpoint", icon: BoxSelect },
-  { id: "fib", label: "Fibonacci retracement", icon: ListFilter },
-  { id: "range", label: "Price range", icon: Ruler },
-  { id: "long", label: "Long position", icon: TrendingUp },
-  { id: "short", label: "Short position", icon: TrendingDown },
+  { id: "fib-retracement", label: "Fibonacci retracement", icon: ListFilter },
+  { id: "price-range", label: "Price range", icon: Ruler },
+  { id: "long-position", label: "Long position", icon: TrendingUp },
+  { id: "short-position", label: "Short position", icon: TrendingDown },
 ];
 
 function getInitialInstrument(symbol: string) {
@@ -88,6 +90,7 @@ export function AdvancedChartWorkspace({
   const [availableInstruments, setAvailableInstruments] = useState<Instrument[]>(instruments);
   const [timeframe, setTimeframe] = useState(timeframes.includes(initialTimeframe as typeof timeframes[number]) ? initialTimeframe : "5m");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [toolSignal, setToolSignal] = useState(0);
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
@@ -360,6 +363,7 @@ export function AdvancedChartWorkspace({
           {tools.map(({ id, label, icon: Icon }) => (
             <button key={id} className={activeTool === id ? "active" : ""} onClick={() => selectTool(id)} title={label} aria-label={label}><Icon size={19} /></button>
           ))}
+          <button className="all-drawing-tools" onClick={() => setShowDrawingLibrary(true)} title="All 67 drawing tools" aria-label="All 67 drawing tools"><Layers3 size={19} /><small>67</small></button>
           <span />
           <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} title="Magnet mode"><Magnet size={19} /></button>
           <button className={drawingsLocked ? "active" : ""} onClick={() => setDrawingsLocked((value) => !value)} title={drawingsLocked ? "Unlock drawings" : "Lock drawings"}>{drawingsLocked ? <Lock size={19} /> : <LockOpen size={19} />}</button>
@@ -367,6 +371,7 @@ export function AdvancedChartWorkspace({
           <button className="danger" onClick={() => setClearSignal((value) => value + 1)} title="Delete all drawings"><Trash2 size={19} /></button>
         </aside>
         <div className="advanced-chart-canvas">
+          {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={selectTool} onClose={() => setShowDrawingLibrary(false)} />}
           <MarketChart
             key={`${instrument.symbol}-${timeframe}`}
             instrument={instrument}

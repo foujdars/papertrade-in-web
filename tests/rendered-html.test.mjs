@@ -20,7 +20,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
 
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
-  assert.match(html, /Interactive KLineChart candlestick chart/);
+  assert.match(html, /Interactive TradingView Lightweight Charts candlestick chart/);
   assert.match(html, /Indicators/);
   assert.match(html, /pill-count">0</);
   assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
@@ -54,8 +54,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(paperTrading, /unrealizedPnl/);
   assert.match(dashboard, /Fibonacci/);
   assert.match(dashboard, /Upstox market data/);
-  assert.match(chart, /import\("klinecharts"\)/);
-  assert.match(chart, /createOverlay/);
+  assert.match(chart, /import\("lightweight-charts"\)/);
+  assert.match(chart, /lightweight-charts-drawing/);
+  assert.match(chart, /DRAWING_TOOL_CATALOG/);
+  assert.match(chart, /DrawingManager/);
+  const catalogSource = chart.slice(chart.indexOf("export const DRAWING_TOOL_CATALOG"), chart.indexOf("] as const;"));
+  assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 67);
   assert.match(chart, /api\/upstox\/candles/);
   assert.match(chart, /scope: "intraday"/);
   assert.match(chart, /timeframe === "1W"/);
@@ -72,7 +76,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mobile-indicator-control/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
-  assert.match(readme, /KLineChart/);
+  assert.match(readme, /TradingView Lightweight Charts/);
   await access(new URL("../public/papertrade-social.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });

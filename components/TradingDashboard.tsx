@@ -2,13 +2,14 @@
 
 import {
   Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
-  Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, LockKeyhole,
+  Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
   Magnet, Minus, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler,
-  Search, Star, Target, Trash2,
+  Redo2, Search, Star, Target, Trash2, Undo2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketChart, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -43,19 +44,19 @@ function getPaperOrderTimestamp(order: PaperOrder) {
 }
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
-  { id: "trend", label: "Trend line", icon: TrendingUp },
-  { id: "straight", label: "Extended line", icon: MoveDiagonal2 },
-  { id: "diagonalRay", label: "Diagonal ray", icon: ArrowUpRight },
-  { id: "horizontal", label: "Horizontal line", icon: Minus },
-  { id: "ray", label: "Horizontal ray", icon: Radio },
-  { id: "vertical", label: "Vertical line", icon: MoveVertical },
-  { id: "channel", label: "Parallel channel", icon: FlipHorizontal2 },
+  { id: "trend-line", label: "Trend line", icon: TrendingUp },
+  { id: "extended-line", label: "Extended line", icon: MoveDiagonal2 },
+  { id: "ray", label: "Diagonal ray", icon: ArrowUpRight },
+  { id: "horizontal-line", label: "Horizontal line", icon: Minus },
+  { id: "horizontal-ray", label: "Horizontal ray", icon: Radio },
+  { id: "vertical-line", label: "Vertical line", icon: MoveVertical },
+  { id: "parallel-channel", label: "Parallel channel", icon: FlipHorizontal2 },
   { id: "brush", label: "Brush", icon: Brush },
   { id: "rectangle", label: "Rectangle + mid", icon: BoxSelect },
-  { id: "fib", label: "Fibonacci", icon: ListFilter },
-  { id: "range", label: "Price range", icon: Ruler },
-  { id: "long", label: "Long position", icon: TrendingUp },
-  { id: "short", label: "Short position", icon: TrendingDown },
+  { id: "fib-retracement", label: "Fibonacci", icon: ListFilter },
+  { id: "price-range", label: "Price range", icon: Ruler },
+  { id: "long-position", label: "Long position", icon: TrendingUp },
+  { id: "short-position", label: "Short position", icon: TrendingDown },
 ];
 
 function Brand() {
@@ -133,6 +134,10 @@ export function TradingDashboard() {
   const [timeframe, setTimeframe] = useState("5m");
   const [livePrice, setLivePrice] = useState(selected.price);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
+  const [drawingsLocked, setDrawingsLocked] = useState(false);
+  const [undoSignal, setUndoSignal] = useState(0);
+  const [redoSignal, setRedoSignal] = useState(0);
   const [toolSignal, setToolSignal] = useState(0);
   const [magnet, setMagnet] = useState(true);
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
@@ -900,12 +905,17 @@ export function TradingDashboard() {
           <div className="chart-body">
             <div className="drawing-toolbar" aria-label="Drawing tools">
               {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
+              <button className="all-drawing-tools" onClick={() => setShowDrawingLibrary(true)} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
               <span />
               <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
+              <button onClick={() => setUndoSignal((value) => value + 1)} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
+              <button onClick={() => setRedoSignal((value) => value + 1)} aria-label="Redo drawing" title="Redo drawing"><Redo2 size={18} /></button>
+              <button className={drawingsLocked ? "active" : ""} onClick={() => setDrawingsLocked((value) => !value)} aria-label={drawingsLocked ? "Unlock drawings" : "Lock drawings"} title={drawingsLocked ? "Unlock drawings" : "Lock drawings"}>{drawingsLocked ? <Lock size={18} /> : <LockOpen size={18} />}</button>
               <button className={hiddenDrawings ? "active" : ""} onClick={() => setHiddenDrawings((value) => !value)} aria-label="Hide drawings" title="Hide drawings">{hiddenDrawings ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
             </div>
-            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} clearSignal={clearSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
+            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} lockedDrawings={drawingsLocked} clearSignal={clearSignal} undoSignal={undoSignal} redoSignal={redoSignal} indicators={indicators} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
