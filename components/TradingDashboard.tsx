@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
-import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
+import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
@@ -30,6 +30,10 @@ import type { NormalizedQuote } from "@/lib/upstox";
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
+const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
+const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
+const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
+const UPSTOX_AUTO_SQUARE_OFF_POLICY = "UPSTOX_15_00_2026_02";
 
 type CustomWatchlist = {
   id: string;
@@ -42,6 +46,44 @@ type NavigationSection = "trade" | "watchlist" | "positions" | "orders" | "marke
 function getPaperOrderTimestamp(order: PaperOrder) {
   const idTimestamp = Number(order.id);
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
+}
+
+function indiaDateKey(value: Date | number) {
+  const date = typeof value === "number" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const record = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${record.year}-${record.month}-${record.day}`;
+}
+
+function squareOffTimestamp(sessionDate: string) {
+  return Date.parse(`${sessionDate}T15:00:00+05:30`);
+}
+
+function squareOffTimeLabel(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
+  const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(instrumentKey)}&timeframe=1m&scope=combined`, { cache: "no-store" });
+  const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
+  if (!response.ok || !payload.ok || !payload.candles?.length) return undefined;
+  const sessionStart = Date.parse(`${sessionDate}T09:15:00+05:30`) / 1_000;
+  const squareOffEnd = Date.parse(`${sessionDate}T15:00:59+05:30`) / 1_000;
+  const candle = payload.candles
+    .filter((item) => Number(item.time) >= sessionStart && Number(item.time) <= squareOffEnd)
+    .sort((a, b) => Number(a.time) - Number(b.time))
+    .at(-1);
+  return candle && Number.isFinite(candle.close) && candle.close > 0 ? candle.close : undefined;
 }
 const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "cursor", label: "Cursor", icon: MousePointer2 },
@@ -173,6 +215,8 @@ export function TradingDashboard() {
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
+  const autoSquareOffInFlightRef = useRef(false);
+  const autoSquareOffRepairInFlightRef = useRef(false);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
@@ -372,68 +416,127 @@ export function TradingDashboard() {
   }, [gainersOpen, stockUniverse]);
 
   useEffect(() => {
-    if (!clock || !orders.length) return;
-    const todayStart = new Date(clock);
-    todayStart.setHours(0, 0, 0, 0);
-    const weekday = clock.getDay() >= 1 && clock.getDay() <= 5;
-    const afterSquareOff = weekday && (clock.getHours() > 15 || (clock.getHours() === 15 && clock.getMinutes() >= 20));
+    if (!clock || !orders.length || autoSquareOffInFlightRef.current) return;
+    const marketClock = getNseMarketStatus(clock);
+    const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
+    const currentIndiaDate = indiaDateKey(clock);
     const symbols = [...new Set(orders.map((order) => order.symbol))];
-    const automaticOrders: PaperOrder[] = [];
-    let nextBalance = balance;
-
-    symbols.forEach((symbol, index) => {
+    const pending = symbols.flatMap((symbol) => {
       const symbolOrders = orders.filter((order) => order.symbol === symbol && (order.product ?? "INTRADAY") === "INTRADAY").sort((a, b) => getPaperOrderTimestamp(b) - getPaperOrderTimestamp(a));
       const latestOrder = symbolOrders[0];
-      if (!latestOrder) return;
+      if (!latestOrder) return [];
       const position = calculatePosition(orders, symbol, latestOrder.price, "INTRADAY");
-      if (!position.quantity || position.side === "FLAT") return;
-      const carriedOver = getPaperOrderTimestamp(latestOrder) < todayStart.getTime();
-      if (!carriedOver && !afterSquareOff) return;
+      if (!position.quantity || position.side === "FLAT") return [];
+      const orderIndiaDate = indiaDateKey(getPaperOrderTimestamp(latestOrder));
+      const carriedOver = orderIndiaDate < currentIndiaDate;
+      if (!carriedOver && !afterSquareOff) return [];
       const instrument = stockUniverse.find((item) => item.symbol === symbol);
+      if (!instrument) return [];
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
-      const squareOffPrice = quote?.lastPrice ?? latestOrder.price;
-      const closingSide = position.side === "LONG" ? "SELL" : "BUY";
-      const charges = calculateUpstoxEquityCharges({ side: closingSide, product: "INTRADAY", quantity: position.quantity, price: squareOffPrice });
-      const order: PaperOrder = {
-        id: `${clock.getTime() + index}`,
-        symbol,
-        side: closingSide,
-        quantity: position.quantity,
-        price: squareOffPrice,
-        status: "COMPLETE",
-        time: clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-        product: "INTRADAY",
-        createdAt: clock.getTime(),
-        charges,
-        autoSquareOff: true,
-        exitReason: "AUTO_SQUARE_OFF",
-      };
-      automaticOrders.push(order);
-      const releasedMargin = squareOffPrice * position.quantity * 0.2;
-      nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+      return [{ symbol, position, instrument, quote, sessionDate: carriedOver ? orderIndiaDate : currentIndiaDate }];
     });
-
-    if (!automaticOrders.length) return;
-    const nextOrders = [...automaticOrders, ...orders];
-    // Automatic square-off is intentionally synchronized with the live market clock.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOrders(nextOrders);
-    setBalance(nextBalance);
-    writePaperOrders(nextOrders);
-    localStorage.setItem("papertrade-balance", String(nextBalance));
-    setProtections((current) => {
-      const automaticallyClosed = new Set(automaticOrders.map((order) => `${order.symbol}:INTRADAY`));
-      const remaining = current.filter((item) => !automaticallyClosed.has(`${item.symbol}:${item.product}`));
-      writePaperProtections(remaining);
-      return remaining;
+    if (!pending.length) return;
+    autoSquareOffInFlightRef.current = true;
+    void Promise.all(pending.map(async (item) => ({
+      ...item,
+      resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate).catch(() => undefined),
+    }))).then((resolved) => {
+      const automaticOrders: PaperOrder[] = [];
+      let nextBalance = balance;
+      resolved.forEach((item, index) => {
+        const squareOffPrice = item.resolvedPrice ?? item.quote?.lastPrice;
+        if (!squareOffPrice || !Number.isFinite(squareOffPrice) || squareOffPrice <= 0) return;
+        const closingSide = item.position.side === "LONG" ? "SELL" : "BUY";
+        const charges = calculateUpstoxEquityCharges({ side: closingSide, product: "INTRADAY", quantity: item.position.quantity, price: squareOffPrice });
+        const exitTimestamp = squareOffTimestamp(item.sessionDate);
+        automaticOrders.push({
+          id: `${exitTimestamp + index}`,
+          symbol: item.symbol,
+          side: closingSide,
+          quantity: item.position.quantity,
+          price: squareOffPrice,
+          status: "COMPLETE",
+          time: squareOffTimeLabel(exitTimestamp),
+          product: "INTRADAY",
+          createdAt: exitTimestamp,
+          charges,
+          autoSquareOff: true,
+          squareOffPolicy: UPSTOX_AUTO_SQUARE_OFF_POLICY,
+          exitReason: "AUTO_SQUARE_OFF",
+        });
+        const releasedMargin = squareOffPrice * item.position.quantity * 0.2;
+        nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+      });
+      if (!automaticOrders.length) return;
+      const nextOrders = [...automaticOrders, ...orders];
+      setOrders(nextOrders);
+      setBalance(nextBalance);
+      writePaperOrders(nextOrders);
+      localStorage.setItem("papertrade-balance", String(nextBalance));
+      setProtections((current) => {
+        const automaticallyClosed = new Set(automaticOrders.map((order) => `${order.symbol}:INTRADAY`));
+        const remaining = current.filter((item) => !automaticallyClosed.has(`${item.symbol}:${item.product}`));
+        writePaperProtections(remaining);
+        return remaining;
+      });
+      setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off at 3:00 PM`);
+      window.setTimeout(() => setToast(""), 4_000);
+    }).finally(() => {
+      autoSquareOffInFlightRef.current = false;
     });
-    setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off at 3:20 PM`);
-    window.setTimeout(() => setToast(""), 4_000);
   }, [balance, clock, marketQuotes, orders, stockUniverse]);
 
   useEffect(() => {
+    if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
+    const candidates = orders
+      .filter((order) => order.autoSquareOff && order.exitReason === "AUTO_SQUARE_OFF" && order.squareOffPolicy !== UPSTOX_AUTO_SQUARE_OFF_POLICY)
+      .map((order) => ({ order, instrument: stockUniverse.find((item) => item.symbol === order.symbol) }))
+      .filter((item): item is { order: PaperOrder; instrument: Instrument } => Boolean(item.instrument));
+    if (!candidates.length) return;
+    autoSquareOffRepairInFlightRef.current = true;
+    void Promise.all(candidates.map(async ({ order, instrument }) => {
+      const sessionDate = indiaDateKey(getPaperOrderTimestamp(order));
+      const price = await fetchSquareOffPrice(instrument.instrumentKey, sessionDate).catch(() => undefined);
+      return { order, sessionDate, price };
+    })).then((results) => {
+      const replacements = new Map<string, PaperOrder>();
+      let balanceAdjustment = 0;
+      for (const { order, sessionDate, price } of results) {
+        if (!price || !Number.isFinite(price) || price <= 0) continue;
+        const correctedTimestamp = squareOffTimestamp(sessionDate);
+        const correctedCharges = calculateUpstoxEquityCharges({ side: order.side, product: "INTRADAY", quantity: order.quantity, price });
+        const correctedTime = squareOffTimeLabel(correctedTimestamp);
+        const priceChanged = Math.abs(price - order.price) > 0.0001;
+        const timeChanged = order.createdAt !== correctedTimestamp || order.time !== correctedTime;
+        if (!priceChanged && !timeChanged) {
+          replacements.set(order.id, { ...order, squareOffPolicy: UPSTOX_AUTO_SQUARE_OFF_POLICY });
+          continue;
+        }
+        const oldCharges = getOrderCharges(order);
+        const oldCashEffect = (order.side === "SELL" ? 1 : -1) * order.price * order.quantity * 0.2 - oldCharges.total;
+        const newCashEffect = (order.side === "SELL" ? 1 : -1) * price * order.quantity * 0.2 - correctedCharges.total;
+        balanceAdjustment += newCashEffect - oldCashEffect;
+        replacements.set(order.id, { ...order, price, time: correctedTime, createdAt: correctedTimestamp, charges: correctedCharges, squareOffPolicy: UPSTOX_AUTO_SQUARE_OFF_POLICY });
+      }
+      if (!replacements.size) return;
+      const repairedOrders = orders.map((order) => replacements.get(order.id) ?? order);
+      writePaperOrders(repairedOrders);
+      setOrders(repairedOrders);
+      setBalance((current) => {
+        const correctedBalance = current + balanceAdjustment;
+        localStorage.setItem("papertrade-balance", String(correctedBalance));
+        return correctedBalance;
+      });
+      setToast(`${replacements.size} auto square-off record${replacements.size > 1 ? "s" : ""} corrected from Upstox 3:00 PM candles`);
+      window.setTimeout(() => setToast(""), 4_000);
+    }).finally(() => {
+      autoSquareOffRepairInFlightRef.current = false;
+    });
+  }, [orders, stockUniverse]);
+
+  useEffect(() => {
     if (!clock || !orders.length || !protections.length || !getNseMarketStatus(clock).isOpen) return;
-    const afterIntradaySquareOff = clock.getHours() > 15 || (clock.getHours() === 15 && clock.getMinutes() >= 20);
+    const afterIntradaySquareOff = getNseMarketStatus(clock).minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
     const triggeredOrders: PaperOrder[] = [];
     const clearedProtectionIds = new Set<string>();
     let nextBalance = balance;
@@ -524,6 +627,12 @@ export function TradingDashboard() {
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
     [clock],
   );
+  const intradayOrdersAllowed = Boolean(
+    clock && marketStatus.isOpen && getNseMarketStatus(clock).minutesFromMidnight < UPSTOX_AUTO_SQUARE_OFF_MINUTES,
+  );
+  const intradayStatusMessage = marketStatus.isOpen && !intradayOrdersAllowed
+    ? "Upstox intraday auto square-off starts at 3:00 PM IST"
+    : marketStatus.message;
   const todayOrders = useMemo(() => {
     if (!clock) return [];
     const start = new Date(clock);
@@ -605,8 +714,8 @@ export function TradingDashboard() {
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
-    if (product === "INTRADAY" && !marketStatus.isOpen) {
-      setToast(marketStatus.message);
+    if (product === "INTRADAY" && !intradayOrdersAllowed) {
+      setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
@@ -651,8 +760,8 @@ export function TradingDashboard() {
 
   function exitPosition(requestedQuantity: number) {
     if (selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
-    if (positionProduct === "INTRADAY" && !marketStatus.isOpen) {
-      setToast(marketStatus.message);
+    if (positionProduct === "INTRADAY" && !intradayOrdersAllowed) {
+      setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
@@ -764,7 +873,11 @@ export function TradingDashboard() {
   }
 
   function openPositionChart(symbol: string) {
+    setSidebarOpen(false);
     setPositionsOpen(false);
+    setOrdersOpen(false);
+    setGainersOpen(false);
+    setPnlOpen(false);
     window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
   }
 
@@ -918,7 +1031,7 @@ export function TradingDashboard() {
             <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onChange={(event) => setStopLossPrice(event.target.value)} placeholder={side === "BUY" ? `Below ${livePrice.toFixed(2)}` : `Above ${livePrice.toFixed(2)}`} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
-          <div className="product-select"><label className={!marketStatus.isOpen ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!marketStatus.isOpen} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{marketStatus.isOpen ? "MIS · 5x leverage" : "Closed · 09:15–15:30 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
+          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · 5x leverage" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Est. taxes &amp; charges</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
@@ -934,17 +1047,17 @@ export function TradingDashboard() {
               )}
               <div className="ticket-exit-controls">
                 <label>Exit qty<input type="text" inputMode="numeric" value={exitQuantity} onFocus={() => setExitQuantity("")} onChange={(event) => setExitQuantity(event.target.value.replace(/\D/g, ""))} onBlur={() => setExitQuantity(String(safeExitQuantity))} /></label>
-                <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
-                <button disabled={positionProduct === "INTRADAY" && !marketStatus.isOpen} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
+                <button disabled={positionProduct === "INTRADAY" && !intradayOrdersAllowed} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
+                <button disabled={positionProduct === "INTRADAY" && !intradayOrdersAllowed} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
               </div>
-              {positionProduct === "INTRADAY" && !marketStatus.isOpen && <small className="market-closed-note">{marketStatus.message}</small>}
+              {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={product === "INTRADAY" && !marketStatus.isOpen} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{product === "INTRADAY" && !marketStatus.isOpen ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={product === "INTRADAY" && !intradayOrdersAllowed} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
-            {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span><small>{order.time}</small></div>)}
+            {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><button className="mini-order-symbol" onClick={() => openPositionChart(order.symbol)}><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></button><small>{order.time}</small></div>)}
             {!todayOrders.length && <div className="no-orders">Today&apos;s simulated trades will appear here.</div>}
           </div>
         </aside>
@@ -968,7 +1081,7 @@ export function TradingDashboard() {
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
-              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><b>{order.symbol}</b><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.exitReason === "TARGET" ? "Target hit" : order.exitReason === "STOP_LOSS" ? "SL hit" : order.autoSquareOff ? "Auto 3:20" : "Complete"}</span></div>)}
+              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.exitReason === "TARGET" ? "Target hit" : order.exitReason === "STOP_LOSS" ? "SL hit" : order.autoSquareOff ? "Auto 3:00" : "Complete"}</span></div>)}
               {!todayOrders.length && <div className="order-empty"><WalletCards size={28} /><b>No orders today</b><span>The daily order book resets at midnight; completed trades remain in P&amp;L.</span></div>}
             </div>
           </section>

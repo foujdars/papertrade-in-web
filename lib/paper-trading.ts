@@ -12,6 +12,7 @@ export type PaperOrder = {
   createdAt?: number;
   charges?: EquityChargeBreakdown;
   autoSquareOff?: boolean;
+  squareOffPolicy?: string;
   exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF";
 };
 

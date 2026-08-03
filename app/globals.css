@@ -261,7 +261,8 @@ h1, h2, p { margin: 0; }
 .section-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 10px; }
 .section-line button { border: 0; color: var(--purple); background: transparent; font-size: 9px; cursor: pointer; }
 .mini-order { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 7px; padding: 7px 0; border-bottom: 1px solid #f0f2f7; }
-.mini-order > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; font-size: 9px; }
+.mini-order-symbol { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 0; border: 0; color: var(--ink); background: transparent; font: inherit; font-size: 9px; text-align: left; cursor: pointer; }
+.mini-order-symbol:hover b, .mini-order-symbol:focus-visible b { color: var(--purple); text-decoration: underline; }
 .mini-order small { color: #939bad; font-size: 8px; }
 .buy-tag, .sell-tag { border-radius: 4px; padding: 3px 4px; font-size: 7px; font-weight: 850; text-align: center; }
 .buy-tag { color: var(--green); background: #e9faf5; }
@@ -326,6 +327,8 @@ h1, h2, p { margin: 0; }
 .watchlist-done { width: 100%; height: 40px; margin-top: 11px; border: 1px solid #d8d3ff; border-radius: 9px; color: var(--purple); background: #fff; font-weight: 800; cursor: pointer; }
 .order-table { overflow-x: auto; }
 .order-row { min-width: 720px; display: grid; grid-template-columns: 80px 1fr 70px 55px 110px 100px 90px; align-items: center; gap: 10px; padding: 11px 7px; border-bottom: 1px solid var(--line); font-size: 10px; }
+.order-symbol-link { width: fit-content; padding: 0; border: 0; color: var(--ink); background: transparent; font: inherit; font-weight: 800; text-align: left; cursor: pointer; }
+.order-symbol-link:hover, .order-symbol-link:focus-visible { color: var(--purple); text-decoration: underline; }
 .table-head { color: #8991a4; background: #fafbfe; font-size: 8px; font-weight: 800; text-transform: uppercase; }
 .complete-tag { width: fit-content; border-radius: 5px; padding: 3px 6px; color: var(--green); background: #e8faf4; font-size: 8px; font-weight: 800; }
 .order-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 48px; color: #8b93a6; font-size: 10px; }

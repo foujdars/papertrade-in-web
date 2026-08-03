@@ -53,6 +53,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(advancedChart, /Exit quantity/);
   assert.doesNotMatch(advancedChart, /> Candles</);
   assert.match(dashboard, /INTRADAY CLOSED/);
+  assert.match(dashboard, /UPSTOX_AUTO_SQUARE_OFF_MINUTES/);
+  assert.match(dashboard, /fetchSquareOffPrice/);
+  assert.match(dashboard, /corrected from Upstox 3:00 PM candles/);
+  assert.match(dashboard, /mini-order-symbol/);
+  assert.match(dashboard, /order-symbol-link/);
+  assert.doesNotMatch(dashboard, /Auto 3:20/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
   assert.match(dashboard, /Fibonacci/);
