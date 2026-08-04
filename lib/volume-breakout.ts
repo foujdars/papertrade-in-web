@@ -50,6 +50,6 @@ export function rankVolumeBreakouts(
       volumeMultiple,
     }];
   })
-    .sort((a, b) => b.volumeMultiple - a.volumeMultiple || b.todayVolume - a.todayVolume)
+    .sort((a, b) => b.changePercent - a.changePercent || b.volumeMultiple - a.volumeMultiple || b.todayVolume - a.todayVolume)
     .slice(0, Math.max(0, limit));
 }

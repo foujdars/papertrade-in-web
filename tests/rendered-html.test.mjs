@@ -61,8 +61,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(dashboard, /5× Volume Watchlist/);
-  assert.match(dashboard, /Daily Volume &gt; 5 × SMA\(Volume, 20\)/);
+  assert.match(dashboard, /<h2>Volume Stocker<\/h2>/);
+  assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);

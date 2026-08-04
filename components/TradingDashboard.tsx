@@ -213,7 +213,6 @@ export function TradingDashboard() {
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
-  const [marketScannerFetchedAt, setMarketScannerFetchedAt] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -404,13 +403,11 @@ export function TradingDashboard() {
         const payload = await response.json() as {
           ok?: boolean;
           rows?: VolumeBreakoutRow[];
-          fetchedAt?: string;
           error?: { message?: string };
         };
         if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Volume scanner is unavailable.");
         if (!controller.signal.aborted) {
           setVolumeBreakoutRows(payload.rows ?? []);
-          setMarketScannerFetchedAt(payload.fetchedAt ?? new Date().toISOString());
         }
       } catch (error) {
         if (!controller.signal.aborted) setMarketScannerError(error instanceof Error ? error.message : "Volume scanner is unavailable.");
@@ -1120,7 +1117,7 @@ export function TradingDashboard() {
       )}
       {marketsOpen && (
         <section className="market-discovery-panel" aria-label="NSE volume breakout watchlist">
-          <div className="market-discovery-head"><div><span className="eyebrow">NSE cash · Live scanner</span><h2>5× Volume Watchlist</h2><small>Top 15 stocks where Daily Volume &gt; 5 × SMA(Volume, 20)</small>{marketScannerFetchedAt && <em>Updated {new Date(marketScannerFetchedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</em>}</div><button className="icon-button" onClick={() => setMarketsOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
+          <div className="market-discovery-head"><div><h2>Volume Stocker</h2></div><button className="icon-button" onClick={() => setMarketsOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
           <div className="market-discovery-list">
             {volumeBreakoutRows.map((row) => {
               const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
@@ -1129,7 +1126,7 @@ export function TradingDashboard() {
                 <button key={row.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument({ ...item, price: row.lastPrice }); setMarketsOpen(false); }}>
                   <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
                   <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>Volume {formatCompactVolume(row.todayVolume)} · SMA20 {formatCompactVolume(row.sma20Volume)}</small></span>
-                  <span><b>{row.volumeMultiple.toFixed(2)}×</b><small>of 20-day SMA</small><small className={row.changePercent >= 0 ? "positive" : "negative"}>{row.changePercent >= 0 ? "+" : ""}{row.changePercent.toFixed(2)}%</small></span>
+                  <span><b>{formatInr(row.lastPrice)}</b><small className={row.changePercent >= 0 ? "positive" : "negative"}>{row.changePercent >= 0 ? "+" : ""}{row.changePercent.toFixed(2)}%</small><small>{row.volumeMultiple.toFixed(2)}× volume</small></span>
                 </button>
               );
             })}

@@ -18,12 +18,12 @@ test("uses today's daily volume inside the 20-session SMA and applies the strict
   assert.ok(rows[0].volumeMultiple > 5);
 });
 
-test("returns only the top 15 qualifying stocks ranked by volume multiple", () => {
+test("returns only the top 15 qualifying stocks ranked by percentage change", () => {
   const candidates = Array.from({ length: 20 }, (_, index) => ({
     symbol: `STOCK${index}`,
     name: `Stock ${index}`,
     instrumentKey: `NSE_EQ|INE00000${String(index).padStart(4, "0")}`,
-    lastPrice: 100,
+    lastPrice: 100 + index,
     previousClose: 100,
     todayVolume: 100 + index,
     sessionDate: "2026-08-04",
@@ -32,4 +32,14 @@ test("returns only the top 15 qualifying stocks ranked by volume multiple", () =
   const rows = rankVolumeBreakouts(candidates, histories);
   assert.equal(rows.length, 15);
   assert.equal(rows[0].symbol, "STOCK19");
+});
+
+test("percentage change ranks ahead of a larger volume multiple", () => {
+  const commonHistory = Array.from({ length: 19 }, (_, index) => ({ date: `2026-07-${String(index + 1).padStart(2, "0")}`, volume: 1 }));
+  const rows = rankVolumeBreakouts([
+    { symbol: "HIGHCHANGE", name: "High Change", instrumentKey: "NSE_EQ|INE000000003", lastPrice: 120, previousClose: 100, todayVolume: 100, sessionDate: "2026-08-04" },
+    { symbol: "HIGHVOLUME", name: "High Volume", instrumentKey: "NSE_EQ|INE000000004", lastPrice: 101, previousClose: 100, todayVolume: 1_000, sessionDate: "2026-08-04" },
+  ], new Map([["HIGHCHANGE", commonHistory], ["HIGHVOLUME", commonHistory]]));
+  assert.equal(rows[0].symbol, "HIGHCHANGE");
+  assert.ok(rows[1].volumeMultiple > rows[0].volumeMultiple);
 });
