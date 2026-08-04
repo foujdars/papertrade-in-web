@@ -26,6 +26,7 @@ import {
 import { buildClosedTrades, getOrderCharges } from "@/lib/trade-analytics";
 import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
+import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
@@ -71,6 +72,10 @@ function squareOffTimeLabel(timestamp: number) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function formatCompactVolume(value: number) {
+  return value.toLocaleString("en-IN", { notation: "compact", maximumFractionDigits: 2 });
 }
 
 async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
@@ -204,8 +209,11 @@ export function TradingDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
-  const [gainersOpen, setGainersOpen] = useState(false);
-  const [gainersLoading, setGainersLoading] = useState(false);
+  const [marketsOpen, setMarketsOpen] = useState(false);
+  const [marketScannerLoading, setMarketScannerLoading] = useState(false);
+  const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
+  const [marketScannerError, setMarketScannerError] = useState("");
+  const [marketScannerFetchedAt, setMarketScannerFetchedAt] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -342,13 +350,6 @@ export function TradingDashboard() {
     "ALL NSE": stockUniverse.length,
   }), [stockUniverse]);
 
-  const topGainerRows = useMemo(() => stockUniverse
-    .filter((item) => item.categories.includes("NIFTY 500"))
-    .map((item) => ({ item, quote: marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol] }))
-    .filter((entry): entry is { item: Instrument; quote: NormalizedQuote } => Boolean(entry.quote))
-    .filter(({ quote }) => quote.changePercent > 0)
-    .sort((a, b) => b.quote.changePercent - a.quote.changePercent)
-    .slice(0, 100), [marketQuotes, stockUniverse]);
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
 
   useEffect(() => {
@@ -382,40 +383,49 @@ export function TradingDashboard() {
   }, [quoteKeys]);
 
   useEffect(() => {
-    if (!gainersOpen) return;
+    if (!marketsOpen || !stockUniverse.length) return;
     const controller = new AbortController();
-    const candidateKeys = stockUniverse
-      .filter((item) => item.categories.includes("NIFTY 500"))
-      .map((item) => item.instrumentKey);
-    const batches = Array.from({ length: Math.ceil(candidateKeys.length / 500) }, (_, index) => candidateKeys.slice(index * 500, index * 500 + 500));
 
-    async function loadTopGainers() {
-      setGainersLoading(true);
+    async function loadVolumeBreakouts() {
+      setMarketScannerLoading(true);
+      setMarketScannerError("");
       try {
-        const responses = await Promise.all(batches.map(async (keys) => {
-          const response = await fetch("/api/upstox/quotes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keys }),
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const payload = await response.json() as { ok?: boolean; quotes?: Record<string, NormalizedQuote> };
-          return response.ok && payload.ok && payload.quotes ? payload.quotes : {};
-        }));
+        const response = await fetch("/api/market/volume-breakouts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instruments: stockUniverse
+              .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
+              .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey })),
+          }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json() as {
+          ok?: boolean;
+          rows?: VolumeBreakoutRow[];
+          fetchedAt?: string;
+          error?: { message?: string };
+        };
+        if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Volume scanner is unavailable.");
         if (!controller.signal.aborted) {
-          setMarketQuotes((current) => Object.assign({}, current, ...responses));
+          setVolumeBreakoutRows(payload.rows ?? []);
+          setMarketScannerFetchedAt(payload.fetchedAt ?? new Date().toISOString());
         }
-      } catch {
-        // The market panel explains when authenticated Upstox quotes are unavailable.
+      } catch (error) {
+        if (!controller.signal.aborted) setMarketScannerError(error instanceof Error ? error.message : "Volume scanner is unavailable.");
       } finally {
-        if (!controller.signal.aborted) setGainersLoading(false);
+        if (!controller.signal.aborted) setMarketScannerLoading(false);
       }
     }
 
-    if (batches.length) void loadTopGainers();
-    return () => controller.abort();
-  }, [gainersOpen, stockUniverse]);
+    void loadVolumeBreakouts();
+    const interval = window.setInterval(() => void loadVolumeBreakouts(), 60_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [marketsOpen, stockUniverse]);
 
   useEffect(() => {
     if (!clock || !orders.length || autoSquareOffInFlightRef.current) return;
@@ -878,7 +888,7 @@ export function TradingDashboard() {
     setSidebarOpen(false);
     setPositionsOpen(false);
     setOrdersOpen(false);
-    setGainersOpen(false);
+    setMarketsOpen(false);
     setPnlOpen(false);
     window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
   }
@@ -887,7 +897,7 @@ export function TradingDashboard() {
     setSidebarOpen(section === "watchlist");
     setPositionsOpen(section === "positions");
     setOrdersOpen(section === "orders");
-    setGainersOpen(section === "markets");
+    setMarketsOpen(section === "markets");
     setPnlOpen(section === "pnl");
   }
 
@@ -897,7 +907,7 @@ export function TradingDashboard() {
       ? "positions"
       : ordersOpen
         ? "orders"
-        : gainersOpen
+        : marketsOpen
           ? "markets"
           : pnlOpen
             ? "pnl"
@@ -1108,19 +1118,24 @@ export function TradingDashboard() {
           </section>
         </div>
       )}
-      {gainersOpen && (
-        <section className="market-discovery-panel" aria-label="Upstox market lists">
-          <div className="market-discovery-head"><div><span className="eyebrow">Upstox · Stocks</span><h2>Top Gainers</h2><small>Live NIFTY 500 stocks ranked by today&apos;s gain</small></div><button className="icon-button" onClick={() => setGainersOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
+      {marketsOpen && (
+        <section className="market-discovery-panel" aria-label="NSE volume breakout watchlist">
+          <div className="market-discovery-head"><div><span className="eyebrow">NSE cash · Live scanner</span><h2>5× Volume Watchlist</h2><small>Top 15 stocks where Daily Volume &gt; 5 × SMA(Volume, 20)</small>{marketScannerFetchedAt && <em>Updated {new Date(marketScannerFetchedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</em>}</div><button className="icon-button" onClick={() => setMarketsOpen(false)} aria-label="Close markets"><X size={20} /></button></div>
           <div className="market-discovery-list">
-            {topGainerRows.map(({ item, quote }) => (
-              <button key={item.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument(item); setGainersOpen(false); }}>
-                <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
-                <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-                <span><b>{formatInr(quote.lastPrice)}</b><small className="positive">+{quote.netChange.toFixed(2)} (+{quote.changePercent.toFixed(2)}%)</small></span>
-              </button>
-            ))}
-            {gainersLoading && !topGainerRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Loading Top Gainers</b><span>Fetching live Upstox NIFTY 500 quotes.</span></div>}
-            {!gainersLoading && !topGainerRows.length && <div className="positions-empty"><Cable size={30} /><b>Top Gainers unavailable</b><span>Check the Upstox token in Broker API settings.</span></div>}
+            {volumeBreakoutRows.map((row) => {
+              const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
+              if (!item) return null;
+              return (
+                <button key={row.symbol} className="trend-stock-row" onClick={() => { chooseTradeInstrument({ ...item, price: row.lastPrice }); setMarketsOpen(false); }}>
+                  <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
+                  <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>Volume {formatCompactVolume(row.todayVolume)} · SMA20 {formatCompactVolume(row.sma20Volume)}</small></span>
+                  <span><b>{row.volumeMultiple.toFixed(2)}×</b><small>of 20-day SMA</small><small className={row.changePercent >= 0 ? "positive" : "negative"}>{row.changePercent >= 0 ? "+" : ""}{row.changePercent.toFixed(2)}%</small></span>
+                </button>
+              );
+            })}
+            {marketScannerLoading && !volumeBreakoutRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Scanning NSE cash stocks</b><span>Comparing live Upstox volume with 20 daily NSE sessions.</span></div>}
+            {!marketScannerLoading && marketScannerError && <div className="positions-empty"><Cable size={30} /><b>Volume scanner unavailable</b><span>{marketScannerError}</span></div>}
+            {!marketScannerLoading && !marketScannerError && !volumeBreakoutRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass the filter</b><span>No NSE cash stock currently has Daily Volume greater than 5 × SMA(Volume, 20).</span></div>}
           </div>
         </section>
       )}

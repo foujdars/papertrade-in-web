@@ -1,0 +1,55 @@
+export const VOLUME_SMA_PERIOD = 20;
+export const VOLUME_BREAKOUT_MULTIPLIER = 5;
+export const VOLUME_BREAKOUT_LIMIT = 15;
+
+export type HistoricalVolumePoint = {
+  date: string;
+  volume: number;
+};
+
+export type VolumeBreakoutCandidate = {
+  symbol: string;
+  name: string;
+  instrumentKey: string;
+  lastPrice: number;
+  previousClose: number;
+  todayVolume: number;
+  sessionDate: string;
+};
+
+export type VolumeBreakoutRow = VolumeBreakoutCandidate & {
+  netChange: number;
+  changePercent: number;
+  sma20Volume: number;
+  volumeMultiple: number;
+};
+
+export function rankVolumeBreakouts(
+  candidates: VolumeBreakoutCandidate[],
+  historyBySymbol: Map<string, HistoricalVolumePoint[]>,
+  limit = VOLUME_BREAKOUT_LIMIT,
+): VolumeBreakoutRow[] {
+  return candidates.flatMap((candidate) => {
+    if (!Number.isFinite(candidate.todayVolume) || candidate.todayVolume <= 0) return [];
+    const previousSessions = (historyBySymbol.get(candidate.symbol) ?? [])
+      .filter((point) => point.date < candidate.sessionDate && Number.isFinite(point.volume) && point.volume >= 0)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, VOLUME_SMA_PERIOD - 1);
+    if (previousSessions.length !== VOLUME_SMA_PERIOD - 1) return [];
+
+    // The scanner expression uses the current daily bar inside SMA(volume, 20).
+    const sma20Volume = (candidate.todayVolume + previousSessions.reduce((sum, point) => sum + point.volume, 0)) / VOLUME_SMA_PERIOD;
+    const volumeMultiple = sma20Volume > 0 ? candidate.todayVolume / sma20Volume : 0;
+    if (!(candidate.todayVolume > sma20Volume * VOLUME_BREAKOUT_MULTIPLIER)) return [];
+    const netChange = candidate.lastPrice - candidate.previousClose;
+    return [{
+      ...candidate,
+      netChange,
+      changePercent: candidate.previousClose > 0 ? (netChange / candidate.previousClose) * 100 : 0,
+      sma20Volume,
+      volumeMultiple,
+    }];
+  })
+    .sort((a, b) => b.volumeMultiple - a.volumeMultiple || b.todayVolume - a.todayVolume)
+    .slice(0, Math.max(0, limit));
+}

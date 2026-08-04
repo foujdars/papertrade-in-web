@@ -30,7 +30,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, styles, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, readme] = await Promise.all([
+  const [page, styles, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, volumeBreakoutRoute, volumeBreakout, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
@@ -43,6 +43,8 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../app/api/upstox/candles/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/quotes/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/instruments/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/market/volume-breakouts/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
 
@@ -59,6 +61,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
+  assert.match(dashboard, /5× Volume Watchlist/);
+  assert.match(dashboard, /Daily Volume &gt; 5 × SMA\(Volume, 20\)/);
+  assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
   assert.match(dashboard, /Fibonacci/);
@@ -96,6 +101,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(candleRoute, /volume: Number\(item\[5\]/);
   assert.match(instrumentRoute, /NSE\.json\.gz/);
   assert.match(instrumentRoute, /ind_nifty500list\.csv/);
+  assert.match(volumeBreakoutRoute, /sec_bhavdata_full_/);
+  assert.match(volumeBreakoutRoute, /market-quote\/quotes/);
+  assert.match(volumeBreakout, /candidate\.todayVolume > sma20Volume \* VOLUME_BREAKOUT_MULTIPLIER/);
+  assert.match(volumeBreakout, /VOLUME_BREAKOUT_LIMIT = 15/);
   assert.match(dashboard, /Load 60 more/);
   assert.match(dashboard, /mobile-indicator-control/);
   assert.match(dashboard, /mobile-scroll-tail/);
