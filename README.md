@@ -11,7 +11,7 @@ A responsive Indian-market paper-trading simulator built with Next.js, vinext an
 - All 67 tools registered by the current drawing extension, covering lines, channels, Fibonacci, Gann, pitchforks, measurements, shapes, annotations and long/short position planning
 - Mobile-first tap-to-place drawings with OHLC magnet snapping, touch selection, anchor/whole-drawing movement, lock, hide, undo, redo, delete and per-symbol persistence
 - Complete daily Upstox NSE equity master with official NIFTY 50, BANK NIFTY and NIFTY 500 constituent membership, search and paged watchlists
-- Live top-15 NSE cash volume watchlist using `Daily Volume > 5 × SMA(Volume, 20)`, combining Upstox live volume with official NSE daily bhavcopy history
+- Live top-15 NSE cash volume watchlist using `Daily Volume > 5 × SMA(Volume, 20)`, with Upstox live volume and adjusted daily candle history
 - Local INR paper orders, cash balance and order book
 - Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage, custom-quantity exits and exit-all
 - NSE intraday order lock outside the regular weekday 09:15–15:30 IST session; Delivery remains available from the main ticket

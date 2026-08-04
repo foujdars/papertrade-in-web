@@ -27,12 +27,13 @@ type UpstoxQuotePayload = {
   data?: Record<string, UpstoxQuote>;
 };
 
-type BhavcopySession = {
-  date: string;
-  volumes: Map<string, number>;
+type UpstoxCandlePayload = {
+  status: string;
+  data?: { candles?: Array<[string | number, number, number, number, number, number?, number?]> };
 };
 
-let historyCache: { expiresAt: number; sessions: BhavcopySession[] } | null = null;
+const HISTORY_BATCH_SIZE = 40;
+const MAX_HISTORY_SCANS = 500;
 
 function indiaDateKey(value: Date | number | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -46,67 +47,20 @@ function indiaDateKey(value: Date | number | string) {
   return `${record.year}-${record.month}-${record.day}`;
 }
 
-function archiveDate(offsetDays: number) {
-  const timestamp = Date.now() - offsetDays * 86_400_000;
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(timestamp);
-  const record = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return { iso: `${record.year}-${record.month}-${record.day}`, file: `${record.day}${record.month}${record.year}` };
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function parseBhavcopy(text: string) {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = (lines.shift() ?? "").split(",").map((value) => value.trim().toUpperCase());
-  const symbolIndex = headers.indexOf("SYMBOL");
-  const seriesIndex = headers.indexOf("SERIES");
-  const volumeIndex = headers.indexOf("TTL_TRD_QNTY");
-  const volumes = new Map<string, number>();
-  if (symbolIndex < 0 || seriesIndex < 0 || volumeIndex < 0) return volumes;
-  for (const line of lines) {
-    const fields = line.split(",").map((value) => value.trim());
-    if (fields[seriesIndex] !== "EQ") continue;
-    const symbol = fields[symbolIndex]?.toUpperCase();
-    const volume = Number(fields[volumeIndex]);
-    if (symbol && Number.isFinite(volume) && volume >= 0) volumes.set(symbol, volume);
-  }
-  return volumes;
-}
-
-async function loadBhavcopyHistory() {
-  if (historyCache && historyCache.expiresAt > Date.now()) return historyCache.sessions;
-  const candidates = Array.from({ length: 35 }, (_, offset) => archiveDate(offset));
-  const results = await Promise.all(candidates.map(async ({ iso, file }) => {
-    const response = await fetch(`https://nsearchives.nseindia.com/products/content/sec_bhavdata_full_${file}.csv`, {
-      headers: { Accept: "text/csv" },
-      cache: "force-cache",
-    });
-    if (!response.ok) return null;
-    const volumes = parseBhavcopy(await response.text());
-    return volumes.size ? { date: iso, volumes } : null;
-  }));
-  const sessions = results
-    .filter((session): session is BhavcopySession => Boolean(session))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 24);
-  if (sessions.length < 19) throw new Error("NSE volume history is temporarily incomplete.");
-  historyCache = { expiresAt: Date.now() + 30 * 60 * 1_000, sessions };
-  return sessions;
-}
-
-function historyBySymbol(sessions: BhavcopySession[]) {
-  const history = new Map<string, HistoricalVolumePoint[]>();
-  for (const session of sessions) {
-    for (const [symbol, volume] of session.volumes) {
-      const points = history.get(symbol) ?? [];
-      points.push({ date: session.date, volume });
-      history.set(symbol, points);
-    }
-  }
-  return history;
+async function loadAdjustedVolumeHistory(candidate: VolumeBreakoutCandidate) {
+  const toDate = indiaDateKey(Date.now());
+  const fromDate = indiaDateKey(Date.now() - 50 * 86_400_000);
+  const encodedKey = encodeURIComponent(candidate.instrumentKey);
+  const payload = await upstoxFetch<UpstoxCandlePayload>(`/v3/historical-candle/${encodedKey}/days/1/${toDate}/${fromDate}`);
+  return (payload.data?.candles ?? []).flatMap((candle): HistoricalVolumePoint[] => {
+    const volume = Number(candle[5]);
+    if (!Number.isFinite(volume) || volume < 0) return [];
+    return [{ date: indiaDateKey(candle[0]), volume }];
+  });
 }
 
 export async function POST(request: Request) {
@@ -125,13 +79,10 @@ export async function POST(request: Request) {
     }
 
     const batches = Array.from({ length: Math.ceil(instruments.length / 500) }, (_, index) => instruments.slice(index * 500, index * 500 + 500));
-    const [sessions, quotePayloads] = await Promise.all([
-      loadBhavcopyHistory(),
-      Promise.all(batches.map((batch) => {
-        const params = new URLSearchParams({ instrument_key: batch.map((item) => item.instrumentKey).join(",") });
-        return upstoxFetch<UpstoxQuotePayload>(`/v2/market-quote/quotes?${params}`);
-      })),
-    ]);
+    const quotePayloads = await Promise.all(batches.map((batch) => {
+      const params = new URLSearchParams({ instrument_key: batch.map((item) => item.instrumentKey).join(",") });
+      return upstoxFetch<UpstoxQuotePayload>(`/v2/market-quote/quotes?${params}`);
+    }));
     const requestedByKey = new Map(instruments.map((item) => [item.instrumentKey, item]));
     const requestedBySymbol = new Map(instruments.map((item) => [item.symbol, item]));
     const candidates: VolumeBreakoutCandidate[] = [];
@@ -153,14 +104,33 @@ export async function POST(request: Request) {
         sessionDate: indiaDateKey(quoteTimestamp),
       });
     }
-    const rows = rankVolumeBreakouts(candidates, historyBySymbol(sessions));
+    const rankedCandidates = candidates
+      .sort((a, b) => {
+        const aChange = a.previousClose > 0 ? (a.lastPrice - a.previousClose) / a.previousClose : 0;
+        const bChange = b.previousClose > 0 ? (b.lastPrice - b.previousClose) / b.previousClose : 0;
+        return bChange - aChange;
+      })
+      .slice(0, MAX_HISTORY_SCANS);
+    const history = new Map<string, HistoricalVolumePoint[]>();
+    let rows = rankVolumeBreakouts(rankedCandidates, history);
+    let historiesScanned = 0;
+    for (let offset = 0; offset < rankedCandidates.length && rows.length < 15; offset += HISTORY_BATCH_SIZE) {
+      const batch = rankedCandidates.slice(offset, offset + HISTORY_BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((candidate) => loadAdjustedVolumeHistory(candidate)));
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") history.set(batch[index].symbol, result.value);
+      });
+      historiesScanned += batch.length;
+      rows = rankVolumeBreakouts(rankedCandidates.slice(0, historiesScanned), history);
+      if (rows.length < 15 && offset + HISTORY_BATCH_SIZE < rankedCandidates.length) await delay(1_050);
+    }
     return Response.json({
       ok: true,
-      source: "Upstox live volume + NSE daily bhavcopy",
+      source: "Upstox live quotes + adjusted daily candles",
       rule: "Daily Volume > 5 × SMA(Volume, 20)",
       rows,
       scanned: candidates.length,
-      historySessions: sessions.length,
+      historiesScanned,
       fetchedAt: new Date().toISOString(),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

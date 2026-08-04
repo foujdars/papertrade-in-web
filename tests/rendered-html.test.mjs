@@ -101,7 +101,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(candleRoute, /volume: Number\(item\[5\]/);
   assert.match(instrumentRoute, /NSE\.json\.gz/);
   assert.match(instrumentRoute, /ind_nifty500list\.csv/);
-  assert.match(volumeBreakoutRoute, /sec_bhavdata_full_/);
+  assert.match(volumeBreakoutRoute, /historical-candle/);
   assert.match(volumeBreakoutRoute, /market-quote\/quotes/);
   assert.match(volumeBreakout, /candidate\.todayVolume > sma20Volume \* VOLUME_BREAKOUT_MULTIPLIER/);
   assert.match(volumeBreakout, /VOLUME_BREAKOUT_LIMIT = 15/);
