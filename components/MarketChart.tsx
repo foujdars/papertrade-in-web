@@ -1221,7 +1221,6 @@ export function MarketChart({
           </div>
         )}
         {placementHint && <div className="chart-placement-hint">{placementHint}</div>}
-        <a className="tradingview-attribution" href="https://www.tradingview.com/" target="_blank" rel="noreferrer">Charts by TradingView</a>
       </div>
     </div>
   );

@@ -64,6 +64,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Fibonacci/);
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("lightweight-charts"\)/);
+  assert.match(chart, /attributionLogo: true/);
+  assert.doesNotMatch(chart, /Charts by TradingView/);
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
   assert.match(chart, /DrawingManager/);
@@ -97,6 +99,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Load 60 more/);
   assert.match(dashboard, /mobile-indicator-control/);
   assert.match(dashboard, /mobile-scroll-tail/);
+  assert.match(dashboard, /quantityInput/);
+  assert.match(dashboard, /setQuantityInput\(event\.target\.value\.replace/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
   assert.match(readme, /TradingView Lightweight Charts/);

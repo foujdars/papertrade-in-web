@@ -473,8 +473,6 @@ h1, h2, p { margin: 0; }
 .rsi-color { background: #7c4dff; }
 
 .chart-placement-hint { position: absolute; z-index: 8; left: 50%; bottom: 34px; transform: translateX(-50%); max-width: calc(100% - 110px); padding: 6px 10px; border: 1px solid #d9d4ff; border-radius: 14px; color: #5747dc; background: rgba(248,247,255,.94); box-shadow: 0 6px 18px #332a7b1b; font-size: 9px; font-weight: 750; pointer-events: none; white-space: nowrap; }
-.tradingview-attribution { position: absolute; z-index: 5; left: 8px; bottom: 5px; color: #778096; font-size: 7px; font-weight: 700; text-decoration: none; opacity: .78; }
-.tradingview-attribution:hover { color: #2962ff; opacity: 1; }
 .drawing-toolbar .all-drawing-tools, .advanced-drawing-tools .all-drawing-tools { position: relative; color: #fff; background: linear-gradient(135deg, #7667ff, #5747dc); }
 .drawing-toolbar .all-drawing-tools:hover, .advanced-drawing-tools .all-drawing-tools:hover { color: #fff; background: linear-gradient(135deg, #6858ef, #4939ca); }
 .all-drawing-tools small { position: absolute; right: -2px; bottom: -2px; min-width: 15px; height: 13px; display: grid; place-items: center; padding: 0 2px; border: 2px solid #fff; border-radius: 7px; color: #5747dc; background: #fff; box-shadow: 0 2px 5px #20263b25; font-size: 6px; font-weight: 900; }
