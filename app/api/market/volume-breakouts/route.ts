@@ -15,6 +15,7 @@ type UpstoxQuote = {
   instrument_token?: string;
   symbol?: string;
   last_price?: number;
+  net_change?: number;
   volume?: number;
   timestamp?: string;
   last_trade_time?: string;
@@ -139,7 +140,8 @@ export async function POST(request: Request) {
       const symbol = quote.symbol?.trim().toUpperCase() ?? "";
       const requested = requestedByKey.get(instrumentKey) ?? requestedBySymbol.get(symbol);
       const lastPrice = Number(quote.last_price);
-      const previousClose = Number(quote.ohlc?.close);
+      const netChange = Number(quote.net_change);
+      const previousClose = Number.isFinite(netChange) ? lastPrice - netChange : Number(quote.ohlc?.close);
       const todayVolume = Number(quote.volume);
       if (!requested || !Number.isFinite(lastPrice) || !Number.isFinite(previousClose) || !Number.isFinite(todayVolume)) continue;
       const quoteTimestamp = quote.timestamp || (Number.isFinite(Number(quote.last_trade_time)) ? Number(quote.last_trade_time) : Date.now());
