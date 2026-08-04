@@ -3,7 +3,7 @@
 import {
   Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
-  Magnet, Minus, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler,
+  Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
   Redo2, Search, Star, Target, Trash2, Undo2,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -193,6 +193,8 @@ export function TradingDashboard() {
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+  const [riskToolEnabled, setRiskToolEnabled] = useState(false);
+  const [theme, setTheme] = useState<"light" | "neon">("light");
   const [quantityInput, setQuantityInput] = useState("1");
   const parsedQuantity = Number.parseInt(quantityInput, 10);
   const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
@@ -233,6 +235,7 @@ export function TradingDashboard() {
         setOrders(readPaperOrders());
         setProtections(readPaperProtections());
         setBalance(Number(localStorage.getItem("papertrade-balance") ?? "1000000"));
+        setTheme(localStorage.getItem("papertrade-theme") === "neon" ? "neon" : "light");
         const savedWatchlists = JSON.parse(localStorage.getItem(CUSTOM_WATCHLIST_STORAGE_KEY) ?? "[]") as CustomWatchlist[];
         if (Array.isArray(savedWatchlists)) {
           setCustomWatchlists(savedWatchlists.slice(0, 5).filter((list) => list?.id && list?.name && Array.isArray(list.symbols)));
@@ -587,6 +590,7 @@ export function TradingDashboard() {
     if (!triggeredOrders.length && !clearedProtectionIds.size) return;
     const remainingProtections = protections.filter((item) => !clearedProtectionIds.has(item.id));
     // Protective exits are synchronized with the latest live quote.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProtections(remainingProtections);
     writePaperProtections(remainingProtections);
     if (!triggeredOrders.length) return;
@@ -618,6 +622,28 @@ export function TradingDashboard() {
   const selectedPosition = selectedPositions.intraday.quantity > 0 ? selectedPositions.intraday : selectedPositions.delivery;
   const positionProduct: "INTRADAY" | "DELIVERY" = selectedPositions.intraday.quantity > 0 ? "INTRADAY" : "DELIVERY";
   const selectedProtection = protections.find((item) => item.symbol === selected.symbol && item.product === positionProduct);
+  const riskToolSide: "BUY" | "SELL" = selectedPosition.quantity > 0 && selectedPosition.side !== "FLAT"
+    ? selectedPosition.side === "LONG" ? "BUY" : "SELL"
+    : side;
+  const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : livePrice;
+  const requestedTargetPrice = Number(targetPrice);
+  const requestedStopLossPrice = Number(stopLossPrice);
+  const chartTargetPrice = Number.isFinite(requestedTargetPrice) && requestedTargetPrice > 0
+    ? requestedTargetPrice
+    : riskEntryPrice * (riskToolSide === "BUY" ? 1.01 : .99);
+  const chartStopLossPrice = Number.isFinite(requestedStopLossPrice) && requestedStopLossPrice > 0
+    ? requestedStopLossPrice
+    : riskEntryPrice * (riskToolSide === "BUY" ? .995 : 1.005);
+
+  useEffect(() => {
+    if (!selectedProtection) return;
+    const restoreProtection = window.setTimeout(() => {
+      setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
+      setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
+      setRiskToolEnabled(true);
+    }, 0);
+    return () => window.clearTimeout(restoreProtection);
+  }, [selectedProtection, selected.symbol]);
   const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = stockUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
@@ -674,6 +700,47 @@ export function TradingDashboard() {
     const target = targetPrice.trim() ? Number(targetPrice) : undefined;
     const stopLoss = stopLossPrice.trim() ? Number(stopLossPrice) : undefined;
     return { target, stopLoss };
+  }
+
+  function activateRiskTool(nextSide: "BUY" | "SELL") {
+    setSide(nextSide);
+    setRiskToolEnabled(true);
+    const positionMatches = selectedPosition.quantity > 0 && selectedPosition.side === (nextSide === "BUY" ? "LONG" : "SHORT");
+    const entry = positionMatches ? selectedPosition.averagePrice : livePrice;
+    const target = Number(targetPrice);
+    const stop = Number(stopLossPrice);
+    const validTarget = Number.isFinite(target) && (nextSide === "BUY" ? target > entry : target < entry);
+    const validStop = Number.isFinite(stop) && (nextSide === "BUY" ? stop < entry : stop > entry);
+    if (!validTarget) setTargetPrice((entry * (nextSide === "BUY" ? 1.01 : .99)).toFixed(2));
+    if (!validStop) setStopLossPrice((entry * (nextSide === "BUY" ? .995 : 1.005)).toFixed(2));
+  }
+
+  function updateChartRiskLevel(level: "target" | "stopLoss", value: number, committed: boolean) {
+    const formatted = value.toFixed(2);
+    if (level === "target") setTargetPrice(formatted);
+    else setStopLossPrice(formatted);
+    if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
+    const nextTarget = level === "target" ? value : Number(targetPrice) || selectedProtection?.targetPrice;
+    const nextStop = level === "stopLoss" ? value : Number(stopLossPrice) || selectedProtection?.stopLossPrice;
+    saveProtection({
+      id: selectedProtection?.id ?? `${Date.now()}-chart-risk`,
+      symbol: selected.symbol,
+      product: positionProduct,
+      side: selectedPosition.side,
+      targetPrice: nextTarget,
+      stopLossPrice: nextStop,
+      createdAt: selectedProtection?.createdAt ?? Date.now(),
+    }, selected.symbol, positionProduct);
+    setToast(`${level === "target" ? "Target" : "Stop loss"} moved to ${formatInr(value)}`);
+    window.setTimeout(() => setToast(""), 2_200);
+  }
+
+  function toggleTheme() {
+    setTheme((current) => {
+      const next = current === "light" ? "neon" : "light";
+      localStorage.setItem("papertrade-theme", next);
+      return next;
+    });
   }
 
   function protectionError(direction: "LONG" | "SHORT", referencePrice: number) {
@@ -814,6 +881,9 @@ export function TradingDashboard() {
     setLivePrice(price > 0 ? price : 1);
     setShowTradeSymbols(false);
     setTradeSymbolSearch("");
+    setRiskToolEnabled(false);
+    setTargetPrice("");
+    setStopLossPrice("");
     setSidebarOpen(false);
     const url = new URL(window.location.href);
     url.searchParams.set("symbol", item.symbol);
@@ -911,7 +981,7 @@ export function TradingDashboard() {
             : "trade";
 
   return (
-    <main className="terminal-shell">
+    <main className="terminal-shell" data-theme={theme}>
       <header className="topbar">
         <Brand />
         <nav className="main-nav" aria-label="Main navigation">
@@ -923,6 +993,7 @@ export function TradingDashboard() {
           </div>
           <div className="funds-button"><WalletCards size={16} /> {formatInr(balance)}</div>
           <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
+          <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
         </div>
       </header>
 
@@ -992,7 +1063,7 @@ export function TradingDashboard() {
             </div>
             <div className="quote-block"><strong>{livePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedNetChange >= 0 ? "+" : ""}{selectedNetChange.toFixed(2)} ({selectedChange >= 0 ? "+" : ""}{selectedChange.toFixed(2)}%)</span></div>
             <div className="ohlc-strip"><span>O <b>{(selectedQuote?.open ?? livePrice * 0.995).toFixed(2)}</b></span><span>H <b>{(selectedQuote?.high ?? livePrice * 1.008).toFixed(2)}</b></span><span>L <b>{(selectedQuote?.low ?? livePrice * 0.988).toFixed(2)}</b></span><span>C <b>{(selectedQuote?.previousClose ?? livePrice).toFixed(2)}</b></span></div>
-            <div className="header-order-buttons"><button className="compact-sell" onClick={() => setSide("SELL")}>Sell <b>{livePrice.toFixed(2)}</b></button><button className="compact-buy" onClick={() => setSide("BUY")}>Buy <b>{livePrice.toFixed(2)}</b></button></div>
+            <div className="header-order-buttons"><button className="compact-sell" onClick={() => activateRiskTool("SELL")}>Sell <b>{livePrice.toFixed(2)}</b></button><button className="compact-buy" onClick={() => activateRiskTool("BUY")}>Buy <b>{livePrice.toFixed(2)}</b></button></div>
           </div>
 
           <div className="chart-controls">
@@ -1018,7 +1089,28 @@ export function TradingDashboard() {
             </div>
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
-            <MarketChart key={`${selected.symbol}-${timeframe}`} instrument={selected} timeframe={timeframe} activeTool={activeTool} toolSignal={toolSignal} magnet={magnet} hiddenDrawings={hiddenDrawings} lockedDrawings={drawingsLocked} clearSignal={clearSignal} undoSignal={undoSignal} redoSignal={redoSignal} indicators={indicators} chartAction={chartAction} onPrice={handlePrice} onFeedStatus={handleFeedStatus} />
+            <MarketChart
+              key={`${selected.symbol}-${timeframe}`}
+              instrument={selected}
+              timeframe={timeframe}
+              activeTool={activeTool}
+              toolSignal={toolSignal}
+              magnet={magnet}
+              hiddenDrawings={hiddenDrawings}
+              lockedDrawings={drawingsLocked}
+              clearSignal={clearSignal}
+              undoSignal={undoSignal}
+              redoSignal={redoSignal}
+              indicators={indicators}
+              chartAction={chartAction}
+              chartTheme={theme}
+              orderTool={{ enabled: riskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity }}
+              onOrderSide={activateRiskTool}
+              onOrderToolChange={updateChartRiskLevel}
+              onOrderToolClose={() => setRiskToolEnabled(false)}
+              onPrice={handlePrice}
+              onFeedStatus={handleFeedStatus}
+            />
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
             <div><Radio size={14} /> {feedStatus.message}</div>
@@ -1029,15 +1121,15 @@ export function TradingDashboard() {
 
         <aside className="order-ticket">
           <div className="ticket-heading"><div><span className="eyebrow">Paper order</span><h2>{selected.symbol}</h2></div><span className="paper-badge">No real money</span></div>
-          <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => setSide("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} onClick={() => setSide("SELL")}>Sell</button></div>
+          <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
           <div className="input-grid">
             <label>Quantity<div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(1, quantity - 1)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + 1))}><Plus size={15} /></button></div></label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={livePrice.toFixed(2)} readOnly /></label>}
           </div>
           <div className="protection-grid">
-            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} placeholder={side === "BUY" ? `Above ${livePrice.toFixed(2)}` : `Below ${livePrice.toFixed(2)}`} /></label>
-            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onChange={(event) => setStopLossPrice(event.target.value)} placeholder={side === "BUY" ? `Below ${livePrice.toFixed(2)}` : `Above ${livePrice.toFixed(2)}`} /></label>
+            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={side === "BUY" ? `Above ${livePrice.toFixed(2)}` : `Below ${livePrice.toFixed(2)}`} /></label>
+            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={side === "BUY" ? `Below ${livePrice.toFixed(2)}` : `Above ${livePrice.toFixed(2)}`} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · 5x leverage" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>

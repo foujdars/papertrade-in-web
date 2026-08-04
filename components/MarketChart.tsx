@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   CandlestickData,
   IChartApi,
@@ -8,6 +8,7 @@ import type {
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
+import { ColorType } from "lightweight-charts";
 import type {
   Anchor,
   DrawingManager,
@@ -144,6 +145,15 @@ export type ChartAction =
   | "scale-indexed";
 
 export type ChartActionRequest = { type: ChartAction; token: number };
+
+export type ChartOrderTool = {
+  enabled: boolean;
+  side: "BUY" | "SELL";
+  entryPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  quantity: number;
+};
 
 type DraftDrawing = {
   toolType: DrawingToolId;
@@ -295,6 +305,11 @@ export function MarketChart({
   visibleBars = 155,
   indicators,
   chartAction,
+  chartTheme = "light",
+  orderTool,
+  onOrderSide,
+  onOrderToolChange,
+  onOrderToolClose,
   onPrice,
   onFeedStatus,
 }: {
@@ -311,6 +326,11 @@ export function MarketChart({
   visibleBars?: number;
   indicators: ChartIndicators;
   chartAction?: ChartActionRequest;
+  chartTheme?: "light" | "neon";
+  orderTool?: ChartOrderTool;
+  onOrderSide?: (side: "BUY" | "SELL") => void;
+  onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
+  onOrderToolClose?: () => void;
   onPrice: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -341,7 +361,8 @@ export function MarketChart({
   const magnetRef = useRef(magnet);
   const lockedRef = useRef(lockedDrawings);
   const hiddenRef = useRef(hiddenDrawings);
-  const dataRef = useRef<Candle[]>(generateCandles(instrument, timeframe, 420));
+  const [initialData] = useState<Candle[]>(() => generateCandles(instrument, timeframe, 420));
+  const dataRef = useRef<Candle[]>(initialData);
   const historyRef = useRef<SerializedDrawing[][]>([]);
   const redoRef = useRef<SerializedDrawing[][]>([]);
   const restoringRef = useRef(false);
@@ -353,10 +374,85 @@ export function MarketChart({
   const storageKeyRef = useRef(drawingStorageKey(instrument, timeframe));
   const gridVisibleRef = useRef(true);
   const crosshairVisibleRef = useRef(true);
-  const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => dataRef.current.at(-1));
-  const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(dataRef.current));
+  const orderToolRef = useRef(orderTool);
+  const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
+  const riskDragPriceRef = useRef(0);
+  const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialData.at(-1));
+  const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "simulated">("loading");
   const [placementHint, setPlacementHint] = useState("");
+  const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number; target: number; stopLoss: number } | null>(null);
+
+  function refreshRiskCoordinates() {
+    const series = candleSeries.current;
+    const tool = orderToolRef.current;
+    if (!series || !tool?.enabled) {
+      setRiskCoordinates(null);
+      return;
+    }
+    const entry = series.priceToCoordinate(tool.entryPrice);
+    const target = series.priceToCoordinate(tool.targetPrice);
+    const stopLoss = series.priceToCoordinate(tool.stopLossPrice);
+    if (entry === null || target === null || stopLoss === null) return;
+    setRiskCoordinates((current) => {
+      if (current && Math.abs(current.entry - entry) < .3 && Math.abs(current.target - target) < .3 && Math.abs(current.stopLoss - stopLoss) < .3) return current;
+      return { entry, target, stopLoss };
+    });
+  }
+
+  function orderToolPnl(tool: ChartOrderTool, price: number) {
+    const direction = tool.side === "BUY" ? 1 : -1;
+    return (price - tool.entryPrice) * direction * tool.quantity;
+  }
+
+  function formatRiskPnl(value: number) {
+    const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+    return `${sign}₹${Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  }
+
+  function riskPriceFromPointer(event: ReactPointerEvent<HTMLDivElement>, level: "target" | "stopLoss") {
+    const host = chartHost.current;
+    const series = candleSeries.current;
+    const tool = orderToolRef.current;
+    if (!host || !series || !tool) return null;
+    const bounds = host.getBoundingClientRect();
+    const rawPrice = series.coordinateToPrice(Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)));
+    if (rawPrice === null || !Number.isFinite(rawPrice)) return null;
+    const tick = Math.max(.05, tool.entryPrice * .0001);
+    if (tool.side === "BUY") {
+      return level === "target" ? Math.max(tool.entryPrice + tick, rawPrice) : Math.max(tick, Math.min(tool.entryPrice - tick, rawPrice));
+    }
+    return level === "target" ? Math.max(tick, Math.min(tool.entryPrice - tick, rawPrice)) : Math.max(tool.entryPrice + tick, rawPrice);
+  }
+
+  function beginRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
+    riskDragRef.current = level;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    chartApi.current?.applyOptions({ handleScroll: false, handleScale: false });
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function moveRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
+    if (riskDragRef.current !== level) return;
+    const price = riskPriceFromPointer(event, level);
+    if (price === null) return;
+    riskDragPriceRef.current = price;
+    onOrderToolChange?.(level, price, false);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function endRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
+    if (riskDragRef.current !== level) return;
+    const price = riskPriceFromPointer(event, level) ?? riskDragPriceRef.current;
+    riskDragRef.current = null;
+    chartApi.current?.applyOptions({ handleScroll: activeToolRef.current === "cursor", handleScale: activeToolRef.current === "cursor" });
+    if (price > 0) onOrderToolChange?.(level, price, true);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
 
   function applyVisibleRange(data = dataRef.current) {
     const chart = chartApi.current;
@@ -631,6 +727,38 @@ export function MarketChart({
   }, [visibleBars]);
 
   useEffect(() => {
+    orderToolRef.current = orderTool;
+    refreshRiskCoordinates();
+    if (!orderTool?.enabled) return;
+    const interval = window.setInterval(refreshRiskCoordinates, 120);
+    return () => window.clearInterval(interval);
+  }, [orderTool?.enabled, orderTool?.entryPrice, orderTool?.quantity, orderTool?.side, orderTool?.stopLossPrice, orderTool?.targetPrice]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    if (!chart) return;
+    const neon = chartTheme === "neon";
+    chart.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: neon ? "#061014" : "#ffffff" },
+        textColor: neon ? "#8fb3bf" : "#65708a",
+        attributionLogo: true,
+        panes: { separatorColor: neon ? "#173541" : "#e3e6ee", separatorHoverColor: neon ? "#00f5b0" : "#d8d3ff", enableResize: true },
+      },
+      grid: {
+        vertLines: { color: neon ? "#102a33" : "#edf0f6" },
+        horzLines: { color: neon ? "#102a33" : "#edf0f6" },
+      },
+      rightPriceScale: { borderColor: neon ? "#1b3b48" : "#dfe3ec" },
+      timeScale: { borderColor: neon ? "#1b3b48" : "#dfe3ec" },
+      crosshair: {
+        vertLine: { color: neon ? "#00f5b0" : "#8c96aa", labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
+        horzLine: { color: neon ? "#00f5b0" : "#8c96aa", labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
+      },
+    });
+  }, [chartTheme]);
+
+  useEffect(() => {
     magnetRef.current = magnet;
     const chart = chartApi.current;
     if (!chart) return;
@@ -651,12 +779,10 @@ export function MarketChart({
       handleScale: activeTool === "cursor",
     });
     chartHost.current?.classList.toggle("is-drawing", activeTool !== "cursor");
-    if (drawingType) {
-      const definition = DRAWING_TOOL_CATALOG.find((tool) => tool.id === drawingType);
-      setPlacementHint(definition ? `Tap ${definition.anchors} ${definition.anchors === 1 ? "point" : "points"} · ${definition.label}` : "Tap on chart");
-    } else {
-      setPlacementHint("");
-    }
+    const definition = drawingType ? DRAWING_TOOL_CATALOG.find((tool) => tool.id === drawingType) : undefined;
+    const hint = definition ? `Tap ${definition.anchors} ${definition.anchors === 1 ? "point" : "points"} · ${definition.label}` : drawingType ? "Tap on chart" : "";
+    const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
+    return () => window.clearTimeout(hintTimer);
   }, [activeTool, toolSignal]);
 
   useEffect(() => {
@@ -734,30 +860,31 @@ export function MarketChart({
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
       if (cancelled) return;
+      const neon = chartTheme === "neon";
       const chart = lwc.createChart(host, {
         autoSize: false,
         width: Math.max(1, Math.floor(host.clientWidth)),
         height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
-          background: { type: lwc.ColorType.Solid, color: "#ffffff" },
-          textColor: "#65708a",
+          background: { type: lwc.ColorType.Solid, color: neon ? "#061014" : "#ffffff" },
+          textColor: neon ? "#8fb3bf" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
           attributionLogo: true,
-          panes: { separatorColor: "#e3e6ee", separatorHoverColor: "#d8d3ff", enableResize: true },
+          panes: { separatorColor: neon ? "#173541" : "#e3e6ee", separatorHoverColor: neon ? "#00f5b0" : "#d8d3ff", enableResize: true },
         },
         grid: {
-          vertLines: { color: "#edf0f6", style: lwc.LineStyle.Dashed },
-          horzLines: { color: "#edf0f6", style: lwc.LineStyle.Dashed },
+          vertLines: { color: neon ? "#102a33" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          horzLines: { color: neon ? "#102a33" : "#edf0f6", style: lwc.LineStyle.Dashed },
         },
         rightPriceScale: {
           visible: true,
-          borderColor: "#dfe3ec",
+          borderColor: neon ? "#1b3b48" : "#dfe3ec",
           scaleMargins: { top: 0.10, bottom: 0.10 },
           minimumWidth: 72,
         },
         leftPriceScale: { visible: false },
         timeScale: {
-          borderColor: "#dfe3ec",
+          borderColor: neon ? "#1b3b48" : "#dfe3ec",
           timeVisible: true,
           secondsVisible: timeframe === "1m",
           rightOffset: 8,
@@ -768,8 +895,8 @@ export function MarketChart({
         },
         crosshair: {
           mode: magnetRef.current ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
-          vertLine: { color: "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: "#252b3d" },
-          horzLine: { color: "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: "#252b3d" },
+          vertLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
+          horzLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
         },
         handleScroll: true,
         handleScale: true,
@@ -997,6 +1124,7 @@ export function MarketChart({
       window.visualViewport?.addEventListener("resize", resizeChart);
       resizeChart();
       window.setTimeout(resizeChart, 180);
+      window.setTimeout(refreshRiskCoordinates, 190);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
       chart.applyOptions({ handleScroll: activeTool === "cursor", handleScale: activeTool === "cursor" });
@@ -1221,6 +1349,45 @@ export function MarketChart({
           </div>
         )}
         {placementHint && <div className="chart-placement-hint">{placementHint}</div>}
+        {onOrderSide && (
+          <div className="chart-quick-order-buttons" aria-label="Paper trade controls">
+            <button className={`chart-sell-button ${orderTool?.enabled && orderTool.side === "SELL" ? "active" : ""}`} onClick={() => onOrderSide("SELL")}><span>Sell</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
+            <button className={`chart-buy-button ${orderTool?.enabled && orderTool.side === "BUY" ? "active" : ""}`} onClick={() => onOrderSide("BUY")}><span>Buy</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
+          </div>
+        )}
+        {orderTool?.enabled && riskCoordinates && (
+          <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
+            <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>
+            <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
+              <span>{orderTool.side} ENTRY</span><b>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+            </div>
+            <div
+              className="risk-line risk-target-line"
+              style={{ top: riskCoordinates.target }}
+              onPointerDown={(event) => beginRiskDrag("target", event)}
+              onPointerMove={(event) => moveRiskDrag("target", event)}
+              onPointerUp={(event) => endRiskDrag("target", event)}
+              onPointerCancel={(event) => endRiskDrag("target", event)}
+            >
+              <span>TARGET</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b><em>↕ drag</em>
+            </div>
+            <div
+              className="risk-line risk-stop-line"
+              style={{ top: riskCoordinates.stopLoss }}
+              onPointerDown={(event) => beginRiskDrag("stopLoss", event)}
+              onPointerMove={(event) => moveRiskDrag("stopLoss", event)}
+              onPointerUp={(event) => endRiskDrag("stopLoss", event)}
+              onPointerCancel={(event) => endRiskDrag("stopLoss", event)}
+            >
+              <span>STOP</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b><em>↕ drag</em>
+            </div>
+            <div className="risk-reward-summary">
+              <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · {orderTool.quantity} qty</span>
+              <b>Risk {formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
+              <b>Reward {formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -74,6 +74,14 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
   assert.match(chart, /DrawingManager/);
+  assert.match(chart, /chart-risk-tool/);
+  assert.match(chart, /beginRiskDrag/);
+  assert.match(chart, /TARGET/);
+  assert.match(chart, /STOP/);
+  assert.match(dashboard, /papertrade-theme/);
+  assert.match(dashboard, /Neon dark theme/);
+  assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
+  assert.match(styles, /chart-quick-order-buttons/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
   assert.match(styles, /height: calc\(100svh - 122px/);
