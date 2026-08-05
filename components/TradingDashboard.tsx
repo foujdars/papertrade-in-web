@@ -15,6 +15,7 @@ import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Inst
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
+  deletePaperTradeOrders,
   getProtectionTrigger,
   readPaperOrders,
   readPaperProtections,
@@ -24,7 +25,7 @@ import {
   type PaperOrder,
   type PaperProtection,
 } from "@/lib/paper-trading";
-import { buildClosedTrades, getOrderCharges } from "@/lib/trade-analytics";
+import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
 import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
@@ -34,6 +35,7 @@ const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
 const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
 const RATNAVEER_REPAIR_STORAGE_KEY = "papertrade-repair-ratnaveer-demo-v1";
+const MAX_VIRTUAL_BALANCE = 100_000_000;
 const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
@@ -219,6 +221,9 @@ export function TradingDashboard() {
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
+  const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
+  const [fundsOpen, setFundsOpen] = useState(false);
+  const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
   const [toast, setToast] = useState("");
@@ -785,13 +790,13 @@ export function TradingDashboard() {
     const nextTarget = level === "target" ? value : Number(targetPrice) || selectedProtection?.targetPrice;
     const nextStop = level === "stopLoss" ? value : Number(stopLossPrice) || selectedProtection?.stopLossPrice;
     saveProtection({
-      id: selectedProtection?.id ?? `${Date.now()}-chart-risk`,
+      id: selectedProtection?.id ?? `${new Date().getTime()}-chart-risk`,
       symbol: selected.symbol,
       product: positionProduct,
       side: selectedPosition.side,
       targetPrice: nextTarget,
       stopLossPrice: nextStop,
-      createdAt: selectedProtection?.createdAt ?? Date.now(),
+      createdAt: selectedProtection?.createdAt ?? new Date().getTime(),
     }, selected.symbol, positionProduct);
     setToast(`${level === "target" ? "Target" : "Stop loss"} moved to ${formatInr(value)}`);
     window.setTimeout(() => setToast(""), 2_200);
@@ -803,6 +808,45 @@ export function TradingDashboard() {
       localStorage.setItem("papertrade-theme", next);
       return next;
     });
+  }
+
+  function addVirtualFunds() {
+    const requestedAmount = Number(fundsInput);
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      setToast("Enter a valid virtual amount");
+      window.setTimeout(() => setToast(""), 3_000);
+      return;
+    }
+    const nextBalance = Math.min(MAX_VIRTUAL_BALANCE, balance + requestedAmount);
+    if (nextBalance <= balance) {
+      setToast("Maximum virtual balance of ₹10 crore already reached");
+      window.setTimeout(() => setToast(""), 3_000);
+      return;
+    }
+    setBalance(nextBalance);
+    localStorage.setItem("papertrade-balance", String(nextBalance));
+    setFundsOpen(false);
+    setToast(`${formatInr(nextBalance - balance)} virtual money added`);
+    window.setTimeout(() => setToast(""), 3_000);
+  }
+
+  function deleteClosedTrade(trade: ClosedPaperTrade) {
+    const deletion = deletePaperTradeOrders(orders, trade.sourceOrderIds);
+    if (!deletion.removedOrders.length) return;
+    const confirmed = window.confirm(
+      `Delete ${trade.symbol} trade from this device? Its entry/exit fills, P&L, charges and graph result will be recalculated.`,
+    );
+    if (!confirmed) return;
+    const nextBalance = balance + deletion.balanceAdjustment;
+    setOrders(deletion.orders);
+    setBalance(nextBalance);
+    writePaperOrders(deletion.orders);
+    localStorage.setItem("papertrade-balance", String(nextBalance));
+    const remainingPosition = calculatePosition(deletion.orders, trade.symbol, Number.NaN, trade.product);
+    if (!remainingPosition.quantity) saveProtection(null, trade.symbol, trade.product);
+    setPnlTradeMenuId(null);
+    setToast(`${trade.symbol} trade deleted and account totals recalculated`);
+    window.setTimeout(() => setToast(""), 3_500);
   }
 
   function protectionError(direction: "LONG" | "SHORT", referencePrice: number) {
@@ -842,13 +886,13 @@ export function TradingDashboard() {
       setToast("Target and stop loss removed");
     } else {
       saveProtection({
-        id: `${Date.now()}`,
+        id: `${new Date().getTime()}`,
         symbol: selected.symbol,
         product: positionProduct,
         side: selectedPosition.side,
         targetPrice: target,
         stopLossPrice: stopLoss,
-        createdAt: Date.now(),
+        createdAt: new Date().getTime(),
       }, selected.symbol, positionProduct);
       setToast("Target and stop loss updated");
     }
@@ -876,9 +920,9 @@ export function TradingDashboard() {
       return;
     }
     const order: PaperOrder = {
-      id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: executionPrice,
+      id: `${new Date().getTime()}`, symbol: selected.symbol, side, quantity, price: executionPrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      product, createdAt: Date.now(), charges: calculateUpstoxEquityCharges({ side, product, quantity, price: executionPrice }),
+      product, createdAt: new Date().getTime(), charges: calculateUpstoxEquityCharges({ side, product, quantity, price: executionPrice }),
       priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
     };
     const executionCharges = getOrderCharges(order);
@@ -889,13 +933,13 @@ export function TradingDashboard() {
     const { target, stopLoss } = protectionValues();
     if ((target !== undefined || stopLoss !== undefined) && nextPosition.quantity > 0 && nextPosition.side === intendedDirection) {
       saveProtection({
-        id: `${Date.now()}-risk`,
+        id: `${new Date().getTime()}-risk`,
         symbol: selected.symbol,
         product,
         side: intendedDirection,
         targetPrice: target,
         stopLossPrice: stopLoss,
-        createdAt: Date.now(),
+        createdAt: new Date().getTime(),
       }, selected.symbol, product);
     } else if (!nextPosition.quantity || nextPosition.side !== intendedDirection) {
       saveProtection(null, selected.symbol, product);
@@ -928,7 +972,7 @@ export function TradingDashboard() {
     const closingSide = selectedPosition.side === "LONG" ? "SELL" : "BUY";
     const exitCharges = calculateUpstoxEquityCharges({ side: closingSide, product: positionProduct, quantity: closingQuantity, price: executionPrice });
     const order: PaperOrder = {
-      id: `${Date.now()}`,
+      id: `${new Date().getTime()}`,
       symbol: selected.symbol,
       side: closingSide,
       quantity: closingQuantity,
@@ -936,7 +980,7 @@ export function TradingDashboard() {
       status: "COMPLETE",
       time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       product: positionProduct,
-      createdAt: Date.now(),
+      createdAt: new Date().getTime(),
       charges: exitCharges,
       exitReason: "MANUAL",
       priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
@@ -1010,7 +1054,7 @@ export function TradingDashboard() {
       return;
     }
     const list: CustomWatchlist = {
-      id: `${Date.now()}`,
+      id: `${new Date().getTime()}`,
       name,
       symbols: watchlistTarget ? [watchlistTarget.symbol] : [],
     };
@@ -1079,7 +1123,7 @@ export function TradingDashboard() {
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
             <span /> {feedStatus.mode === "live" ? "Upstox data" : feedStatus.mode === "loading" ? "Connecting" : "Fallback data"}
           </div>
-          <div className="funds-button"><WalletCards size={16} /> {formatInr(balance)}</div>
+          <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
           <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
         </div>
@@ -1382,10 +1426,32 @@ export function TradingDashboard() {
               </div>
             </div>
             <div className="pnl-trade-list">
-              {closedTrades.map((trade) => <div key={`${trade.id}-${trade.symbol}`} className="pnl-trade-row"><span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} shares · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span><span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span></div>)}
+              {closedTrades.map((trade) => {
+                const menuOpen = pnlTradeMenuId === trade.id;
+                return (
+                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
+                    <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
+                    <span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} shares · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span>
+                    <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
+                    {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); deleteClosedTrade(trade); }}><Trash2 size={14} /> Delete trade</button></div>}
+                  </div>
+                );
+              })}
               {!closedTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades yet</b><span>Close a paper position to build your P&amp;L history.</span></div>}
             </div>
             <p className="pnl-disclaimer">Charges are estimates using current Upstox equity rates; actual contract-note rounding can differ.</p>
+          </section>
+        </div>
+      )}
+      {fundsOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setFundsOpen(false)}>
+          <section className="modal funds-modal" role="dialog" aria-modal="true" aria-label="Add virtual money" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Paper account</span><h2>Add virtual money</h2></div><button className="icon-button" onClick={() => setFundsOpen(false)} aria-label="Close virtual funds"><X size={20} /></button></div>
+            <div className="virtual-balance-card"><span>Current virtual cash</span><b>{formatInr(balance)}</b><small>Maximum total balance: ₹10,00,00,000</small></div>
+            <label className="funds-input-label">Amount to add (₹)<input type="number" min="1" max={Math.max(0, MAX_VIRTUAL_BALANCE - balance)} step="1000" value={fundsInput} onChange={(event) => setFundsInput(event.target.value)} /></label>
+            <div className="funds-shortcuts">{[[100_000, "₹1L"], [1_000_000, "₹10L"], [10_000_000, "₹1Cr"], [100_000_000, "₹10Cr"]].map(([amount, label]) => <button key={label} onClick={() => setFundsInput(String(amount))}>{label}</button>)}</div>
+            <button className="primary-button" disabled={balance >= MAX_VIRTUAL_BALANCE} onClick={addVirtualFunds}>{balance >= MAX_VIRTUAL_BALANCE ? "₹10 CRORE LIMIT REACHED" : "ADD VIRTUAL MONEY"}</button>
+            <p className="field-help">Simulation only. This does not deposit real money or connect to your broker balance.</p>
           </section>
         </div>
       )}

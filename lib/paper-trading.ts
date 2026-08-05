@@ -84,6 +84,16 @@ function orderCashEffect(order: PaperOrder) {
   return (order.side === "SELL" ? 1 : -1) * order.price * order.quantity * .2 - charges.total;
 }
 
+export function deletePaperTradeOrders(orders: PaperOrder[], sourceOrderIds: string[]) {
+  const ids = new Set(sourceOrderIds);
+  const removedOrders = orders.filter((order) => ids.has(order.id));
+  return {
+    orders: orders.filter((order) => !ids.has(order.id)),
+    removedOrders,
+    balanceAdjustment: -removedOrders.reduce((total, order) => total + orderCashEffect(order), 0),
+  };
+}
+
 export function repairRatnaveerSimulationTrade(orders: PaperOrder[]) {
   const ordered = [...orders].sort((a, b) => paperOrderTimestamp(a) - paperOrderTimestamp(b));
   const idsToRemove = new Set<string>();

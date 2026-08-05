@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
+import { calculatePosition, deletePaperTradeOrders, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
+import { buildClosedTrades } from "../lib/trade-analytics.ts";
 
 function order(id, side, quantity, price) {
   return {
@@ -77,4 +78,15 @@ test("removes the corrupted RATNAVEER simulated stop-loss pair and repairs cash"
   assert.deepEqual(repaired.orders.map((item) => item.id), ["good"]);
   assert.equal(repaired.removedOrders.length, 2);
   assert.ok(repaired.balanceAdjustment > 277000 && repaired.balanceAdjustment < 279000);
+});
+
+test("tracks the source fills of a completed trade and deletes them consistently", () => {
+  const fills = [order(2, "SELL", 10, 110), order(1, "BUY", 10, 100), order(3, "BUY", 2, 90)];
+  const trades = buildClosedTrades(fills);
+  assert.equal(trades.length, 1);
+  assert.deepEqual(new Set(trades[0].sourceOrderIds), new Set(["1", "2"]));
+  const deletion = deletePaperTradeOrders(fills, trades[0].sourceOrderIds);
+  assert.deepEqual(deletion.orders.map((item) => item.id), ["3"]);
+  assert.equal(deletion.removedOrders.length, 2);
+  assert.ok(Number.isFinite(deletion.balanceAdjustment));
 });

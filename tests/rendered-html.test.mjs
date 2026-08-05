@@ -70,6 +70,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("lightweight-charts"\)/);
   assert.match(chart, /attributionLogo: true/);
+  assert.match(chart, /right-axis marker should contain only the price/);
+  assert.match(chart, /title: ""/);
   assert.doesNotMatch(chart, /Charts by TradingView/);
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
@@ -86,6 +88,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /quoteIsFresh/);
   assert.match(dashboard, /chart-trade-footer/);
   assert.match(dashboard, /orderSheetOpen/);
+  assert.match(dashboard, /deleteClosedTrade/);
+  assert.match(dashboard, /Delete trade/);
+  assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
+  assert.match(dashboard, /Add virtual money/);
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);

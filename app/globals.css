@@ -463,6 +463,8 @@ h1, h2, p { margin: 0; }
 .pnl-bar-slot.loss .pnl-bar-caption small { color: var(--red); }
 .pnl-trade-list { max-height: 300px; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; overflow: auto; }
 .pnl-trade-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+.pnl-trade-row { cursor: pointer; }
+.pnl-trade-row.selected { border-color: #bcb4ff; background: #faf9ff; }
 .pnl-trade-row > span:first-child { padding: 4px; border-radius: 5px; font-size: 7px; font-weight: 900; text-align: center; }
 .pnl-trade-row > span:first-child.win { color: var(--green); background: #e9faf5; }
 .pnl-trade-row > span:first-child.loss { color: var(--red); background: #fff0f2; }
@@ -470,6 +472,19 @@ h1, h2, p { margin: 0; }
 .pnl-trade-row > span:nth-child(2) b { font-size: 10px; }
 .pnl-trade-row small { color: #8992a5; font-size: 8px; }
 .pnl-trade-row > span:nth-child(3) { align-items: flex-end; }
+.pnl-trade-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 9px; border-top: 1px solid var(--line); }
+.pnl-trade-actions small { line-height: 1.4; }
+.pnl-trade-actions button { height: 31px; flex: none; display: flex; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid #f0445840; border-radius: 7px; color: var(--red); background: #fff0f2; font-size: 8px; font-weight: 850; cursor: pointer; }
+.funds-modal { width: min(420px, 100%); }
+.virtual-balance-card { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding: 14px; border: 1px solid #ddd8ff; border-radius: 11px; background: linear-gradient(135deg, #faf9ff, #f2efff); }
+.virtual-balance-card span, .virtual-balance-card small { color: var(--muted); font-size: 9px; }
+.virtual-balance-card b { color: var(--purple); font-size: 20px; }
+.funds-input-label { display: flex; flex-direction: column; gap: 7px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.funds-input-label input { width: 100%; }
+.funds-shortcuts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 14px; }
+.funds-shortcuts button { height: 34px; border: 1px solid var(--line); border-radius: 8px; color: var(--purple); background: var(--purple-soft); font-size: 9px; font-weight: 800; cursor: pointer; }
+.funds-modal > .primary-button { width: 100%; }
+.funds-modal > .field-help { margin-top: 10px; text-align: center; }
 .pnl-disclaimer { margin-top: 10px; color: #8a93a7; font-size: 8px; line-height: 1.45; }
 .mobile-bottom-nav { display: none; }
 .mobile-scroll-tail { display: none; }
@@ -487,7 +502,8 @@ h1, h2, p { margin: 0; }
   html { scroll-padding-bottom: 150px; }
   .topbar { position: sticky; top: 0; height: 58px; flex-basis: 58px; padding: 0 12px; }
   .topbar > .brand { flex: 1; }
-  .main-nav, .funds-button, .top-actions > .icon-button, .profile-button { display: none; }
+  .main-nav, .top-actions > .icon-button, .profile-button { display: none; }
+  .funds-button { width: 36px; justify-content: center; padding: 0; font-size: 0; }
   .api-button { width: 36px; justify-content: center; padding: 0; font-size: 0; }
   .workspace { display: block; }
   .watchlist-panel { position: fixed; z-index: 80; inset: 58px 0 64px; width: auto; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(100%); transition: transform .2s ease, opacity .15s ease; border-right: 0; box-shadow: 0 -16px 42px #151a2d24; }
@@ -618,7 +634,9 @@ h1, h2, p { margin: 0; }
 }
 .terminal-shell[data-theme="neon"] :is(.topbar, .watchlist-panel, .order-ticket, .chart-area, .drawing-toolbar, .mobile-bottom-nav, .market-discovery-panel, .modal) { color: var(--ink); background: #071419f5; border-color: var(--line); }
 .terminal-shell[data-theme="neon"] :is(.chart-trade-footer, .instrument-header, .chart-controls, .chart-statusbar, .mobile-panel-head, .market-discovery-head) { color: var(--ink); border-color: var(--line); background: #09191f; }
-.terminal-shell[data-theme="neon"] :is(.chart-positions-trigger, .pnl-stat-grid > div, .pnl-chart-card, .pnl-trade-row, .positions-summary, .position-row, .order-row, .table-head, .order-empty, .positions-empty, .no-orders, .recent-orders-mini, .connection-state, .custom-list-editor > div) { color: var(--ink); border-color: #1b3a45; background: #0a1d24; }
+.terminal-shell[data-theme="neon"] :is(.chart-positions-trigger, .pnl-stat-grid > div, .pnl-chart-card, .pnl-trade-row, .positions-summary, .position-row, .order-row, .table-head, .order-empty, .positions-empty, .no-orders, .recent-orders-mini, .connection-state, .custom-list-editor > div, .virtual-balance-card) { color: var(--ink); border-color: #1b3a45; background: #0a1d24; }
+.terminal-shell[data-theme="neon"] .pnl-trade-row.selected { border-color: #8f68e8; background: #151c31; box-shadow: 0 0 18px #a978ff18; }
+.terminal-shell[data-theme="neon"] .pnl-trade-actions button { color: #ff7892; border-color: #ff55784d; background: #37121e; }
 .terminal-shell[data-theme="neon"] :is(.trend-stock-row, .market-discovery-list) { color: var(--ink); border-color: #17343e; background: transparent; }
 .terminal-shell[data-theme="neon"] .trend-stock-row:hover,
 .terminal-shell[data-theme="neon"] .position-row:hover { border-color: #6d58a5; background: #10262e; }

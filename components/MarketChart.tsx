@@ -918,7 +918,8 @@ export function MarketChart({
         priceLineWidth: 1,
         priceLineStyle: lwc.LineStyle.Dashed,
         lastValueVisible: true,
-        title: instrument.symbol,
+        // Keep the symbol in the OHLC legend; the right-axis marker should contain only the price.
+        title: "",
       });
       chartApi.current = chart;
       candleSeries.current = series;

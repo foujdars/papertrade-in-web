@@ -1,5 +1,5 @@
-import type { PaperOrder } from "@/lib/paper-trading";
-import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
+import type { PaperOrder } from "./paper-trading.ts";
+import { calculateUpstoxEquityCharges } from "./trading-charges.ts";
 
 export type ClosedPaperTrade = {
   id: string;
@@ -12,12 +12,14 @@ export type ClosedPaperTrade = {
   charges: number;
   netPnl: number;
   closedAt: number;
+  sourceOrderIds: string[];
 };
 
 type OpenLeg = {
   signedQuantity: number;
   averagePrice: number;
   entryCharges: number;
+  entryOrderIds: string[];
 };
 
 function orderTimestamp(order: PaperOrder) {
@@ -44,7 +46,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
     const quantity = Math.max(0, order.quantity);
     if (!quantity || !Number.isFinite(order.price)) continue;
     const key = `${order.symbol}:${order.product ?? "INTRADAY"}`;
-    const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0 };
+    const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0, entryOrderIds: [] };
     const orderCharges = getOrderCharges(order).total;
 
     if (leg.signedQuantity === 0 || Math.sign(leg.signedQuantity) === direction) {
@@ -53,6 +55,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
       leg.averagePrice = combinedQuantity ? (leg.averagePrice * previousQuantity + order.price * quantity) / combinedQuantity : 0;
       leg.signedQuantity += direction * quantity;
       leg.entryCharges += orderCharges;
+      leg.entryOrderIds.push(order.id);
       positions.set(key, leg);
       continue;
     }
@@ -75,6 +78,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
       charges,
       netPnl: grossPnl - charges,
       closedAt: orderTimestamp(order),
+      sourceOrderIds: [...new Set([...leg.entryOrderIds, order.id])],
     });
 
     leg.entryCharges -= allocatedEntryCharges;
@@ -86,6 +90,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
       leg.signedQuantity = nextQuantity;
       leg.averagePrice = order.price;
       leg.entryCharges = orderCharges * (reversingQuantity / quantity);
+      leg.entryOrderIds = [order.id];
       positions.set(key, leg);
     } else {
       leg.signedQuantity = nextQuantity;
