@@ -18,6 +18,7 @@ import {
   getProtectionTrigger,
   readPaperOrders,
   readPaperProtections,
+  repairRatnaveerSimulationTrade,
   writePaperOrders,
   writePaperProtections,
   type PaperOrder,
@@ -31,6 +32,8 @@ import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
+const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
+const RATNAVEER_REPAIR_STORAGE_KEY = "papertrade-repair-ratnaveer-demo-v1";
 const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
@@ -180,7 +183,6 @@ export function TradingDashboard() {
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
-  const [livePrice, setLivePrice] = useState(selected.price);
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
@@ -210,6 +212,7 @@ export function TradingDashboard() {
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
@@ -225,16 +228,34 @@ export function TradingDashboard() {
     message: "Connecting to Upstox…",
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
+  const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
+  const pendingChartRestoreRef = useRef<{ symbol: string; timeframe: string } | null>({ symbol: "__PENDING__", timeframe: "5m" });
   const autoSquareOffInFlightRef = useRef(false);
+  const autoSquareOffRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
       try {
-        setOrders(readPaperOrders());
+        const storedOrders = readPaperOrders();
+        let restoredOrders = storedOrders;
+        let restoredBalance = Number(localStorage.getItem("papertrade-balance") ?? "1000000");
+        if (localStorage.getItem(RATNAVEER_REPAIR_STORAGE_KEY) !== "done") {
+          const repair = repairRatnaveerSimulationTrade(storedOrders);
+          if (repair.removedOrders.length) {
+            restoredOrders = repair.orders;
+            restoredBalance += repair.balanceAdjustment;
+            writePaperOrders(restoredOrders);
+            localStorage.setItem("papertrade-balance", String(restoredBalance));
+            setToast("Removed the corrupted RATNAVEER simulated stop-loss trade and repaired cash");
+            window.setTimeout(() => setToast(""), 5_000);
+          }
+          localStorage.setItem(RATNAVEER_REPAIR_STORAGE_KEY, "done");
+        }
+        setOrders(restoredOrders);
         setProtections(readPaperProtections());
-        setBalance(Number(localStorage.getItem("papertrade-balance") ?? "1000000"));
+        setBalance(restoredBalance);
         setTheme(localStorage.getItem("papertrade-theme") === "neon" ? "neon" : "light");
         const savedWatchlists = JSON.parse(localStorage.getItem(CUSTOM_WATCHLIST_STORAGE_KEY) ?? "[]") as CustomWatchlist[];
         if (Array.isArray(savedWatchlists)) {
@@ -257,8 +278,13 @@ export function TradingDashboard() {
   useEffect(() => {
     const applyRequestedChart = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
-      const requestedSymbol = params.get("symbol")?.toUpperCase();
-      const requestedTimeframe = params.get("timeframe");
+      let savedChart: { symbol?: string; timeframe?: string } = {};
+      try { savedChart = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
+      const requestedSymbol = params.get("symbol")?.toUpperCase() ?? savedChart.symbol?.toUpperCase();
+      const requestedTimeframe = params.get("timeframe") ?? savedChart.timeframe;
+      pendingChartRestoreRef.current = requestedSymbol
+        ? { symbol: requestedSymbol, timeframe: periods.includes(requestedTimeframe ?? "") ? requestedTimeframe! : "5m" }
+        : null;
       if (requestedTimeframe && periods.includes(requestedTimeframe)) {
         setTimeframe(requestedTimeframe);
       }
@@ -266,12 +292,18 @@ export function TradingDashboard() {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
         if (fallbackInstrument) {
           setSelected(fallbackInstrument);
-          setLivePrice(fallbackInstrument.price);
         }
       }
     }, 0);
     return () => window.clearTimeout(applyRequestedChart);
   }, []);
+
+  useEffect(() => {
+    const pending = pendingChartRestoreRef.current;
+    if (pending && selected.symbol !== pending.symbol) return;
+    pendingChartRestoreRef.current = null;
+    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe }));
+  }, [selected.symbol, timeframe]);
 
   useEffect(() => {
     if (!showTradeSymbols) return;
@@ -303,7 +335,9 @@ export function TradingDashboard() {
         const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
         if (!response.ok || !payload.ok || !payload.instruments?.length) return;
         const merged = mergeInstrumentUniverse(payload.instruments);
-        const requestedSymbol = new URLSearchParams(window.location.search).get("symbol")?.toUpperCase();
+        let savedSymbol = "";
+        try { savedSymbol = (JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}") as { symbol?: string }).symbol?.toUpperCase() ?? ""; } catch { /* Ignore malformed preference. */ }
+        const requestedSymbol = new URLSearchParams(window.location.search).get("symbol")?.toUpperCase() ?? savedSymbol;
         setStockUniverse(merged);
         setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol ?? current.symbol)) ?? current);
       } catch {
@@ -357,8 +391,12 @@ export function TradingDashboard() {
   useEffect(() => {
     const controller = new AbortController();
     if (!quoteKeys) return;
+    let retryAt = 0;
+    let requestInFlight = false;
 
     async function loadWatchlistQuotes() {
+      if (requestInFlight || Date.now() < retryAt) return;
+      requestInFlight = true;
       try {
         const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`, {
           cache: "no-store",
@@ -367,22 +405,35 @@ export function TradingDashboard() {
         const payload = await response.json() as {
           ok?: boolean;
           quotes?: Record<string, NormalizedQuote>;
+          error?: { code?: string; retryAfterSeconds?: number };
         };
         if (response.ok && payload.ok && payload.quotes) {
           setMarketQuotes((current) => ({ ...current, ...payload.quotes }));
+          const receivedAt = Date.now();
+          setMarketQuoteUpdatedAt((current) => ({
+            ...current,
+            ...Object.fromEntries(Object.keys(payload.quotes ?? {}).map((key) => [key, receivedAt])),
+          }));
+          retryAt = 0;
+        } else if (payload.error?.code === "RATE_LIMITED") {
+          retryAt = Date.now() + Math.max(30, payload.error.retryAfterSeconds ?? 30) * 1_000;
+          setToast("Upstox rate limit reached. Live trading is paused; retrying automatically.");
+          window.setTimeout(() => setToast(""), 5_000);
         }
       } catch {
-        // The chart reports the connection error; static watchlist values remain usable.
+        retryAt = Date.now() + 30_000;
+      } finally {
+        requestInFlight = false;
       }
     }
 
     void loadWatchlistQuotes();
-    const interval = window.setInterval(() => void loadWatchlistQuotes(), 10_000);
+    const interval = window.setInterval(() => void loadWatchlistQuotes(), 20_000);
     return () => {
       controller.abort();
       window.clearInterval(interval);
     };
-  }, [quoteKeys]);
+  }, [quoteKeys, selected.instrumentKey, selected.symbol]);
 
   useEffect(() => {
     if (!marketsOpen || !stockUniverse.length) return;
@@ -420,15 +471,11 @@ export function TradingDashboard() {
     }
 
     void loadVolumeBreakouts();
-    const interval = window.setInterval(() => void loadVolumeBreakouts(), 60_000);
-    return () => {
-      controller.abort();
-      window.clearInterval(interval);
-    };
+    return () => controller.abort();
   }, [marketsOpen, stockUniverse]);
 
   useEffect(() => {
-    if (!clock || !orders.length || autoSquareOffInFlightRef.current) return;
+    if (!clock || !orders.length || autoSquareOffInFlightRef.current || Date.now() < autoSquareOffRetryAtRef.current) return;
     const marketClock = getNseMarketStatus(clock);
     const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
     const currentIndiaDate = indiaDateKey(clock);
@@ -456,7 +503,7 @@ export function TradingDashboard() {
       const automaticOrders: PaperOrder[] = [];
       let nextBalance = balance;
       resolved.forEach((item, index) => {
-        const squareOffPrice = item.resolvedPrice ?? item.quote?.lastPrice;
+        const squareOffPrice = item.resolvedPrice;
         if (!squareOffPrice || !Number.isFinite(squareOffPrice) || squareOffPrice <= 0) return;
         const closingSide = item.position.side === "LONG" ? "SELL" : "BUY";
         const charges = calculateUpstoxEquityCharges({ side: closingSide, product: "INTRADAY", quantity: item.position.quantity, price: squareOffPrice });
@@ -475,11 +522,15 @@ export function TradingDashboard() {
           autoSquareOff: true,
           squareOffPolicy: UPSTOX_AUTO_SQUARE_OFF_POLICY,
           exitReason: "AUTO_SQUARE_OFF",
+          priceSource: item.resolvedPrice ? "UPSTOX_CANDLE" : "UPSTOX_QUOTE",
         });
         const releasedMargin = squareOffPrice * item.position.quantity * 0.2;
         nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
       });
-      if (!automaticOrders.length) return;
+      if (!automaticOrders.length) {
+        autoSquareOffRetryAtRef.current = Date.now() + 60_000;
+        return;
+      }
       const nextOrders = [...automaticOrders, ...orders];
       setOrders(nextOrders);
       setBalance(nextBalance);
@@ -557,13 +608,16 @@ export function TradingDashboard() {
       if (protection.product === "INTRADAY" && afterIntradaySquareOff) return;
       const instrument = stockUniverse.find((item) => item.symbol === protection.symbol);
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[protection.symbol] : marketQuotes[protection.symbol];
-      const price = protection.symbol === selected.symbol ? livePrice : quote?.lastPrice;
-      const position = calculatePosition(orders, protection.symbol, price ?? 0, protection.product);
+      const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : protection.symbol;
+      const quoteIsFresh = Boolean(quote && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000);
+      const price = quote?.lastPrice;
+      const latestFill = orders.find((order) => order.symbol === protection.symbol && (order.product ?? "INTRADAY") === protection.product);
+      const position = calculatePosition(orders, protection.symbol, price ?? latestFill?.price ?? Number.NaN, protection.product);
       if (!position.quantity || position.side === "FLAT" || position.side !== protection.side) {
         clearedProtectionIds.add(protection.id);
         return;
       }
-      if (!price || !Number.isFinite(price)) return;
+      if (!quoteIsFresh || !price || !Number.isFinite(price)) return;
       const trigger = getProtectionTrigger(protection, price);
       if (!trigger) return;
       const closingSide = position.side === "LONG" ? "SELL" : "BUY";
@@ -580,6 +634,7 @@ export function TradingDashboard() {
         createdAt: clock.getTime(),
         charges,
         exitReason: trigger,
+        priceSource: "UPSTOX_QUOTE",
       };
       triggeredOrders.push(order);
       clearedProtectionIds.add(protection.id);
@@ -595,7 +650,6 @@ export function TradingDashboard() {
     writePaperProtections(remainingProtections);
     if (!triggeredOrders.length) return;
     const nextOrders = [...triggeredOrders, ...orders];
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrders(nextOrders);
     setBalance(nextBalance);
     writePaperOrders(nextOrders);
@@ -603,21 +657,24 @@ export function TradingDashboard() {
     const reasons = triggeredOrders.map((order) => order.exitReason === "TARGET" ? "target" : "stop loss");
     setToast(`${triggeredOrders.length} position${triggeredOrders.length > 1 ? "s" : ""} exited by ${[...new Set(reasons)].join(" / ")}`);
     window.setTimeout(() => setToast(""), 4_000);
-  }, [balance, clock, livePrice, marketQuotes, orders, protections, selected.symbol, stockUniverse]);
-  const handlePrice = useCallback((value: number) => setLivePrice(value), []);
+  }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, orders, protections, selected.symbol, stockUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
-  const selectedChange = selectedQuote?.changePercent ?? selected.change;
-  const selectedNetChange = selectedQuote?.netChange ?? livePrice * selected.change / 100;
-  const orderValue = livePrice * quantity;
+  const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
+  const selectedQuoteIsFresh = Boolean(selectedQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[selectedQuoteKey] ?? 0) <= 45_000);
+  const verifiedLivePrice = selectedQuoteIsFresh ? selectedQuote?.lastPrice : undefined;
+  const visibleLivePrice = verifiedLivePrice ?? 0;
+  const selectedChange = selectedQuoteIsFresh ? selectedQuote?.changePercent ?? 0 : 0;
+  const selectedNetChange = selectedQuoteIsFresh ? selectedQuote?.netChange ?? 0 : 0;
+  const orderValue = visibleLivePrice * quantity;
   const margin = orderValue * 0.2;
-  const estimatedOrderCharges = useMemo(() => calculateUpstoxEquityCharges({ side, product, quantity, price: livePrice }), [livePrice, product, quantity, side]);
+  const estimatedOrderCharges = useMemo(() => calculateUpstoxEquityCharges({ side, product, quantity, price: visibleLivePrice }), [product, quantity, side, visibleLivePrice]);
   const selectedPositions = useMemo(
     () => ({
-      intraday: calculatePosition(orders, selected.symbol, livePrice, "INTRADAY"),
-      delivery: calculatePosition(orders, selected.symbol, livePrice, "DELIVERY"),
+      intraday: calculatePosition(orders, selected.symbol, verifiedLivePrice ?? Number.NaN, "INTRADAY"),
+      delivery: calculatePosition(orders, selected.symbol, verifiedLivePrice ?? Number.NaN, "DELIVERY"),
     }),
-    [livePrice, orders, selected.symbol],
+    [orders, selected.symbol, verifiedLivePrice],
   );
   const selectedPosition = selectedPositions.intraday.quantity > 0 ? selectedPositions.intraday : selectedPositions.delivery;
   const positionProduct: "INTRADAY" | "DELIVERY" = selectedPositions.intraday.quantity > 0 ? "INTRADAY" : "DELIVERY";
@@ -625,7 +682,7 @@ export function TradingDashboard() {
   const riskToolSide: "BUY" | "SELL" = selectedPosition.quantity > 0 && selectedPosition.side !== "FLAT"
     ? selectedPosition.side === "LONG" ? "BUY" : "SELL"
     : side;
-  const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : livePrice;
+  const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : visibleLivePrice;
   const requestedTargetPrice = Number(targetPrice);
   const requestedStopLossPrice = Number(stopLossPrice);
   const chartTargetPrice = Number.isFinite(requestedTargetPrice) && requestedTargetPrice > 0
@@ -647,16 +704,17 @@ export function TradingDashboard() {
   const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = stockUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
-    const lastFill = orders.find((order) => order.symbol === symbol);
+    const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : symbol;
+    const quoteIsFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000);
     const positionLivePrice = symbol === selected.symbol
-      ? livePrice
-      : quote?.lastPrice ?? (instrument && instrument.price > 0 ? instrument.price : lastFill?.price ?? 0);
+      ? verifiedLivePrice ?? Number.NaN
+      : quoteIsFresh ? quote?.lastPrice ?? Number.NaN : Number.NaN;
     return (["INTRADAY", "DELIVERY"] as const).map((positionProductName) => ({
       ...calculatePosition(orders, symbol, positionLivePrice, positionProductName),
       name: instrument?.name ?? symbol,
       product: positionProductName,
     })).filter((position) => position.quantity > 0);
-  }), [livePrice, marketQuotes, orders, positionSymbols, selected.symbol, stockUniverse]);
+  }), [clock, marketQuoteUpdatedAt, marketQuotes, orders, positionSymbols, selected.symbol, stockUniverse, verifiedLivePrice]);
   const totalOpenPnl = openPositions.reduce((total, position) => total + position.unrealizedPnl, 0);
   const marketStatus = useMemo(
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
@@ -704,9 +762,13 @@ export function TradingDashboard() {
 
   function activateRiskTool(nextSide: "BUY" | "SELL") {
     setSide(nextSide);
-    setRiskToolEnabled(true);
     const positionMatches = selectedPosition.quantity > 0 && selectedPosition.side === (nextSide === "BUY" ? "LONG" : "SHORT");
-    const entry = positionMatches ? selectedPosition.averagePrice : livePrice;
+    const entry = positionMatches ? selectedPosition.averagePrice : visibleLivePrice;
+    if (!entry) {
+      setRiskToolEnabled(false);
+      return;
+    }
+    setRiskToolEnabled(true);
     const target = Number(targetPrice);
     const stop = Number(stopLossPrice);
     const validTarget = Number.isFinite(target) && (nextSide === "BUY" ? target > entry : target < entry);
@@ -763,7 +825,12 @@ export function TradingDashboard() {
 
   function applyProtectionToOpenPosition() {
     if (!selectedPosition.quantity || selectedPosition.side === "FLAT") return;
-    const error = protectionError(selectedPosition.side, livePrice);
+    if (!verifiedLivePrice) {
+      setToast("Live Upstox price unavailable. Protection was not changed.");
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
+    const error = protectionError(selectedPosition.side, verifiedLivePrice);
     if (error) {
       setToast(error);
       window.setTimeout(() => setToast(""), 3_200);
@@ -790,26 +857,35 @@ export function TradingDashboard() {
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
+    const executionPrice = verifiedLivePrice;
+    if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
+      setToast("Live Upstox price unavailable. Paper order was not placed.");
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
     if (product === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     const intendedDirection = side === "BUY" ? "LONG" : "SHORT";
-    const riskError = protectionError(intendedDirection, livePrice);
+    const riskError = protectionError(intendedDirection, executionPrice);
     if (riskError) {
       setToast(riskError);
       window.setTimeout(() => setToast(""), 3_200);
       return;
     }
     const order: PaperOrder = {
-      id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: livePrice,
+      id: `${Date.now()}`, symbol: selected.symbol, side, quantity, price: executionPrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      product, createdAt: Date.now(), charges: estimatedOrderCharges,
+      product, createdAt: Date.now(), charges: calculateUpstoxEquityCharges({ side, product, quantity, price: executionPrice }),
+      priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
     };
+    const executionCharges = getOrderCharges(order);
     const nextOrders = [order, ...orders];
-    const nextBalance = (side === "BUY" ? balance - margin : balance + margin) - estimatedOrderCharges.total;
-    const nextPosition = calculatePosition(nextOrders, selected.symbol, livePrice, product);
+    const executionMargin = executionPrice * quantity * .2;
+    const nextBalance = (side === "BUY" ? balance - executionMargin : balance + executionMargin) - executionCharges.total;
+    const nextPosition = calculatePosition(nextOrders, selected.symbol, executionPrice, product);
     const { target, stopLoss } = protectionValues();
     if ((target !== undefined || stopLoss !== undefined) && nextPosition.quantity > 0 && nextPosition.side === intendedDirection) {
       saveProtection({
@@ -830,12 +906,19 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setTargetPrice("");
     setStopLossPrice("");
-    setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(estimatedOrderCharges.total)}`);
+    setOrderSheetOpen(false);
+    setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
     window.setTimeout(() => setToast(""), 3200);
   }
 
   function exitPosition(requestedQuantity: number) {
     if (selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
+    const executionPrice = verifiedLivePrice;
+    if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
+      setToast("Live Upstox price unavailable. Position was not exited.");
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
     if (positionProduct === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
@@ -843,22 +926,23 @@ export function TradingDashboard() {
     }
     const closingQuantity = Math.min(selectedPosition.quantity, Math.max(1, Math.floor(requestedQuantity)));
     const closingSide = selectedPosition.side === "LONG" ? "SELL" : "BUY";
-    const exitCharges = calculateUpstoxEquityCharges({ side: closingSide, product: positionProduct, quantity: closingQuantity, price: livePrice });
+    const exitCharges = calculateUpstoxEquityCharges({ side: closingSide, product: positionProduct, quantity: closingQuantity, price: executionPrice });
     const order: PaperOrder = {
       id: `${Date.now()}`,
       symbol: selected.symbol,
       side: closingSide,
       quantity: closingQuantity,
-      price: livePrice,
+      price: executionPrice,
       status: "COMPLETE",
       time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
       product: positionProduct,
       createdAt: Date.now(),
       charges: exitCharges,
       exitReason: "MANUAL",
+      priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
     };
     const nextOrders = [order, ...orders];
-    const exitMargin = livePrice * closingQuantity * 0.2;
+    const exitMargin = executionPrice * closingQuantity * 0.2;
     const nextBalance = (closingSide === "BUY" ? balance - exitMargin : balance + exitMargin) - exitCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
@@ -876,9 +960,8 @@ export function TradingDashboard() {
 
   function chooseTradeInstrument(item: Instrument) {
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
-    const price = quote?.lastPrice ?? item.price;
-    setSelected({ ...item, price: price > 0 ? price : 1 });
-    setLivePrice(price > 0 ? price : 1);
+    const price = quote?.lastPrice ?? 0;
+    setSelected({ ...item, price: price > 0 ? price : 0 });
     setShowTradeSymbols(false);
     setTradeSymbolSearch("");
     setRiskToolEnabled(false);
@@ -889,6 +972,11 @@ export function TradingDashboard() {
     url.searchParams.set("symbol", item.symbol);
     url.searchParams.set("timeframe", timeframe);
     window.history.replaceState({}, "", url);
+  }
+
+  function openOrderSheet(nextSide: "BUY" | "SELL") {
+    activateRiskTool(nextSide);
+    setOrderSheetOpen(true);
   }
 
   function saveCustomWatchlists(nextLists: CustomWatchlist[]) {
@@ -1061,9 +1149,9 @@ export function TradingDashboard() {
                 </div>
               )}
             </div>
-            <div className="quote-block"><strong>{livePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedNetChange >= 0 ? "+" : ""}{selectedNetChange.toFixed(2)} ({selectedChange >= 0 ? "+" : ""}{selectedChange.toFixed(2)}%)</span></div>
-            <div className="ohlc-strip"><span>O <b>{(selectedQuote?.open ?? livePrice * 0.995).toFixed(2)}</b></span><span>H <b>{(selectedQuote?.high ?? livePrice * 1.008).toFixed(2)}</b></span><span>L <b>{(selectedQuote?.low ?? livePrice * 0.988).toFixed(2)}</b></span><span>C <b>{(selectedQuote?.previousClose ?? livePrice).toFixed(2)}</b></span></div>
-            <div className="header-order-buttons"><button className="compact-sell" onClick={() => activateRiskTool("SELL")}>Sell <b>{livePrice.toFixed(2)}</b></button><button className="compact-buy" onClick={() => activateRiskTool("BUY")}>Buy <b>{livePrice.toFixed(2)}</b></button></div>
+            <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedQuoteIsFresh ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : "Waiting for Upstox"}</span></div>
+            <div className="ohlc-strip"><span>O <b>{selectedQuoteIsFresh ? selectedQuote?.open?.toFixed(2) ?? "—" : "—"}</b></span><span>H <b>{selectedQuoteIsFresh ? selectedQuote?.high?.toFixed(2) ?? "—" : "—"}</b></span><span>L <b>{selectedQuoteIsFresh ? selectedQuote?.low?.toFixed(2) ?? "—" : "—"}</b></span><span>C <b>{selectedQuoteIsFresh ? selectedQuote?.previousClose?.toFixed(2) ?? "—" : "—"}</b></span></div>
+            <div className="header-order-buttons"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
 
           <div className="chart-controls">
@@ -1105,10 +1193,8 @@ export function TradingDashboard() {
               chartAction={chartAction}
               chartTheme={theme}
               orderTool={{ enabled: riskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity }}
-              onOrderSide={activateRiskTool}
               onOrderToolChange={updateChartRiskLevel}
               onOrderToolClose={() => setRiskToolEnabled(false)}
-              onPrice={handlePrice}
               onFeedStatus={handleFeedStatus}
             />
           </div>
@@ -1117,19 +1203,31 @@ export function TradingDashboard() {
             <div>Click + drag to pan · Scroll/pinch to zoom</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
+          <div className="chart-trade-footer">
+            <div className="chart-trade-buttons">
+              <button className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
+              <button className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
+            </div>
+            <button className="chart-positions-trigger" onClick={() => setPositionsOpen(true)}>
+              <span>Stocks <ChevronDown size={14} /></span>
+              <b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b>
+            </button>
+          </div>
         </section>
 
-        <aside className="order-ticket">
+        {orderSheetOpen && <button className="order-sheet-backdrop" aria-label="Close paper order" onClick={() => setOrderSheetOpen(false)} />}
+        <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
+          <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
           <div className="ticket-heading"><div><span className="eyebrow">Paper order</span><h2>{selected.symbol}</h2></div><span className="paper-badge">No real money</span></div>
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
           <div className="input-grid">
             <label>Quantity<div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(1, quantity - 1)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + 1))}><Plus size={15} /></button></div></label>
-            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={livePrice.toFixed(2)} readOnly /></label>}
+            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
-            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={side === "BUY" ? `Above ${livePrice.toFixed(2)}` : `Below ${livePrice.toFixed(2)}`} /></label>
-            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={side === "BUY" ? `Below ${livePrice.toFixed(2)}` : `Above ${livePrice.toFixed(2)}`} /></label>
+            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
+            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · 5x leverage" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>Delivery</b><small>CNC · no leverage</small></span></label></div>
@@ -1137,7 +1235,7 @@ export function TradingDashboard() {
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} shares</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
-              <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {formatInr(livePrice)} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
+              <small>Avg {formatInr(selectedPosition.averagePrice)} · Live {verifiedLivePrice ? formatInr(verifiedLivePrice) : "paused"} · {selectedPosition.returnPercent >= 0 ? "+" : ""}{selectedPosition.returnPercent.toFixed(2)}%</small>
               {selectedProtection && (
                 <div className="active-protection">
                   <span>Active exits</span>
@@ -1154,7 +1252,7 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={product === "INTRADAY" && !intradayOrdersAllowed} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={!verifiedLivePrice || (product === "INTRADAY" && !intradayOrdersAllowed)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>

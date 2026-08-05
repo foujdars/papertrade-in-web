@@ -32,8 +32,9 @@ type UpstoxCandlePayload = {
   data?: { candles?: Array<[string | number, number, number, number, number, number?, number?]> };
 };
 
-const HISTORY_BATCH_SIZE = 40;
-const MAX_HISTORY_SCANS = 500;
+const HISTORY_BATCH_SIZE = 15;
+const MAX_HISTORY_SCANS = 120;
+let scannerCache: { expiresAt: number; payload: Record<string, unknown> } | null = null;
 
 function indiaDateKey(value: Date | number | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -65,6 +66,9 @@ async function loadAdjustedVolumeHistory(candidate: VolumeBreakoutCandidate) {
 
 export async function POST(request: Request) {
   try {
+    if (scannerCache && scannerCache.expiresAt > Date.now()) {
+      return Response.json(scannerCache.payload, { headers: { "Cache-Control": "private, max-age=30" } });
+    }
     const payload = await request.json() as { instruments?: unknown };
     if (!Array.isArray(payload.instruments) || payload.instruments.length < 1 || payload.instruments.length > 3_000) {
       return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 3,000 NSE cash instruments." } }, { status: 400 });
@@ -124,7 +128,7 @@ export async function POST(request: Request) {
       rows = rankVolumeBreakouts(rankedCandidates.slice(0, historiesScanned), history);
       if (rows.length < 15 && offset + HISTORY_BATCH_SIZE < rankedCandidates.length) await delay(1_050);
     }
-    return Response.json({
+    const responsePayload = {
       ok: true,
       source: "Upstox live quotes + adjusted daily candles",
       rule: "Daily Volume > 5 × SMA(Volume, 20)",
@@ -132,7 +136,9 @@ export async function POST(request: Request) {
       scanned: candidates.length,
       historiesScanned,
       fetchedAt: new Date().toISOString(),
-    }, { headers: { "Cache-Control": "no-store" } });
+    };
+    scannerCache = { expiresAt: Date.now() + 2 * 60_000, payload: responsePayload };
+    return Response.json(responsePayload, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch (error) {
     return upstoxErrorResponse(error);
   }

@@ -277,6 +277,18 @@ h1, h2, p { margin: 0; }
 .chart-statusbar.feed-loading div:first-child, .chart-statusbar.feed-simulated div:first-child { color: #a56a00; }
 .chart-statusbar.feed-error div:first-child { color: var(--red); }
 
+.chart-trade-footer { flex: 0 0 59px; display: flex; align-items: center; gap: 12px; padding: 7px 14px 8px 55px; border-top: 1px solid var(--line); background: var(--surface); }
+.chart-trade-buttons { min-width: 0; flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.chart-trade-buttons button { min-width: 0; height: 41px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 9px; color: #fff; cursor: pointer; }
+.chart-trade-buttons button span { font-size: 11px; font-weight: 850; text-transform: uppercase; }
+.chart-trade-buttons button b { font-size: 10px; }
+.chart-trade-buttons .sell { background: linear-gradient(135deg, #fb4767, #dc274d); }
+.chart-trade-buttons .buy { background: linear-gradient(135deg, #00c894, #009f79); }
+.chart-positions-trigger { min-width: 132px; height: 41px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--soft); cursor: pointer; }
+.chart-positions-trigger span { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 750; }
+.chart-positions-trigger b { font-size: 10px; }
+.mobile-order-close, .order-sheet-backdrop { display: none; }
+
 .order-ticket { padding: 17px 15px; border-left: 1px solid var(--line); overflow-y: auto; }
 .paper-badge { border: 1px solid #ffd58f; border-radius: 999px; padding: 4px 7px; color: #9b6400; background: #fff8e7; font-size: 8px; font-weight: 800; }
 .side-switch { height: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 15px 0 12px; padding: 4px; border-radius: 10px; background: #f2f4f8; }
@@ -482,7 +494,11 @@ h1, h2, p { margin: 0; }
   .watchlist-panel.mobile-open { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); }
   .mobile-panel-head { height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); }
   .chart-area { height: calc(100svh - 122px - env(safe-area-inset-bottom, 0px)); min-height: 0; }
-  .order-ticket { border: 0; border-top: 8px solid var(--soft); padding: 20px; }
+  .order-ticket { position: fixed; z-index: 121; left: 0; right: 0; bottom: 0; max-height: 88svh; visibility: hidden; opacity: 0; padding: 22px 20px calc(24px + env(safe-area-inset-bottom, 0px)); border: 1px solid var(--line); border-radius: 20px 20px 0 0; overflow-y: auto; transform: translateY(105%); transition: transform .22s ease, opacity .18s ease, visibility .18s; box-shadow: 0 -20px 70px #09101f66; }
+  .order-ticket.mobile-open { visibility: visible; opacity: 1; transform: translateY(0); }
+  .order-sheet-backdrop { position: fixed; z-index: 120; inset: 0; display: block; border: 0; background: #020812a8; backdrop-filter: blur(5px); }
+  .mobile-order-close { position: absolute; z-index: 2; top: 15px; right: 15px; display: grid; }
+  .order-ticket .ticket-heading { padding-right: 45px; }
   .instrument-header { min-height: 70px; gap: 10px; padding-inline: 12px; }
   .instrument-title { min-width: 0; flex: 1; }
   .instrument-title .star-button { display: none; }
@@ -530,7 +546,14 @@ h1, h2, p { margin: 0; }
   .rsi-wrap { height: 110px; flex-basis: 110px; }
   .chart-statusbar { padding-left: 46px; font-size: 8px; }
   .chart-statusbar div:last-child { margin-left: auto; }
-  .order-ticket { padding-bottom: 25px; }
+  .chart-trade-footer { flex: 0 0 72px; display: grid; grid-template-rows: 39px 18px; gap: 3px; padding: 5px 8px 5px 46px; }
+  .chart-trade-buttons { gap: 7px; }
+  .chart-trade-buttons button { height: 39px; gap: 5px; }
+  .chart-trade-buttons button span { font-size: 9px; }
+  .chart-trade-buttons button b { font-size: 8px; }
+  .chart-positions-trigger { width: 100%; min-width: 0; height: 18px; justify-content: flex-start; gap: 8px; padding: 0 3px; border: 0; background: transparent; }
+  .chart-positions-trigger span, .chart-positions-trigger b { font-size: 8px; }
+  .order-ticket { padding-bottom: calc(25px + env(safe-area-inset-bottom, 0px)); }
   .modal { padding: 17px; border-radius: 14px; }
   .position-row { grid-template-columns: 43px minmax(0, 1fr) auto 16px; padding: 10px; }
   .pnl-stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -579,6 +602,36 @@ h1, h2, p { margin: 0; }
 .drawing-toolbar .all-drawing-tools, .advanced-drawing-tools .all-drawing-tools { position: relative; color: #fff; background: linear-gradient(135deg, #7667ff, #5747dc); }
 .drawing-toolbar .all-drawing-tools:hover, .advanced-drawing-tools .all-drawing-tools:hover { color: #fff; background: linear-gradient(135deg, #6858ef, #4939ca); }
 .all-drawing-tools small { position: absolute; right: -2px; bottom: -2px; min-width: 15px; height: 13px; display: grid; place-items: center; padding: 0 2px; border: 2px solid #fff; border-radius: 7px; color: #5747dc; background: #fff; box-shadow: 0 2px 5px #20263b25; font-size: 6px; font-weight: 900; }
+
+/* High-contrast graphite theme: calm panels, neon accents only for actions and state. */
+.terminal-shell[data-theme="neon"] {
+  --ink: #eef8fb;
+  --muted: #91a8b2;
+  --line: #1b3943;
+  --surface: #071419;
+  --soft: #0a1c22;
+  --purple: #ad7cff;
+  --purple-soft: #241b42;
+  --green: #00e6a5;
+  --red: #ff5578;
+  background: linear-gradient(150deg, #071419 0%, #061116 55%, #101024 100%);
+}
+.terminal-shell[data-theme="neon"] :is(.topbar, .watchlist-panel, .order-ticket, .chart-area, .drawing-toolbar, .mobile-bottom-nav, .market-discovery-panel, .modal) { color: var(--ink); background: #071419f5; border-color: var(--line); }
+.terminal-shell[data-theme="neon"] :is(.chart-trade-footer, .instrument-header, .chart-controls, .chart-statusbar, .mobile-panel-head, .market-discovery-head) { color: var(--ink); border-color: var(--line); background: #09191f; }
+.terminal-shell[data-theme="neon"] :is(.chart-positions-trigger, .pnl-stat-grid > div, .pnl-chart-card, .pnl-trade-row, .positions-summary, .position-row, .order-row, .table-head, .order-empty, .positions-empty, .no-orders, .recent-orders-mini, .connection-state, .custom-list-editor > div) { color: var(--ink); border-color: #1b3a45; background: #0a1d24; }
+.terminal-shell[data-theme="neon"] :is(.trend-stock-row, .market-discovery-list) { color: var(--ink); border-color: #17343e; background: transparent; }
+.terminal-shell[data-theme="neon"] .trend-stock-row:hover,
+.terminal-shell[data-theme="neon"] .position-row:hover { border-color: #6d58a5; background: #10262e; }
+.terminal-shell[data-theme="neon"] :is(.pnl-chart-card, .positions-summary, .margin-card, .ticket-live-position) { background: linear-gradient(135deg, #0b2027, #101b2a); }
+.terminal-shell[data-theme="neon"] :is(.pnl-bar-caption b, .active-protection b, .ohlc-strip b, .section-line b, .ticket-heading h2, .modal h2, .market-discovery-head h2, .position-row, .mini-order-symbol, .chart-positions-trigger) { color: #eef8fb; }
+.terminal-shell[data-theme="neon"] :is(.pnl-stat-grid span, .pnl-trade-row small, .position-row small, .trend-stock-row small, .order-row, .ticket-live-position small, .disclaimer, .no-orders) { color: #91a8b2; }
+.terminal-shell[data-theme="neon"] :is(.buy-tag, .pnl-trade-row > span:first-child.win) { color: #00e6a5; background: #06382e; }
+.terminal-shell[data-theme="neon"] :is(.sell-tag, .pnl-trade-row > span:first-child.loss) { color: #ff6c89; background: #3a1320; }
+.terminal-shell[data-theme="neon"] .control-button.mobile-indicator-control { color: var(--ink); background: #0a1c22; }
+.terminal-shell[data-theme="neon"] .chart-trade-buttons .buy { box-shadow: 0 0 20px #00e6a52e; }
+.terminal-shell[data-theme="neon"] .chart-trade-buttons .sell { box-shadow: 0 0 20px #ff55782b; }
+.terminal-shell[data-theme="neon"] .order-sheet-backdrop { background: #02080dcc; }
+.terminal-shell[data-theme="neon"] .mobile-scroll-tail { color: #718b95; background: linear-gradient(#071419, #0a1c22); }
 
 .drawing-library-backdrop { position: absolute; z-index: 55; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(28,34,52,.34); backdrop-filter: blur(2px); }
 .drawing-library { width: min(760px, 100%); max-height: min(620px, calc(100% - 10px)); display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #ddd9ff; border-radius: 14px; background: #fff; box-shadow: 0 24px 70px #20263b38; }

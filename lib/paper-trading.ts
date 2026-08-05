@@ -1,4 +1,4 @@
-import type { EquityChargeBreakdown } from "@/lib/trading-charges";
+import { calculateUpstoxEquityCharges, type EquityChargeBreakdown } from "./trading-charges.ts";
 
 export type PaperOrder = {
   id: string;
@@ -14,6 +14,7 @@ export type PaperOrder = {
   autoSquareOff?: boolean;
   squareOffPolicy?: string;
   exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF";
+  priceSource?: "UPSTOX_QUOTE" | "UPSTOX_CANDLE";
 };
 
 export type PaperPosition = {
@@ -66,6 +67,55 @@ export function readPaperProtections(): PaperProtection[] {
 
 export function writePaperProtections(protections: PaperProtection[]) {
   localStorage.setItem(PAPER_PROTECTIONS_STORAGE_KEY, JSON.stringify(protections));
+}
+
+function paperOrderTimestamp(order: PaperOrder) {
+  const idTimestamp = Number(order.id);
+  return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
+}
+
+function orderCashEffect(order: PaperOrder) {
+  const charges = order.charges ?? calculateUpstoxEquityCharges({
+    side: order.side,
+    product: order.product ?? "INTRADAY",
+    quantity: order.quantity,
+    price: order.price,
+  });
+  return (order.side === "SELL" ? 1 : -1) * order.price * order.quantity * .2 - charges.total;
+}
+
+export function repairRatnaveerSimulationTrade(orders: PaperOrder[]) {
+  const ordered = [...orders].sort((a, b) => paperOrderTimestamp(a) - paperOrderTimestamp(b));
+  const idsToRemove = new Set<string>();
+
+  for (const exit of ordered) {
+    const exitTimestamp = paperOrderTimestamp(exit);
+    const isCorruptedExit = exit.symbol === "RATNAVEER" &&
+      exit.side === "BUY" &&
+      exit.quantity === 500 &&
+      exit.price >= 1_000 &&
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(exitTimestamp)) === "2026-08-05";
+    if (!isCorruptedExit) continue;
+    const entry = [...ordered].reverse().find((candidate) => {
+      const candidateTimestamp = paperOrderTimestamp(candidate);
+      return candidate.symbol === exit.symbol &&
+        candidate.side === "SELL" &&
+        candidate.quantity === exit.quantity &&
+        candidate.price > 0 &&
+        candidate.price < 1_000 &&
+        candidateTimestamp < exitTimestamp &&
+        exitTimestamp - candidateTimestamp <= 4 * 60 * 60 * 1_000;
+    });
+    idsToRemove.add(exit.id);
+    if (entry) idsToRemove.add(entry.id);
+  }
+
+  const removedOrders = orders.filter((order) => idsToRemove.has(order.id));
+  return {
+    orders: orders.filter((order) => !idsToRemove.has(order.id)),
+    removedOrders,
+    balanceAdjustment: -removedOrders.reduce((total, order) => total + orderCashEffect(order), 0),
+  };
 }
 
 export function getProtectionTrigger(protection: PaperProtection, livePrice: number): "TARGET" | "STOP_LOSS" | null {

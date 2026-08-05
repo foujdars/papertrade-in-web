@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition, getProtectionTrigger } from "../lib/paper-trading.ts";
+import { calculatePosition, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
 
 function order(id, side, quantity, price) {
   return {
@@ -62,4 +62,19 @@ test("triggers target and stop loss correctly for long and short positions", () 
   assert.equal(getProtectionTrigger(shortProtection, 90), "TARGET");
   assert.equal(getProtectionTrigger(shortProtection, 106), "STOP_LOSS");
   assert.equal(getProtectionTrigger(longProtection, 100), null);
+});
+
+test("removes the corrupted RATNAVEER simulated stop-loss pair and repairs cash", () => {
+  const entryTime = Date.parse("2026-08-05T09:17:21+05:30");
+  const exitTime = Date.parse("2026-08-05T09:21:32+05:30");
+  const goodOrder = { ...order(3, "SELL", 2508, 213.67), id: "good", symbol: "RATNAVEER", createdAt: Date.parse("2026-08-05T09:33:53+05:30") };
+  const corrupted = [
+    goodOrder,
+    { ...order(2, "BUY", 500, 2987.4), id: "bad-exit", symbol: "RATNAVEER", createdAt: exitTime },
+    { ...order(1, "SELL", 500, 208.73), id: "bad-entry", symbol: "RATNAVEER", createdAt: entryTime },
+  ];
+  const repaired = repairRatnaveerSimulationTrade(corrupted);
+  assert.deepEqual(repaired.orders.map((item) => item.id), ["good"]);
+  assert.equal(repaired.removedOrders.length, 2);
+  assert.ok(repaired.balanceAdjustment > 277000 && repaired.balanceAdjustment < 279000);
 });
