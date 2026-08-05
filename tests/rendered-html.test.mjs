@@ -52,11 +52,13 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
-  const [marketsWorkspace, fnoRoute, optionChainRoute, fnoTypes] = await Promise.all([
+  const [marketsWorkspace, optionChainSheet, fnoRoute, optionChainRoute, fnoTypes, fnoClient] = await Promise.all([
     readFile(new URL("../components/MarketsWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/OptionChainSheet.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/fno-underlyings/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/option-chain/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/fno.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/fno-client.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /<TradingDashboard \/>/);
@@ -116,10 +118,16 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Delete trade/);
   assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
   assert.match(dashboard, /option-dual-chart/);
+  assert.match(dashboard, /option-chart-divider/);
+  assert.match(dashboard, /Option Chain/);
+  assert.match(dashboard, /openFnoUnderlying/);
   assert.match(dashboard, /quantityStep/);
-  assert.match(marketsWorkspace, /option chain/i);
-  assert.match(marketsWorkspace, /CALL LTP · OI · IV/);
-  assert.match(marketsWorkspace, /PUT LTP · OI · IV/);
+  assert.match(marketsWorkspace, /fno-symbol-row/);
+  assert.match(marketsWorkspace, /onSelectUnderlying/);
+  assert.match(optionChainSheet, /option-sheet-handle/);
+  assert.match(optionChainSheet, />CALL</);
+  assert.match(optionChainSheet, />PUT</);
+  assert.match(fnoClient, /nearestAtmRow/);
   assert.match(fnoRoute, /segment !== "NSE_FO"/);
   assert.match(optionChainRoute, /\/v2\/option\/chain/);
   assert.match(optionChainRoute, /\/v2\/option\/contract/);

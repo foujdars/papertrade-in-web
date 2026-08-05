@@ -13,7 +13,7 @@ A responsive Indian-market paper-trading simulator built with Next.js, vinext an
 - Complete daily Upstox NSE equity master with official NIFTY 50, BANK NIFTY and NIFTY 500 constituent membership, search and paged watchlists
 - Live top-15 NSE cash volume watchlist using `Daily Volume > 5 × SMA(Volume, 20)`, with Upstox live volume and adjusted daily candle history
 - Current NSE F&O universe with searchable indices and stocks, live Upstox expiry-wise Call/Put option chains, strike selection, OI, IV, Greeks and lot sizes
-- Mobile-friendly vertical spot and option candlestick charts; selecting a CE or PE opens the underlying above the chosen contract and trades the exact active `NSE_FO` instrument
+- Mobile-friendly vertical spot and option candlestick charts with a wide-range draggable divider; tapping an F&O symbol opens its nearest live ATM contract, while the chart's Option Chain button opens a resizable slide-up Call/Put selector
 - Local INR paper orders, cash balance and order book
 - Real-time long/short position P&L with weighted average entry, realized P&L, unrealized P&L, return percentage, custom-quantity exits and exit-all
 - NSE intraday order lock outside the regular weekday 09:15–15:30 IST session; Delivery remains available from the main ticket

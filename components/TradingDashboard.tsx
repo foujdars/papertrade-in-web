@@ -7,12 +7,15 @@ import {
   LogOut, Redo2, Search, Star, Target, Trash2, Undo2, UserRound,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { MarketsWorkspace } from "@/components/MarketsWorkspace";
+import { OptionChainSheet } from "@/components/OptionChainSheet";
+import { optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
+import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -245,6 +248,9 @@ export function TradingDashboard() {
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
+  const [optionChainOpen, setOptionChainOpen] = useState(false);
+  const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
+  const [optionSplitPercent, setOptionSplitPercent] = useState(50);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
@@ -435,6 +441,17 @@ export function TradingDashboard() {
   }), [stockUniverse]);
 
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
+  const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
+    if (selected.assetType !== "OPTION" || !spotInstrument) return null;
+    return {
+      symbol: spotInstrument.symbol,
+      name: spotInstrument.name,
+      instrumentKey: spotInstrument.instrumentKey,
+      underlyingType: spotInstrument.assetType === "INDEX" ? "INDEX" : "EQUITY",
+      optionContracts: 0,
+      futureContracts: 0,
+    };
+  }, [selected.assetType, spotInstrument]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1076,7 +1093,10 @@ export function TradingDashboard() {
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
     setSelected({ ...item, price: price > 0 ? price : 0 });
-    if (item.assetType !== "OPTION") setSpotInstrument(null);
+    if (item.assetType !== "OPTION") {
+      setSpotInstrument(null);
+      setOptionChainOpen(false);
+    }
     setShowTradeSymbols(false);
     setTradeSymbolSearch("");
     setRiskToolEnabled(false);
@@ -1098,6 +1118,54 @@ export function TradingDashboard() {
     setQuantityInput(String(Math.max(1, option.lotSize ?? 1)));
     setExitQuantity(String(Math.max(1, option.lotSize ?? 1)));
     setMarketsOpen(false);
+  }
+
+  async function openFnoUnderlying(underlying: FnoUnderlying) {
+    if (openingUnderlyingKey) return;
+    setOpeningUnderlyingKey(underlying.instrumentKey);
+    setToast(`Opening ${underlying.symbol} spot and option charts…`);
+    try {
+      const expiries = await loadOptionExpiries(underlying);
+      const rows = await loadOptionChain(underlying, expiries[0]);
+      const atmRow = nearestAtmRow(rows);
+      const contract = defaultOptionSide(atmRow);
+      if (!atmRow || !contract) throw new Error("No live ATM option contract is available for this symbol.");
+      chooseOptionTradeInstrument(
+        optionToInstrument(contract, atmRow, underlying),
+        underlyingToInstrument(underlying, atmRow.underlyingSpotPrice),
+      );
+      setOptionSplitPercent(50);
+      setToast(`${underlying.symbol} opened with the nearest ATM ${contract.optionType}.`);
+      window.setTimeout(() => setToast(""), 2_800);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to open this F&O symbol.");
+      window.setTimeout(() => setToast(""), 4_000);
+    } finally {
+      setOpeningUnderlyingKey("");
+    }
+  }
+
+  function beginOptionSplitDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const container = event.currentTarget.parentElement;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const move = (nextEvent: PointerEvent) => {
+      nextEvent.preventDefault();
+      const percent = ((nextEvent.clientY - bounds.top) / bounds.height) * 100;
+      setOptionSplitPercent(Math.max(16, Math.min(84, percent)));
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      document.body.classList.remove("resizing-option-charts");
+    };
+    document.body.classList.add("resizing-option-charts");
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", stop, { once: true });
+    window.addEventListener("pointercancel", stop, { once: true });
   }
 
   function openOrderSheet(nextSide: "BUY" | "SELL") {
@@ -1190,6 +1258,7 @@ export function TradingDashboard() {
   }
 
   function openNavigationSection(section: NavigationSection) {
+    setOptionChainOpen(false);
     setSidebarOpen(section === "watchlist");
     setPositionsOpen(section === "positions");
     setOrdersOpen(section === "orders");
@@ -1320,9 +1389,13 @@ export function TradingDashboard() {
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
-              <div className="option-dual-chart" aria-label="Spot and option charts">
+              <div
+                className="option-dual-chart"
+                style={{ gridTemplateRows: `minmax(0, ${optionSplitPercent}fr) 16px minmax(0, ${100 - optionSplitPercent}fr)` }}
+                aria-label="Spot and option charts"
+              >
                 <section className="dual-chart-pane spot-pane">
-                  <header><span>SPOT</span><b>{spotInstrument.symbol}</b><small>Underlying chart</small></header>
+                  <header><span>SPOT</span><b>{spotInstrument.symbol}</b><button className="option-chain-trigger" onClick={() => setOptionChainOpen(true)}>Option Chain</button><small>{timeframe}</small></header>
                   <MarketChart
                     key={`spot-${spotInstrument.instrumentKey}-${timeframe}`}
                     instrument={spotInstrument}
@@ -1340,8 +1413,9 @@ export function TradingDashboard() {
                     onFeedStatus={() => undefined}
                   />
                 </section>
+                <button className="option-chart-divider" onPointerDown={beginOptionSplitDrag} aria-label="Drag to resize spot and option charts"><span /></button>
                 <section className="dual-chart-pane option-pane">
-                  <header><span className={selected.optionType === "CE" ? "call-badge" : "put-badge"}>{selected.optionType}</span><b>{selected.strikePrice?.toLocaleString("en-IN")} · {selected.expiry}</b><small>Option premium</small></header>
+                  <header><span className={selected.optionType === "CE" ? "call-badge" : "put-badge"}>{selected.optionType}</span><b>{selected.strikePrice?.toLocaleString("en-IN")} · {selected.expiry}</b><small>{timeframe}</small></header>
                   <MarketChart
                     key={`${selected.instrumentKey}-${timeframe}`}
                     instrument={selected}
@@ -1498,10 +1572,19 @@ export function TradingDashboard() {
           volumeLoading={marketScannerLoading}
           volumeError={marketScannerError}
           stockUniverse={stockUniverse}
+          openingUnderlyingKey={openingUnderlyingKey}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
-          onSelectOption={chooseOptionTradeInstrument}
-          onSelectSpot={(spot) => { chooseTradeInstrument(spot); setMarketsOpen(false); }}
+          onSelectUnderlying={(underlying) => void openFnoUnderlying(underlying)}
           onClose={() => setMarketsOpen(false)}
+        />
+      )}
+      {optionChainOpen && activeFnoUnderlying && (
+        <OptionChainSheet
+          key={`${activeFnoUnderlying.instrumentKey}-${selected.expiry ?? ""}`}
+          underlying={activeFnoUnderlying}
+          currentOption={selected}
+          onSelect={chooseOptionTradeInstrument}
+          onClose={() => setOptionChainOpen(false)}
         />
       )}
       {watchlistPickerOpen && (
