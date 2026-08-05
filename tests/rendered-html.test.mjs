@@ -77,6 +77,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
   assert.match(chart, /DrawingManager/);
   assert.match(chart, /chart-risk-tool/);
+  assert.match(chart, /entireTextOnly: true/);
   assert.match(chart, /beginRiskDrag/);
   assert.match(chart, /TARGET/);
   assert.match(chart, /STOP/);
@@ -132,7 +133,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(volumeBreakout, /VOLUME_BREAKOUT_LIMIT = 15/);
   assert.match(dashboard, /Load 60 more/);
   assert.match(dashboard, /mobile-indicator-control/);
-  assert.match(dashboard, /mobile-scroll-tail/);
+  assert.doesNotMatch(dashboard, /mobile-scroll-tail/);
+  assert.match(styles, /chart-trade-footer \{ flex: 0 0 72px; display: grid; grid-template-rows: 39px 18px; gap: 3px; padding: 5px 12px; \}/);
   assert.match(dashboard, /quantityInput/);
   assert.match(dashboard, /setQuantityInput\(event\.target\.value\.replace/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);

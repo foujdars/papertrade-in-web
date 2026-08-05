@@ -881,6 +881,7 @@ export function MarketChart({
           borderColor: neon ? "#1b3b48" : "#dfe3ec",
           scaleMargins: { top: 0.10, bottom: 0.10 },
           minimumWidth: 72,
+          entireTextOnly: true,
         },
         leftPriceScale: { visible: false },
         timeScale: {
