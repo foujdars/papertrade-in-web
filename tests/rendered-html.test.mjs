@@ -30,10 +30,15 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, styles, dashboard, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, volumeBreakoutRoute, volumeBreakout, readme] = await Promise.all([
+  const [page, styles, dashboard, authProvider, supabaseClient, authMigration, setupGuide, androidManifest, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, volumeBreakoutRoute, volumeBreakout, readme] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AuthProvider.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/supabase-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/0001_auth_and_trading_state.sql", import.meta.url), "utf8"),
+    readFile(new URL("../SETUP_FROM_SCRATCH.md", import.meta.url), "utf8"),
+    readFile(new URL("../android/app/src/main/AndroidManifest.xml", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/ChartFunctionMenu.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/AdvancedChartWorkspace.tsx", import.meta.url), "utf8"),
@@ -49,6 +54,16 @@ test("ships project assets and removes the starter preview", async () => {
   ]);
 
   assert.match(page, /<TradingDashboard \/>/);
+  assert.match(page, /<AuthProvider>/);
+  assert.match(authProvider, /provider: "google"/);
+  assert.match(authProvider, /in\.papertrade\.app:\/\/auth\/callback/);
+  assert.match(authProvider, /trading_states/);
+  assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
+  assert.match(supabaseClient, /flowType: "pkce"/);
+  assert.match(authMigration, /enable row level security/);
+  assert.match(authMigration, /auth\.uid\(\) = user_id/);
+  assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
+  assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
   assert.match(advancedChart, /LIVE P&amp;L/);
   assert.match(advancedChart, /exitPosition/);

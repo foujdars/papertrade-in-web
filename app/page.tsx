@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "@/components/AuthProvider";
 import { TradingDashboard } from "@/components/TradingDashboard";
 
 export const metadata: Metadata = {
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <TradingDashboard />;
+  return <AuthProvider><TradingDashboard /></AuthProvider>;
 }

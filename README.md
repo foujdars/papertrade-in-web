@@ -18,6 +18,8 @@ A responsive Indian-market paper-trading simulator built with Next.js, vinext an
 - Server-only Upstox access-token handling with visible live/fallback feed status
 - Responsive desktop and mobile layouts
 - Capacitor 8 Android app project that opens the full-screen chart and uses the same local paper-order engine
+- Optional Supabase Google authentication with Android deep-link return through the system browser
+- Per-user Supabase cloud sync for virtual balance, paper orders, protections, watchlists, chart preference and theme
 
 ## Run locally
 
@@ -37,7 +39,7 @@ npm run start
 
 ## Android APK
 
-The Android app uses the stable hosted web application so it can reach the secure Upstox server routes. It therefore requires an internet connection. Paper orders and positions remain local to the Android WebView storage.
+The Android app uses the stable hosted web application so it can reach the secure Upstox server routes. It therefore requires an internet connection. When Supabase is configured, paper orders and preferences are synchronized to the signed-in user while retaining a local copy for responsive use.
 
 ```bash
 npm run android:sync
@@ -48,7 +50,7 @@ The debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Hosting
 
-Vercel uses the native Next.js build configured in `vercel.json`. Add `UPSTOX_ACCESS_TOKEN` as a Production environment variable and redeploy. Do not prefix it with `NEXT_PUBLIC_`; the browser must never receive the token.
+Vercel uses the native Next.js build configured in `vercel.json`. Add `UPSTOX_ACCESS_TOKEN` as a Production environment variable and redeploy. Do not prefix it with `NEXT_PUBLIC_`; the browser must never receive the token. To enable Google login, also add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, then follow `SETUP_FROM_SCRATCH.md`.
 
 ## Data and safety
 

@@ -1,13 +1,15 @@
 "use client";
 
 import {
-  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, ChevronDown, ChevronRight,
+  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, CheckCircle2, ChevronDown, ChevronRight, Cloud,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
   Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
-  Redo2, Search, Star, Target, Trash2, Undo2,
+  LogOut, Redo2, Search, Star, Target, Trash2, Undo2, UserRound,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
@@ -29,6 +31,7 @@ import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib
 import { calculateUpstoxEquityCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
+import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
@@ -174,6 +177,8 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 }
 
 export function TradingDashboard() {
+  const router = useRouter();
+  const { configured: authConfigured, user, syncStatus, signOut } = useAuth();
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
@@ -223,6 +228,7 @@ export function TradingDashboard() {
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -1089,7 +1095,7 @@ export function TradingDashboard() {
     setOrdersOpen(false);
     setMarketsOpen(false);
     setPnlOpen(false);
-    window.location.assign(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+    router.push(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
   }
 
   function openNavigationSection(section: NavigationSection) {
@@ -1126,6 +1132,7 @@ export function TradingDashboard() {
           <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
           <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
+          {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
       </header>
 
@@ -1450,6 +1457,19 @@ export function TradingDashboard() {
             <div className="funds-shortcuts">{[[100_000, "₹1L"], [1_000_000, "₹10L"], [10_000_000, "₹1Cr"], [100_000_000, "₹10Cr"]].map(([amount, label]) => <button key={label} onClick={() => setFundsInput(String(amount))}>{label}</button>)}</div>
             <button className="primary-button" disabled={balance >= MAX_VIRTUAL_BALANCE} onClick={addVirtualFunds}>{balance >= MAX_VIRTUAL_BALANCE ? "₹10 CRORE LIMIT REACHED" : "ADD VIRTUAL MONEY"}</button>
             <p className="field-help">Simulation only. This does not deposit real money or connect to your broker balance.</p>
+          </section>
+        </div>
+      )}
+      {accountOpen && user && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
+          <section className="modal account-modal" role="dialog" aria-modal="true" aria-label="Your PaperTrade account" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Secure account</span><h2>Your profile</h2></div><button className="icon-button" onClick={() => setAccountOpen(false)} aria-label="Close account"><X size={20} /></button></div>
+            <div className="account-profile">
+              <span>{user.user_metadata?.avatar_url ? <Image unoptimized width={43} height={43} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={25} />}</span>
+              <div><b>{(user.user_metadata?.full_name as string | undefined) ?? "Paper trader"}</b><small>{user.email}</small></div>
+            </div>
+            <div className={`account-sync sync-${syncStatus}`}>{syncStatus === "synced" ? <CheckCircle2 size={17} /> : <Cloud size={17} />}<span><b>{syncStatus === "synced" ? "Portfolio synced" : syncStatus === "saving" ? "Saving portfolio…" : syncStatus === "error" ? "Cloud setup required" : "Loading portfolio…"}</b><small>Virtual balance, orders, watchlists and preferences</small></span></div>
+            <button className="signout-button" onClick={() => void signOut()}><LogOut size={17} /> Sign out</button>
           </section>
         </div>
       )}
