@@ -331,7 +331,7 @@ export function MarketChart({
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
-  onPrice: (value: number) => void;
+  onPrice?: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
   const chartHost = useRef<HTMLDivElement>(null);
@@ -1204,7 +1204,7 @@ export function MarketChart({
         dataRef.current = payload.candles;
         const latest = payload.candles.at(-1);
         setLatestCandle(latest);
-        if (latest) onPrice(latest.close);
+        if (latest) onPrice?.(latest.close);
         candleSeries.current?.setData(payload.candles.map(toCandleData));
         syncIndicatorData(payload.candles);
         applyVisibleRange(payload.candles);
@@ -1253,7 +1253,7 @@ export function MarketChart({
         const latest = dataRef.current.at(-1);
         if (latest) {
           setLatestCandle(latest);
-          onPrice(latest.close);
+          onPrice?.(latest.close);
         }
         setFeedMode("live");
         onFeedStatus({ mode: "live", message: "Upstox historical + intraday candles", updatedAt: payload.fetchedAt });
