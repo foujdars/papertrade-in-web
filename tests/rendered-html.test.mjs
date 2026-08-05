@@ -52,11 +52,19 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
+  const [marketsWorkspace, fnoRoute, optionChainRoute, fnoTypes] = await Promise.all([
+    readFile(new URL("../components/MarketsWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/upstox/fno-underlyings/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/upstox/option-chain/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/fno.ts", import.meta.url), "utf8"),
+  ]);
 
   assert.match(page, /<TradingDashboard \/>/);
   assert.match(page, /<AuthProvider>/);
   assert.match(authProvider, /provider: "google"/);
   assert.match(authProvider, /in\.papertrade\.app:\/\/auth\/callback/);
+  assert.match(authProvider, /skipBrowserRedirect: true/);
+  assert.match(authProvider, /Browser\.open/);
   assert.match(authProvider, /trading_states/);
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
   assert.match(supabaseClient, /flowType: "pkce"/);
@@ -76,7 +84,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(dashboard, /<h2>Volume Stocker<\/h2>/);
+  assert.match(marketsWorkspace, />Volume Stocker<\/button>/);
   assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
@@ -107,6 +115,15 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /deleteClosedTrade/);
   assert.match(dashboard, /Delete trade/);
   assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
+  assert.match(dashboard, /option-dual-chart/);
+  assert.match(dashboard, /quantityStep/);
+  assert.match(marketsWorkspace, /option chain/i);
+  assert.match(marketsWorkspace, /CALL LTP · OI · IV/);
+  assert.match(marketsWorkspace, /PUT LTP · OI · IV/);
+  assert.match(fnoRoute, /segment !== "NSE_FO"/);
+  assert.match(optionChainRoute, /\/v2\/option\/chain/);
+  assert.match(optionChainRoute, /\/v2\/option\/contract/);
+  assert.match(fnoTypes, /optionToInstrument/);
   assert.match(dashboard, /Add virtual money/);
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
   assert.match(styles, /chart-trade-buttons/);

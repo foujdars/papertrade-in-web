@@ -1,5 +1,5 @@
 import type { PaperOrder } from "./paper-trading.ts";
-import { calculateUpstoxEquityCharges } from "./trading-charges.ts";
+import { calculateUpstoxEquityCharges, calculateUpstoxOptionCharges } from "./trading-charges.ts";
 
 export type ClosedPaperTrade = {
   id: string;
@@ -28,12 +28,16 @@ function orderTimestamp(order: PaperOrder) {
 }
 
 export function getOrderCharges(order: PaperOrder) {
-  return order.charges ?? calculateUpstoxEquityCharges({
+  return order.charges ?? (order.assetType === "OPTION" ? calculateUpstoxOptionCharges({
+    side: order.side,
+    quantity: order.quantity,
+    price: order.price,
+  }) : calculateUpstoxEquityCharges({
     side: order.side,
     product: order.product ?? "INTRADAY",
     quantity: order.quantity,
     price: order.price,
-  });
+  }));
 }
 
 export function buildClosedTrades(orders: PaperOrder[]) {

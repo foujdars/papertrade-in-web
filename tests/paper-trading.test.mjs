@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePosition, deletePaperTradeOrders, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
 import { buildClosedTrades } from "../lib/trade-analytics.ts";
+import { calculateUpstoxOptionCharges } from "../lib/trading-charges.ts";
 
 function order(id, side, quantity, price) {
   return {
@@ -14,6 +15,15 @@ function order(id, side, quantity, price) {
     time: "10:00",
   };
 }
+
+test("calculates current NSE option premium charges", () => {
+  const buy = calculateUpstoxOptionCharges({ side: "BUY", quantity: 65, price: 100 });
+  const sell = calculateUpstoxOptionCharges({ side: "SELL", quantity: 65, price: 100 });
+  assert.equal(buy.brokerage, 20);
+  assert.equal(buy.stt, 0);
+  assert.equal(sell.stt, 9.75);
+  assert.ok(sell.total > buy.total);
+});
 
 test("calculates live unrealized P&L for a long position", () => {
   const position = calculatePosition([order(1, "BUY", 10, 100)], "RELIANCE", 110);

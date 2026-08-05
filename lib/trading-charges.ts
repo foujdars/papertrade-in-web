@@ -39,3 +39,25 @@ export function calculateUpstoxEquityCharges({ side, product, quantity, price }:
     total: roundPaise(Object.values(values).reduce((sum, value) => sum + value, 0)),
   };
 }
+
+export function calculateUpstoxOptionCharges({ side, quantity, price }: Omit<EquityChargeInput, "product">): EquityChargeBreakdown {
+  const premiumTurnover = Math.max(0, quantity * price);
+  const brokerage = premiumTurnover > 0 ? 20 : 0;
+  const stt = side === "SELL" ? premiumTurnover * 0.0015 : 0;
+  const transactionCharges = premiumTurnover * 0.0003553;
+  const sebiCharges = premiumTurnover * 0.000001;
+  const stampDuty = side === "BUY" ? premiumTurnover * 0.00003 : 0;
+  const dpCharges = 0;
+  const gst = (brokerage + transactionCharges + sebiCharges) * 0.18;
+  const values = { brokerage, stt, transactionCharges, sebiCharges, gst, stampDuty, dpCharges };
+  return {
+    brokerage: roundPaise(brokerage),
+    stt: roundPaise(stt),
+    transactionCharges: roundPaise(transactionCharges),
+    sebiCharges: roundPaise(sebiCharges),
+    gst: roundPaise(gst),
+    stampDuty: roundPaise(stampDuty),
+    dpCharges: 0,
+    total: roundPaise(Object.values(values).reduce((sum, value) => sum + value, 0)),
+  };
+}

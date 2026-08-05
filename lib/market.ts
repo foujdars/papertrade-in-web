@@ -17,6 +17,13 @@ export type Instrument = {
   change: number;
   instrumentKey: string;
   categories: Array<"NIFTY 50" | "BANK NIFTY" | "NIFTY 500">;
+  assetType?: "EQUITY" | "INDEX" | "OPTION" | "FUTURE";
+  optionType?: "CE" | "PE";
+  strikePrice?: number;
+  expiry?: string;
+  lotSize?: number;
+  underlyingKey?: string;
+  underlyingSymbol?: string;
 };
 
 export const instruments: Instrument[] = [

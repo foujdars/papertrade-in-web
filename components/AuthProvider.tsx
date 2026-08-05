@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cloudReady, setCloudReady] = useState(!configured);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(configured ? "loading" : "disabled");
   const [authError, setAuthError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const lastUploadedState = useRef("");
   const activeUserId = useRef<string | null>(null);
 
@@ -70,8 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!url.startsWith(NATIVE_AUTH_CALLBACK)) return;
     const code = new URL(url).searchParams.get("code");
     const client = getSupabaseBrowserClient();
-    if (!code || !client) return;
+    if (!code || !client) {
+      setSigningIn(false);
+      setAuthError("Google returned to the app without a valid login code. Confirm the Android redirect URL in Supabase.");
+      return;
+    }
     const { error } = await client.auth.exchangeCodeForSession(code);
+    setSigningIn(false);
     if (error) setAuthError(error.message);
     await Browser.close().catch(() => undefined);
   }, []);
@@ -178,20 +184,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     const client = getSupabaseBrowserClient();
-    if (!client) return;
+    if (!client || signingIn) return;
     setAuthError("");
-    const native = Capacitor.isNativePlatform();
+    setSigningIn(true);
+    const native = Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "web";
     const redirectTo = native ? NATIVE_AUTH_CALLBACK : `${window.location.origin}/auth/callback`;
     const { data, error } = await client.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo, skipBrowserRedirect: native },
+      options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error) {
+      setSigningIn(false);
       setAuthError(error.message);
       return;
     }
-    if (native && data.url) await Browser.open({ url: data.url, windowName: "_system" });
-  }, []);
+    if (!data.url) {
+      setSigningIn(false);
+      setAuthError("Supabase did not return a Google login URL. Check that the Google provider is enabled.");
+      return;
+    }
+    if (!native) {
+      window.location.assign(data.url);
+      return;
+    }
+    try {
+      await Browser.open({ url: data.url, windowName: "_system", presentationStyle: "popover" });
+    } catch {
+      const opened = window.open(data.url, "_system");
+      if (!opened) {
+        setSigningIn(false);
+        setAuthError("The Android browser could not open. Install the latest APK and allow PaperTrade IN to open links.");
+      }
+    }
+  }, [signingIn]);
 
   const signOut = useCallback(async () => {
     const client = getSupabaseBrowserClient();
@@ -225,7 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <span className="eyebrow">Secure paper trading</span>
             <h1>Welcome to PaperTrade IN</h1>
             <p>Sign in to keep your virtual balance, watchlists, orders and P&amp;L securely connected to your account.</p>
-            <button className="google-signin" onClick={() => void signInWithGoogle()}><LogIn size={19} /><span>Continue with Google</span></button>
+            <button type="button" className="google-signin" disabled={signingIn} onClick={() => void signInWithGoogle()}><LogIn size={19} /><span>{signingIn ? "Opening Google…" : "Continue with Google"}</span></button>
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
             <small className="auth-disclaimer">No real exchange orders are placed. Your Google password is never shared with PaperTrade IN.</small>

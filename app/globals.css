@@ -432,6 +432,51 @@ h1, h2, p { margin: 0; }
 .trend-tabs button { flex: none; min-height: 38px; padding: 0 15px; border: 1px solid #dfe2eb; border-radius: 9px; color: #4e566a; background: #fff; font-size: 11px; font-weight: 750; cursor: pointer; }
 .trend-tabs button.active { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); box-shadow: inset 0 0 0 1px var(--purple); }
 .market-discovery-list { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--line); }
+.market-search { height: 42px; flex: 0 0 42px; display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: #8992a5; background: var(--soft); }
+.market-search input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 11px; }
+.fno-underlying-row { width: 100%; min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; align-items: center; gap: 11px; padding: 10px 4px; border: 0; border-bottom: 1px solid #edf0f5; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
+.fno-underlying-row:hover { background: #fafaff; }
+.fno-underlying-row > span:nth-child(2), .fno-underlying-row > span:nth-child(3) { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.fno-underlying-row > span:nth-child(2) b { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.fno-underlying-row small { overflow: hidden; color: #8a93a7; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.fno-underlying-row > span:nth-child(3) { align-items: flex-end; }
+.fno-underlying-row > span:nth-child(3) b { color: var(--purple); font-size: 9px; }
+.fno-underlying-row > svg { color: #929aad; }
+.option-chain-head { min-height: 58px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 38px; align-items: center; gap: 12px; padding-bottom: 12px; }
+.option-chain-head > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.option-chain-head h2 { overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.option-chain-head small { color: var(--muted); font-size: 9px; }
+.option-chain-actions { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.option-chain-actions > button { height: 39px; display: flex; align-items: center; gap: 6px; padding: 0 13px; border: 1px solid #d8d2ff; border-radius: 9px; color: var(--purple); background: var(--purple-soft); font-size: 10px; font-weight: 800; cursor: pointer; }
+.option-chain-actions label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 8px; font-weight: 750; }
+.option-chain-actions select { height: 39px; min-width: 150px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font-size: 10px; }
+.option-chain-legend { display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); align-items: center; padding: 9px 6px; border: 1px solid var(--line); border-bottom: 0; border-radius: 10px 10px 0 0; color: var(--muted); background: var(--soft); font-size: 8px; font-weight: 850; text-align: center; }
+.option-chain-list { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 0 0 10px 10px; }
+.option-chain-row { min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+.option-chain-row.atm { box-shadow: inset 3px 0 var(--purple), inset -3px 0 var(--purple); background: var(--purple-soft); }
+.option-chain-row > button { min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 7px; align-content: center; padding: 8px 12px; border: 0; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
+.option-chain-row > button:last-child { text-align: right; }
+.option-chain-row > button:hover { background: #6657ee0b; }
+.option-chain-row > button:disabled { opacity: .45; cursor: not-allowed; }
+.option-chain-row > button b { font-size: 11px; }
+.option-chain-row > button small { font-size: 8px; font-weight: 800; }
+.option-chain-row > button em { grid-column: 1 / -1; overflow: hidden; color: var(--muted); font-size: 7px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.option-chain-row > span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-inline: 1px solid var(--line); font-size: 10px; }
+.option-chain-row > span small { padding: 2px 5px; border-radius: 8px; color: #fff; background: var(--purple); font-size: 6px; font-weight: 850; }
+.option-dual-chart { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.dual-chart-pane { min-width: 0; min-height: 0; display: grid; grid-template-rows: 25px minmax(0, 1fr); overflow: hidden; position: relative; }
+.dual-chart-pane + .dual-chart-pane { border-top: 2px solid var(--purple); }
+.dual-chart-pane > header { z-index: 8; display: flex; align-items: center; gap: 7px; padding: 0 9px; border-bottom: 1px solid var(--line); color: var(--muted); background: var(--soft); }
+.dual-chart-pane > header span { padding: 2px 5px; border-radius: 5px; color: #fff; background: #64748b; font-size: 7px; font-weight: 900; }
+.dual-chart-pane > header .call-badge { background: var(--green); }
+.dual-chart-pane > header .put-badge { background: var(--red); }
+.dual-chart-pane > header b { overflow: hidden; color: var(--ink); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.dual-chart-pane > header small { margin-left: auto; font-size: 7px; }
+.dual-chart-pane > .lightweight-stack { min-height: 0; height: 100%; }
+.contract-summary, .lot-helper { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; font-weight: 650; }
+.terminal-shell[data-theme="neon"] :is(.market-search, .option-chain-actions select, .option-chain-legend, .dual-chart-pane > header) { color: var(--ink); border-color: var(--line); background: #0a1d24; }
+.terminal-shell[data-theme="neon"] :is(.fno-underlying-row, .option-chain-row, .option-chain-list) { color: var(--ink); border-color: #17343e; background: transparent; }
+.terminal-shell[data-theme="neon"] :is(.fno-underlying-row:hover, .option-chain-row > button:hover) { background: #10262e; }
 .trend-stock-row { width: 100%; min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 10px 4px; border: 0; border-bottom: 1px solid #edf0f5; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }
 .trend-stock-row:hover { background: #fafaff; }
 .trend-stock-row > span:nth-child(2), .trend-stock-row > span:nth-child(3) { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -573,6 +618,15 @@ h1, h2, p { margin: 0; }
   .pnl-stat-grid { grid-template-columns: repeat(2, 1fr); }
   .pnl-modal { padding: 14px; }
   .toast { width: calc(100% - 24px); justify-content: center; bottom: 76px; text-align: center; }
+  .market-discovery-panel { padding-inline: 10px; }
+  .option-chain-actions { align-items: stretch; }
+  .option-chain-actions > button { padding-inline: 9px; }
+  .option-chain-actions select { min-width: 132px; }
+  .option-chain-legend, .option-chain-row { grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr); }
+  .option-chain-row > button { padding-inline: 7px; }
+  .option-chain-row > button em { font-size: 6px; }
+  .option-dual-chart { grid-template-rows: minmax(0, 44%) minmax(0, 56%); }
+  .dual-chart-pane { grid-template-rows: 23px minmax(0, 1fr); }
 }
 
 .advanced-chart-link { text-decoration: none; }
@@ -927,6 +981,7 @@ h1, h2, p { margin: 0; }
 .auth-card > p { margin: 12px 0 24px; color: #96acb5; font-size: 12px; line-height: 1.6; }
 .google-signin { width: 100%; height: 50px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 12px; color: #071519; background: #fff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 30px #0005; }
 .google-signin:hover { background: #effcff; }
+.google-signin:disabled { opacity: .68; cursor: wait; }
 .auth-error { margin-top: 13px; padding: 10px; border: 1px solid #ff597956; border-radius: 9px; color: #ff9eb1; background: #3a1320; font-size: 10px; line-height: 1.45; }
 .auth-points { display: flex; justify-content: center; gap: 16px; margin: 19px 0 12px; color: #83d9c1; font-size: 9px; font-weight: 700; }
 .auth-points span { display: flex; align-items: center; gap: 5px; }

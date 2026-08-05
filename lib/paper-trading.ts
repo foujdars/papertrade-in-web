@@ -1,4 +1,4 @@
-import { calculateUpstoxEquityCharges, type EquityChargeBreakdown } from "./trading-charges.ts";
+import { calculateUpstoxEquityCharges, calculateUpstoxOptionCharges, type EquityChargeBreakdown } from "./trading-charges.ts";
 
 export type PaperOrder = {
   id: string;
@@ -15,6 +15,15 @@ export type PaperOrder = {
   squareOffPolicy?: string;
   exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF";
   priceSource?: "UPSTOX_QUOTE" | "UPSTOX_CANDLE";
+  instrumentKey?: string;
+  instrumentName?: string;
+  assetType?: "EQUITY" | "INDEX" | "OPTION" | "FUTURE";
+  optionType?: "CE" | "PE";
+  strikePrice?: number;
+  expiry?: string;
+  lotSize?: number;
+  underlyingKey?: string;
+  underlyingSymbol?: string;
 };
 
 export type PaperPosition = {
@@ -75,12 +84,16 @@ function paperOrderTimestamp(order: PaperOrder) {
 }
 
 function orderCashEffect(order: PaperOrder) {
-  const charges = order.charges ?? calculateUpstoxEquityCharges({
+  const charges = order.charges ?? (order.assetType === "OPTION" ? calculateUpstoxOptionCharges({
+    side: order.side,
+    quantity: order.quantity,
+    price: order.price,
+  }) : calculateUpstoxEquityCharges({
     side: order.side,
     product: order.product ?? "INTRADAY",
     quantity: order.quantity,
     price: order.price,
-  });
+  }));
   return (order.side === "SELL" ? 1 : -1) * order.price * order.quantity * .2 - charges.total;
 }
 
