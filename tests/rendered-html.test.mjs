@@ -52,9 +52,10 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
-  const [marketsWorkspace, optionChainSheet, fnoRoute, optionChainRoute, fnoTypes, fnoClient] = await Promise.all([
+  const [marketsWorkspace, optionChainSheet, fnoChartWorkspace, fnoRoute, optionChainRoute, fnoTypes, fnoClient] = await Promise.all([
     readFile(new URL("../components/MarketsWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/OptionChainSheet.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/FnoChartWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/fno-underlyings/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/option-chain/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/fno.ts", import.meta.url), "utf8"),
@@ -117,9 +118,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /deleteClosedTrade/);
   assert.match(dashboard, /Delete trade/);
   assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
-  assert.match(dashboard, /option-dual-chart/);
-  assert.match(dashboard, /option-chart-divider/);
-  assert.match(dashboard, /Option Chain/);
+  assert.match(dashboard, /FnoChartWorkspace/);
+  assert.match(fnoChartWorkspace, /fno-focus-workspace/);
+  assert.match(fnoChartWorkspace, /fno-window-slider/);
+  assert.match(fnoChartWorkspace, /1-Tap Market/);
+  assert.match(fnoChartWorkspace, /Limit\/Trigger on Chart/);
+  assert.match(fnoChartWorkspace, /Option Chain/);
   assert.match(dashboard, /openFnoUnderlying/);
   assert.match(dashboard, /quantityStep/);
   assert.match(marketsWorkspace, /fno-symbol-row/);

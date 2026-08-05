@@ -14,6 +14,7 @@ import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { MarketsWorkspace } from "@/components/MarketsWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
+import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
@@ -251,6 +252,7 @@ export function TradingDashboard() {
   const [optionChainOpen, setOptionChainOpen] = useState(false);
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
+  const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
@@ -428,10 +430,11 @@ export function TradingDashboard() {
   const quoteKeys = useMemo(
     () => [...new Set([
       selected.instrumentKey,
+      spotInstrument?.instrumentKey,
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
       ...visibleInstruments.map((item) => item.instrumentKey),
-    ])].slice(0, 100).join(","),
-    [positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
+    ].filter((value): value is string => Boolean(value)))].slice(0, 100).join(","),
+    [positionSymbols, selected.instrumentKey, spotInstrument?.instrumentKey, tradingUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -733,6 +736,11 @@ export function TradingDashboard() {
   const visibleLivePrice = verifiedLivePrice ?? 0;
   const selectedChange = selectedQuoteIsFresh ? selectedQuote?.changePercent ?? 0 : 0;
   const selectedNetChange = selectedQuoteIsFresh ? selectedQuote?.netChange ?? 0 : 0;
+  const spotQuote = spotInstrument ? marketQuotes[spotInstrument.instrumentKey] ?? marketQuotes[spotInstrument.symbol] : undefined;
+  const spotQuoteKey = spotInstrument && marketQuotes[spotInstrument.instrumentKey] ? spotInstrument.instrumentKey : spotInstrument?.symbol ?? "";
+  const spotQuoteIsFresh = Boolean(spotQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[spotQuoteKey] ?? 0) <= 45_000);
+  const verifiedSpotPrice = spotQuoteIsFresh ? spotQuote?.lastPrice ?? 0 : spotInstrument?.price ?? 0;
+  const verifiedSpotChange = spotQuoteIsFresh ? spotQuote?.changePercent ?? 0 : 0;
   const orderValue = visibleLivePrice * quantity;
   const quantityStep = selected.assetType === "OPTION" ? Math.max(1, selected.lotSize ?? 1) : 1;
   const orderLots = selected.assetType === "OPTION" ? quantity / quantityStep : 0;
@@ -1096,6 +1104,7 @@ export function TradingDashboard() {
     if (item.assetType !== "OPTION") {
       setSpotInstrument(null);
       setOptionChainOpen(false);
+      setFnoTradeDockOpen(false);
     }
     setShowTradeSymbols(false);
     setTradeSymbolSearch("");
@@ -1117,6 +1126,7 @@ export function TradingDashboard() {
     setSpotInstrument(spot);
     setQuantityInput(String(Math.max(1, option.lotSize ?? 1)));
     setExitQuantity(String(Math.max(1, option.lotSize ?? 1)));
+    setFnoTradeDockOpen(false);
     setMarketsOpen(false);
   }
 
@@ -1134,6 +1144,7 @@ export function TradingDashboard() {
         optionToInstrument(contract, atmRow, underlying),
         underlyingToInstrument(underlying, atmRow.underlyingSpotPrice),
       );
+      setTimeframe("5m");
       setOptionSplitPercent(50);
       setToast(`${underlying.symbol} opened with the nearest ATM ${contract.optionType}.`);
       window.setTimeout(() => setToast(""), 2_800);
@@ -1389,55 +1400,7 @@ export function TradingDashboard() {
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
-              <div
-                className="option-dual-chart"
-                style={{ gridTemplateRows: `minmax(0, ${optionSplitPercent}fr) 16px minmax(0, ${100 - optionSplitPercent}fr)` }}
-                aria-label="Spot and option charts"
-              >
-                <section className="dual-chart-pane spot-pane">
-                  <header><span>SPOT</span><b>{spotInstrument.symbol}</b><button className="option-chain-trigger" onClick={() => setOptionChainOpen(true)}>Option Chain</button><small>{timeframe}</small></header>
-                  <MarketChart
-                    key={`spot-${spotInstrument.instrumentKey}-${timeframe}`}
-                    instrument={spotInstrument}
-                    timeframe={timeframe}
-                    activeTool="cursor"
-                    toolSignal={0}
-                    magnet={true}
-                    hiddenDrawings={false}
-                    lockedDrawings={true}
-                    clearSignal={0}
-                    undoSignal={0}
-                    redoSignal={0}
-                    indicators={DEFAULT_CHART_INDICATORS}
-                    chartTheme={theme}
-                    onFeedStatus={() => undefined}
-                  />
-                </section>
-                <button className="option-chart-divider" onPointerDown={beginOptionSplitDrag} aria-label="Drag to resize spot and option charts"><span /></button>
-                <section className="dual-chart-pane option-pane">
-                  <header><span className={selected.optionType === "CE" ? "call-badge" : "put-badge"}>{selected.optionType}</span><b>{selected.strikePrice?.toLocaleString("en-IN")} · {selected.expiry}</b><small>{timeframe}</small></header>
-                  <MarketChart
-                    key={`${selected.instrumentKey}-${timeframe}`}
-                    instrument={selected}
-                    timeframe={timeframe}
-                    activeTool={activeTool}
-                    toolSignal={toolSignal}
-                    magnet={magnet}
-                    hiddenDrawings={hiddenDrawings}
-                    lockedDrawings={drawingsLocked}
-                    clearSignal={clearSignal}
-                    undoSignal={undoSignal}
-                    redoSignal={redoSignal}
-                    indicators={indicators}
-                    chartAction={chartAction}
-                    chartTheme={theme}
-                    orderTool={{ enabled: riskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity }}
-                    onOrderToolChange={updateChartRiskLevel}
-                    onOrderToolClose={() => setRiskToolEnabled(false)}
-                    onFeedStatus={handleFeedStatus}
-                  />
-                </section>
-              </div>
+              <div className="fno-chart-underlay" />
             ) : (
               <MarketChart
                 key={`${selected.symbol}-${timeframe}`}
@@ -1524,6 +1487,29 @@ export function TradingDashboard() {
           </div>
         </aside>
       </div>
+
+      {activeNavigationSection === "trade" && selected.assetType === "OPTION" && spotInstrument && (
+        <FnoChartWorkspace
+          spot={spotInstrument}
+          option={selected}
+          timeframe={timeframe}
+          spotPrice={verifiedSpotPrice}
+          spotChange={verifiedSpotChange}
+          optionPrice={verifiedLivePrice ?? selected.price}
+          optionChange={selectedChange}
+          splitPercent={optionSplitPercent}
+          quantity={quantity}
+          lotSize={quantityStep}
+          margin={margin}
+          tradeDockOpen={fnoTradeDockOpen}
+          onShowTradeDock={() => setFnoTradeDockOpen(true)}
+          onSplitPointerDown={beginOptionSplitDrag}
+          onOptionChain={() => setOptionChainOpen(true)}
+          onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
+          onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
+          onFeedStatus={handleFeedStatus}
+        />
+      )}
 
       <nav className="mobile-bottom-nav">
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>

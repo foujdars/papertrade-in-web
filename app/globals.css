@@ -680,6 +680,69 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .kline-indicator-legend { z-index: 4; }
 .rsi-color { background: #7c4dff; }
 
+/* Focused F&O mobile workspace: two charts, one divider and an on-demand order dock. */
+.fno-focus-workspace { --ink: #202535; --muted: #687084; --line: #e5e7ef; --surface: #fff; --soft: #f6f7fb; --green: #069b87; --red: #df3159; position: fixed; z-index: 80; inset: 64px 0 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 0; overflow: hidden; padding: 6px; color-scheme: light; color: #202535; background: #eef0f7; }
+.fno-focus-charts { min-width: 0; min-height: 0; display: grid; overflow: hidden; background: #eef0f7; }
+.fno-chart-card { min-width: 0; min-height: 0; isolation: isolate; display: grid; grid-template-rows: 58px minmax(0, 1fr); overflow: hidden; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 2px 7px #27314b18; }
+.fno-chart-card > header { min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 10px 13px 5px; color: #242938; background: #fff; }
+.fno-chart-card > header > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fno-chart-card > header b { overflow: hidden; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.fno-chart-card > header span { color: #4f576a; font-size: 10px; }
+.fno-chart-card > header i { margin-left: 3px; font-style: normal; }
+.fno-chart-card > header > button { margin-left: auto; padding: 5px 2px 2px; border: 0; border-bottom: 1px solid currentColor; color: #343a4a; background: transparent; font-size: 12px; cursor: pointer; }
+.fno-chart-card > header > small { min-width: 40px; margin-left: auto; padding: 7px 8px; border-radius: 8px; color: #303646; background: #f7f8fb; box-shadow: 0 2px 7px #20283c18; font-size: 10px; font-weight: 700; text-align: center; }
+.fno-chart-card > header > button + small { margin-left: 0; }
+.fno-clean-chart { min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+.fno-clean-chart > .lightweight-stack, .fno-clean-chart .price-chart-wrap { width: 100%; height: 100%; min-height: 0; }
+.fno-clean-chart :is(.chart-symbol-legend, .lightweight-symbol-legend, .indicator-legend, .lightweight-indicator-legend, .chart-placement-hint, .chart-quick-order-buttons, .chart-risk-tool) { display: none !important; }
+.fno-window-slider { position: relative; width: 100%; height: 36px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: row-resize; touch-action: none; }
+.fno-window-slider::before { content: ""; position: absolute; inset: -7px 0; }
+.fno-window-slider span { width: 70px; height: 7px; border-radius: 99px; background: #414a5e; box-shadow: 0 2px 6px #1b22353b; }
+.fno-trade-dock { padding: 6px 6px calc(5px + env(safe-area-inset-bottom, 0px)); color: #252a39; background: #eef0f7; }
+.fno-order-modes { width: min(410px, 100%); height: 34px; display: grid; grid-template-columns: 1fr 1.2fr; margin: 0 auto 7px; padding: 3px; border-radius: 20px; background: #fff; box-shadow: 0 2px 8px #28324b18; }
+.fno-order-modes button { border: 0; border-radius: 17px; color: #6c7280; background: transparent; font-size: 10px; cursor: pointer; }
+.fno-order-modes button.active { color: #fff; background: #3c455a; }
+.fno-trade-actions { display: grid; grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr); gap: 9px; }
+.fno-trade-actions > button { position: relative; min-width: 0; height: 59px; border: 0; border-radius: 10px; color: #fff; font-size: 11px; line-height: 1.05; cursor: pointer; box-shadow: 0 3px 9px #202a4230; }
+.fno-trade-actions > button b { font-size: 14px; }
+.fno-trade-actions > button.buy { background: #08bcd1; }
+.fno-trade-actions > button.sell { background: #df1f57; }
+.fno-trade-actions > button small { position: absolute; top: calc(100% + 3px); left: 0; right: 0; color: #444b5c; font-size: 8px; white-space: nowrap; }
+.fno-lot-stepper { height: 59px; display: grid; grid-template-columns: 38px 1fr 38px; align-items: center; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px #28324b18; }
+.fno-lot-stepper button { width: 31px; height: 31px; display: grid; place-items: center; justify-self: center; padding: 0; border: 0; border-radius: 50%; color: #596174; background: #f1f2f6; cursor: pointer; }
+.fno-lot-stepper span { display: flex; flex-direction: column; align-items: center; }
+.fno-lot-stepper b { font-size: 17px; }
+.fno-lot-stepper small { color: #858b99; font-size: 8px; }
+.fno-chart-underlay { flex: 1; min-height: 0; background: #eef0f7; }
+.terminal-shell[data-theme="neon"] .fno-focus-workspace,
+.terminal-shell[data-theme="neon"] .fno-trade-dock { color: #202535; background: #eef0f7; }
+.terminal-shell[data-theme="neon"] .fno-chart-card,
+.terminal-shell[data-theme="neon"] .fno-chart-card > header,
+.terminal-shell[data-theme="neon"] .fno-order-modes,
+.terminal-shell[data-theme="neon"] .fno-lot-stepper { color: #202535; background: #fff; }
+
+/* The option chain is deliberately independent from the terminal theme so it can never collapse into raw text. */
+.option-sheet-backdrop { z-index: 130; }
+.option-sheet-backdrop .option-chain-sheet { --ink: #252a39; --muted: #747c8f; --line: #e4e6ed; --surface: #fff; --soft: #f7f8fb; --purple: #434c61; --purple-soft: #f0f1f5; --green: #079b88; --red: #d73a5e; contain: layout paint; color-scheme: light; color: #252a39; border-color: #dfe2ea; background: #fff; }
+.option-sheet-backdrop .option-sheet-header,
+.option-sheet-backdrop .option-sheet-columns,
+.option-sheet-backdrop .option-sheet-row { border-color: #e4e6ed; }
+.option-sheet-backdrop .option-sheet-header select { color: #252a39; border-color: #dfe2ea; background: #f7f8fb; }
+.option-sheet-backdrop .option-sheet-list { color: #252a39; background: #fff; }
+.option-sheet-backdrop .option-sheet-row { background: #fff; }
+.option-sheet-backdrop .option-sheet-row.atm { background: #f0f1f5; box-shadow: inset 3px 0 #434c61, inset -3px 0 #434c61; }
+.option-sheet-backdrop .option-sheet-row > button { color: #252a39; background: transparent; }
+
+@media (max-width: 760px) {
+  .fno-focus-workspace { inset: 58px 0 calc(64px + env(safe-area-inset-bottom, 0px)); padding: 3px 0 0; }
+  .fno-chart-card { border-radius: 15px; }
+  .fno-chart-card > header { padding-inline: 12px; }
+  .fno-chart-card > header b { font-size: 13px; }
+  .fno-window-slider { height: 36px; }
+  .fno-trade-dock { min-height: 118px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .fno-trade-actions { grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr); gap: 7px; }
+}
+
 .chart-placement-hint { position: absolute; z-index: 8; left: 50%; bottom: 34px; transform: translateX(-50%); max-width: calc(100% - 110px); padding: 6px 10px; border: 1px solid #d9d4ff; border-radius: 14px; color: #5747dc; background: rgba(248,247,255,.94); box-shadow: 0 6px 18px #332a7b1b; font-size: 9px; font-weight: 750; pointer-events: none; white-space: nowrap; }
 .chart-quick-order-buttons { position: absolute; z-index: 16; left: 50%; bottom: 31px; width: min(330px, calc(100% - 108px)); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; transform: translateX(-50%); }
 .chart-quick-order-buttons button { min-width: 0; height: 38px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid; border-radius: 9px; color: #fff; box-shadow: 0 7px 22px #1720332d; cursor: pointer; backdrop-filter: blur(8px); }
