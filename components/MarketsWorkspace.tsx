@@ -1,12 +1,8 @@
 "use client";
 
-import { Activity, Cable, Search, TrendingUp, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { FnoUnderlying } from "@/lib/fno";
+import { Activity, Cable, TrendingUp, X } from "lucide-react";
 import { formatInr, type Instrument } from "@/lib/market";
 import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
-
-type MarketTab = "volume" | "indices" | "fno";
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0);
@@ -18,7 +14,6 @@ export function MarketsWorkspace({
   volumeError,
   stockUniverse,
   onSelectCash,
-  onSelectUnderlying,
   onClose,
 }: {
   volumeRows: VolumeBreakoutRow[];
@@ -26,62 +21,13 @@ export function MarketsWorkspace({
   volumeError: string;
   stockUniverse: Instrument[];
   onSelectCash: (instrument: Instrument, price: number) => void;
-  onSelectUnderlying: (underlying: FnoUnderlying) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<MarketTab>("volume");
-  const [underlyings, setUnderlyings] = useState<FnoUnderlying[]>([]);
-  const [fnoLoading, setFnoLoading] = useState(true);
-  const [fnoError, setFnoError] = useState("");
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/upstox/fno-underlyings", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[]; error?: { message?: string } };
-        if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "F&O instruments are unavailable.");
-        setUnderlyings(payload.underlyings ?? []);
-      })
-      .catch((error) => { if (!controller.signal.aborted) setFnoError(error instanceof Error ? error.message : "F&O instruments are unavailable."); })
-      .finally(() => { if (!controller.signal.aborted) setFnoLoading(false); });
-    return () => controller.abort();
-  }, []);
-
-  const filteredUnderlyings = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const underlyingType = tab === "indices" ? "INDEX" : "EQUITY";
-    return underlyings.filter((item) => item.underlyingType === underlyingType
-      && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term)));
-  }, [search, tab, underlyings]);
-
-  function renderUnderlying(item: FnoUnderlying) {
-    return (
-      <button
-        key={item.instrumentKey}
-        className="trend-stock-row fno-symbol-row"
-        onClick={() => onSelectUnderlying(item)}
-        aria-label={`Open ${item.symbol} chart`}
-      >
-        <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
-        <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-      </button>
-    );
-  }
-
   return (
-    <section className="market-discovery-panel" aria-label="NSE markets and F&O">
-      <div className="market-discovery-head"><div><span className="eyebrow">NSE market lists</span><h2>Markets</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
-      <nav className="trend-tabs" aria-label="Market lists">
-        <button className={tab === "volume" ? "active" : ""} onClick={() => { setTab("volume"); setSearch(""); }}>Volume Stocker</button>
-        <button className={tab === "indices" ? "active" : ""} onClick={() => { setTab("indices"); setSearch(""); }}>Indices</button>
-        <button className={tab === "fno" ? "active" : ""} onClick={() => { setTab("fno"); setSearch(""); }}>F&amp;O</button>
-      </nav>
-
-      {(tab === "indices" || tab === "fno") && <label className="market-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "indices" ? "Search indices" : "Search F&O symbols"} /></label>}
-
+    <section className="market-discovery-panel" aria-label="NSE volume stocker">
+      <div className="market-discovery-head"><div><span className="eyebrow">NSE CASH · LIVE SCANNER</span><h2>Volume Stocker</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
       <div className="market-discovery-list">
-        {tab === "volume" && volumeRows.map((row) => {
+        {volumeRows.map((row) => {
           const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
           if (!item) return null;
           return (
@@ -92,14 +38,9 @@ export function MarketsWorkspace({
             </button>
           );
         })}
-        {tab === "volume" && volumeLoading && !volumeRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Scanning NSE cash stocks</b><span>Comparing live Upstox volume with 20 daily sessions.</span></div>}
-        {tab === "volume" && !volumeLoading && volumeError && <div className="positions-empty"><Cable size={30} /><b>Volume scanner unavailable</b><span>{volumeError}</span></div>}
-        {tab === "volume" && !volumeLoading && !volumeError && !volumeRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass the filter</b><span>No NSE cash stock currently passes the configured volume rule.</span></div>}
-
-        {(tab === "indices" || tab === "fno") && filteredUnderlyings.map(renderUnderlying)}
-        {(tab === "indices" || tab === "fno") && fnoLoading && !underlyings.length && <div className="positions-empty"><Activity size={30} /><b>Loading current NSE F&amp;O symbols</b><span>Reading today&apos;s active instruments from Upstox.</span></div>}
-        {(tab === "indices" || tab === "fno") && !fnoLoading && fnoError && <div className="positions-empty"><Cable size={30} /><b>F&amp;O list unavailable</b><span>{fnoError}</span></div>}
-        {(tab === "indices" || tab === "fno") && !fnoLoading && !fnoError && !filteredUnderlyings.length && <div className="positions-empty"><Activity size={30} /><b>No matching symbols</b><span>Try another symbol name.</span></div>}
+        {volumeLoading && !volumeRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Scanning NSE cash stocks</b><span>Comparing live Upstox volume with 20 daily sessions.</span></div>}
+        {!volumeLoading && volumeError && <div className="positions-empty"><Cable size={30} /><b>Volume scanner unavailable</b><span>{volumeError}</span></div>}
+        {!volumeLoading && !volumeError && !volumeRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass the filter</b><span>No NSE cash stock currently passes the configured volume rule.</span></div>}
       </div>
     </section>
   );

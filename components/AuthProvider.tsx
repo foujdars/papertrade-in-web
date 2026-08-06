@@ -4,7 +4,7 @@ import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import type { Session, User } from "@supabase/supabase-js";
-import { Cloud, LogIn, ShieldCheck, TrendingUp } from "lucide-react";
+import { CandlestickChart, Cloud, LogIn, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
 
@@ -242,7 +242,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={contextValue}>
       {configured && (authLoading || (session && !cloudReady)) ? (
-        <main className="auth-screen auth-loading-screen"><span className="auth-logo"><TrendingUp size={28} /></span><b>Preparing PaperTrade IN…</b><small>Securing your account and loading your paper portfolio.</small></main>
+        <main className="auth-screen auth-loading-screen">
+          <section className="auth-welcome-stage">
+            <div className="welcome-market-visual" aria-hidden="true">
+              <span /><span /><span /><span /><span /><span /><i><TrendingUp size={22} /></i>
+            </div>
+            <span className="auth-logo"><TrendingUp size={28} /></span>
+            <span className="auth-welcome-eyebrow"><Sparkles size={14} /> Welcome back</span>
+            <b>Getting your trading desk ready</b>
+            <small>Restoring your charts, watchlists and paper portfolio securely.</small>
+            <div className="welcome-loading-pills"><span><CandlestickChart size={14} /> Live charts</span><span><ShieldCheck size={14} /> Paper trades only</span></div>
+            <div className="welcome-progress" aria-label="Loading"><i /></div>
+          </section>
+        </main>
       ) : configured && !session ? (
         <main className="auth-screen">
           <section className="auth-card">

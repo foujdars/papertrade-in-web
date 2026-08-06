@@ -402,9 +402,18 @@ export function MarketChart({
     const target = series.priceToCoordinate(tool.targetPrice);
     const stopLoss = series.priceToCoordinate(tool.stopLossPrice);
     if (entry === null || target === null || stopLoss === null) return;
+    const chartHeight = chartHost.current?.clientHeight ?? 0;
+    const clampToChart = (coordinate: number) => chartHeight > 60
+      ? Math.max(28, Math.min(chartHeight - 28, coordinate))
+      : coordinate;
+    const nextCoordinates = {
+      entry: clampToChart(entry),
+      target: clampToChart(target),
+      stopLoss: clampToChart(stopLoss),
+    };
     setRiskCoordinates((current) => {
-      if (current && Math.abs(current.entry - entry) < .3 && Math.abs(current.target - target) < .3 && Math.abs(current.stopLoss - stopLoss) < .3) return current;
-      return { entry, target, stopLoss };
+      if (current && Math.abs(current.entry - nextCoordinates.entry) < .3 && Math.abs(current.target - nextCoordinates.target) < .3 && Math.abs(current.stopLoss - nextCoordinates.stopLoss) < .3) return current;
+      return nextCoordinates;
     });
   }
 
@@ -1328,7 +1337,7 @@ export function MarketChart({
         )}
         {orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
-            <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>
+            {onOrderToolClose && <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>}
             <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <span>{orderTool.side} ENTRY</span><b>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
             </div>

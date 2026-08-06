@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, CalendarRange, Check, ChevronDown, Clock3, List, PenTool, Plus, Settings, X } from "lucide-react";
+import { CalendarRange, Check, ChevronDown, Clock3, List, Plus, X } from "lucide-react";
 import { useEffect } from "react";
 
 export const CHART_TIMEFRAMES = ["1m", "2m", "3m", "5m", "10m", "15m", "30m", "1H", "2H", "3H", "4H", "1D", "1W", "1M", "1Y"] as const;
@@ -19,18 +19,12 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
-export function ChartTimeframeMenu({ current, onSelect, onIndicators, onDrawings, onSettings, onClose }: { current: string; onSelect: (timeframe: string) => void; onIndicators: () => void; onDrawings: () => void; onSettings: () => void; onClose: () => void }) {
+export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: string; onSelect: (timeframe: string) => void; onClose: () => void }) {
   useEscape(onClose);
   return (
     <div className="chart-function-backdrop" role="presentation" onPointerDown={onClose}>
       <section className="chart-function-menu timeframe-menu" role="dialog" aria-modal="true" aria-label="Choose chart timeframe" onPointerDown={(event) => event.stopPropagation()}>
         <header><div><Clock3 size={18} /><span><b>Timeframe</b><small>Choose the candle interval</small></span></div><button onClick={onClose} aria-label="Close timeframe selector"><X size={18} /></button></header>
-        <nav className="chart-menu-tabs" aria-label="Chart menu sections">
-          <button className="active"><Clock3 size={16} /><span><b>{current}</b><small>Range</small></span></button>
-          <button onClick={onIndicators}><Activity size={16} /><span><b>Indicators</b><small>Studies</small></span></button>
-          <button onClick={onDrawings}><PenTool size={16} /><span><b>Drawings</b><small>Tools</small></span></button>
-          <button onClick={onSettings}><Settings size={16} /><span><b>Settings</b><small>View</small></span></button>
-        </nav>
         <div className="timeframe-groups">
           {timeframeGroups.map(({ label, icon: Icon, values }) => (
             <section key={label}>

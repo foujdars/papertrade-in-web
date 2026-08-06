@@ -1,11 +1,10 @@
 "use client";
 
 import {
-  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
-  Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
-  Link2, Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
-  LogOut, Redo2, Search, Star, Target, Trash2, Undo2, UserRound,
-  TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
+  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
+  Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, Plus, Radio, Sun,
+  LogOut, Search, Star, Target, Trash2, UserRound,
+  TrendingUp, WalletCards, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
@@ -13,11 +12,13 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
+import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace } from "@/components/MarketsWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
+import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
@@ -137,23 +138,6 @@ async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
     .at(-1);
   return candle && Number.isFinite(candle.close) && candle.close > 0 ? candle.close : undefined;
 }
-const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
-  { id: "cursor", label: "Cursor", icon: MousePointer2 },
-  { id: "trend-line", label: "Trend line", icon: TrendingUp },
-  { id: "extended-line", label: "Extended line", icon: MoveDiagonal2 },
-  { id: "ray", label: "Diagonal ray", icon: ArrowUpRight },
-  { id: "horizontal-line", label: "Horizontal line", icon: Minus },
-  { id: "horizontal-ray", label: "Horizontal ray", icon: Radio },
-  { id: "vertical-line", label: "Vertical line", icon: MoveVertical },
-  { id: "parallel-channel", label: "Parallel channel", icon: FlipHorizontal2 },
-  { id: "brush", label: "Brush", icon: Brush },
-  { id: "rectangle", label: "Rectangle + mid", icon: BoxSelect },
-  { id: "fib-retracement", label: "Fibonacci", icon: ListFilter },
-  { id: "price-range", label: "Price range", icon: Ruler },
-  { id: "long-position", label: "Long position", icon: TrendingUp },
-  { id: "short-position", label: "Short position", icon: TrendingDown },
-];
-
 function Brand({ onClick }: { onClick: () => void }) {
   return (
     <button className="brand" onClick={onClick} aria-label="Open Trade chart">
@@ -273,6 +257,7 @@ export function TradingDashboard() {
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
+  const [fnoListOpen, setFnoListOpen] = useState(false);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
@@ -315,6 +300,7 @@ export function TradingDashboard() {
     setFnoFutureInstrument(restoredFuture ? futureToInstrument(restoredFuture, restoredUnderlying) : null);
     setFnoTopMode("SPOT");
     setWorkspaceMode("trade");
+    setFnoListOpen(false);
     setFnoTradeDockOpen(false);
     setOptionChainOpen(false);
     setOrderSheetOpen(false);
@@ -421,7 +407,7 @@ export function TradingDashboard() {
   }, [fnoUnderlying, selected, timeframe]);
 
   useEffect(() => {
-    if (selected.assetType !== "OPTION" || !spotInstrument) return;
+    if (workspaceMode !== "fno") return;
     const handleHistoryBack = () => closeFnoWorkspace();
     window.addEventListener("popstate", handleHistoryBack);
     let nativeListener: { remove: () => Promise<void> } | undefined;
@@ -432,7 +418,7 @@ export function TradingDashboard() {
       window.removeEventListener("popstate", handleHistoryBack);
       if (nativeListener) void nativeListener.remove();
     };
-  }, [closeFnoWorkspace, selected.assetType, spotInstrument]);
+  }, [closeFnoWorkspace, workspaceMode]);
 
   useEffect(() => {
     if (!showTradeSymbols) return;
@@ -854,16 +840,23 @@ export function TradingDashboard() {
   const chartStopLossPrice = Number.isFinite(requestedStopLossPrice) && requestedStopLossPrice > 0
     ? requestedStopLossPrice
     : riskEntryPrice * (riskToolSide === "BUY" ? .995 : 1.005);
+  const activeRiskToolEnabled = riskToolEnabled || Boolean(selectedProtection && selectedPosition.quantity > 0);
+  const riskDisplayQuantity = selectedPosition.quantity > 0 ? selectedPosition.quantity : quantity;
 
   useEffect(() => {
-    if (!selectedProtection) return;
     const restoreProtection = window.setTimeout(() => {
-      setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
-      setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
-      setRiskToolEnabled(true);
+      if (selectedProtection) {
+        setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
+        setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
+        setRiskToolEnabled(true);
+      } else {
+        setTargetPrice("");
+        setStopLossPrice("");
+        setRiskToolEnabled(false);
+      }
     }, 0);
     return () => window.clearTimeout(restoreProtection);
-  }, [selectedProtection, selected.symbol]);
+  }, [selected.instrumentKey, selectedProtection]);
   const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = tradingUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
@@ -1222,6 +1215,7 @@ export function TradingDashboard() {
     setExitQuantity(String(Math.max(1, option.lotSize ?? 1)));
     setFnoTradeDockOpen(false);
     setWorkspaceMode("fno");
+    setFnoListOpen(false);
     setMarketsOpen(false);
   }
 
@@ -1237,6 +1231,7 @@ export function TradingDashboard() {
     setFnoFutureInstrument(nearestFuture ? futureToInstrument(nearestFuture, underlying) : null);
     setFnoTopMode("SPOT");
     setMarketsOpen(false);
+    setFnoListOpen(false);
   }
 
   async function openFnoUnderlying(underlying: FnoUnderlying) {
@@ -1405,6 +1400,7 @@ export function TradingDashboard() {
     setOptionChainOpen(false);
     if (section === "trade") {
       setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      setFnoListOpen(false);
       if (selected.assetType === "OPTION" && spotInstrument) closeFnoWorkspace();
       else setWorkspaceMode("trade");
       return;
@@ -1413,12 +1409,13 @@ export function TradingDashboard() {
       setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       if (selected.assetType === "OPTION" && spotInstrument) {
         setWorkspaceMode("fno");
+        setFnoListOpen(false);
         return;
       }
       const saved = lastFnoWorkspaceRef.current;
       if (!saved) {
-        setToast("Open an F&O stock from Markets, then select an option contract");
-        window.setTimeout(() => setToast(""), 3_500);
+        setWorkspaceMode("fno");
+        setFnoListOpen(true);
         return;
       }
       setSelected(saved.option);
@@ -1428,8 +1425,10 @@ export function TradingDashboard() {
       setFnoTopMode(saved.topMode);
       setTimeframe(saved.timeframe);
       setWorkspaceMode("fno");
+      setFnoListOpen(false);
       return;
     }
+    setFnoListOpen(false);
     setSidebarOpen(section === "watchlist");
     setPositionsOpen(false);
     setOrdersOpen(section === "orders");
@@ -1549,20 +1548,23 @@ export function TradingDashboard() {
           </div>
 
           <div className="chart-body">
-            <div className="drawing-toolbar" aria-label="Drawing tools">
-              {drawingTools.map(({ id, label, icon: Icon }) => <button key={id} className={activeTool === id ? "active" : ""} onClick={() => { setActiveTool(id); setToolSignal((value) => value + 1); }} aria-label={label} title={label}><Icon size={18} /></button>)}
-              <button className="all-drawing-tools" onClick={() => setShowDrawingLibrary(true)} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
-              <span />
-              <button className={magnet ? "active" : ""} onClick={() => setMagnet((value) => !value)} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
-              <button onClick={() => setUndoSignal((value) => value + 1)} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
-              <button onClick={() => setRedoSignal((value) => value + 1)} aria-label="Redo drawing" title="Redo drawing"><Redo2 size={18} /></button>
-              <button className={drawingsLocked ? "active" : ""} onClick={() => setDrawingsLocked((value) => !value)} aria-label={drawingsLocked ? "Unlock drawings" : "Lock drawings"} title={drawingsLocked ? "Unlock drawings" : "Lock drawings"}>{drawingsLocked ? <Lock size={18} /> : <LockOpen size={18} />}</button>
-              <button className={hiddenDrawings ? "active" : ""} onClick={() => setHiddenDrawings((value) => !value)} aria-label="Hide drawings" title="Hide drawings">{hiddenDrawings ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-              <button className="danger-tool" onClick={() => setClearSignal((value) => value + 1)} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
-            </div>
+            <ChartDrawingToolbar
+              activeTool={activeTool}
+              magnet={magnet}
+              locked={drawingsLocked}
+              hidden={hiddenDrawings}
+              onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }}
+              onAllTools={() => setShowDrawingLibrary(true)}
+              onToggleMagnet={() => setMagnet((value) => !value)}
+              onUndo={() => setUndoSignal((value) => value + 1)}
+              onRedo={() => setRedoSignal((value) => value + 1)}
+              onToggleLock={() => setDrawingsLocked((value) => !value)}
+              onToggleHidden={() => setHiddenDrawings((value) => !value)}
+              onClear={() => setClearSignal((value) => value + 1)}
+            />
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
-            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onIndicators={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} onDrawings={() => { setShowTimeframeMenu(false); setShowDrawingLibrary(true); }} onSettings={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} onClose={() => setShowTimeframeMenu(false)} />}
+            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
             ) : (
@@ -1582,9 +1584,9 @@ export function TradingDashboard() {
                 chartAction={chartAction}
                 chartTheme={theme}
                 onChartTap={() => setChartTradeFooterOpen((value) => !value)}
-                orderTool={{ enabled: riskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity }}
+                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
-                onOrderToolClose={() => setRiskToolEnabled(false)}
+                onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onFeedStatus={handleFeedStatus}
               />
             )}
@@ -1672,15 +1674,24 @@ export function TradingDashboard() {
           optionSwitching={fnoSwitchingOption}
           onToggleTradeDock={() => setFnoTradeDockOpen((value) => !value)}
           onSplitPointerDown={beginOptionSplitDrag}
+          onOpenSymbols={() => setFnoListOpen(true)}
           onOptionChain={() => setOptionChainOpen(true)}
           onTimeframeChange={setTimeframe}
           onToggleTopMode={() => setFnoTopMode((current) => current === "SPOT" && fnoFutureInstrument ? "FUTURE" : "SPOT")}
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
+          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
+          onOrderToolChange={updateChartRiskLevel}
+          onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onFeedStatus={handleFeedStatus}
         />
       )}
+
+      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace onSelect={openFnoNormalChart} onClose={() => {
+        if (selected.assetType === "OPTION" && spotInstrument) setFnoListOpen(false);
+        else closeFnoWorkspace();
+      }} />}
 
       <nav className="mobile-bottom-nav">
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
@@ -1730,7 +1741,6 @@ export function TradingDashboard() {
           volumeError={marketScannerError}
           stockUniverse={stockUniverse}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
-          onSelectUnderlying={openFnoNormalChart}
           onClose={() => setMarketsOpen(false)}
         />
       )}

@@ -52,14 +52,16 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
   ]);
-  const [marketsWorkspace, optionChainSheet, fnoChartWorkspace, fnoRoute, optionChainRoute, fnoTypes, fnoClient] = await Promise.all([
+  const [marketsWorkspace, fnoListsWorkspace, optionChainSheet, fnoChartWorkspace, fnoRoute, optionChainRoute, fnoTypes, fnoClient, chartToolbar] = await Promise.all([
     readFile(new URL("../components/MarketsWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/FnoListsWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/OptionChainSheet.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/FnoChartWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/fno-underlyings/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/upstox/option-chain/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/fno.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/fno-client.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/ChartDrawingToolbar.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /<TradingDashboard \/>/);
@@ -70,6 +72,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /Browser\.open/);
   assert.match(authProvider, /trading_states/);
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
+  assert.match(authProvider, /Welcome back/);
+  assert.match(authProvider, /Getting your trading desk ready/);
   assert.match(supabaseClient, /flowType: "pkce"/);
   assert.match(authMigration, /enable row level security/);
   assert.match(authMigration, /auth\.uid\(\) = user_id/);
@@ -87,12 +91,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(marketsWorkspace, />Volume Stocker<\/button>/);
+  assert.match(marketsWorkspace, /<h2>Volume Stocker<\/h2>/);
   assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
-  assert.match(dashboard, /Fibonacci/);
+  assert.match(chartToolbar, /Fibonacci/);
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("lightweight-charts"\)/);
   assert.match(chart, /attributionLogo: true/);
@@ -125,20 +129,25 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoChartWorkspace, /Limit\/Trigger on Chart/);
   assert.match(fnoChartWorkspace, /Option Chain/);
   assert.match(fnoChartWorkspace, /FNO_TIMEFRAME_GROUPS/);
+  assert.match(fnoChartWorkspace, />Tools</);
+  assert.doesNotMatch(fnoChartWorkspace, />Settings</);
   assert.match(fnoChartWorkspace, /onToggleTopMode/);
   assert.match(fnoChartWorkspace, /onToggleOptionType/);
   assert.match(fnoChartWorkspace, /className="sell"/);
   assert.match(fnoChartWorkspace, /className="buy"/);
+  assert.match(fnoChartWorkspace, /ChartDrawingToolbar/);
+  assert.match(fnoChartWorkspace, /orderTool=\{orderTool\}/);
   assert.match(dashboard, /openFnoUnderlying/);
   assert.match(dashboard, /openFnoNormalChart/);
   assert.match(dashboard, /chart-derivatives-link/);
-  assert.match(dashboard, /onSelectUnderlying=\{openFnoNormalChart\}/);
+  assert.match(dashboard, /FnoListsWorkspace/);
   assert.match(dashboard, /toggleFnoOptionType/);
   assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
   assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
   assert.match(dashboard, /quantityStep/);
-  assert.match(marketsWorkspace, /fno-symbol-row/);
-  assert.match(marketsWorkspace, /onSelectUnderlying/);
+  assert.doesNotMatch(marketsWorkspace, /fno-symbol-row|Indices|F&amp;O/);
+  assert.match(fnoListsWorkspace, /fno-symbol-row/);
+  assert.match(fnoListsWorkspace, /Indices &amp; F&amp;O/);
   assert.doesNotMatch(marketsWorkspace, /openingUnderlyingKey/);
   assert.match(optionChainSheet, /option-sheet-handle/);
   assert.match(optionChainSheet, />CALL</);
@@ -158,6 +167,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);
+  assert.match(chart, /clampToChart/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
   assert.match(styles, /height: calc\(100svh - 108px/);
   assert.match(functionMenu, /EMA 200/);
@@ -200,6 +210,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(dashboard, /mobile-scroll-tail/);
   assert.match(styles, /chart-trade-footer \{ flex: 0 0 59px; display: grid; grid-template-rows: 36px 15px; gap: 2px; padding: 3px 10px; \}/);
   assert.match(dashboard, /quantityInput/);
+  assert.match(dashboard, /activeRiskToolEnabled/);
+  assert.match(dashboard, /setRiskToolEnabled\(true\)/);
   assert.match(dashboard, /setQuantityInput\(event\.target\.value\.replace/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);
@@ -217,8 +229,7 @@ test("uses popup selectors and a focused default candle range", async () => {
   assert.match(selectors, /Choose chart timeframe/);
   assert.match(selectors, /Minutes/);
   assert.match(selectors, /Days & longer/);
-  assert.match(selectors, /Chart menu sections/);
-  assert.match(selectors, /Drawings/);
+  assert.doesNotMatch(selectors, /Chart menu sections|Drawings|Settings/);
   assert.match(selectors, /Choose watchlist/);
   assert.match(dashboard, /<ChartTimeframeMenu/);
   assert.match(dashboard, /<WatchlistSelector/);
