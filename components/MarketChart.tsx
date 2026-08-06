@@ -310,6 +310,7 @@ export function MarketChart({
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
+  onChartTap,
   onPrice,
   onFeedStatus,
 }: {
@@ -331,6 +332,7 @@ export function MarketChart({
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
+  onChartTap?: () => void;
   onPrice?: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -375,6 +377,8 @@ export function MarketChart({
   const gridVisibleRef = useRef(true);
   const crosshairVisibleRef = useRef(true);
   const orderToolRef = useRef(orderTool);
+  const onChartTapRef = useRef(onChartTap);
+  const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialData.at(-1));
@@ -382,6 +386,10 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number; target: number; stopLoss: number } | null>(null);
+
+  useEffect(() => {
+    onChartTapRef.current = onChartTap;
+  }, [onChartTap]);
 
   function refreshRiskCoordinates() {
     const series = candleSeries.current;
@@ -949,6 +957,7 @@ export function MarketChart({
         const point = { x: event.clientX - host.getBoundingClientRect().left, y: event.clientY - host.getBoundingClientRect().top };
 
         if (!selectedTool) {
+          tapGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
           const drawings = [...currentManager.getAllDrawings()].reverse();
           const hit = drawings.find((drawingItem) => {
             if (!drawingItem.options.visible) return false;
@@ -963,6 +972,7 @@ export function MarketChart({
             currentManager.deselectAll();
             return;
           }
+          tapGestureRef.current = null;
           currentManager.selectDrawing(hit.id);
           if (hit.options.locked) return;
           const start = pointerAnchor(event, false);
@@ -1020,6 +1030,8 @@ export function MarketChart({
       };
 
       const onPointerMove = (event: PointerEvent) => {
+        const tap = tapGestureRef.current;
+        if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) tap.moved = true;
         const edit = editRef.current;
         if (edit) {
           const current = pointerAnchor(event, false);
@@ -1058,6 +1070,9 @@ export function MarketChart({
       };
 
       const onPointerUp = (event: PointerEvent) => {
+        const tap = tapGestureRef.current;
+        tapGestureRef.current = null;
+        if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) onChartTapRef.current?.();
         if (editRef.current) {
           editRef.current.drawing.setState("selected");
           editRef.current = null;

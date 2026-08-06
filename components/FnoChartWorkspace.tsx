@@ -1,8 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronsUpDown, Minus, Plus, SlidersHorizontal } from "lucide-react";
+import { Activity, ChevronDown, ChevronsUpDown, Clock3, Minus, PenTool, Plus, Settings, SlidersHorizontal } from "lucide-react";
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type FeedStatus } from "@/components/MarketChart";
+import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
+import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, type Instrument } from "@/lib/market";
 
 const FNO_TIMEFRAME_GROUPS = [
@@ -31,7 +33,7 @@ export function FnoChartWorkspace({
   margin,
   tradeDockOpen,
   optionSwitching,
-  onShowTradeDock,
+  onToggleTradeDock,
   onSplitPointerDown,
   onOptionChain,
   onTimeframeChange,
@@ -56,7 +58,7 @@ export function FnoChartWorkspace({
   margin: number;
   tradeDockOpen: boolean;
   optionSwitching: boolean;
-  onShowTradeDock: () => void;
+  onToggleTradeDock: () => void;
   onSplitPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onOptionChain: () => void;
   onTimeframeChange: (timeframe: string) => void;
@@ -68,6 +70,12 @@ export function FnoChartWorkspace({
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+  const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
+  const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
+  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
+  const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
+  const [toolSignal, setToolSignal] = useState(0);
+  const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const underlyingSymbol = option.underlyingSymbol || topInstrument.underlyingSymbol || topInstrument.symbol;
   const optionLabel = `${option.expiry ? new Date(`${option.expiry}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""} ${option.strikePrice?.toLocaleString("en-IN") ?? ""}`.trim();
   const lots = Math.max(1, Math.round(quantity / lotSize));
@@ -83,7 +91,7 @@ export function FnoChartWorkspace({
         className="fno-focus-charts"
         style={{ gridTemplateRows: `minmax(0, ${splitPercent}fr) 16px minmax(0, ${100 - splitPercent}fr)` }}
       >
-        <section className="fno-chart-card" onClick={onShowTradeDock}>
+        <section className="fno-chart-card">
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={!canToggleFuture} onClick={(event) => { event.stopPropagation(); onToggleTopMode(); }}>
@@ -99,16 +107,18 @@ export function FnoChartWorkspace({
               key={`focus-top-${topInstrument.instrumentKey}-${timeframe}`}
               instrument={topInstrument}
               timeframe={timeframe}
-              activeTool="cursor"
-              toolSignal={0}
+              activeTool={activeTool}
+              toolSignal={toolSignal}
               magnet={true}
-              hiddenDrawings={true}
-              lockedDrawings={true}
+              hiddenDrawings={false}
+              lockedDrawings={false}
               clearSignal={0}
               undoSignal={0}
               redoSignal={0}
-              indicators={DEFAULT_CHART_INDICATORS}
+              indicators={indicators}
+              chartAction={chartAction}
               chartTheme="light"
+              onChartTap={onToggleTradeDock}
               onFeedStatus={() => undefined}
             />
           </div>
@@ -116,7 +126,7 @@ export function FnoChartWorkspace({
 
         <button className="fno-window-slider" onPointerDown={onSplitPointerDown} aria-label="Drag to resize both chart windows"><span /></button>
 
-        <section className="fno-chart-card" onClick={onShowTradeDock}>
+        <section className="fno-chart-card">
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={optionSwitching} onClick={(event) => { event.stopPropagation(); onToggleOptionType(); }}>
@@ -131,16 +141,18 @@ export function FnoChartWorkspace({
               key={`focus-option-${option.instrumentKey}-${timeframe}`}
               instrument={option}
               timeframe={timeframe}
-              activeTool="cursor"
-              toolSignal={0}
+              activeTool={activeTool}
+              toolSignal={toolSignal}
               magnet={true}
-              hiddenDrawings={true}
-              lockedDrawings={true}
+              hiddenDrawings={false}
+              lockedDrawings={false}
               clearSignal={0}
               undoSignal={0}
               redoSignal={0}
-              indicators={DEFAULT_CHART_INDICATORS}
+              indicators={indicators}
+              chartAction={chartAction}
               chartTheme="light"
+              onChartTap={onToggleTradeDock}
               onFeedStatus={onFeedStatus}
             />
           </div>
@@ -163,12 +175,20 @@ export function FnoChartWorkspace({
           <button className="fno-time-menu-backdrop" onClick={() => setTimeMenuOpen(false)} aria-label="Close timeframe menu" />
           <section className="fno-timeframe-menu" aria-label="Chart timeframe">
             <header><b>Chart interval</b><button onClick={() => setTimeMenuOpen(false)}><ChevronDown size={17} /></button></header>
+            <nav className="fno-chart-menu-tabs" aria-label="Chart menu sections">
+              <button className="active"><Clock3 size={16} /><span><b>{timeframe}</b><small>Range</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setIndicatorMenuOpen(true); }}><Activity size={16} /><span><b>Indicators</b><small>Studies</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setDrawingMenuOpen(true); }}><PenTool size={16} /><span><b>Drawings</b><small>Tools</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setIndicatorMenuOpen(true); }}><Settings size={16} /><span><b>Settings</b><small>View</small></span></button>
+            </nav>
             {FNO_TIMEFRAME_GROUPS.map((group) => (
               <div key={group.label}><span>{group.label}</span><nav>{group.values.map((value) => <button key={value} className={timeframe === value ? "active" : ""} onClick={() => { onTimeframeChange(value); setTimeMenuOpen(false); }}>{value}</button>)}</nav></div>
             ))}
           </section>
         </>
       )}
+      {indicatorMenuOpen && <ChartFunctionMenu indicators={indicators} onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setIndicatorMenuOpen(false)} />}
+      {drawingMenuOpen && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setDrawingMenuOpen(false)} />}
     </section>
   );
 }

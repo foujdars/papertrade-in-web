@@ -22,7 +22,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
   assert.match(html, /PaperTrade IN/);
   assert.match(html, /Interactive TradingView Lightweight Charts candlestick chart/);
   assert.match(html, /Functions/);
-  assert.match(html, /pill-count">0</);
+  assert.match(html, /0 active/);
   assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
   assert.match(html, /Broker API/);
   assert.match(html, /No real money/);
@@ -159,7 +159,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
-  assert.match(styles, /height: calc\(100svh - 122px/);
+  assert.match(styles, /height: calc\(100svh - 108px/);
   assert.match(functionMenu, /EMA 200/);
   assert.match(functionMenu, /VWAP/);
   assert.match(functionMenu, /MACD/);
@@ -196,9 +196,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(volumeBreakout, /candidate\.todayVolume > sma20Volume \* VOLUME_BREAKOUT_MULTIPLIER/);
   assert.match(volumeBreakout, /VOLUME_BREAKOUT_LIMIT = 15/);
   assert.match(dashboard, /Load 60 more/);
-  assert.match(dashboard, /mobile-indicator-control/);
+  assert.match(dashboard, /label="Functions"/);
   assert.doesNotMatch(dashboard, /mobile-scroll-tail/);
-  assert.match(styles, /chart-trade-footer \{ flex: 0 0 72px; display: grid; grid-template-rows: 39px 18px; gap: 3px; padding: 5px 12px; \}/);
+  assert.match(styles, /chart-trade-footer \{ flex: 0 0 59px; display: grid; grid-template-rows: 36px 15px; gap: 2px; padding: 3px 10px; \}/);
   assert.match(dashboard, /quantityInput/);
   assert.match(dashboard, /setQuantityInput\(event\.target\.value\.replace/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
@@ -217,6 +217,8 @@ test("uses popup selectors and a focused default candle range", async () => {
   assert.match(selectors, /Choose chart timeframe/);
   assert.match(selectors, /Minutes/);
   assert.match(selectors, /Days & longer/);
+  assert.match(selectors, /Chart menu sections/);
+  assert.match(selectors, /Drawings/);
   assert.match(selectors, /Choose watchlist/);
   assert.match(dashboard, /<ChartTimeframeMenu/);
   assert.match(dashboard, /<WatchlistSelector/);
@@ -224,4 +226,10 @@ test("uses popup selectors and a focused default candle range", async () => {
   assert.doesNotMatch(dashboard, /className="watchlist-tabs"/);
   assert.doesNotMatch(dashboard, /<span>Positions<\/span>/);
   assert.match(chart, /visibleBars = 22/);
+  assert.match(chart, /onChartTapRef/);
+  assert.match(dashboard, /workspaceMode/);
+  assert.match(dashboard, /<span>F&amp;O<\/span>/);
+  assert.match(dashboard, /Brand onClick/);
+  assert.match(dashboard, /trade-footer-hidden/);
+  assert.match(dashboard, /setFnoTradeDockOpen\(\(value\) => !value\)/);
 });

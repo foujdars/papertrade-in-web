@@ -4,10 +4,10 @@ import {
   Activity,
   ArrowUpRight,
   BoxSelect,
-  Brush,
   Crosshair,
   GitBranch,
   Grid2X2,
+  MousePointer2,
   PenTool,
   Ruler,
   Search,
@@ -74,6 +74,7 @@ export function DrawingToolLibrary({
           {categories.map((item) => <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
         </nav>
         <div className="drawing-library-grid">
+          {!query.trim() && category === "All" && <button className={activeTool === "cursor" ? "active" : ""} onClick={() => { onSelect("cursor"); onClose(); }}><i><MousePointer2 size={17} /></i><span><b>Pointer</b><small>Move, zoom and select drawings</small></span></button>}
           {filtered.map((tool) => {
             const Icon = categoryIcons[tool.category] ?? BoxSelect;
             return (

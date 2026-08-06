@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, CheckCircle2, ChevronDown, ChevronRight, Cloud,
+  Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
   Link2, Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
   LogOut, Redo2, Search, Star, Target, Trash2, Undo2, UserRound,
@@ -58,7 +58,16 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "trade" | "watchlist" | "orders" | "markets" | "pnl";
+type NavigationSection = "trade" | "fno" | "watchlist" | "orders" | "markets" | "pnl";
+
+type FnoWorkspaceSnapshot = {
+  option: Instrument;
+  spot: Instrument;
+  underlying: FnoUnderlying | null;
+  future: Instrument | null;
+  topMode: "SPOT" | "FUTURE";
+  timeframe: string;
+};
 
 function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
   if (!order.instrumentKey || (order.assetType !== "OPTION" && order.assetType !== "FUTURE")) return null;
@@ -145,12 +154,12 @@ const drawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
   { id: "short-position", label: "Short position", icon: TrendingDown },
 ];
 
-function Brand() {
+function Brand({ onClick }: { onClick: () => void }) {
   return (
-    <div className="brand">
+    <button className="brand" onClick={onClick} aria-label="Open Trade chart">
       <span className="brand-mark"><TrendingUp size={20} strokeWidth={3} /></span>
       <span>PaperTrade <b>IN</b></span>
-    </div>
+    </button>
   );
 }
 
@@ -263,6 +272,8 @@ export function TradingDashboard() {
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
+  const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
@@ -286,6 +297,7 @@ export function TradingDashboard() {
   const autoSquareOffInFlightRef = useRef(false);
   const autoSquareOffRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
+  const lastFnoWorkspaceRef = useRef<FnoWorkspaceSnapshot | null>(null);
 
   const closeFnoWorkspace = useCallback(() => {
     let saved: { instrument?: Instrument; timeframe?: string; fnoUnderlying?: FnoUnderlying } = {};
@@ -302,6 +314,7 @@ export function TradingDashboard() {
     setFnoUnderlying(restoredUnderlying);
     setFnoFutureInstrument(restoredFuture ? futureToInstrument(restoredFuture, restoredUnderlying) : null);
     setFnoTopMode("SPOT");
+    setWorkspaceMode("trade");
     setFnoTradeDockOpen(false);
     setOptionChainOpen(false);
     setOrderSheetOpen(false);
@@ -310,6 +323,11 @@ export function TradingDashboard() {
     url.searchParams.set("timeframe", restoredTimeframe);
     window.history.replaceState({}, "", url);
   }, []);
+
+  useEffect(() => {
+    if (selected.assetType !== "OPTION" || !spotInstrument) return;
+    lastFnoWorkspaceRef.current = { option: selected, spot: spotInstrument, underlying: fnoUnderlying, future: fnoFutureInstrument, topMode: fnoTopMode, timeframe };
+  }, [fnoFutureInstrument, fnoTopMode, fnoUnderlying, selected, spotInstrument, timeframe]);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
@@ -370,6 +388,7 @@ export function TradingDashboard() {
       }
       if (savedChart.instrument?.instrumentKey && savedChart.instrument.assetType === "OPTION") {
         setSelected(savedChart.instrument);
+        setWorkspaceMode("fno");
         setDerivativeInstruments((current) => current.some((item) => item.instrumentKey === savedChart.instrument!.instrumentKey) ? current : [savedChart.instrument!, ...current]);
         setSpotInstrument(savedChart.spotInstrument?.instrumentKey ? savedChart.spotInstrument : null);
       }
@@ -1168,7 +1187,9 @@ export function TradingDashboard() {
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
     setSelected({ ...item, price: price > 0 ? price : 0 });
+    setChartTradeFooterOpen(false);
     if (item.assetType !== "OPTION") {
+      setWorkspaceMode("trade");
       setSpotInstrument(null);
       setFnoUnderlying(null);
       setFnoFutureInstrument(null);
@@ -1200,6 +1221,7 @@ export function TradingDashboard() {
     setQuantityInput(String(Math.max(1, option.lotSize ?? 1)));
     setExitQuantity(String(Math.max(1, option.lotSize ?? 1)));
     setFnoTradeDockOpen(false);
+    setWorkspaceMode("fno");
     setMarketsOpen(false);
   }
 
@@ -1364,6 +1386,7 @@ export function TradingDashboard() {
     if (!instrument) return;
     chooseTradeInstrument(instrument);
     if (instrument.assetType === "OPTION" && instrument.underlyingKey) {
+      setWorkspaceMode("fno");
       const knownSpot = stockUniverse.find((item) => item.instrumentKey === instrument.underlyingKey || item.symbol === instrument.underlyingSymbol);
       setSpotInstrument(knownSpot ?? {
         symbol: instrument.underlyingSymbol || "SPOT",
@@ -1380,6 +1403,33 @@ export function TradingDashboard() {
 
   function openNavigationSection(section: NavigationSection) {
     setOptionChainOpen(false);
+    if (section === "trade") {
+      setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      if (selected.assetType === "OPTION" && spotInstrument) closeFnoWorkspace();
+      else setWorkspaceMode("trade");
+      return;
+    }
+    if (section === "fno") {
+      setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      if (selected.assetType === "OPTION" && spotInstrument) {
+        setWorkspaceMode("fno");
+        return;
+      }
+      const saved = lastFnoWorkspaceRef.current;
+      if (!saved) {
+        setToast("Open an F&O stock from Markets, then select an option contract");
+        window.setTimeout(() => setToast(""), 3_500);
+        return;
+      }
+      setSelected(saved.option);
+      setSpotInstrument(saved.spot);
+      setFnoUnderlying(saved.underlying);
+      setFnoFutureInstrument(saved.future);
+      setFnoTopMode(saved.topMode);
+      setTimeframe(saved.timeframe);
+      setWorkspaceMode("fno");
+      return;
+    }
     setSidebarOpen(section === "watchlist");
     setPositionsOpen(false);
     setOrdersOpen(section === "orders");
@@ -1395,14 +1445,14 @@ export function TradingDashboard() {
         ? "markets"
         : pnlOpen
           ? "pnl"
-          : "trade";
+          : workspaceMode;
 
   return (
     <main className="terminal-shell" data-theme={theme}>
       <header className="topbar">
-        <Brand />
+        <Brand onClick={() => openNavigationSection("trade")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -1491,7 +1541,7 @@ export function TradingDashboard() {
           </div>
 
           <div className="chart-controls">
-            <button className={`control-button mobile-indicator-control ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }}><Activity size={16} /> Functions <span className="pill-count">{activeIndicatorCount}</span></button>
+            <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
             <div className="chart-right-controls">
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
@@ -1512,7 +1562,7 @@ export function TradingDashboard() {
             </div>
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
-            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
+            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onIndicators={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} onDrawings={() => { setShowTimeframeMenu(false); setShowDrawingLibrary(true); }} onSettings={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} onClose={() => setShowTimeframeMenu(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
             ) : (
@@ -1531,6 +1581,7 @@ export function TradingDashboard() {
                 indicators={indicators}
                 chartAction={chartAction}
                 chartTheme={theme}
+                onChartTap={() => setChartTradeFooterOpen((value) => !value)}
                 orderTool={{ enabled: riskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={() => setRiskToolEnabled(false)}
@@ -1543,7 +1594,7 @@ export function TradingDashboard() {
             <div>Click + drag to pan · Scroll/pinch to zoom</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
-          <div className="chart-trade-footer">
+          <div className={`chart-trade-footer ${chartTradeFooterOpen ? "" : "trade-footer-hidden"}`} aria-hidden={!chartTradeFooterOpen}>
             <div className="chart-trade-buttons">
               <button className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
               <button className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
@@ -1602,7 +1653,7 @@ export function TradingDashboard() {
         </aside>
       </div>
 
-      {activeNavigationSection === "trade" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
+      {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
           topInstrument={fnoTopInstrument}
           topMode={fnoTopMode}
@@ -1619,7 +1670,7 @@ export function TradingDashboard() {
           margin={margin}
           tradeDockOpen={fnoTradeDockOpen}
           optionSwitching={fnoSwitchingOption}
-          onShowTradeDock={() => setFnoTradeDockOpen(true)}
+          onToggleTradeDock={() => setFnoTradeDockOpen((value) => !value)}
           onSplitPointerDown={beginOptionSplitDrag}
           onOptionChain={() => setOptionChainOpen(true)}
           onTimeframeChange={setTimeframe}
@@ -1633,6 +1684,7 @@ export function TradingDashboard() {
 
       <nav className="mobile-bottom-nav">
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
+        <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
         <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
         <button className={activeNavigationSection === "orders" ? "active" : ""} onClick={() => openNavigationSection("orders")}><WalletCards size={19} /><span>Orders</span></button>
         <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
