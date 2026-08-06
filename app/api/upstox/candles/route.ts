@@ -28,9 +28,14 @@ type TimeframeConfig = {
 
 const timeframeMap: Record<string, TimeframeConfig> = {
   "1m": { unit: "minutes", interval: "1", lookbackDays: 7 },
+  "2m": { unit: "minutes", interval: "2", lookbackDays: 7 },
+  "3m": { unit: "minutes", interval: "3", lookbackDays: 10 },
   "5m": { unit: "minutes", interval: "5", lookbackDays: 14 },
+  "10m": { unit: "minutes", interval: "10", lookbackDays: 20 },
   "15m": { unit: "minutes", interval: "15", lookbackDays: 30 },
+  "30m": { unit: "minutes", interval: "30", lookbackDays: 45 },
   "1H": { unit: "hours", interval: "1", lookbackDays: 90 },
+  "2H": { unit: "hours", interval: "2", lookbackDays: 90 },
   "3H": { unit: "hours", interval: "3", lookbackDays: 90 },
   "4H": { unit: "hours", interval: "4", lookbackDays: 90 },
   "1D": { unit: "days", interval: "1", lookbackDays: 365 },

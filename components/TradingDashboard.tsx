@@ -9,13 +9,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { MarketsWorkspace } from "@/components/MarketsWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
-import { optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
+import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
@@ -38,9 +40,10 @@ import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
 import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
-const periods = ["1m", "5m", "15m", "1H", "3H", "4H", "1D", "1W", "1M", "1Y"];
+const periods = ["1m", "2m", "3m", "5m", "10m", "15m", "30m", "1H", "2H", "3H", "4H", "1D", "1W", "1M", "1Y"];
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
 const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
+const LAST_CASH_CHART_STORAGE_KEY = "papertrade-last-cash-chart";
 const RATNAVEER_REPAIR_STORAGE_KEY = "papertrade-repair-ratnaveer-demo-v1";
 const MAX_VIRTUAL_BALANCE = 100_000_000;
 const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
@@ -208,6 +211,10 @@ export function TradingDashboard() {
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
+  const [fnoUnderlying, setFnoUnderlying] = useState<FnoUnderlying | null>(null);
+  const [fnoFutureInstrument, setFnoFutureInstrument] = useState<Instrument | null>(null);
+  const [fnoTopMode, setFnoTopMode] = useState<"SPOT" | "FUTURE">("SPOT");
+  const [fnoSwitchingOption, setFnoSwitchingOption] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistLimit, setWatchlistLimit] = useState(60);
   const [watchlist, setWatchlist] = useState<string>("NIFTY 50");
@@ -276,6 +283,28 @@ export function TradingDashboard() {
   const autoSquareOffInFlightRef = useRef(false);
   const autoSquareOffRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
+
+  const closeFnoWorkspace = useCallback(() => {
+    let saved: { instrument?: Instrument; timeframe?: string } = {};
+    try { saved = JSON.parse(localStorage.getItem(LAST_CASH_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
+    const fallback = saved.instrument?.instrumentKey && saved.instrument.assetType !== "OPTION"
+      ? saved.instrument
+      : instruments[0];
+    const restoredTimeframe = saved.timeframe && periods.includes(saved.timeframe) ? saved.timeframe : "5m";
+    setSelected(fallback);
+    setTimeframe(restoredTimeframe);
+    setSpotInstrument(null);
+    setFnoUnderlying(null);
+    setFnoFutureInstrument(null);
+    setFnoTopMode("SPOT");
+    setFnoTradeDockOpen(false);
+    setOptionChainOpen(false);
+    setOrderSheetOpen(false);
+    const url = new URL(window.location.href);
+    url.searchParams.set("symbol", fallback.symbol);
+    url.searchParams.set("timeframe", restoredTimeframe);
+    window.history.replaceState({}, "", url);
+  }, []);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
@@ -357,6 +386,25 @@ export function TradingDashboard() {
   }, [selected, spotInstrument, timeframe]);
 
   useEffect(() => {
+    if (selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
+    localStorage.setItem(LAST_CASH_CHART_STORAGE_KEY, JSON.stringify({ instrument: selected, timeframe }));
+  }, [selected, timeframe]);
+
+  useEffect(() => {
+    if (selected.assetType !== "OPTION" || !spotInstrument) return;
+    const handleHistoryBack = () => closeFnoWorkspace();
+    window.addEventListener("popstate", handleHistoryBack);
+    let nativeListener: { remove: () => Promise<void> } | undefined;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener("backButton", () => closeFnoWorkspace()).then((listener) => { nativeListener = listener; });
+    }
+    return () => {
+      window.removeEventListener("popstate", handleHistoryBack);
+      if (nativeListener) void nativeListener.remove();
+    };
+  }, [closeFnoWorkspace, selected.assetType, spotInstrument]);
+
+  useEffect(() => {
     if (!showTradeSymbols) return;
     const closeSymbolSearch = (event: PointerEvent) => {
       if (!tradeSymbolPickerRef.current?.contains(event.target as Node)) {
@@ -427,14 +475,15 @@ export function TradingDashboard() {
     for (const item of [...stockUniverse, ...derivativeInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
   }, [derivativeInstruments, stockUniverse]);
+  const fnoTopInstrument = fnoTopMode === "FUTURE" && fnoFutureInstrument ? fnoFutureInstrument : spotInstrument;
   const quoteKeys = useMemo(
     () => [...new Set([
       selected.instrumentKey,
-      spotInstrument?.instrumentKey,
+      fnoTopInstrument?.instrumentKey,
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
       ...visibleInstruments.map((item) => item.instrumentKey),
     ].filter((value): value is string => Boolean(value)))].slice(0, 100).join(","),
-    [positionSymbols, selected.instrumentKey, spotInstrument?.instrumentKey, tradingUniverse, visibleInstruments],
+    [fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -446,6 +495,7 @@ export function TradingDashboard() {
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
   const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return null;
+    if (fnoUnderlying?.instrumentKey === spotInstrument.instrumentKey) return fnoUnderlying;
     return {
       symbol: spotInstrument.symbol,
       name: spotInstrument.name,
@@ -454,7 +504,7 @@ export function TradingDashboard() {
       optionContracts: 0,
       futureContracts: 0,
     };
-  }, [selected.assetType, spotInstrument]);
+  }, [fnoUnderlying, selected.assetType, spotInstrument]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -736,11 +786,11 @@ export function TradingDashboard() {
   const visibleLivePrice = verifiedLivePrice ?? 0;
   const selectedChange = selectedQuoteIsFresh ? selectedQuote?.changePercent ?? 0 : 0;
   const selectedNetChange = selectedQuoteIsFresh ? selectedQuote?.netChange ?? 0 : 0;
-  const spotQuote = spotInstrument ? marketQuotes[spotInstrument.instrumentKey] ?? marketQuotes[spotInstrument.symbol] : undefined;
-  const spotQuoteKey = spotInstrument && marketQuotes[spotInstrument.instrumentKey] ? spotInstrument.instrumentKey : spotInstrument?.symbol ?? "";
-  const spotQuoteIsFresh = Boolean(spotQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[spotQuoteKey] ?? 0) <= 45_000);
-  const verifiedSpotPrice = spotQuoteIsFresh ? spotQuote?.lastPrice ?? 0 : spotInstrument?.price ?? 0;
-  const verifiedSpotChange = spotQuoteIsFresh ? spotQuote?.changePercent ?? 0 : 0;
+  const topQuote = fnoTopInstrument ? marketQuotes[fnoTopInstrument.instrumentKey] ?? marketQuotes[fnoTopInstrument.symbol] : undefined;
+  const topQuoteKey = fnoTopInstrument && marketQuotes[fnoTopInstrument.instrumentKey] ? fnoTopInstrument.instrumentKey : fnoTopInstrument?.symbol ?? "";
+  const topQuoteIsFresh = Boolean(topQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[topQuoteKey] ?? 0) <= 45_000);
+  const verifiedTopPrice = topQuoteIsFresh ? topQuote?.lastPrice ?? 0 : fnoTopInstrument?.price ?? 0;
+  const verifiedTopChange = topQuoteIsFresh ? topQuote?.changePercent ?? 0 : 0;
   const orderValue = visibleLivePrice * quantity;
   const quantityStep = selected.assetType === "OPTION" ? Math.max(1, selected.lotSize ?? 1) : 1;
   const orderLots = selected.assetType === "OPTION" ? quantity / quantityStep : 0;
@@ -1103,6 +1153,9 @@ export function TradingDashboard() {
     setSelected({ ...item, price: price > 0 ? price : 0 });
     if (item.assetType !== "OPTION") {
       setSpotInstrument(null);
+      setFnoUnderlying(null);
+      setFnoFutureInstrument(null);
+      setFnoTopMode("SPOT");
       setOptionChainOpen(false);
       setFnoTradeDockOpen(false);
     }
@@ -1115,7 +1168,10 @@ export function TradingDashboard() {
     const url = new URL(window.location.href);
     url.searchParams.set("symbol", item.symbol);
     url.searchParams.set("timeframe", timeframe);
-    window.history.replaceState({}, "", url);
+    if (item.assetType === "OPTION") {
+      if (window.history.state?.papertradeFno) window.history.replaceState({ ...window.history.state, papertradeFno: true }, "", url);
+      else window.history.pushState({ papertradeFno: true }, "", url);
+    } else window.history.replaceState({}, "", url);
   }
 
   function chooseOptionTradeInstrument(option: Instrument, spot: Instrument) {
@@ -1140,6 +1196,10 @@ export function TradingDashboard() {
       const atmRow = nearestAtmRow(rows);
       const contract = defaultOptionSide(atmRow);
       if (!atmRow || !contract) throw new Error("No live ATM option contract is available for this symbol.");
+      const nearestFuture = underlying.futures?.[0];
+      setFnoUnderlying(underlying);
+      setFnoFutureInstrument(nearestFuture ? futureToInstrument(nearestFuture, underlying) : null);
+      setFnoTopMode("SPOT");
       chooseOptionTradeInstrument(
         optionToInstrument(contract, atmRow, underlying),
         underlyingToInstrument(underlying, atmRow.underlyingSpotPrice),
@@ -1149,10 +1209,29 @@ export function TradingDashboard() {
       setToast(`${underlying.symbol} opened with the nearest ATM ${contract.optionType}.`);
       window.setTimeout(() => setToast(""), 2_800);
     } catch (error) {
+      setFnoUnderlying(null);
+      setFnoFutureInstrument(null);
       setToast(error instanceof Error ? error.message : "Unable to open this F&O symbol.");
       window.setTimeout(() => setToast(""), 4_000);
     } finally {
       setOpeningUnderlyingKey("");
+    }
+  }
+
+  async function toggleFnoOptionType() {
+    if (!activeFnoUnderlying || !selected.expiry || !selected.strikePrice || fnoSwitchingOption) return;
+    setFnoSwitchingOption(true);
+    try {
+      const rows = await loadOptionChain(activeFnoUnderlying, selected.expiry);
+      const row = rows.find((item) => item.strikePrice === selected.strikePrice);
+      const contract = selected.optionType === "CE" ? row?.put : row?.call;
+      if (!row || !contract || contract.marketData.ltp <= 0) throw new Error("The matching Call/Put contract is unavailable.");
+      chooseOptionTradeInstrument(optionToInstrument(contract, row, activeFnoUnderlying), underlyingToInstrument(activeFnoUnderlying, row.underlyingSpotPrice));
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to switch the option contract.");
+      window.setTimeout(() => setToast(""), 3_000);
+    } finally {
+      setFnoSwitchingOption(false);
     }
   }
 
@@ -1488,13 +1567,15 @@ export function TradingDashboard() {
         </aside>
       </div>
 
-      {activeNavigationSection === "trade" && selected.assetType === "OPTION" && spotInstrument && (
+      {activeNavigationSection === "trade" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
-          spot={spotInstrument}
+          topInstrument={fnoTopInstrument}
+          topMode={fnoTopMode}
+          canToggleFuture={Boolean(fnoFutureInstrument)}
           option={selected}
           timeframe={timeframe}
-          spotPrice={verifiedSpotPrice}
-          spotChange={verifiedSpotChange}
+          topPrice={verifiedTopPrice}
+          topChange={verifiedTopChange}
           optionPrice={verifiedLivePrice ?? selected.price}
           optionChange={selectedChange}
           splitPercent={optionSplitPercent}
@@ -1502,9 +1583,13 @@ export function TradingDashboard() {
           lotSize={quantityStep}
           margin={margin}
           tradeDockOpen={fnoTradeDockOpen}
+          optionSwitching={fnoSwitchingOption}
           onShowTradeDock={() => setFnoTradeDockOpen(true)}
           onSplitPointerDown={beginOptionSplitDrag}
           onOptionChain={() => setOptionChainOpen(true)}
+          onTimeframeChange={setTimeframe}
+          onToggleTopMode={() => setFnoTopMode((current) => current === "SPOT" && fnoFutureInstrument ? "FUTURE" : "SPOT")}
+          onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
           onFeedStatus={handleFeedStatus}

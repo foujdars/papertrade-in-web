@@ -124,7 +124,15 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoChartWorkspace, /1-Tap Market/);
   assert.match(fnoChartWorkspace, /Limit\/Trigger on Chart/);
   assert.match(fnoChartWorkspace, /Option Chain/);
+  assert.match(fnoChartWorkspace, /FNO_TIMEFRAME_GROUPS/);
+  assert.match(fnoChartWorkspace, /onToggleTopMode/);
+  assert.match(fnoChartWorkspace, /onToggleOptionType/);
+  assert.match(fnoChartWorkspace, /className="sell"/);
+  assert.match(fnoChartWorkspace, /className="buy"/);
   assert.match(dashboard, /openFnoUnderlying/);
+  assert.match(dashboard, /toggleFnoOptionType/);
+  assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
+  assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
   assert.match(dashboard, /quantityStep/);
   assert.match(marketsWorkspace, /fno-symbol-row/);
   assert.match(marketsWorkspace, /onSelectUnderlying/);
@@ -133,9 +141,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(optionChainSheet, />PUT</);
   assert.match(fnoClient, /nearestAtmRow/);
   assert.match(fnoRoute, /segment !== "NSE_FO"/);
+  assert.match(fnoRoute, /item\.instrument_type === "FUT"/);
+  assert.match(fnoRoute, /tradingSymbol: item\.trading_symbol/);
   assert.match(optionChainRoute, /\/v2\/option\/chain/);
   assert.match(optionChainRoute, /\/v2\/option\/contract/);
   assert.match(fnoTypes, /optionToInstrument/);
+  assert.match(fnoTypes, /futureToInstrument/);
   assert.match(dashboard, /Add virtual money/);
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
   assert.match(styles, /chart-trade-buttons/);
@@ -165,6 +176,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(serverAdapter, /staleMs: 5_000/);
   assert.match(candleRoute, /historical-candle\/intraday/);
   assert.match(candleRoute, /Promise\.allSettled/);
+  assert.match(candleRoute, /"2m".*interval: "2"/);
+  assert.match(candleRoute, /"30m".*interval: "30"/);
   assert.match(candleRoute, /"1W".*weeks/);
   assert.match(candleRoute, /"1M".*months/);
   assert.match(candleRoute, /aggregateAnnualCandles/);

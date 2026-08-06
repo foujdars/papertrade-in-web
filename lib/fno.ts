@@ -7,6 +7,15 @@ export type FnoUnderlying = {
   underlyingType: "INDEX" | "EQUITY";
   optionContracts: number;
   futureContracts: number;
+  futures?: FutureContract[];
+};
+
+export type FutureContract = {
+  instrumentKey: string;
+  tradingSymbol: string;
+  expiry: string;
+  lotSize: number;
+  lastPrice: number;
 };
 
 export type OptionMarketData = {
@@ -79,6 +88,23 @@ export function optionToInstrument(
     optionType: contract.optionType,
     strikePrice: row.strikePrice,
     expiry: row.expiry,
+    lotSize: contract.lotSize,
+    underlyingKey: underlying.instrumentKey,
+    underlyingSymbol: underlying.symbol,
+  };
+}
+
+export function futureToInstrument(contract: FutureContract, underlying: FnoUnderlying): Instrument {
+  return {
+    symbol: contract.tradingSymbol,
+    name: `${underlying.symbol} Future`,
+    exchange: "NSE",
+    price: contract.lastPrice,
+    change: 0,
+    instrumentKey: contract.instrumentKey,
+    categories: [],
+    assetType: "FUTURE",
+    expiry: contract.expiry,
     lotSize: contract.lotSize,
     underlyingKey: underlying.instrumentKey,
     underlyingSymbol: underlying.symbol,

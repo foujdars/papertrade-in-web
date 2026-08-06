@@ -13,6 +13,11 @@ type UpstoxDerivative = {
   underlying_symbol?: string;
   underlying_type?: string;
   name?: string;
+  instrument_key?: string;
+  trading_symbol?: string;
+  expiry?: string;
+  lot_size?: number;
+  last_price?: number;
 };
 
 let cache: { expiresAt: number; underlyings: FnoUnderlying[] } | null = null;
@@ -55,15 +60,27 @@ async function loadUnderlyings() {
       underlyingType,
       optionContracts: 0,
       futureContracts: 0,
+      futures: [],
     } satisfies FnoUnderlying;
-    if (item.instrument_type === "FUT") current.futureContracts += 1;
-    else current.optionContracts += 1;
+    if (item.instrument_type === "FUT") {
+      current.futureContracts += 1;
+      if (item.instrument_key && item.trading_symbol && item.expiry) {
+        current.futures?.push({
+          instrumentKey: item.instrument_key,
+          tradingSymbol: item.trading_symbol.trim(),
+          expiry: item.expiry,
+          lotSize: Math.max(1, Math.round(Number(item.lot_size) || 1)),
+          lastPrice: Number(item.last_price) || 0,
+        });
+      }
+    } else current.optionContracts += 1;
     grouped.set(item.underlying_key, current);
   }
 
   const priority = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
   const underlyings = [...grouped.values()]
     .filter((item) => item.optionContracts > 0)
+    .map((item) => ({ ...item, futures: (item.futures ?? []).sort((a, b) => a.expiry.localeCompare(b.expiry)) }))
     .sort((a, b) => {
       const aPriority = priority.indexOf(a.symbol);
       const bPriority = priority.indexOf(b.symbol);
