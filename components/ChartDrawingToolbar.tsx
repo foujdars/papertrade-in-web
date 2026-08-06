@@ -4,6 +4,8 @@ import {
   ArrowUpRight,
   BoxSelect,
   Brush,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
   FlipHorizontal2,
@@ -48,6 +50,7 @@ export function ChartDrawingToolbar({
   magnet,
   locked,
   hidden,
+  collapsed = false,
   className = "",
   onSelect,
   onAllTools,
@@ -57,11 +60,13 @@ export function ChartDrawingToolbar({
   onToggleLock,
   onToggleHidden,
   onClear,
+  onToggleCollapsed,
 }: {
   activeTool: DrawingTool;
   magnet: boolean;
   locked: boolean;
   hidden: boolean;
+  collapsed?: boolean;
   className?: string;
   onSelect: (tool: DrawingTool) => void;
   onAllTools: () => void;
@@ -71,20 +76,24 @@ export function ChartDrawingToolbar({
   onToggleLock: () => void;
   onToggleHidden: () => void;
   onClear: () => void;
+  onToggleCollapsed?: () => void;
 }) {
   return (
-    <div className={`drawing-toolbar ${className}`.trim()} aria-label="Drawing tools">
-      {primaryDrawingTools.map(({ id, label, icon: Icon }) => (
-        <button key={id} className={activeTool === id ? "active" : ""} onClick={() => onSelect(id)} aria-label={label} title={label}><Icon size={18} /></button>
-      ))}
-      <button className="all-drawing-tools" onClick={onAllTools} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
-      <span />
-      <button className={magnet ? "active" : ""} onClick={onToggleMagnet} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
-      <button onClick={onUndo} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
-      <button onClick={onRedo} aria-label="Redo drawing" title="Redo drawing"><Redo2 size={18} /></button>
-      <button className={locked ? "active" : ""} onClick={onToggleLock} aria-label={locked ? "Unlock drawings" : "Lock drawings"} title={locked ? "Unlock drawings" : "Lock drawings"}>{locked ? <Lock size={18} /> : <LockOpen size={18} />}</button>
-      <button className={hidden ? "active" : ""} onClick={onToggleHidden} aria-label="Hide drawings" title="Hide drawings">{hidden ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-      <button className="danger-tool" onClick={onClear} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
+    <div className={`drawing-toolbar ${collapsed ? "collapsed" : ""} ${className}`.trim()} aria-label="Drawing tools">
+      {onToggleCollapsed && <button className="drawing-toolbar-toggle" onClick={onToggleCollapsed} aria-label={collapsed ? "Show drawing toolbar" : "Hide drawing toolbar"} title={collapsed ? "Show tools" : "Hide tools"}>{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>}
+      {!collapsed && <>
+        {primaryDrawingTools.map(({ id, label, icon: Icon }) => (
+          <button key={id} className={activeTool === id ? "active" : ""} onClick={() => onSelect(id)} aria-label={label} title={label}><Icon size={18} /></button>
+        ))}
+        <button className="all-drawing-tools" onClick={onAllTools} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
+        <span />
+        <button className={magnet ? "active" : ""} onClick={onToggleMagnet} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
+        <button onClick={onUndo} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>
+        <button onClick={onRedo} aria-label="Redo drawing" title="Redo drawing"><Redo2 size={18} /></button>
+        <button className={locked ? "active" : ""} onClick={onToggleLock} aria-label={locked ? "Unlock drawings" : "Lock drawings"} title={locked ? "Unlock drawings" : "Lock drawings"}>{locked ? <Lock size={18} /> : <LockOpen size={18} />}</button>
+        <button className={hidden ? "active" : ""} onClick={onToggleHidden} aria-label="Hide drawings" title="Hide drawings">{hidden ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+        <button className="danger-tool" onClick={onClear} aria-label="Delete drawings" title="Delete drawings"><Trash2 size={18} /></button>
+      </>}
     </div>
   );
 }

@@ -91,6 +91,7 @@ export function FnoChartWorkspace({
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
   const underlyingSymbol = option.underlyingSymbol || topInstrument.underlyingSymbol || topInstrument.symbol;
   const optionLabel = `${option.expiry ? new Date(`${option.expiry}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""} ${option.strikePrice?.toLocaleString("en-IN") ?? ""}`.trim();
   const lots = Math.max(1, Math.round(quantity / lotSize));
@@ -101,13 +102,15 @@ export function FnoChartWorkspace({
   }
 
   return (
-    <section className={`fno-focus-workspace ${tradeDockOpen ? "trade-dock-visible" : ""}`} aria-label="F&O spot and option charts">
+    <section className={`fno-focus-workspace ${tradeDockOpen ? "trade-dock-visible" : ""} ${toolbarCollapsed ? "toolbar-collapsed" : ""}`} aria-label="F&O spot and option charts">
       <ChartDrawingToolbar
         className="fno-drawing-toolbar"
         activeTool={activeTool}
         magnet={magnet}
         locked={lockedDrawings}
         hidden={hiddenDrawings}
+        collapsed={toolbarCollapsed}
+        onToggleCollapsed={() => setToolbarCollapsed((value) => !value)}
         onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }}
         onAllTools={() => setDrawingMenuOpen(true)}
         onToggleMagnet={() => setMagnet((value) => !value)}

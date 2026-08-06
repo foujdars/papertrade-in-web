@@ -49,7 +49,7 @@
 .terminal-shell[data-theme="neon"] .chart-statusbar { color: #78949f; }
 .terminal-shell[data-theme="neon"] .chart-symbol-legend,
 .terminal-shell[data-theme="neon"] .indicator-legend { color: #91aab4; border-color: #1d3b46; background: #071419df; box-shadow: 0 5px 20px #0005; }
-.terminal-shell[data-theme="neon"] .chart-symbol-legend { background: #071419; box-shadow: none; }
+.terminal-shell[data-theme="neon"] .chart-symbol-legend { border-color: transparent; background: transparent; box-shadow: none; }
 .terminal-shell[data-theme="neon"] .chart-symbol-legend b,
 .terminal-shell[data-theme="neon"] .indicator-legend b { color: #e9fbff; }
 .terminal-shell[data-theme="neon"] .chart-placement-hint { color: #d0baff; border-color: #a978ff66; background: #171230ed; box-shadow: 0 0 18px #a978ff24; }
@@ -266,11 +266,14 @@ h1, h2, p { margin: 0; }
 .dashboard-indicator-popover input { accent-color: var(--purple); }
 .dashboard-indicator-popover i { width: 18px; height: 3px; border-radius: 2px; }
 .chart-body { flex: 1; min-height: 0; position: relative; display: flex; }
-.drawing-toolbar { width: 44px; flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 5px; border-right: 1px solid var(--line); background: #fff; overflow-y: auto; z-index: 5; }
+.drawing-toolbar { width: 44px; flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 5px; border-right: 1px solid var(--line); background: #fff; overflow-y: auto; overflow-x: visible; z-index: 5; }
 .drawing-toolbar button { width: 32px; height: 31px; flex: none; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #6f7890; cursor: pointer; }
 .drawing-toolbar button:hover, .drawing-toolbar button.active { color: var(--purple); background: var(--purple-soft); }
 .drawing-toolbar > span { width: 24px; height: 1px; flex: none; margin: 3px 0; background: var(--line); }
 .drawing-toolbar button.danger-tool:hover { color: var(--red); background: #fff0f2; }
+.drawing-toolbar .drawing-toolbar-toggle { position: sticky; z-index: 3; top: 0; color: var(--purple); border: 1px solid var(--line); background: var(--surface); box-shadow: 0 3px 10px #24264b1a; }
+.drawing-toolbar.collapsed { width: 21px; flex-basis: 21px; padding: 7px 1px; overflow: visible; }
+.drawing-toolbar.collapsed .drawing-toolbar-toggle { width: 19px; height: 38px; border-radius: 0 8px 8px 0; }
 .chart-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .price-chart-wrap { flex: 1; min-height: 260px; position: relative; }
 .price-chart { position: absolute; inset: 0; }
@@ -278,7 +281,7 @@ h1, h2, p { margin: 0; }
 .drawing-layer line, .drawing-layer rect, .drawing-layer polygon { vector-effect: non-scaling-stroke; }
 .drawing-layer text { vector-effect: non-scaling-stroke; font-family: Inter, sans-serif; }
 .drawing-layer.drawing-active { pointer-events: auto; cursor: crosshair; }
-.chart-symbol-legend { position: absolute; z-index: 2; top: 8px; left: 12px; right: 80px; width: max-content; max-width: calc(100% - 92px); display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); box-shadow: none; pointer-events: none; }
+.chart-symbol-legend { position: absolute; z-index: 2; top: 8px; left: 12px; right: 64px; width: max-content; max-width: calc(100% - 76px); display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 3px 5px; border: 1px solid transparent; border-radius: 5px; overflow: hidden; background: transparent; box-shadow: none; pointer-events: none; text-shadow: 0 1px 2px var(--surface); }
 .chart-symbol-legend b { color: #20263b; font-size: 11px; letter-spacing: -.1px; }
 .chart-symbol-legend span { display: flex; gap: 4px; color: #8b93a6; font-size: 9px; }
 .chart-symbol-legend i { color: #4f596f; font-style: normal; font-weight: 700; }
@@ -680,6 +683,19 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .pnl-modal { padding: 14px; }
   .toast { width: calc(100% - 24px); justify-content: center; bottom: 76px; text-align: center; }
   .market-discovery-panel { padding-inline: 10px; }
+  .market-discovery-panel { padding-top: 5px; }
+  .market-discovery-head { min-height: 38px; margin-bottom: 3px; }
+  .market-discovery-head > div { gap: 0; }
+  .market-discovery-head .eyebrow { display: none; }
+  .market-discovery-head h2 { font-size: 18px; letter-spacing: -.3px; }
+  .market-discovery-head .icon-button { width: 32px; height: 32px; }
+  .trend-tabs { gap: 6px; padding-bottom: 5px; }
+  .trend-tabs button { min-height: 32px; padding-inline: 12px; font-size: 9px; }
+  .market-search { height: 35px; flex-basis: 35px; margin-bottom: 5px; padding-inline: 10px; }
+  .trend-stock-row { min-height: 55px; gap: 9px; padding: 7px 4px; }
+  .trend-stock-row .symbol-avatar { width: 30px; height: 30px; }
+  .trend-stock-row > span:nth-child(2) { gap: 2px; }
+  .trend-stock-row > span:nth-child(3) { gap: 2px; }
   .option-chain-actions { align-items: stretch; }
   .option-chain-actions > button { padding-inline: 9px; }
   .option-chain-actions select { min-width: 132px; }
@@ -724,6 +740,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .fno-drawing-toolbar { position: absolute; z-index: 22; top: 1px; bottom: 1px; left: 0; width: 36px; padding: 4px 2px; border: 0; border-right: 1px solid #e4e7ef; background: #fff; }
 .fno-drawing-toolbar button { width: 30px; height: 29px; }
 .fno-focus-workspace > .fno-focus-charts { margin-left: 36px; }
+.fno-focus-workspace.toolbar-collapsed > .fno-focus-charts { margin-left: 21px; }
+.fno-drawing-toolbar.collapsed { width: 21px; }
 .fno-symbol-list-link { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; padding: 0; border: 1px solid #e1e4ec; border-radius: 8px; color: #596276; background: #fff; cursor: pointer; }
 .fno-window-slider { position: relative; z-index: 2; width: 100%; height: 16px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: row-resize; touch-action: none; }
 .fno-window-slider::before { content: ""; position: absolute; inset: -7px 0; }

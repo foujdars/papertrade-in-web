@@ -137,6 +137,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoChartWorkspace, /className="buy"/);
   assert.match(fnoChartWorkspace, /ChartDrawingToolbar/);
   assert.match(fnoChartWorkspace, /orderTool=\{orderTool\}/);
+  assert.match(fnoChartWorkspace, /toolbarCollapsed/);
+  assert.match(chartToolbar, /Hide drawing toolbar/);
+  assert.match(chartToolbar, /Show drawing toolbar/);
   assert.match(dashboard, /openFnoUnderlying/);
   assert.match(dashboard, /openFnoNormalChart/);
   assert.match(dashboard, /chart-derivatives-link/);
@@ -144,6 +147,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /toggleFnoOptionType/);
   assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
   assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
+  assert.match(dashboard, /savedChart\.symbol\?\.toUpperCase\(\) \?\? params\.get\("symbol"\)/);
+  assert.match(dashboard, /else if \(savedChart\.instrument\?\.instrumentKey\)/);
+  assert.match(dashboard, /workspaceMode, fnoTopMode/);
   assert.match(dashboard, /quantityStep/);
   assert.doesNotMatch(marketsWorkspace, /fno-symbol-row|Indices|F&amp;O/);
   assert.match(fnoListsWorkspace, /fno-symbol-row/);
@@ -165,9 +171,13 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoTypes, /futureToInstrument/);
   assert.match(dashboard, /Add virtual money/);
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
+  assert.match(styles, /drawing-toolbar\.collapsed/);
+  assert.match(styles, /chart-symbol-legend[^}]+background: transparent/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /clampToChart/);
+  assert.match(chart, /minimumWidth: 58/);
+  assert.match(chart, /minimumFractionDigits: 0, maximumFractionDigits: 2/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
   assert.match(styles, /height: calc\(100svh - 108px/);
   assert.match(functionMenu, /EMA 200/);

@@ -258,6 +258,7 @@ export function TradingDashboard() {
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
   const [fnoListOpen, setFnoListOpen] = useState(false);
+  const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(false);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
@@ -362,10 +363,10 @@ export function TradingDashboard() {
   useEffect(() => {
     const applyRequestedChart = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
-      let savedChart: { symbol?: string; timeframe?: string; instrument?: Instrument; spotInstrument?: Instrument; fnoUnderlying?: FnoUnderlying } = {};
+      let savedChart: { symbol?: string; timeframe?: string; instrument?: Instrument; spotInstrument?: Instrument; fnoUnderlying?: FnoUnderlying; workspaceMode?: "trade" | "fno"; fnoTopMode?: "SPOT" | "FUTURE" } = {};
       try { savedChart = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
-      const requestedSymbol = params.get("symbol")?.toUpperCase() ?? savedChart.symbol?.toUpperCase();
-      const requestedTimeframe = params.get("timeframe") ?? savedChart.timeframe;
+      const requestedSymbol = savedChart.symbol?.toUpperCase() ?? params.get("symbol")?.toUpperCase();
+      const requestedTimeframe = savedChart.timeframe ?? params.get("timeframe");
       pendingChartRestoreRef.current = requestedSymbol
         ? { symbol: requestedSymbol, timeframe: periods.includes(requestedTimeframe ?? "") ? requestedTimeframe! : "5m" }
         : null;
@@ -374,16 +375,21 @@ export function TradingDashboard() {
       }
       if (savedChart.instrument?.instrumentKey && savedChart.instrument.assetType === "OPTION") {
         setSelected(savedChart.instrument);
-        setWorkspaceMode("fno");
+        setWorkspaceMode(savedChart.workspaceMode === "trade" ? "trade" : "fno");
         setDerivativeInstruments((current) => current.some((item) => item.instrumentKey === savedChart.instrument!.instrumentKey) ? current : [savedChart.instrument!, ...current]);
         setSpotInstrument(savedChart.spotInstrument?.instrumentKey ? savedChart.spotInstrument : null);
+      } else if (savedChart.instrument?.instrumentKey) {
+        setSelected(savedChart.instrument);
+        setWorkspaceMode("trade");
+        setSpotInstrument(null);
       }
       if (savedChart.fnoUnderlying?.instrumentKey) {
         setFnoUnderlying(savedChart.fnoUnderlying);
         const savedFuture = savedChart.fnoUnderlying.futures?.[0];
         setFnoFutureInstrument(savedFuture ? futureToInstrument(savedFuture, savedChart.fnoUnderlying) : null);
       }
-      if (requestedSymbol) {
+      if (savedChart.fnoTopMode) setFnoTopMode(savedChart.fnoTopMode);
+      if (requestedSymbol && savedChart.instrument?.symbol.toUpperCase() !== requestedSymbol) {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
         if (fallbackInstrument) {
           setSelected(fallbackInstrument);
@@ -397,8 +403,8 @@ export function TradingDashboard() {
     const pending = pendingChartRestoreRef.current;
     if (pending && selected.symbol !== pending.symbol) return;
     pendingChartRestoreRef.current = null;
-    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe, instrument: selected, spotInstrument, fnoUnderlying }));
-  }, [fnoUnderlying, selected, spotInstrument, timeframe]);
+    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe, instrument: selected, spotInstrument, fnoUnderlying, workspaceMode, fnoTopMode }));
+  }, [fnoTopMode, fnoUnderlying, selected, spotInstrument, timeframe, workspaceMode]);
 
   useEffect(() => {
     if (selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
@@ -1217,6 +1223,7 @@ export function TradingDashboard() {
     setWorkspaceMode("fno");
     setFnoListOpen(false);
     setMarketsOpen(false);
+    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: option.symbol, timeframe, instrument: option, spotInstrument: spot, fnoUnderlying, workspaceMode: "fno", fnoTopMode }));
   }
 
   function openFnoNormalChart(underlying: FnoUnderlying) {
@@ -1553,6 +1560,8 @@ export function TradingDashboard() {
               magnet={magnet}
               locked={drawingsLocked}
               hidden={hiddenDrawings}
+              collapsed={tradeToolbarCollapsed}
+              onToggleCollapsed={() => setTradeToolbarCollapsed((value) => !value)}
               onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }}
               onAllTools={() => setShowDrawingLibrary(true)}
               onToggleMagnet={() => setMagnet((value) => !value)}

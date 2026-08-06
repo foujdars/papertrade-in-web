@@ -897,7 +897,7 @@ export function MarketChart({
           visible: true,
           borderColor: neon ? "#1b3b48" : "#dfe3ec",
           scaleMargins: { top: 0.10, bottom: 0.10 },
-          minimumWidth: 72,
+          minimumWidth: 58,
           entireTextOnly: true,
         },
         leftPriceScale: { visible: false },
@@ -921,7 +921,7 @@ export function MarketChart({
         kineticScroll: { mouse: true, touch: true },
         localization: {
           locale: "en-IN",
-          priceFormatter: (price: number) => price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          priceFormatter: (price: number) => price.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
           timeFormatter: indiaTime,
         },
       });
