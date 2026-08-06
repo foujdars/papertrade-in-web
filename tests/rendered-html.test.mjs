@@ -207,3 +207,21 @@ test("ships project assets and removes the starter preview", async () => {
   await access(new URL("../public/papertrade-social.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });
+
+test("uses popup selectors and a focused default candle range", async () => {
+  const [dashboard, selectors, chart] = await Promise.all([
+    readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/CompactSelectors.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(selectors, /Choose chart timeframe/);
+  assert.match(selectors, /Minutes/);
+  assert.match(selectors, /Days & longer/);
+  assert.match(selectors, /Choose watchlist/);
+  assert.match(dashboard, /<ChartTimeframeMenu/);
+  assert.match(dashboard, /<WatchlistSelector/);
+  assert.doesNotMatch(dashboard, /periods\.map/);
+  assert.doesNotMatch(dashboard, /className="watchlist-tabs"/);
+  assert.doesNotMatch(dashboard, /<span>Positions<\/span>/);
+  assert.match(chart, /visibleBars = 22/);
+});

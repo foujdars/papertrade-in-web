@@ -302,7 +302,7 @@ export function MarketChart({
   clearSignal = 0,
   undoSignal = 0,
   redoSignal = 0,
-  visibleBars = 155,
+  visibleBars = 22,
   indicators,
   chartAction,
   chartTheme = "light",
@@ -458,10 +458,10 @@ export function MarketChart({
     const chart = chartApi.current;
     if (!chart || !data.length) return;
     const count = data.length;
-    const bars = Math.max(24, Math.min(visibleBarsRef.current, count));
+    const bars = Math.max(12, Math.min(visibleBarsRef.current, count));
     chart.timeScale().setVisibleLogicalRange({
       from: Math.max(-0.5, count - bars - 0.5),
-      to: count - 1 + Math.max(5, Math.min(12, bars * 0.06)),
+      to: count - 1 + Math.max(2, Math.min(4, bars * 0.08)),
     });
   }
 

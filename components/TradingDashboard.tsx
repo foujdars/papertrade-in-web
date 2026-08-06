@@ -14,6 +14,7 @@ import { Capacitor } from "@capacitor/core";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace } from "@/components/MarketsWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
@@ -40,7 +41,7 @@ import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
 import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
-const periods = ["1m", "2m", "3m", "5m", "10m", "15m", "30m", "1H", "2H", "3H", "4H", "1D", "1W", "1M", "1Y"];
+const periods: readonly string[] = CHART_TIMEFRAMES;
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
 const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
 const LAST_CASH_CHART_STORAGE_KEY = "papertrade-last-cash-chart";
@@ -57,7 +58,7 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "trade" | "watchlist" | "positions" | "orders" | "markets" | "pnl";
+type NavigationSection = "trade" | "watchlist" | "orders" | "markets" | "pnl";
 
 function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
   if (!order.instrumentKey || (order.assetType !== "OPTION" && order.assetType !== "FUTURE")) return null;
@@ -227,6 +228,8 @@ export function TradingDashboard() {
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
+  const [showTimeframeMenu, setShowTimeframeMenu] = useState(false);
+  const [showWatchlistSelector, setShowWatchlistSelector] = useState(false);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [drawingsLocked, setDrawingsLocked] = useState(false);
   const [undoSignal, setUndoSignal] = useState(0);
@@ -501,6 +504,12 @@ export function TradingDashboard() {
   }), [stockUniverse]);
 
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
+  const activeWatchlistName = activeCustomList?.name ?? watchlist;
+  const activeWatchlistCount = activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
+  const watchlistChoices = useMemo(() => [
+    ...watchlistTabs.map((tab) => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
+    ...customWatchlists.map((list) => ({ id: `custom:${list.id}`, name: list.name, count: list.symbols.length, custom: true })),
+  ], [customWatchlists, watchlistCounts]);
   const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return null;
     if (fnoUnderlying?.instrumentKey === spotInstrument.instrumentKey) return fnoUnderlying;
@@ -1372,7 +1381,7 @@ export function TradingDashboard() {
   function openNavigationSection(section: NavigationSection) {
     setOptionChainOpen(false);
     setSidebarOpen(section === "watchlist");
-    setPositionsOpen(section === "positions");
+    setPositionsOpen(false);
     setOrdersOpen(section === "orders");
     setMarketsOpen(section === "markets");
     setPnlOpen(section === "pnl");
@@ -1380,22 +1389,20 @@ export function TradingDashboard() {
 
   const activeNavigationSection: NavigationSection = sidebarOpen
     ? "watchlist"
-    : positionsOpen
-      ? "positions"
-      : ordersOpen
-        ? "orders"
-        : marketsOpen
-          ? "markets"
-          : pnlOpen
-            ? "pnl"
-            : "trade";
+    : ordersOpen
+      ? "orders"
+      : marketsOpen
+        ? "markets"
+        : pnlOpen
+          ? "pnl"
+          : "trade";
 
   return (
     <main className="terminal-shell" data-theme={theme}>
       <header className="topbar">
         <Brand />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "positions" ? "nav-active" : ""} onClick={() => openNavigationSection("positions")}>Positions</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -1412,11 +1419,8 @@ export function TradingDashboard() {
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
           <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
-          <div className="watchlist-tabs">
-            {watchlistTabs.map((tab) => <button key={tab} onClick={() => { setWatchlist(tab); setWatchlistLimit(60); }} className={watchlist === tab ? "active" : ""}><span>{tab}</span><small>{watchlistCounts[tab]}</small></button>)}
-            {customWatchlists.map((list) => <button key={list.id} onClick={() => { setWatchlist(`custom:${list.id}`); setWatchlistLimit(60); }} className={watchlist === `custom:${list.id}` ? "active" : ""}><span>{list.name}</span><small>{list.symbols.length}</small></button>)}
-            {customWatchlists.length < 5 && <button className="new-watchlist-tab" onClick={() => openWatchlistPicker(null)}><Plus size={12} /><span>New list</span></button>}
-          </div>
+          <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>
+          {showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
           <div className="instrument-list">
             {visibleInstruments.map((item) => {
@@ -1487,9 +1491,8 @@ export function TradingDashboard() {
           </div>
 
           <div className="chart-controls">
-            <div className="period-tabs">{periods.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => setTimeframe(period)}>{period}</button>)}</div>
-            <span className="control-divider" />
-            <button className={`control-button mobile-indicator-control ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={16} /> Functions <span className="pill-count">{activeIndicatorCount}</span></button>
+            <button className={`control-button mobile-indicator-control ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }}><Activity size={16} /> Functions <span className="pill-count">{activeIndicatorCount}</span></button>
+            <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
             <div className="chart-right-controls">
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
             </div>
@@ -1509,6 +1512,7 @@ export function TradingDashboard() {
             </div>
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
             ) : (
@@ -1630,7 +1634,6 @@ export function TradingDashboard() {
       <nav className="mobile-bottom-nav">
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
-        <button className={activeNavigationSection === "positions" ? "active" : ""} onClick={() => openNavigationSection("positions")}><BriefcaseBusiness size={19} /><span>Positions</span></button>
         <button className={activeNavigationSection === "orders" ? "active" : ""} onClick={() => openNavigationSection("orders")}><WalletCards size={19} /><span>Orders</span></button>
         <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
         <button className={activeNavigationSection === "pnl" ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>P&amp;L</span></button>
