@@ -3,7 +3,7 @@
 import {
   Activity, ArrowUpRight, Bot, BoxSelect, BriefcaseBusiness, Brush, Cable, CheckCircle2, ChevronDown, ChevronRight, Cloud,
   Eye, EyeOff, FlipHorizontal2, Layers3, LineChart, ListFilter, Lock, LockKeyhole, LockOpen,
-  Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
+  Link2, Magnet, Minus, Moon, MousePointer2, MoveDiagonal2, MoveVertical, Plus, Radio, Ruler, Sun,
   LogOut, Redo2, Search, Star, Target, Trash2, Undo2, UserRound,
   TrendingDown, TrendingUp, WalletCards, X, type LucideIcon,
 } from "lucide-react";
@@ -285,17 +285,19 @@ export function TradingDashboard() {
   const autoSquareOffRepairInFlightRef = useRef(false);
 
   const closeFnoWorkspace = useCallback(() => {
-    let saved: { instrument?: Instrument; timeframe?: string } = {};
+    let saved: { instrument?: Instrument; timeframe?: string; fnoUnderlying?: FnoUnderlying } = {};
     try { saved = JSON.parse(localStorage.getItem(LAST_CASH_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
-    const fallback = saved.instrument?.instrumentKey && saved.instrument.assetType !== "OPTION"
+    const fallback = saved.instrument?.instrumentKey && saved.instrument.assetType !== "OPTION" && saved.instrument.assetType !== "FUTURE"
       ? saved.instrument
       : instruments[0];
     const restoredTimeframe = saved.timeframe && periods.includes(saved.timeframe) ? saved.timeframe : "5m";
     setSelected(fallback);
     setTimeframe(restoredTimeframe);
     setSpotInstrument(null);
-    setFnoUnderlying(null);
-    setFnoFutureInstrument(null);
+    const restoredUnderlying = saved.fnoUnderlying?.instrumentKey === fallback.instrumentKey ? saved.fnoUnderlying : null;
+    const restoredFuture = restoredUnderlying?.futures?.[0];
+    setFnoUnderlying(restoredUnderlying);
+    setFnoFutureInstrument(restoredFuture ? futureToInstrument(restoredFuture, restoredUnderlying) : null);
     setFnoTopMode("SPOT");
     setFnoTradeDockOpen(false);
     setOptionChainOpen(false);
@@ -353,7 +355,7 @@ export function TradingDashboard() {
   useEffect(() => {
     const applyRequestedChart = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
-      let savedChart: { symbol?: string; timeframe?: string; instrument?: Instrument; spotInstrument?: Instrument } = {};
+      let savedChart: { symbol?: string; timeframe?: string; instrument?: Instrument; spotInstrument?: Instrument; fnoUnderlying?: FnoUnderlying } = {};
       try { savedChart = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
       const requestedSymbol = params.get("symbol")?.toUpperCase() ?? savedChart.symbol?.toUpperCase();
       const requestedTimeframe = params.get("timeframe") ?? savedChart.timeframe;
@@ -367,6 +369,11 @@ export function TradingDashboard() {
         setSelected(savedChart.instrument);
         setDerivativeInstruments((current) => current.some((item) => item.instrumentKey === savedChart.instrument!.instrumentKey) ? current : [savedChart.instrument!, ...current]);
         setSpotInstrument(savedChart.spotInstrument?.instrumentKey ? savedChart.spotInstrument : null);
+      }
+      if (savedChart.fnoUnderlying?.instrumentKey) {
+        setFnoUnderlying(savedChart.fnoUnderlying);
+        const savedFuture = savedChart.fnoUnderlying.futures?.[0];
+        setFnoFutureInstrument(savedFuture ? futureToInstrument(savedFuture, savedChart.fnoUnderlying) : null);
       }
       if (requestedSymbol) {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
@@ -382,13 +389,14 @@ export function TradingDashboard() {
     const pending = pendingChartRestoreRef.current;
     if (pending && selected.symbol !== pending.symbol) return;
     pendingChartRestoreRef.current = null;
-    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe, instrument: selected, spotInstrument }));
-  }, [selected, spotInstrument, timeframe]);
+    localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe, instrument: selected, spotInstrument, fnoUnderlying }));
+  }, [fnoUnderlying, selected, spotInstrument, timeframe]);
 
   useEffect(() => {
     if (selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
-    localStorage.setItem(LAST_CASH_CHART_STORAGE_KEY, JSON.stringify({ instrument: selected, timeframe }));
-  }, [selected, timeframe]);
+    const selectedUnderlying = fnoUnderlying?.instrumentKey === selected.instrumentKey ? fnoUnderlying : undefined;
+    localStorage.setItem(LAST_CASH_CHART_STORAGE_KEY, JSON.stringify({ instrument: selected, timeframe, fnoUnderlying: selectedUnderlying }));
+  }, [fnoUnderlying, selected, timeframe]);
 
   useEffect(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return;
@@ -1186,6 +1194,20 @@ export function TradingDashboard() {
     setMarketsOpen(false);
   }
 
+  function openFnoNormalChart(underlying: FnoUnderlying) {
+    const listedInstrument = stockUniverse.find((item) => item.instrumentKey === underlying.instrumentKey || item.symbol === underlying.symbol);
+    const quote = marketQuotes[underlying.instrumentKey] ?? marketQuotes[underlying.symbol];
+    const normalInstrument = listedInstrument
+      ? { ...listedInstrument, price: quote?.lastPrice ?? listedInstrument.price }
+      : underlyingToInstrument(underlying, quote?.lastPrice ?? 0);
+    chooseTradeInstrument(normalInstrument);
+    setFnoUnderlying(underlying);
+    const nearestFuture = underlying.futures?.[0];
+    setFnoFutureInstrument(nearestFuture ? futureToInstrument(nearestFuture, underlying) : null);
+    setFnoTopMode("SPOT");
+    setMarketsOpen(false);
+  }
+
   async function openFnoUnderlying(underlying: FnoUnderlying) {
     if (openingUnderlyingKey) return;
     setOpeningUnderlyingKey(underlying.instrumentKey);
@@ -1436,6 +1458,15 @@ export function TradingDashboard() {
               >
                 <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
               </button>}
+              {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button
+                className="chart-derivatives-link"
+                disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey}
+                onClick={() => void openFnoUnderlying(fnoUnderlying)}
+                aria-label={`Open ${selected.symbol} option charts`}
+                title="Open option charts"
+              >
+                <Link2 size={19} />
+              </button>}
               {showTradeSymbols && (
                 <div className="trade-symbol-menu">
                   <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
@@ -1643,9 +1674,8 @@ export function TradingDashboard() {
           volumeLoading={marketScannerLoading}
           volumeError={marketScannerError}
           stockUniverse={stockUniverse}
-          openingUnderlyingKey={openingUnderlyingKey}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
-          onSelectUnderlying={(underlying) => void openFnoUnderlying(underlying)}
+          onSelectUnderlying={openFnoNormalChart}
           onClose={() => setMarketsOpen(false)}
         />
       )}

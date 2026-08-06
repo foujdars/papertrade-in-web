@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type UpstoxOptionContract = {
-  expiry?: string;
+  expiry?: string | number;
   instrument_key?: string;
   trading_symbol?: string;
   instrument_type?: "CE" | "PE";
@@ -39,6 +39,19 @@ type OptionChainPayload = { status?: string; data?: UpstoxChainRow[] };
 function finite(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeExpiry(value: string | number | undefined) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    const milliseconds = numeric > 10_000_000_000 ? numeric : numeric * 1_000;
+    const date = new Date(milliseconds);
+    if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 }
 
 function normalizeSide(side: ChainSide | undefined, contract: UpstoxOptionContract | undefined, optionType: "CE" | "PE") {
@@ -92,7 +105,7 @@ export async function GET(request: Request) {
     if (expiry) contractParams.set("expiry_date", expiry);
     const contractsPayload = await upstoxFetch<OptionContractPayload>(`/v2/option/contract?${contractParams}`);
     const contracts = contractsPayload.data ?? [];
-    const expiries = [...new Set(contracts.map((item) => item.expiry).filter((value): value is string => Boolean(value)))].sort();
+    const expiries = [...new Set(contracts.map((item) => normalizeExpiry(item.expiry)).filter(Boolean))].sort();
 
     if (!expiry) {
       return Response.json(

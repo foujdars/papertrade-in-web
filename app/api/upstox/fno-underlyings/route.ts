@@ -15,7 +15,7 @@ type UpstoxDerivative = {
   name?: string;
   instrument_key?: string;
   trading_symbol?: string;
-  expiry?: string;
+  expiry?: string | number;
   lot_size?: number;
   last_price?: number;
 };
@@ -41,6 +41,19 @@ function normalizeIndexSymbol(value: string) {
   return aliases[normalized] ?? normalized.replace(/[^A-Z0-9]/g, "");
 }
 
+function normalizeExpiry(value: string | number | undefined) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    const milliseconds = numeric > 10_000_000_000 ? numeric : numeric * 1_000;
+    const date = new Date(milliseconds);
+    if (!Number.isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
 async function loadUnderlyings() {
   if (cache && cache.expiresAt > Date.now()) return cache.underlyings;
   const master = await loadNseMaster();
@@ -64,11 +77,12 @@ async function loadUnderlyings() {
     } satisfies FnoUnderlying;
     if (item.instrument_type === "FUT") {
       current.futureContracts += 1;
-      if (item.instrument_key && item.trading_symbol && item.expiry) {
+      const expiry = normalizeExpiry(item.expiry);
+      if (item.instrument_key && item.trading_symbol && expiry) {
         current.futures?.push({
           instrumentKey: item.instrument_key,
           tradingSymbol: item.trading_symbol.trim(),
-          expiry: item.expiry,
+          expiry,
           lotSize: Math.max(1, Math.round(Number(item.lot_size) || 1)),
           lastPrice: Number(item.last_price) || 0,
         });
@@ -80,7 +94,7 @@ async function loadUnderlyings() {
   const priority = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
   const underlyings = [...grouped.values()]
     .filter((item) => item.optionContracts > 0)
-    .map((item) => ({ ...item, futures: (item.futures ?? []).sort((a, b) => a.expiry.localeCompare(b.expiry)) }))
+    .map((item) => ({ ...item, futures: (item.futures ?? []).sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))) }))
     .sort((a, b) => {
       const aPriority = priority.indexOf(a.symbol);
       const bPriority = priority.indexOf(b.symbol);

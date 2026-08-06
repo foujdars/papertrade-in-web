@@ -130,12 +130,16 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoChartWorkspace, /className="sell"/);
   assert.match(fnoChartWorkspace, /className="buy"/);
   assert.match(dashboard, /openFnoUnderlying/);
+  assert.match(dashboard, /openFnoNormalChart/);
+  assert.match(dashboard, /chart-derivatives-link/);
+  assert.match(dashboard, /onSelectUnderlying=\{openFnoNormalChart\}/);
   assert.match(dashboard, /toggleFnoOptionType/);
   assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
   assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
   assert.match(dashboard, /quantityStep/);
   assert.match(marketsWorkspace, /fno-symbol-row/);
   assert.match(marketsWorkspace, /onSelectUnderlying/);
+  assert.doesNotMatch(marketsWorkspace, /openingUnderlyingKey/);
   assert.match(optionChainSheet, /option-sheet-handle/);
   assert.match(optionChainSheet, />CALL</);
   assert.match(optionChainSheet, />PUT</);
@@ -143,8 +147,11 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoRoute, /segment !== "NSE_FO"/);
   assert.match(fnoRoute, /item\.instrument_type === "FUT"/);
   assert.match(fnoRoute, /tradingSymbol: item\.trading_symbol/);
+  assert.match(fnoRoute, /normalizeExpiry/);
+  assert.match(fnoRoute, /String\(a\.expiry\)\.localeCompare/);
   assert.match(optionChainRoute, /\/v2\/option\/chain/);
   assert.match(optionChainRoute, /\/v2\/option\/contract/);
+  assert.match(optionChainRoute, /normalizeExpiry/);
   assert.match(fnoTypes, /optionToInstrument/);
   assert.match(fnoTypes, /futureToInstrument/);
   assert.match(dashboard, /Add virtual money/);
