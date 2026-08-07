@@ -1,12 +1,28 @@
 "use client";
 
-import { Activity, Cable, Search, X } from "lucide-react";
+import { Activity, Cable, Search, Star, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { FnoUnderlying } from "@/lib/fno";
+import { formatInr } from "@/lib/market";
+import type { NormalizedQuote } from "@/lib/upstox";
 
 type FnoListTab = "indices" | "fno";
 
-export function FnoListsWorkspace({ onSelect, onClose }: { onSelect: (underlying: FnoUnderlying) => void; onClose: () => void }) {
+export function FnoListsWorkspace({
+  quotes,
+  starredSymbols,
+  onQuoteKeysChange,
+  onSelect,
+  onStar,
+  onClose,
+}: {
+  quotes: Record<string, NormalizedQuote>;
+  starredSymbols: ReadonlySet<string>;
+  onQuoteKeysChange: (keys: string[]) => void;
+  onSelect: (underlying: FnoUnderlying) => void;
+  onStar: (underlying: FnoUnderlying) => void;
+  onClose: () => void;
+}) {
   const [tab, setTab] = useState<FnoListTab>("indices");
   const [underlyings, setUnderlyings] = useState<FnoUnderlying[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +42,11 @@ export function FnoListsWorkspace({ onSelect, onClose }: { onSelect: (underlying
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    onQuoteKeysChange(underlyings.map((item) => item.instrumentKey));
+    return () => onQuoteKeysChange([]);
+  }, [onQuoteKeysChange, underlyings]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const type = tab === "indices" ? "INDEX" : "EQUITY";
@@ -42,12 +63,18 @@ export function FnoListsWorkspace({ onSelect, onClose }: { onSelect: (underlying
       </nav>
       <label className="market-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "indices" ? "Search indices" : "Search F&O stocks"} /></label>
       <div className="market-discovery-list">
-        {filtered.map((item) => (
-          <button key={item.instrumentKey} className="trend-stock-row fno-symbol-row" onClick={() => onSelect(item)} aria-label={`Open ${item.symbol} chart`}>
-            <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
-            <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-          </button>
-        ))}
+        {filtered.map((item) => {
+          const quote = quotes[item.instrumentKey] ?? quotes[item.symbol];
+          const starred = starredSymbols.has(item.symbol);
+          return (
+            <div key={item.instrumentKey} className="trend-stock-row fno-symbol-row" role="button" tabIndex={0} onClick={() => onSelect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(item); }} aria-label={`Open ${item.symbol} chart`}>
+              <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
+              <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
+              <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{quote ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : "Loading"}</small></span>
+              <button type="button" className={`watchlist-star ${starred ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); onStar(item); }} aria-label={`${starred ? "Manage" : "Add"} ${item.symbol} custom watchlists`}><Star size={16} fill={starred ? "currentColor" : "none"} /></button>
+            </div>
+          );
+        })}
         {loading && !underlyings.length && <div className="positions-empty"><Activity size={30} /><b>Loading active derivative symbols</b><span>Reading the current NSE contracts from Upstox.</span></div>}
         {!loading && error && <div className="positions-empty"><Cable size={30} /><b>F&amp;O list unavailable</b><span>{error}</span></div>}
         {!loading && !error && !filtered.length && <div className="positions-empty"><Activity size={30} /><b>No matching symbols</b><span>Try another symbol name.</span></div>}

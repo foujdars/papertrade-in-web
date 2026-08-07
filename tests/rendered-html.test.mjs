@@ -177,6 +177,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(marketsWorkspace, /fno-symbol-row|Indices|F&amp;O/);
   assert.match(fnoListsWorkspace, /fno-symbol-row/);
   assert.match(fnoListsWorkspace, /Indices &amp; F&amp;O/);
+  assert.match(fnoListsWorkspace, /quote\.changePercent/);
+  assert.match(fnoListsWorkspace, /watchlist-star/);
+  assert.match(fnoListsWorkspace, /onQuoteKeysChange/);
   assert.doesNotMatch(marketsWorkspace, /openingUnderlyingKey/);
   assert.match(optionChainSheet, /option-sheet-handle/);
   assert.match(optionChainSheet, />CALL</);

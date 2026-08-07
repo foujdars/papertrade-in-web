@@ -302,6 +302,7 @@ export function TradingDashboard() {
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
   const [fnoListOpen, setFnoListOpen] = useState(false);
+  const [fnoListQuoteKeys, setFnoListQuoteKeys] = useState<string[]>([]);
   const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(true);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
@@ -520,16 +521,21 @@ export function TradingDashboard() {
     return () => controller.abort();
   }, []);
 
-  const filtered = useMemo(() => stockUniverse.filter((item) => {
+  const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
     const standardList = watchlistTabs.find((tab) => tab === watchlist);
-    const matchesList = Boolean(term)
-      || customList?.symbols.includes(item.symbol)
-      || standardList === "ALL NSE"
-      || (standardList !== undefined && item.categories.includes(standardList));
-    return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
-  }), [customWatchlists, search, stockUniverse, watchlist]);
+    const universe = customList
+      ? [...new Map([...stockUniverse, ...derivativeInstruments].map((item) => [item.instrumentKey, item])).values()]
+      : stockUniverse;
+    return universe.filter((item) => {
+      const matchesList = Boolean(term)
+        || customList?.symbols.includes(item.symbol)
+        || standardList === "ALL NSE"
+        || (standardList !== undefined && item.categories.includes(standardList));
+      return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
+    });
+  }, [customWatchlists, derivativeInstruments, search, stockUniverse, watchlist]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
     return stockUniverse
@@ -552,10 +558,11 @@ export function TradingDashboard() {
       selected.instrumentKey,
       fnoTopInstrument?.instrumentKey,
       ...LIVE_INDEX_TICKERS.map((item) => item.instrumentKey),
+      ...fnoListQuoteKeys,
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
       ...visibleInstruments.map((item) => item.instrumentKey),
-    ].filter((value): value is string => Boolean(value)))].slice(0, 100).join(","),
-    [fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
+    ].filter((value): value is string => Boolean(value)))].slice(0, 500).join(","),
+    [fnoListQuoteKeys, fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -565,6 +572,7 @@ export function TradingDashboard() {
   }), [stockUniverse]);
 
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
+  const customWatchlistSymbols = useMemo(() => new Set(customWatchlists.flatMap((list) => list.symbols)), [customWatchlists]);
   const activeWatchlistName = activeCustomList?.name ?? watchlist;
   const activeWatchlistCount = activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
   const watchlistChoices = useMemo(() => [
@@ -594,7 +602,10 @@ export function TradingDashboard() {
       if (requestInFlight || Date.now() < retryAt) return;
       requestInFlight = true;
       try {
-        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`, {
+        const response = await fetch("/api/upstox/quotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: quoteKeys.split(",") }),
           cache: "no-store",
           signal: controller.signal,
         });
@@ -1469,6 +1480,16 @@ export function TradingDashboard() {
     setWatchlistPickerOpen(true);
   }
 
+  function openFnoWatchlistPicker(underlying: FnoUnderlying) {
+    const quote = marketQuotes[underlying.instrumentKey] ?? marketQuotes[underlying.symbol];
+    const listedInstrument = stockUniverse.find((item) => item.instrumentKey === underlying.instrumentKey || item.symbol === underlying.symbol);
+    const instrument = listedInstrument
+      ? { ...listedInstrument, price: quote?.lastPrice ?? listedInstrument.price }
+      : underlyingToInstrument(underlying, quote?.lastPrice ?? 0);
+    setDerivativeInstruments((current) => current.some((item) => item.instrumentKey === instrument.instrumentKey) ? current : [instrument, ...current]);
+    openWatchlistPicker(instrument);
+  }
+
   function toggleWatchlistMembership(listId: string) {
     if (!watchlistTarget) return;
     const nextLists = customWatchlists.map((list) => list.id !== listId ? list : {
@@ -1885,7 +1906,7 @@ export function TradingDashboard() {
         />
       )}
 
-      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace onSelect={openFnoNormalChart} onClose={() => {
+      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onStar={openFnoWatchlistPicker} onClose={() => {
         if (selected.assetType === "OPTION" && spotInstrument) setFnoListOpen(false);
         else closeFnoWorkspace();
       }} />}
