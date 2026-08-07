@@ -117,6 +117,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /NSE_INDEX\|Nifty Bank/);
   assert.match(dashboard, /BSE_INDEX\|SENSEX/);
   assert.match(dashboard, /live-index-strip/);
+  assert.match(dashboard, /quote\?\.netChange/);
+  assert.match(dashboard, /assetType: "INDEX"/);
+  assert.match(dashboard, /defaultRiskDistance = 2_000/);
+  assert.match(dashboard, /defaultRewardDistance = 3_000/);
   assert.match(dashboard, /papertrade-theme/);
   assert.match(dashboard, /Neon dark theme/);
   assert.match(dashboard, /papertrade-last-chart/);
@@ -181,6 +185,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /terminal-shell\[data-theme="neon"\]/);
   assert.match(styles, /drawing-toolbar\.collapsed/);
   assert.match(styles, /chart-symbol-legend[^}]+background: transparent/);
+  assert.match(styles, /risk-entry-line[^}]+border-top-style: solid/);
+  assert.match(styles, /risk-reward-summary[^}]+background: transparent/);
+  assert.match(styles, /chart-live-pnl[^}]+top: 10px[^}]+right: 82px/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /legendSafeTop/);

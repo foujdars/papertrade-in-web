@@ -53,9 +53,9 @@ const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
 const UPSTOX_AUTO_SQUARE_OFF_POLICY = "UPSTOX_15_00_2026_02";
 const LIVE_INDEX_TICKERS = [
-  { label: "NIFTY 50", instrumentKey: "NSE_INDEX|Nifty 50" },
-  { label: "BANK NIFTY", instrumentKey: "NSE_INDEX|Nifty Bank" },
-  { label: "SENSEX", instrumentKey: "BSE_INDEX|SENSEX" },
+  { label: "NIFTY 50", symbol: "NIFTY", name: "Nifty 50", instrumentKey: "NSE_INDEX|Nifty 50" },
+  { label: "BANK NIFTY", symbol: "BANKNIFTY", name: "Nifty Bank", instrumentKey: "NSE_INDEX|Nifty Bank" },
+  { label: "SENSEX", symbol: "SENSEX", name: "BSE Sensex", instrumentKey: "BSE_INDEX|SENSEX" },
 ] as const;
 
 type CustomWatchlist = {
@@ -844,16 +844,18 @@ export function TradingDashboard() {
     ? selectedPosition.side === "LONG" ? "BUY" : "SELL"
     : side;
   const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : visibleLivePrice;
+  const riskDisplayQuantity = selectedPosition.quantity > 0 ? selectedPosition.quantity : quantity;
+  const defaultRiskDistance = 2_000 / Math.max(1, riskDisplayQuantity);
+  const defaultRewardDistance = 3_000 / Math.max(1, riskDisplayQuantity);
   const requestedTargetPrice = Number(targetPrice);
   const requestedStopLossPrice = Number(stopLossPrice);
   const chartTargetPrice = Number.isFinite(requestedTargetPrice) && requestedTargetPrice > 0
     ? requestedTargetPrice
-    : riskEntryPrice * (riskToolSide === "BUY" ? 1.01 : .99);
+    : riskEntryPrice + (riskToolSide === "BUY" ? defaultRewardDistance : -defaultRewardDistance);
   const chartStopLossPrice = Number.isFinite(requestedStopLossPrice) && requestedStopLossPrice > 0
     ? requestedStopLossPrice
-    : riskEntryPrice * (riskToolSide === "BUY" ? .995 : 1.005);
+    : riskEntryPrice + (riskToolSide === "BUY" ? -defaultRiskDistance : defaultRiskDistance);
   const activeRiskToolEnabled = riskToolEnabled || Boolean(selectedProtection && selectedPosition.quantity > 0);
-  const riskDisplayQuantity = selectedPosition.quantity > 0 ? selectedPosition.quantity : quantity;
 
   useEffect(() => {
     const restoreProtection = window.setTimeout(() => {
@@ -939,10 +941,13 @@ export function TradingDashboard() {
     setRiskToolEnabled(true);
     const target = Number(targetPrice);
     const stop = Number(stopLossPrice);
+    const displayQuantity = Math.max(1, positionMatches ? selectedPosition.quantity : quantity);
+    const rewardDistance = 3_000 / displayQuantity;
+    const riskDistance = 2_000 / displayQuantity;
     const validTarget = Number.isFinite(target) && (nextSide === "BUY" ? target > entry : target < entry);
     const validStop = Number.isFinite(stop) && (nextSide === "BUY" ? stop < entry : stop > entry);
-    if (!validTarget) setTargetPrice((entry * (nextSide === "BUY" ? 1.01 : .99)).toFixed(2));
-    if (!validStop) setStopLossPrice((entry * (nextSide === "BUY" ? .995 : 1.005)).toFixed(2));
+    if (!validTarget) setTargetPrice((entry + (nextSide === "BUY" ? rewardDistance : -rewardDistance)).toFixed(4));
+    if (!validStop) setStopLossPrice((entry + (nextSide === "BUY" ? -riskDistance : riskDistance)).toFixed(4));
   }
 
   function updateChartRiskLevel(level: "target" | "stopLoss", value: number, committed: boolean) {
@@ -1482,12 +1487,17 @@ export function TradingDashboard() {
           const quote = marketQuotes[item.instrumentKey];
           const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
           const change = quote?.changePercent ?? 0;
+          const points = quote?.netChange ?? 0;
           return (
-            <div className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `${item.label} live from Upstox` : `${item.label} waiting for Upstox`}>
+            <button type="button" className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
+              chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
+              setSection("trade");
+            }}>
               <span>{item.label}</span>
               <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
+              <small className={points >= 0 ? "positive" : "negative"}>{quote ? `${points >= 0 ? "+" : ""}${points.toFixed(2)}` : "—"}</small>
               <em className={change >= 0 ? "positive" : "negative"}>{quote ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Live"}</em>
-            </div>
+            </button>
           );
         })}
       </section>
