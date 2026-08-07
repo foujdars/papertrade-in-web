@@ -1557,7 +1557,7 @@ export function TradingDashboard() {
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("trade")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
@@ -1590,9 +1590,10 @@ export function TradingDashboard() {
         })}
       </section>
 
-      <div className="workspace">
+      <div className={`workspace section-${activeNavigationSection}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
+          <div className="desktop-panel-head"><span className="eyebrow">Indian markets</span><h2>Watchlist</h2></div>
           <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
           <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>
           {showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
@@ -1668,6 +1669,9 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
+            <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
+              <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
+            </button>
             <div className="chart-right-controls">
               <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
             </div>
@@ -1837,8 +1841,8 @@ export function TradingDashboard() {
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setOrdersOpen(false)}>
-          <section className="modal orders-modal" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={() => setOrdersOpen(false)}>
+          <section className="modal orders-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
@@ -1914,8 +1918,8 @@ export function TradingDashboard() {
         </div>
       )}
       {pnlOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPnlOpen(false)}>
-          <section className="modal pnl-modal" role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={() => setPnlOpen(false)}>
+          <section className="modal pnl-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
             <div className="pnl-stat-grid">
               <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
