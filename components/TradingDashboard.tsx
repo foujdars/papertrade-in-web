@@ -1600,7 +1600,7 @@ export function TradingDashboard() {
           : workspaceMode;
 
   return (
-    <main className="terminal-shell" data-theme={theme}>
+    <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("trade")} />
         <nav className="main-nav" aria-label="Main navigation">
