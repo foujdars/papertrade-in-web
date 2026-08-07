@@ -1490,8 +1490,8 @@ export function TradingDashboard() {
           const points = quote?.netChange ?? 0;
           return (
             <button type="button" className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
+              openNavigationSection("trade");
               chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
-              setSection("trade");
             }}>
               <span>{item.label}</span>
               <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
