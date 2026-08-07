@@ -6,7 +6,7 @@ import {
   LogOut, Search, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -43,6 +43,9 @@ import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
+const subscribeToNativePlatform = () => () => {};
+const getAndroidPlatformSnapshot = () => Capacitor.getPlatform() === "android";
+const getServerAndroidPlatformSnapshot = () => false;
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
 const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
 const LAST_CASH_CHART_STORAGE_KEY = "papertrade-last-cash-chart";
@@ -272,6 +275,7 @@ export function TradingDashboard() {
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [riskToolEnabled, setRiskToolEnabled] = useState(false);
   const [theme, setTheme] = useState<"light" | "neon">("light");
+  const isAndroidApp = useSyncExternalStore(subscribeToNativePlatform, getAndroidPlatformSnapshot, getServerAndroidPlatformSnapshot);
   const [quantityInput, setQuantityInput] = useState("1");
   const parsedQuantity = Number.parseInt(quantityInput, 10);
   const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
@@ -1607,7 +1611,7 @@ export function TradingDashboard() {
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
           <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
-          <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
+          {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
