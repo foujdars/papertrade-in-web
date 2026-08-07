@@ -91,7 +91,7 @@ export function FnoChartWorkspace({
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
-  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(true);
   const underlyingSymbol = option.underlyingSymbol || topInstrument.underlyingSymbol || topInstrument.symbol;
   const optionLabel = `${option.expiry ? new Date(`${option.expiry}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""} ${option.strikePrice?.toLocaleString("en-IN") ?? ""}`.trim();
   const lots = Math.max(1, Math.round(quantity / lotSize));

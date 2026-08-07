@@ -52,6 +52,11 @@ const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
 const UPSTOX_AUTO_SQUARE_OFF_POLICY = "UPSTOX_15_00_2026_02";
+const LIVE_INDEX_TICKERS = [
+  { label: "NIFTY 50", instrumentKey: "NSE_INDEX|Nifty 50" },
+  { label: "BANK NIFTY", instrumentKey: "NSE_INDEX|Nifty Bank" },
+  { label: "SENSEX", instrumentKey: "BSE_INDEX|SENSEX" },
+] as const;
 
 type CustomWatchlist = {
   id: string;
@@ -258,7 +263,7 @@ export function TradingDashboard() {
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
   const [fnoListOpen, setFnoListOpen] = useState(false);
-  const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(false);
+  const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(true);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
@@ -502,6 +507,7 @@ export function TradingDashboard() {
     () => [...new Set([
       selected.instrumentKey,
       fnoTopInstrument?.instrumentKey,
+      ...LIVE_INDEX_TICKERS.map((item) => item.instrumentKey),
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
       ...visibleInstruments.map((item) => item.instrumentKey),
     ].filter((value): value is string => Boolean(value)))].slice(0, 100).join(","),
@@ -1471,6 +1477,21 @@ export function TradingDashboard() {
         </div>
       </header>
 
+      <section className="live-index-strip" aria-label="Live Indian market indices">
+        {LIVE_INDEX_TICKERS.map((item) => {
+          const quote = marketQuotes[item.instrumentKey];
+          const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
+          const change = quote?.changePercent ?? 0;
+          return (
+            <div className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `${item.label} live from Upstox` : `${item.label} waiting for Upstox`}>
+              <span>{item.label}</span>
+              <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
+              <em className={change >= 0 ? "positive" : "negative"}>{quote ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Live"}</em>
+            </div>
+          );
+        })}
+      </section>
+
       <div className="workspace">
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
@@ -1593,7 +1614,7 @@ export function TradingDashboard() {
                 chartAction={chartAction}
                 chartTheme={theme}
                 onChartTap={() => setChartTradeFooterOpen((value) => !value)}
-                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
+                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity, livePnl: selectedPosition.quantity > 0 && selectedQuoteIsFresh ? selectedPosition.unrealizedPnl : undefined }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onFeedStatus={handleFeedStatus}
@@ -1690,7 +1711,7 @@ export function TradingDashboard() {
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
-          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
+          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity, livePnl: selectedPosition.quantity > 0 && selectedQuoteIsFresh ? selectedPosition.unrealizedPnl : undefined }}
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onFeedStatus={handleFeedStatus}

@@ -153,6 +153,7 @@ export type ChartOrderTool = {
   targetPrice: number;
   stopLossPrice: number;
   quantity: number;
+  livePnl?: number;
 };
 
 type DraftDrawing = {
@@ -385,7 +386,7 @@ export function MarketChart({
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
-  const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number; target: number; stopLoss: number } | null>(null);
+  const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number | null; target: number | null; stopLoss: number | null } | null>(null);
 
   useEffect(() => {
     onChartTapRef.current = onChartTap;
@@ -401,18 +402,26 @@ export function MarketChart({
     const entry = series.priceToCoordinate(tool.entryPrice);
     const target = series.priceToCoordinate(tool.targetPrice);
     const stopLoss = series.priceToCoordinate(tool.stopLossPrice);
-    if (entry === null || target === null || stopLoss === null) return;
+    if (entry === null || target === null || stopLoss === null) {
+      setRiskCoordinates(null);
+      return;
+    }
     const chartHeight = chartHost.current?.clientHeight ?? 0;
-    const clampToChart = (coordinate: number) => chartHeight > 60
-      ? Math.max(28, Math.min(chartHeight - 28, coordinate))
-      : coordinate;
+    const legendSafeTop = 58;
+    const axisSafeBottom = Math.max(legendSafeTop, chartHeight - 28);
+    const visibleCoordinate = (coordinate: number) => coordinate >= legendSafeTop && coordinate <= axisSafeBottom
+      ? coordinate
+      : null;
     const nextCoordinates = {
-      entry: clampToChart(entry),
-      target: clampToChart(target),
-      stopLoss: clampToChart(stopLoss),
+      entry: visibleCoordinate(entry),
+      target: visibleCoordinate(target),
+      stopLoss: visibleCoordinate(stopLoss),
     };
     setRiskCoordinates((current) => {
-      if (current && Math.abs(current.entry - nextCoordinates.entry) < .3 && Math.abs(current.target - nextCoordinates.target) < .3 && Math.abs(current.stopLoss - nextCoordinates.stopLoss) < .3) return current;
+      const coordinateMatches = (previous: number | null, next: number | null) => previous === null || next === null
+        ? previous === next
+        : Math.abs(previous - next) < .3;
+      if (current && coordinateMatches(current.entry, nextCoordinates.entry) && coordinateMatches(current.target, nextCoordinates.target) && coordinateMatches(current.stopLoss, nextCoordinates.stopLoss)) return current;
       return nextCoordinates;
     });
   }
@@ -1338,10 +1347,10 @@ export function MarketChart({
         {orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
             {onOrderToolClose && <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>}
-            <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
-              <span>{orderTool.side} ENTRY</span><b>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
-            </div>
-            <div
+            {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+            </div>}
+            {riskCoordinates.target !== null && <div
               className="risk-line risk-target-line"
               style={{ top: riskCoordinates.target }}
               onPointerDown={(event) => beginRiskDrag("target", event)}
@@ -1349,9 +1358,9 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("target", event)}
               onPointerCancel={(event) => endRiskDrag("target", event)}
             >
-              <span>TARGET</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b><em>↕ drag</em>
-            </div>
-            <div
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.targetPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+            </div>}
+            {riskCoordinates.stopLoss !== null && <div
               className="risk-line risk-stop-line"
               style={{ top: riskCoordinates.stopLoss }}
               onPointerDown={(event) => beginRiskDrag("stopLoss", event)}
@@ -1359,15 +1368,18 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("stopLoss", event)}
               onPointerCancel={(event) => endRiskDrag("stopLoss", event)}
             >
-              <span>STOP</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b><em>↕ drag</em>
-            </div>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.stopLossPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+            </div>}
             <div className="risk-reward-summary">
-              <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · {orderTool.quantity} qty</span>
+              <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · Qty {orderTool.quantity}</span>
               <b>Risk {formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
               <b>Reward {formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
             </div>
           </div>
         )}
+        {typeof orderTool?.livePnl === "number" && Number.isFinite(orderTool.livePnl) && <div className={`chart-live-pnl ${orderTool.livePnl >= 0 ? "positive" : "negative"}`}>
+          <span>Live P&amp;L</span><b>{formatRiskPnl(orderTool.livePnl)}</b>
+        </div>}
       </div>
     </div>
   );
