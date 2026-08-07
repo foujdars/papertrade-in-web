@@ -121,8 +121,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /assetType: "INDEX"/);
   assert.match(dashboard, /defaultRiskDistance = 2_000/);
   assert.match(dashboard, /defaultRewardDistance = 3_000/);
-  assert.match(dashboard, /chart-status-live-price/);
+  assert.match(dashboard, /chart-status-live-pnl/);
   assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
+  assert.match(dashboard, /Daily P&amp;L heat map/);
+  assert.match(dashboard, /pnl-calendar-grid/);
+  assert.match(dashboard, /Weekend \/ holiday/);
+  assert.doesNotMatch(dashboard, /pnlChartTrades|pnl-bars/);
   assert.match(dashboard, /papertrade-theme/);
   assert.match(dashboard, /Neon dark theme/);
   assert.match(dashboard, /papertrade-last-chart/);
@@ -194,6 +198,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /risk-reward-summary[^}]+background: transparent/);
   assert.match(styles, /fno-focus-workspace[^}]+color-scheme: dark/);
   assert.match(styles, /chart-live-pnl[^}]+top: 10px[^}]+right: 82px/);
+  assert.match(styles, /pnl-calendar-day\.profit/);
+  assert.match(styles, /pnl-calendar-day\.loss/);
+  assert.match(styles, /pnl-calendar-day\.no-trade/);
+  assert.match(styles, /pnl-calendar-day\.holiday/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);
   assert.match(chart, /legendSafeTop/);

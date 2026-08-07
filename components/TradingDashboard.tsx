@@ -57,6 +57,28 @@ const LIVE_INDEX_TICKERS = [
   { label: "BANK NIFTY", symbol: "BANKNIFTY", name: "Nifty Bank", instrumentKey: "NSE_INDEX|Nifty Bank" },
   { label: "SENSEX", symbol: "SENSEX", name: "BSE Sensex", instrumentKey: "BSE_INDEX|SENSEX" },
 ] as const;
+const PNL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
+const PNL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const INDIA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+
+function indiaDateParts(timestamp: number) {
+  const parts = INDIA_DATE_FORMATTER.formatToParts(new Date(timestamp));
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return { year: value("year"), month: value("month"), day: value("day") };
+}
+
+function calendarDateKey(year: number, monthIndex: number, day: number) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function compactCalendarPnl(value: number) {
+  const absolute = Math.abs(value);
+  const amount = absolute >= 10_000_000 ? `${(absolute / 10_000_000).toFixed(1)}Cr`
+    : absolute >= 100_000 ? `${(absolute / 100_000).toFixed(1)}L`
+      : absolute >= 1_000 ? `${(absolute / 1_000).toFixed(1)}K`
+        : absolute.toFixed(0);
+  return `${value >= 0 ? "+" : "−"}₹${amount}`;
+}
 
 type CustomWatchlist = {
   id: string;
@@ -270,6 +292,8 @@ export function TradingDashboard() {
   const [marketScannerError, setMarketScannerError] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
+  const [pnlCalendarMonth, setPnlCalendarMonth] = useState(() => indiaDateParts(Date.now()).month - 1);
+  const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [fundsInput, setFundsInput] = useState("100000");
@@ -916,8 +940,40 @@ export function TradingDashboard() {
       winRate: closedTrades.length ? wins / closedTrades.length * 100 : 0,
     };
   }, [closedTrades]);
-  const pnlChartTrades = closedTrades.slice(0, 14).reverse();
-  const pnlChartMaximum = Math.max(1, ...pnlChartTrades.map((trade) => Math.abs(trade.netPnl)));
+  const pnlCalendarYears = useMemo(() => {
+    const years = new Set<number>([pnlCalendarYear, indiaDateParts(Date.now()).year]);
+    closedTrades.forEach((trade) => { if (trade.closedAt > 0) years.add(indiaDateParts(trade.closedAt).year); });
+    return [...years].sort((a, b) => b - a);
+  }, [closedTrades, pnlCalendarYear]);
+  const pnlCalendar = useMemo(() => {
+    const dailyResults = new Map<string, { pnl: number; trades: number }>();
+    closedTrades.forEach((trade) => {
+      if (!trade.closedAt) return;
+      const parts = indiaDateParts(trade.closedAt);
+      if (parts.year !== pnlCalendarYear || parts.month !== pnlCalendarMonth + 1) return;
+      const key = calendarDateKey(parts.year, parts.month - 1, parts.day);
+      const current = dailyResults.get(key) ?? { pnl: 0, trades: 0 };
+      dailyResults.set(key, { pnl: current.pnl + trade.netPnl, trades: current.trades + 1 });
+    });
+    const daysInMonth = new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth + 1, 0)).getUTCDate();
+    const firstWeekday = (new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth, 1)).getUTCDay() + 6) % 7;
+    const todayParts = indiaDateParts(Date.now());
+    const days = Array.from({ length: daysInMonth }, (_, index) => {
+      const day = index + 1;
+      const key = calendarDateKey(pnlCalendarYear, pnlCalendarMonth, day);
+      const result = dailyResults.get(key);
+      const weekday = new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth, day)).getUTCDay();
+      const weekend = weekday === 0 || weekday === 6;
+      const status = result ? result.pnl >= 0 ? "profit" : "loss" : weekend ? "holiday" : "no-trade";
+      return { day, key, result, status, today: todayParts.year === pnlCalendarYear && todayParts.month === pnlCalendarMonth + 1 && todayParts.day === day };
+    });
+    return {
+      days,
+      firstWeekday,
+      monthPnl: [...dailyResults.values()].reduce((sum, result) => sum + result.pnl, 0),
+      monthTrades: [...dailyResults.values()].reduce((sum, result) => sum + result.trades, 0),
+    };
+  }, [closedTrades, pnlCalendarMonth, pnlCalendarYear]);
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
@@ -1002,7 +1058,7 @@ export function TradingDashboard() {
     const deletion = deletePaperTradeOrders(orders, trade.sourceOrderIds);
     if (!deletion.removedOrders.length) return;
     const confirmed = window.confirm(
-      `Delete ${trade.symbol} trade from this device? Its entry/exit fills, P&L, charges and graph result will be recalculated.`,
+      `Delete ${trade.symbol} trade from this device? Its entry/exit fills, P&L, charges and calendar heat map will be recalculated.`,
     );
     if (!confirmed) return;
     const nextBalance = balance + deletion.balanceAdjustment;
@@ -1451,6 +1507,11 @@ export function TradingDashboard() {
     setPositionsOpen(false);
     setOrdersOpen(section === "orders");
     setMarketsOpen(section === "markets");
+    if (section === "pnl") {
+      const currentDate = indiaDateParts(clock?.getTime() ?? Date.now());
+      setPnlCalendarMonth(currentDate.month - 1);
+      setPnlCalendarYear(currentDate.year);
+    }
     setPnlOpen(section === "pnl");
   }
 
@@ -1624,7 +1685,7 @@ export function TradingDashboard() {
                 chartAction={chartAction}
                 chartTheme={theme}
                 onChartTap={() => setChartTradeFooterOpen((value) => !value)}
-                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity, livePnl: selectedPosition.quantity > 0 && selectedQuoteIsFresh ? selectedPosition.unrealizedPnl : undefined }}
+                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onFeedStatus={handleFeedStatus}
@@ -1633,8 +1694,8 @@ export function TradingDashboard() {
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
             <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
-            <div className={`chart-status-live-price ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
-              {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live</span><b>{formatInr(visibleLivePrice)}</b></> : null}
+            <div className={`chart-status-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
+              {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></> : null}
             </div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
@@ -1723,7 +1784,7 @@ export function TradingDashboard() {
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
-          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity, livePnl: selectedPosition.quantity > 0 && selectedQuoteIsFresh ? selectedPosition.unrealizedPnl : undefined }}
+          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onFeedStatus={handleFeedStatus}
@@ -1835,21 +1896,20 @@ export function TradingDashboard() {
               <div><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b></div>
               <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
             </div>
-            <div className="pnl-chart-card">
-              <div><b>Recent trade results</b><small>Oldest to newest · net after charges</small></div>
-              <div className="pnl-bars" aria-label="Recent completed trade profit and loss chart">
-                {pnlChartTrades.map((trade) => {
-                  const barHeight = `${Math.max(5, Math.abs(trade.netPnl) / pnlChartMaximum * 100)}%`;
-                  const resultClass = trade.netPnl >= 0 ? "profit" : "loss";
-                  return (
-                    <div className={`pnl-bar-slot ${resultClass}`} key={trade.id} title={`${trade.symbol}: ${formatInr(trade.netPnl)}`}>
-                      <div className="pnl-bar-half profit-half">{trade.netPnl >= 0 && <i style={{ height: barHeight }} />}</div>
-                      <div className="pnl-bar-half loss-half">{trade.netPnl < 0 && <i style={{ height: barHeight }} />}</div>
-                      <span className="pnl-bar-caption"><b>{trade.symbol}</b><small>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</small></span>
-                    </div>
-                  );
-                })}
+            <div className="pnl-calendar-card">
+              <div className="pnl-calendar-head">
+                <span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span>
+                <div className="pnl-calendar-selectors">
+                  <label>Month<select value={pnlCalendarMonth} onChange={(event) => setPnlCalendarMonth(Number(event.target.value))}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
+                  <label>Year<select value={pnlCalendarYear} onChange={(event) => setPnlCalendarYear(Number(event.target.value))}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+                </div>
               </div>
+              <div className="pnl-calendar-weekdays">{PNL_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
+              <div className="pnl-calendar-grid" aria-label={`${PNL_MONTHS[pnlCalendarMonth]} ${pnlCalendarYear} daily profit and loss heat map`}>
+                {Array.from({ length: pnlCalendar.firstWeekday }, (_, index) => <span className="pnl-calendar-blank" key={`blank-${index}`} />)}
+                {pnlCalendar.days.map((date) => <div className={`pnl-calendar-day ${date.status} ${date.today ? "today" : ""}`} key={date.key} title={date.result ? `${date.result.trades} trade${date.result.trades === 1 ? "" : "s"}: ${formatInr(date.result.pnl)}` : date.status === "holiday" ? "Weekend / market holiday" : "No trades"}><b>{date.day}</b><small>{date.result ? compactCalendarPnl(date.result.pnl) : date.status === "holiday" ? "Holiday" : "No trade"}</small></div>)}
+              </div>
+              <div className="pnl-calendar-legend"><span className="profit">Profit</span><span className="loss">Loss</span><span className="no-trade">No trade</span><span className="holiday">Weekend / holiday</span></div>
             </div>
             <div className="pnl-trade-list">
               {closedTrades.map((trade) => {

@@ -314,10 +314,11 @@ h1, h2, p { margin: 0; }
 .chart-statusbar > div { min-width: 0; display: flex; align-items: center; gap: 5px; }
 .chart-statusbar > div:last-child { justify-self: end; white-space: nowrap; }
 .chart-feed-warning { overflow: hidden; color: var(--red); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.chart-status-live-price { min-width: 78px; justify-content: center; color: var(--muted); opacity: 0; }
-.chart-status-live-price.visible { color: var(--green); opacity: 1; }
-.chart-status-live-price span { font-size: 8px; font-weight: 750; }
-.chart-status-live-price b { color: var(--ink); font-size: 10px; font-variant-numeric: tabular-nums; }
+.chart-status-live-pnl { min-width: 100px; justify-content: center; color: var(--muted); opacity: 0; }
+.chart-status-live-pnl.visible { opacity: 1; }
+.chart-status-live-pnl svg { color: var(--green); }
+.chart-status-live-pnl span { font-size: 8px; font-weight: 750; }
+.chart-status-live-pnl b { font-size: 10px; font-variant-numeric: tabular-nums; }
 
 .chart-trade-footer { flex: 0 0 59px; display: flex; align-items: center; gap: 12px; padding: 7px 14px 8px 55px; border-top: 1px solid var(--line); background: var(--surface); }
 .chart-trade-footer.trade-footer-hidden { flex-basis: 0; height: 0; min-height: 0; padding-block: 0; border-top: 0; overflow: hidden; opacity: 0; pointer-events: none; }
@@ -568,23 +569,34 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .pnl-stat-grid > div { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fafbfe; }
 .pnl-stat-grid span { color: #828b9e; font-size: 8px; font-weight: 750; text-transform: uppercase; }
 .pnl-stat-grid b { font-size: 15px; }
-.pnl-chart-card { margin-top: 12px; padding: 13px; border: 1px solid #e2defd; border-radius: 11px; background: linear-gradient(135deg, #faf9ff, #f4f1ff); }
-.pnl-chart-card > div:first-child { display: flex; align-items: center; justify-content: space-between; }
-.pnl-chart-card b { font-size: 10px; }
-.pnl-chart-card small { color: #858da0; font-size: 8px; }
-.pnl-bars { height: 148px; display: flex; align-items: stretch; gap: 8px; margin-top: 12px; overflow-x: auto; overflow-y: hidden; }
-.pnl-bar-slot { flex: 1 0 54px; min-width: 54px; max-width: 72px; display: grid; grid-template-rows: 56px 56px 36px; }
-.pnl-bar-half { display: flex; justify-content: center; }
-.pnl-bar-half.profit-half { align-items: flex-end; border-bottom: 1px solid #cbc6e8; }
-.pnl-bar-half.loss-half { align-items: flex-start; }
-.pnl-bar-half i { width: min(36px, 72%); min-height: 3px; display: block; }
-.pnl-bar-slot.profit .profit-half i { border-radius: 4px 4px 0 0; background: linear-gradient(#32d5ac, #00a67e); }
-.pnl-bar-slot.loss .loss-half i { border-radius: 0 0 4px 4px; background: linear-gradient(#f04458, #ff8997); }
-.pnl-bar-caption { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 5px; text-align: center; }
-.pnl-bar-caption b { width: 100%; overflow: hidden; color: #576077; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
-.pnl-bar-caption small { font-size: 7px; font-weight: 800; white-space: nowrap; }
-.pnl-bar-slot.profit .pnl-bar-caption small { color: var(--green); }
-.pnl-bar-slot.loss .pnl-bar-caption small { color: var(--red); }
+.pnl-calendar-card { margin-top: 12px; padding: 13px; border: 1px solid #e2defd; border-radius: 11px; background: linear-gradient(135deg, #faf9ff, #f4f1ff); }
+.pnl-calendar-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.pnl-calendar-head > span { display: flex; flex-direction: column; gap: 3px; }
+.pnl-calendar-head b { font-size: 10px; }
+.pnl-calendar-head small { color: #858da0; font-size: 8px; }
+.pnl-calendar-head small i { font-style: normal; font-weight: 850; }
+.pnl-calendar-selectors { display: flex; gap: 6px; }
+.pnl-calendar-selectors label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 7px; font-weight: 750; text-transform: uppercase; }
+.pnl-calendar-selectors select { height: 28px; min-width: 72px; padding: 0 24px 0 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); font-size: 8px; font-weight: 800; outline: 0; }
+.pnl-calendar-weekdays, .pnl-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.pnl-calendar-weekdays { margin-top: 11px; }
+.pnl-calendar-weekdays span { padding: 3px 0; color: var(--muted); font-size: 7px; font-weight: 850; text-align: center; text-transform: uppercase; }
+.pnl-calendar-day, .pnl-calendar-blank { min-width: 0; min-height: 38px; border-radius: 7px; }
+.pnl-calendar-day { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 5px; border: 1px solid transparent; overflow: hidden; }
+.pnl-calendar-day b { font-size: 9px; }
+.pnl-calendar-day small { overflow: hidden; font-size: 6px; font-weight: 800; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.pnl-calendar-day.profit { color: #006c53; border-color: #00a67e40; background: #c9f5e7; }
+.pnl-calendar-day.loss { color: #a91f39; border-color: #f0445845; background: #ffd8de; }
+.pnl-calendar-day.no-trade { color: #66738c; border-color: #9aa8c02e; background: #e9edf5; }
+.pnl-calendar-day.holiday { color: #7d6d91; border-color: #a38eb737; background: #e8e0ef; }
+.pnl-calendar-day.today { outline: 2px solid var(--purple); outline-offset: 1px; }
+.pnl-calendar-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; color: var(--muted); font-size: 7px; }
+.pnl-calendar-legend span { display: flex; align-items: center; gap: 4px; }
+.pnl-calendar-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 2px; }
+.pnl-calendar-legend .profit::before { background: #6bd8b8; }
+.pnl-calendar-legend .loss::before { background: #ff8194; }
+.pnl-calendar-legend .no-trade::before { background: #b8c1d2; }
+.pnl-calendar-legend .holiday::before { background: #bba9ca; }
 .pnl-trade-list { max-height: 300px; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; overflow: auto; }
 .pnl-trade-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .pnl-trade-row { cursor: pointer; }
@@ -902,14 +914,19 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .terminal-shell[data-theme="neon"] .option-sheet-list { color: var(--ink); background: #071419; }
 .terminal-shell[data-theme="neon"] .option-sheet-row.atm { color: var(--ink); background: #151c31; box-shadow: inset 3px 0 var(--purple), inset -3px 0 var(--purple); }
 .terminal-shell[data-theme="neon"] :is(.chart-trade-footer, .instrument-header, .chart-controls, .chart-statusbar, .mobile-panel-head, .market-discovery-head) { color: var(--ink); border-color: var(--line); background: #09191f; }
-.terminal-shell[data-theme="neon"] :is(.chart-positions-trigger, .pnl-stat-grid > div, .pnl-chart-card, .pnl-trade-row, .positions-summary, .position-row, .order-row, .table-head, .order-empty, .positions-empty, .no-orders, .recent-orders-mini, .connection-state, .custom-list-editor > div, .virtual-balance-card) { color: var(--ink); border-color: #1b3a45; background: #0a1d24; }
+.terminal-shell[data-theme="neon"] :is(.chart-positions-trigger, .pnl-stat-grid > div, .pnl-calendar-card, .pnl-trade-row, .positions-summary, .position-row, .order-row, .table-head, .order-empty, .positions-empty, .no-orders, .recent-orders-mini, .connection-state, .custom-list-editor > div, .virtual-balance-card) { color: var(--ink); border-color: #1b3a45; background: #0a1d24; }
 .terminal-shell[data-theme="neon"] .pnl-trade-row.selected { border-color: #8f68e8; background: #151c31; box-shadow: 0 0 18px #a978ff18; }
 .terminal-shell[data-theme="neon"] .pnl-trade-actions button { color: #ff7892; border-color: #ff55784d; background: #37121e; }
 .terminal-shell[data-theme="neon"] :is(.trend-stock-row, .market-discovery-list) { color: var(--ink); border-color: #17343e; background: transparent; }
 .terminal-shell[data-theme="neon"] .trend-stock-row:hover,
 .terminal-shell[data-theme="neon"] .position-row:hover { border-color: #6d58a5; background: #10262e; }
-.terminal-shell[data-theme="neon"] :is(.pnl-chart-card, .positions-summary, .margin-card, .ticket-live-position) { background: linear-gradient(135deg, #0b2027, #101b2a); }
-.terminal-shell[data-theme="neon"] :is(.pnl-bar-caption b, .active-protection b, .ohlc-strip b, .section-line b, .ticket-heading h2, .modal h2, .market-discovery-head h2, .position-row, .mini-order-symbol, .chart-positions-trigger) { color: #eef8fb; }
+.terminal-shell[data-theme="neon"] :is(.pnl-calendar-card, .positions-summary, .margin-card, .ticket-live-position) { background: linear-gradient(135deg, #0b2027, #101b2a); }
+.terminal-shell[data-theme="neon"] :is(.pnl-calendar-head b, .active-protection b, .ohlc-strip b, .section-line b, .ticket-heading h2, .modal h2, .market-discovery-head h2, .position-row, .mini-order-symbol, .chart-positions-trigger) { color: #eef8fb; }
+.terminal-shell[data-theme="neon"] .pnl-calendar-selectors select { color: var(--ink); border-color: #27505c; background: #071419; }
+.terminal-shell[data-theme="neon"] .pnl-calendar-day.profit { color: #8af5d5; border-color: #00e6a54d; background: #06382e; }
+.terminal-shell[data-theme="neon"] .pnl-calendar-day.loss { color: #ff9aad; border-color: #ff55784d; background: #3a1320; }
+.terminal-shell[data-theme="neon"] .pnl-calendar-day.no-trade { color: #a7bac2; border-color: #29434d; background: #10252c; }
+.terminal-shell[data-theme="neon"] .pnl-calendar-day.holiday { color: #c5b4d4; border-color: #4a3f59; background: #221d2d; }
 .terminal-shell[data-theme="neon"] :is(.pnl-stat-grid span, .pnl-trade-row small, .position-row small, .trend-stock-row small, .order-row, .ticket-live-position small, .disclaimer, .no-orders) { color: #91a8b2; }
 .terminal-shell[data-theme="neon"] :is(.buy-tag, .pnl-trade-row > span:first-child.win) { color: #00e6a5; background: #06382e; }
 .terminal-shell[data-theme="neon"] :is(.sell-tag, .pnl-trade-row > span:first-child.loss) { color: #ff6c89; background: #3a1320; }
