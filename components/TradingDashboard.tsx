@@ -291,6 +291,7 @@ export function TradingDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
+  const [desktopOrderPanelOpen, setDesktopOrderPanelOpen] = useState(true);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [optionChainOpen, setOptionChainOpen] = useState(false);
@@ -323,6 +324,7 @@ export function TradingDashboard() {
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
+  const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
   const pendingChartRestoreRef = useRef<{ symbol: string; timeframe: string } | null>({ symbol: "__PENDING__", timeframe: "5m" });
   const autoSquareOffInFlightRef = useRef(false);
@@ -474,7 +476,7 @@ export function TradingDashboard() {
   useEffect(() => {
     if (!showTradeSymbols) return;
     const closeSymbolSearch = (event: PointerEvent) => {
-      if (!tradeSymbolPickerRef.current?.contains(event.target as Node)) {
+      if (!tradeSymbolPickerRef.current?.contains(event.target as Node) && !desktopTradeSymbolPickerRef.current?.contains(event.target as Node)) {
         setShowTradeSymbols(false);
         setTradeSymbolSearch("");
       }
@@ -1560,8 +1562,8 @@ export function TradingDashboard() {
           <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
-          <div className={`market-status ${feedStatus.mode}`} title={feedStatus.message}>
-            <span /> {feedStatus.mode === "live" ? "Upstox data" : feedStatus.mode === "loading" ? "Connecting" : "Fallback data"}
+          <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
+            <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
           <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
           <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>
@@ -1570,31 +1572,15 @@ export function TradingDashboard() {
         </div>
       </header>
 
-      <section className="live-index-strip" aria-label="Live Indian market indices">
-        {LIVE_INDEX_TICKERS.map((item) => {
-          const quote = marketQuotes[item.instrumentKey];
-          const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
-          const change = quote?.changePercent ?? 0;
-          const points = quote?.netChange ?? 0;
-          return (
-            <button type="button" className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
-              openNavigationSection("trade");
-              chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
-            }}>
-              <span>{item.label}</span>
-              <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
-              <small className={points >= 0 ? "positive" : "negative"}>{quote ? `${points >= 0 ? "+" : ""}${points.toFixed(2)}` : "—"}</small>
-              <em className={change >= 0 ? "positive" : "negative"}>{quote ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Live"}</em>
-            </button>
-          );
-        })}
-      </section>
-
-      <div className={`workspace section-${activeNavigationSection}`}>
+      <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
           <div className="desktop-panel-head"><span className="eyebrow">Indian markets</span><h2>Watchlist</h2></div>
           <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
+          <div className="desktop-watchlist-tabs" role="tablist" aria-label="Watchlists">
+            {watchlistChoices.map((choice) => <button type="button" role="tab" aria-selected={watchlist === choice.id} className={watchlist === choice.id ? "active" : ""} key={choice.id} onClick={() => { setWatchlist(choice.id); setWatchlistLimit(60); }}><span>{choice.name}</span><small>{choice.count}</small></button>)}
+            <button type="button" className="new-list-tab" onClick={() => openWatchlistPicker(null)}><Plus size={14} /> New list</button>
+          </div>
           <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>
           {showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
@@ -1624,6 +1610,25 @@ export function TradingDashboard() {
         </aside>
 
         <section className="chart-area">
+          {activeNavigationSection === "trade" && <section className="live-index-strip chart-index-strip" aria-label="Live Indian market indices">
+            {LIVE_INDEX_TICKERS.map((item) => {
+              const quote = marketQuotes[item.instrumentKey];
+              const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
+              const change = quote?.changePercent ?? 0;
+              const points = quote?.netChange ?? 0;
+              return (
+                <button type="button" className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
+                  openNavigationSection("trade");
+                  chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
+                }}>
+                  <span>{item.label}</span>
+                  <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
+                  <small className={points >= 0 ? "positive" : "negative"}>{quote ? `${points >= 0 ? "+" : ""}${points.toFixed(2)}` : "—"}</small>
+                  <em className={change >= 0 ? "positive" : "negative"}>{quote ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Live"}</em>
+                </button>
+              );
+            })}
+          </section>}
           <div className="instrument-header">
             <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
               <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
@@ -1667,14 +1672,23 @@ export function TradingDashboard() {
           </div>
 
           <div className="chart-controls">
+            <div ref={desktopTradeSymbolPickerRef} className="desktop-chart-symbol trade-symbol-picker">
+              <button className="desktop-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
+                <span>{selected.symbol}</span><small>NSE</small><ChevronDown size={15} />
+              </button>
+              {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
+              {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(fnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
+              {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
+                <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
+                <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
+              </div>}
+            </div>
             <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
             <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
               <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
             </button>
-            <div className="chart-right-controls">
-              <button className="control-button" onClick={() => setShowApi(true)}><Cable size={16} /> Data source</button>
-            </div>
+            <div className="chart-control-orders"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
 
           <div className="chart-body">
@@ -1744,6 +1758,7 @@ export function TradingDashboard() {
         </section>
 
         {orderSheetOpen && <button className="order-sheet-backdrop" aria-label="Close paper order" onClick={() => setOrderSheetOpen(false)} />}
+        <button type="button" className="desktop-order-panel-toggle" onClick={() => setDesktopOrderPanelOpen((value) => !value)} aria-label={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"} title={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"}><ChevronRight size={16} /></button>
         <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
           <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2>{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
