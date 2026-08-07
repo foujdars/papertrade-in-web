@@ -993,9 +993,49 @@ export function TradingDashboard() {
       monthTrades: [...dailyResults.values()].reduce((sum, result) => sum + result.trades, 0),
     };
   }, [clock, closedTrades, pnlCalendarMonth, pnlCalendarYear]);
+  const pnlVisuals = useMemo(() => {
+    const ordered = [...closedTrades].sort((a, b) => a.closedAt - b.closedAt);
+    const wins = ordered.filter((trade) => trade.netPnl > 0);
+    const losses = ordered.filter((trade) => trade.netPnl < 0);
+    const curveData = ordered.reduce((state, trade) => {
+      const equity = state.equity + trade.netPnl;
+      const peak = Math.max(state.peak, equity);
+      return {
+        equity,
+        peak,
+        maxDrawdown: Math.max(state.maxDrawdown, peak - equity),
+        curve: [...state.curve, equity],
+      };
+    }, { equity: 0, peak: 0, maxDrawdown: 0, curve: [] as number[] });
+    const { equity, maxDrawdown, curve } = curveData;
+    const low = Math.min(0, ...curve);
+    const high = Math.max(0, ...curve);
+    const range = Math.max(1, high - low);
+    const points = curve.map((value, index) => {
+      const x = curve.length > 1 ? index / (curve.length - 1) * 100 : 50;
+      const y = 36 - (value - low) / range * 30;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    });
+    const equityPoints = points.length > 1 ? points.join(" ") : points.length ? `0,${points[0].split(",")[1]} 100,${points[0].split(",")[1]}` : "0,34 100,34";
+    const totalProfit = wins.reduce((sum, trade) => sum + trade.netPnl, 0);
+    const totalLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.netPnl, 0));
+    return {
+      equityPoints,
+      equityAreaPoints: `0,40 ${equityPoints} 100,40`,
+      bestTrade: ordered.length ? Math.max(...ordered.map((trade) => trade.netPnl)) : 0,
+      worstTrade: ordered.length ? Math.min(...ordered.map((trade) => trade.netPnl)) : 0,
+      averageWin: wins.length ? totalProfit / wins.length : 0,
+      averageLoss: losses.length ? totalLoss / losses.length : 0,
+      expectancy: ordered.length ? equity / ordered.length : 0,
+      profitFactor: totalLoss ? totalProfit / totalLoss : totalProfit ? Number.POSITIVE_INFINITY : 0,
+      maxDrawdown,
+      wins: wins.length,
+      losses: losses.length,
+    };
+  }, [closedTrades]);
   const visiblePnlTrades = useMemo(() => selectedPnlDateKey
     ? closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey)
-    : closedTrades, [closedTrades, selectedPnlDateKey]);
+    : [], [closedTrades, selectedPnlDateKey]);
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
@@ -1944,23 +1984,43 @@ export function TradingDashboard() {
               <div><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b></div>
               <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
             </div>
-            <div className="pnl-calendar-card">
-              <div className="pnl-calendar-head">
-                <span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span>
-                <div className="pnl-calendar-selectors">
-                  <label>Month<select value={pnlCalendarMonth} onChange={(event) => { setPnlCalendarMonth(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
-                  <label>Year<select value={pnlCalendarYear} onChange={(event) => { setPnlCalendarYear(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+            <div className="pnl-analysis-grid">
+              <div className="pnl-calendar-card">
+                <div className="pnl-calendar-head">
+                  <span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span>
+                  <div className="pnl-calendar-selectors">
+                    <label>Month<select value={pnlCalendarMonth} onChange={(event) => { setPnlCalendarMonth(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
+                    <label>Year<select value={pnlCalendarYear} onChange={(event) => { setPnlCalendarYear(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+                  </div>
+                </div>
+                <div className="pnl-calendar-weekdays">{PNL_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
+                <div className="pnl-calendar-grid" aria-label={`${PNL_MONTHS[pnlCalendarMonth]} ${pnlCalendarYear} daily profit and loss heat map`}>
+                  {Array.from({ length: pnlCalendar.firstWeekday }, (_, index) => <span className="pnl-calendar-blank" key={`blank-${index}`} />)}
+                  {pnlCalendar.days.map((date) => <button type="button" className={`pnl-calendar-day ${date.status} ${date.today ? "today" : ""} ${selectedPnlDateKey === date.key ? "selected" : ""}`} key={date.key} title={date.result ? `${date.result.trades} trade${date.result.trades === 1 ? "" : "s"}: ${formatInr(date.result.pnl)}` : undefined} onClick={() => { setSelectedPnlDateKey(date.key); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><b>{date.day}</b>{date.result && <small>{compactCalendarPnl(date.result.pnl)}</small>}</button>)}
+                </div>
+                <div className="pnl-calendar-legend"><span className="profit">Profit</span><span className="loss">Loss</span></div>
+              </div>
+              <div className="pnl-visuals">
+                <article className="pnl-equity-card">
+                  <div><span><b>Equity curve</b><small>Net performance across completed trades</small></span><strong className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</strong></div>
+                  <svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Cumulative paper trading profit and loss">
+                    <defs><linearGradient id="pnlEquityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".28" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient></defs>
+                    <polygon points={pnlVisuals.equityAreaPoints} fill="url(#pnlEquityFill)" />
+                    <polyline points={pnlVisuals.equityPoints} fill="none" stroke="currentColor" strokeWidth="1.35" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                </article>
+                <div className="pnl-performance-grid">
+                  <article className="pnl-win-card"><div className="pnl-win-donut" style={{ background: `conic-gradient(var(--green) 0 ${pnlStats.winRate}%, var(--red) ${pnlStats.winRate}% 100%)` }}><span><b>{pnlStats.winRate.toFixed(0)}%</b><small>Win rate</small></span></div><div><span><i className="positive">{pnlVisuals.wins}</i> wins</span><span><i className="negative">{pnlVisuals.losses}</i> losses</span></div></article>
+                  <article className="pnl-metric-card"><span>Profit factor</span><b>{Number.isFinite(pnlVisuals.profitFactor) ? pnlVisuals.profitFactor.toFixed(2) : "∞"}</b><small>Gross profit / gross loss</small></article>
+                  <article className="pnl-metric-card"><span>Avg. win / loss</span><b><i className="positive">{formatInr(pnlVisuals.averageWin)}</i><em>/</em><i className="negative">{formatInr(pnlVisuals.averageLoss)}</i></b><small>Average result by outcome</small></article>
+                  <article className="pnl-metric-card"><span>Expectancy</span><b className={pnlVisuals.expectancy >= 0 ? "positive" : "negative"}>{pnlVisuals.expectancy >= 0 ? "+" : ""}{formatInr(pnlVisuals.expectancy)}</b><small>Expected net P&amp;L per trade</small></article>
+                  <article className="pnl-metric-card"><span>Max drawdown</span><b className="negative">{formatInr(pnlVisuals.maxDrawdown)}</b><small>Largest equity decline</small></article>
+                  <article className="pnl-metric-card"><span>Best / worst</span><b><i className="positive">{formatInr(pnlVisuals.bestTrade)}</i><em>/</em><i className="negative">{formatInr(Math.abs(pnlVisuals.worstTrade))}</i></b><small>Single completed trade</small></article>
                 </div>
               </div>
-              <div className="pnl-calendar-weekdays">{PNL_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
-              <div className="pnl-calendar-grid" aria-label={`${PNL_MONTHS[pnlCalendarMonth]} ${pnlCalendarYear} daily profit and loss heat map`}>
-                {Array.from({ length: pnlCalendar.firstWeekday }, (_, index) => <span className="pnl-calendar-blank" key={`blank-${index}`} />)}
-                {pnlCalendar.days.map((date) => <button type="button" className={`pnl-calendar-day ${date.status} ${date.today ? "today" : ""} ${selectedPnlDateKey === date.key ? "selected" : ""}`} key={date.key} title={date.result ? `${date.result.trades} trade${date.result.trades === 1 ? "" : "s"}: ${formatInr(date.result.pnl)}` : undefined} onClick={() => { setSelectedPnlDateKey(date.key); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><b>{date.day}</b>{date.result && <small>{compactCalendarPnl(date.result.pnl)}</small>}</button>)}
-              </div>
-              <div className="pnl-calendar-legend"><span className="profit">Profit</span><span className="loss">Loss</span></div>
             </div>
-            <div className="pnl-trade-list" ref={pnlTradeListRef}>
-              {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Show all</button></div>}
+            {selectedPnlDateKey && <div className="pnl-trade-list" ref={pnlTradeListRef}>
+              <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Hide trades</button></div>
               {visiblePnlTrades.map((trade) => {
                 const menuOpen = pnlTradeMenuId === trade.id;
                 return (
@@ -1972,8 +2032,8 @@ export function TradingDashboard() {
                   </div>
                 );
               })}
-              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all history." : "Close a paper position to build your P&amp;L history."}</span></div>}
-            </div>
+              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades on this date</b><span>Choose another calendar date.</span></div>}
+            </div>}
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>
         </div>
