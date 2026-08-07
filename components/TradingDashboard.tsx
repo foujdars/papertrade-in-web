@@ -1856,7 +1856,7 @@ export function TradingDashboard() {
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {ordersOpen && (
-        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={() => setOrdersOpen(false)}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setOrdersOpen(false); }}>
           <section className="modal orders-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
@@ -1933,7 +1933,7 @@ export function TradingDashboard() {
         </div>
       )}
       {pnlOpen && (
-        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={() => setPnlOpen(false)}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
           <section className="modal pnl-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
             <div className="pnl-stat-grid">
