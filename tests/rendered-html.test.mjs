@@ -121,6 +121,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /assetType: "INDEX"/);
   assert.match(dashboard, /defaultRiskDistance = 2_000/);
   assert.match(dashboard, /defaultRewardDistance = 3_000/);
+  assert.match(dashboard, /chart-status-live-price/);
+  assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
   assert.match(dashboard, /papertrade-theme/);
   assert.match(dashboard, /Neon dark theme/);
   assert.match(dashboard, /papertrade-last-chart/);
@@ -149,6 +151,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(fnoChartWorkspace, /orderTool=\{orderTool\}/);
   assert.match(fnoChartWorkspace, /toolbarCollapsed/);
   assert.match(fnoChartWorkspace, /useState\(true\)/);
+  assert.equal((fnoChartWorkspace.match(/chartTheme=\{chartTheme\}/g) ?? []).length, 2);
+  assert.doesNotMatch(fnoChartWorkspace, /chartTheme="light"/);
   assert.match(dashboard, /tradeToolbarCollapsed, setTradeToolbarCollapsed\] = useState\(true\)/);
   assert.match(chartToolbar, /Hide drawing toolbar/);
   assert.match(chartToolbar, /Show drawing toolbar/);
@@ -186,7 +190,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /drawing-toolbar\.collapsed/);
   assert.match(styles, /chart-symbol-legend[^}]+background: transparent/);
   assert.match(styles, /risk-entry-line[^}]+border-top-style: solid/);
+  assert.match(styles, /risk-line > span, \.risk-line > b[^}]+border: 1px solid currentColor/);
   assert.match(styles, /risk-reward-summary[^}]+background: transparent/);
+  assert.match(styles, /fno-focus-workspace[^}]+color-scheme: dark/);
   assert.match(styles, /chart-live-pnl[^}]+top: 10px[^}]+right: 82px/);
   assert.match(styles, /chart-trade-buttons/);
   assert.match(chart, /function fitStudyPanes/);

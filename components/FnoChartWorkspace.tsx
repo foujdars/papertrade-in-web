@@ -47,6 +47,7 @@ export function FnoChartWorkspace({
   orderTool,
   onOrderToolChange,
   onOrderToolClose,
+  chartTheme,
 }: {
   topInstrument: Instrument;
   topMode: "SPOT" | "FUTURE";
@@ -76,6 +77,7 @@ export function FnoChartWorkspace({
   orderTool?: ChartOrderTool;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
+  chartTheme: "light" | "neon";
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
@@ -151,7 +153,7 @@ export function FnoChartWorkspace({
               redoSignal={redoSignal}
               indicators={indicators}
               chartAction={chartAction}
-              chartTheme="light"
+              chartTheme={chartTheme}
               onChartTap={onToggleTradeDock}
               onFeedStatus={() => undefined}
             />
@@ -185,7 +187,7 @@ export function FnoChartWorkspace({
               redoSignal={redoSignal}
               indicators={indicators}
               chartAction={chartAction}
-              chartTheme="light"
+              chartTheme={chartTheme}
               onChartTap={onToggleTradeDock}
               orderTool={orderTool}
               onOrderToolChange={onOrderToolChange}

@@ -1631,9 +1631,11 @@ export function TradingDashboard() {
               />
             )}
           </div>
-          <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.message}>
-            <div><Radio size={14} /> {feedStatus.message}</div>
-            <div>Click + drag to pan · Scroll/pinch to zoom</div>
+          <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
+            <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
+            <div className={`chart-status-live-price ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
+              {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live</span><b>{formatInr(visibleLivePrice)}</b></> : null}
+            </div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
           <div className={`chart-trade-footer ${chartTradeFooterOpen ? "" : "trade-footer-hidden"}`} aria-hidden={!chartTradeFooterOpen}>
@@ -1725,6 +1727,7 @@ export function TradingDashboard() {
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onFeedStatus={handleFeedStatus}
+          chartTheme={theme}
         />
       )}
 
