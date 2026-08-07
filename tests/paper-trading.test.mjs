@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePosition, deletePaperTradeOrders, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
 import { buildClosedTrades } from "../lib/trade-analytics.ts";
-import { calculateUpstoxOptionCharges } from "../lib/trading-charges.ts";
+import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
 
 function order(id, side, quantity, price) {
   return {
@@ -21,8 +21,37 @@ test("calculates current NSE option premium charges", () => {
   const sell = calculateUpstoxOptionCharges({ side: "SELL", quantity: 65, price: 100 });
   assert.equal(buy.brokerage, 20);
   assert.equal(buy.stt, 0);
+  assert.equal(buy.ipftCharges, 0.03);
   assert.equal(sell.stt, 9.75);
   assert.ok(sell.total > buy.total);
+});
+
+test("calculates current NSE futures charges and routes them through the shared F&O model", () => {
+  const buy = calculateUpstoxFutureCharges({ side: "BUY", quantity: 65, price: 100 });
+  const sell = calculateUpstoxFutureCharges({ side: "SELL", quantity: 65, price: 100 });
+
+  assert.equal(buy.brokerage, 3.25);
+  assert.equal(buy.stt, 0);
+  assert.equal(buy.stampDuty, 0.13);
+  assert.equal(sell.stt, 3.25);
+  assert.equal(sell.stampDuty, 0);
+  assert.equal(sell.total, 7.23);
+  assert.deepEqual(
+    calculateUpstoxTradingCharges("FUTURE", { side: "SELL", product: "INTRADAY", quantity: 65, price: 100 }),
+    sell,
+  );
+});
+
+test("deducts both futures legs from completed-trade P&L", () => {
+  const legacyWrongCharges = { brokerage: 0, stt: 0, transactionCharges: 0, ipftCharges: 0, sebiCharges: 0, gst: 0, stampDuty: 0, dpCharges: 0, total: 999 };
+  const entry = { ...order(1, "BUY", 65, 100), assetType: "FUTURE", product: "INTRADAY", charges: legacyWrongCharges };
+  const exit = { ...order(2, "SELL", 65, 110), assetType: "FUTURE", product: "INTRADAY", charges: legacyWrongCharges };
+  const [trade] = buildClosedTrades([entry, exit]);
+  const expectedCharges = calculateUpstoxFutureCharges(entry).total + calculateUpstoxFutureCharges(exit).total;
+
+  assert.equal(trade.grossPnl, 650);
+  assert.equal(trade.charges, expectedCharges);
+  assert.equal(trade.netPnl, 650 - expectedCharges);
 });
 
 test("calculates live unrealized P&L for a long position", () => {

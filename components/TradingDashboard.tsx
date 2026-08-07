@@ -36,7 +36,7 @@ import {
   type PaperProtection,
 } from "@/lib/paper-trading";
 import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
-import { calculateUpstoxEquityCharges, calculateUpstoxOptionCharges } from "@/lib/trading-charges";
+import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
 import { useAuth } from "@/components/AuthProvider";
@@ -131,9 +131,7 @@ function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
 }
 
 function calculateInstrumentCharges(instrument: Pick<Instrument, "assetType">, input: { side: "BUY" | "SELL"; product: "INTRADAY" | "DELIVERY"; quantity: number; price: number }) {
-  return instrument.assetType === "OPTION"
-    ? calculateUpstoxOptionCharges({ side: input.side, quantity: input.quantity, price: input.price })
-    : calculateUpstoxEquityCharges(input);
+  return calculateUpstoxTradingCharges(instrument.assetType, input);
 }
 
 function getPaperOrderTimestamp(order: PaperOrder) {
@@ -761,9 +759,12 @@ export function TradingDashboard() {
       for (const { order, sessionDate, price } of results) {
         if (!price || !Number.isFinite(price) || price <= 0) continue;
         const correctedTimestamp = squareOffTimestamp(sessionDate);
-        const correctedCharges = order.assetType === "OPTION"
-          ? calculateUpstoxOptionCharges({ side: order.side, quantity: order.quantity, price })
-          : calculateUpstoxEquityCharges({ side: order.side, product: "INTRADAY", quantity: order.quantity, price });
+        const correctedCharges = calculateUpstoxTradingCharges(order.assetType, {
+          side: order.side,
+          product: "INTRADAY",
+          quantity: order.quantity,
+          price,
+        });
         const correctedTime = squareOffTimeLabel(correctedTimestamp);
         const priceChanged = Math.abs(price - order.price) > 0.0001;
         const timeChanged = order.createdAt !== correctedTimestamp || order.time !== correctedTime;
