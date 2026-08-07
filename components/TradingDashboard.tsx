@@ -59,6 +59,8 @@ const LIVE_INDEX_TICKERS = [
 ] as const;
 const PNL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
 const PNL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DEFAULT_RISK_AMOUNT = 2_000;
+const DEFAULT_REWARD_AMOUNT = 3_000;
 const INDIA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 
 function indiaDateParts(timestamp: number) {
@@ -78,6 +80,17 @@ function compactCalendarPnl(value: number) {
       : absolute >= 1_000 ? `${(absolute / 1_000).toFixed(1)}K`
         : absolute.toFixed(0);
   return `${value >= 0 ? "+" : "−"}₹${amount}`;
+}
+
+function defaultProtectionPrices(entryPrice: number, direction: "LONG" | "SHORT", quantity: number) {
+  const safeQuantity = Math.max(1, quantity);
+  const riskDistance = DEFAULT_RISK_AMOUNT / safeQuantity;
+  const rewardDistance = DEFAULT_REWARD_AMOUNT / safeQuantity;
+  const directionMultiplier = direction === "LONG" ? 1 : -1;
+  return {
+    target: Math.max(.05, entryPrice + directionMultiplier * rewardDistance),
+    stopLoss: Math.max(.05, entryPrice - directionMultiplier * riskDistance),
+  };
 }
 
 type CustomWatchlist = {
@@ -266,6 +279,7 @@ export function TradingDashboard() {
   const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
   const [targetPrice, setTargetPrice] = useState("");
   const [stopLossPrice, setStopLossPrice] = useState("");
+  const [riskLevelsCustomized, setRiskLevelsCustomized] = useState(false);
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
   const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
@@ -294,6 +308,7 @@ export function TradingDashboard() {
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
   const [pnlCalendarMonth, setPnlCalendarMonth] = useState(() => indiaDateParts(Date.now()).month - 1);
   const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
+  const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [fundsInput, setFundsInput] = useState("100000");
@@ -308,6 +323,7 @@ export function TradingDashboard() {
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
+  const pnlTradeListRef = useRef<HTMLDivElement>(null);
   const pendingChartRestoreRef = useRef<{ symbol: string; timeframe: string } | null>({ symbol: "__PENDING__", timeframe: "5m" });
   const autoSquareOffInFlightRef = useRef(false);
   const autoSquareOffRetryAtRef = useRef(0);
@@ -869,16 +885,15 @@ export function TradingDashboard() {
     : side;
   const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : visibleLivePrice;
   const riskDisplayQuantity = selectedPosition.quantity > 0 ? selectedPosition.quantity : quantity;
-  const defaultRiskDistance = 2_000 / Math.max(1, riskDisplayQuantity);
-  const defaultRewardDistance = 3_000 / Math.max(1, riskDisplayQuantity);
+  const defaultProtection = defaultProtectionPrices(riskEntryPrice, riskToolSide === "BUY" ? "LONG" : "SHORT", riskDisplayQuantity);
   const requestedTargetPrice = Number(targetPrice);
   const requestedStopLossPrice = Number(stopLossPrice);
   const chartTargetPrice = Number.isFinite(requestedTargetPrice) && requestedTargetPrice > 0
     ? requestedTargetPrice
-    : riskEntryPrice + (riskToolSide === "BUY" ? defaultRewardDistance : -defaultRewardDistance);
+    : defaultProtection.target;
   const chartStopLossPrice = Number.isFinite(requestedStopLossPrice) && requestedStopLossPrice > 0
     ? requestedStopLossPrice
-    : riskEntryPrice + (riskToolSide === "BUY" ? -defaultRiskDistance : defaultRiskDistance);
+    : defaultProtection.stopLoss;
   const activeRiskToolEnabled = riskToolEnabled || Boolean(selectedProtection && selectedPosition.quantity > 0);
 
   useEffect(() => {
@@ -886,11 +901,13 @@ export function TradingDashboard() {
       if (selectedProtection) {
         setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
         setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
+        setRiskLevelsCustomized(true);
         setRiskToolEnabled(true);
       } else {
         setTargetPrice("");
         setStopLossPrice("");
         setRiskToolEnabled(false);
+        setRiskLevelsCustomized(false);
       }
     }, 0);
     return () => window.clearTimeout(restoreProtection);
@@ -941,7 +958,7 @@ export function TradingDashboard() {
     };
   }, [closedTrades]);
   const pnlCalendarYears = useMemo(() => {
-    const years = new Set<number>([pnlCalendarYear, indiaDateParts(Date.now()).year]);
+    const years = new Set<number>([pnlCalendarYear]);
     closedTrades.forEach((trade) => { if (trade.closedAt > 0) years.add(indiaDateParts(trade.closedAt).year); });
     return [...years].sort((a, b) => b - a);
   }, [closedTrades, pnlCalendarYear]);
@@ -957,7 +974,7 @@ export function TradingDashboard() {
     });
     const daysInMonth = new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth + 1, 0)).getUTCDate();
     const firstWeekday = (new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth, 1)).getUTCDay() + 6) % 7;
-    const todayParts = indiaDateParts(Date.now());
+    const todayParts = clock ? indiaDateParts(clock.getTime()) : null;
     const days = Array.from({ length: daysInMonth }, (_, index) => {
       const day = index + 1;
       const key = calendarDateKey(pnlCalendarYear, pnlCalendarMonth, day);
@@ -965,7 +982,7 @@ export function TradingDashboard() {
       const weekday = new Date(Date.UTC(pnlCalendarYear, pnlCalendarMonth, day)).getUTCDay();
       const weekend = weekday === 0 || weekday === 6;
       const status = result ? result.pnl >= 0 ? "profit" : "loss" : weekend ? "holiday" : "no-trade";
-      return { day, key, result, status, today: todayParts.year === pnlCalendarYear && todayParts.month === pnlCalendarMonth + 1 && todayParts.day === day };
+      return { day, key, result, status, today: Boolean(todayParts && todayParts.year === pnlCalendarYear && todayParts.month === pnlCalendarMonth + 1 && todayParts.day === day) };
     });
     return {
       days,
@@ -973,7 +990,10 @@ export function TradingDashboard() {
       monthPnl: [...dailyResults.values()].reduce((sum, result) => sum + result.pnl, 0),
       monthTrades: [...dailyResults.values()].reduce((sum, result) => sum + result.trades, 0),
     };
-  }, [closedTrades, pnlCalendarMonth, pnlCalendarYear]);
+  }, [clock, closedTrades, pnlCalendarMonth, pnlCalendarYear]);
+  const visiblePnlTrades = useMemo(() => selectedPnlDateKey
+    ? closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey)
+    : closedTrades, [closedTrades, selectedPnlDateKey]);
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
@@ -995,18 +1015,18 @@ export function TradingDashboard() {
       return;
     }
     setRiskToolEnabled(true);
-    const target = Number(targetPrice);
-    const stop = Number(stopLossPrice);
-    const displayQuantity = Math.max(1, positionMatches ? selectedPosition.quantity : quantity);
-    const rewardDistance = 3_000 / displayQuantity;
-    const riskDistance = 2_000 / displayQuantity;
-    const validTarget = Number.isFinite(target) && (nextSide === "BUY" ? target > entry : target < entry);
-    const validStop = Number.isFinite(stop) && (nextSide === "BUY" ? stop < entry : stop > entry);
-    if (!validTarget) setTargetPrice((entry + (nextSide === "BUY" ? rewardDistance : -rewardDistance)).toFixed(4));
-    if (!validStop) setStopLossPrice((entry + (nextSide === "BUY" ? -riskDistance : riskDistance)).toFixed(4));
+    const projectedQuantity = Math.max(1, positionMatches ? selectedPosition.quantity + quantity : quantity);
+    const projectedEntry = positionMatches
+      ? ((selectedPosition.averagePrice * selectedPosition.quantity) + (entry * quantity)) / projectedQuantity
+      : entry;
+    const defaults = defaultProtectionPrices(projectedEntry, nextSide === "BUY" ? "LONG" : "SHORT", projectedQuantity);
+    setTargetPrice(defaults.target.toFixed(4));
+    setStopLossPrice(defaults.stopLoss.toFixed(4));
+    setRiskLevelsCustomized(false);
   }
 
   function updateChartRiskLevel(level: "target" | "stopLoss", value: number, committed: boolean) {
+    setRiskLevelsCustomized(true);
     const formatted = value.toFixed(2);
     if (level === "target") setTargetPrice(formatted);
     else setStopLossPrice(formatted);
@@ -1168,7 +1188,12 @@ export function TradingDashboard() {
     const executionMargin = executionPrice * quantity * .2;
     const nextBalance = (side === "BUY" ? balance - executionMargin : balance + executionMargin) - executionCharges.total;
     const nextPosition = calculatePosition(nextOrders, selected.symbol, executionPrice, product);
-    const { target, stopLoss } = protectionValues();
+    const requestedProtection = protectionValues();
+    const automaticProtection = nextPosition.quantity > 0
+      ? defaultProtectionPrices(nextPosition.averagePrice, intendedDirection, nextPosition.quantity)
+      : requestedProtection;
+    const target = riskLevelsCustomized ? requestedProtection.target : automaticProtection.target;
+    const stopLoss = riskLevelsCustomized ? requestedProtection.stopLoss : automaticProtection.stopLoss;
     if ((target !== undefined || stopLoss !== undefined) && nextPosition.quantity > 0 && nextPosition.side === intendedDirection) {
       saveProtection({
         id: `${new Date().getTime()}-risk`,
@@ -1188,6 +1213,7 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setTargetPrice("");
     setStopLossPrice("");
+    setRiskLevelsCustomized(false);
     setOrderSheetOpen(false);
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
     window.setTimeout(() => setToast(""), 3200);
@@ -1511,6 +1537,7 @@ export function TradingDashboard() {
       const currentDate = indiaDateParts(clock?.getTime() ?? Date.now());
       setPnlCalendarMonth(currentDate.month - 1);
       setPnlCalendarYear(currentDate.year);
+      setSelectedPnlDateKey(null);
     }
     setPnlOpen(section === "pnl");
   }
@@ -1688,15 +1715,16 @@ export function TradingDashboard() {
                 orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
+                onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onFeedStatus={handleFeedStatus}
               />
             )}
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
-            <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
             <div className={`chart-status-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
               {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></> : null}
             </div>
+            <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
           <div className={`chart-trade-footer ${chartTradeFooterOpen ? "" : "trade-footer-hidden"}`} aria-hidden={!chartTradeFooterOpen}>
@@ -1722,8 +1750,8 @@ export function TradingDashboard() {
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
-            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
-            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
+            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
+            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · no leverage"}</small></span></label></div>
@@ -1787,6 +1815,7 @@ export function TradingDashboard() {
           orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
+          onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
           onFeedStatus={handleFeedStatus}
           chartTheme={theme}
         />
@@ -1900,19 +1929,20 @@ export function TradingDashboard() {
               <div className="pnl-calendar-head">
                 <span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span>
                 <div className="pnl-calendar-selectors">
-                  <label>Month<select value={pnlCalendarMonth} onChange={(event) => setPnlCalendarMonth(Number(event.target.value))}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
-                  <label>Year<select value={pnlCalendarYear} onChange={(event) => setPnlCalendarYear(Number(event.target.value))}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+                  <label>Month<select value={pnlCalendarMonth} onChange={(event) => { setPnlCalendarMonth(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
+                  <label>Year<select value={pnlCalendarYear} onChange={(event) => { setPnlCalendarYear(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
                 </div>
               </div>
               <div className="pnl-calendar-weekdays">{PNL_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div>
               <div className="pnl-calendar-grid" aria-label={`${PNL_MONTHS[pnlCalendarMonth]} ${pnlCalendarYear} daily profit and loss heat map`}>
                 {Array.from({ length: pnlCalendar.firstWeekday }, (_, index) => <span className="pnl-calendar-blank" key={`blank-${index}`} />)}
-                {pnlCalendar.days.map((date) => <div className={`pnl-calendar-day ${date.status} ${date.today ? "today" : ""}`} key={date.key} title={date.result ? `${date.result.trades} trade${date.result.trades === 1 ? "" : "s"}: ${formatInr(date.result.pnl)}` : date.status === "holiday" ? "Weekend / market holiday" : "No trades"}><b>{date.day}</b><small>{date.result ? compactCalendarPnl(date.result.pnl) : date.status === "holiday" ? "Holiday" : "No trade"}</small></div>)}
+                {pnlCalendar.days.map((date) => <button type="button" className={`pnl-calendar-day ${date.status} ${date.today ? "today" : ""} ${selectedPnlDateKey === date.key ? "selected" : ""}`} key={date.key} title={date.result ? `${date.result.trades} trade${date.result.trades === 1 ? "" : "s"}: ${formatInr(date.result.pnl)}` : undefined} onClick={() => { setSelectedPnlDateKey(date.key); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><b>{date.day}</b>{date.result && <small>{compactCalendarPnl(date.result.pnl)}</small>}</button>)}
               </div>
-              <div className="pnl-calendar-legend"><span className="profit">Profit</span><span className="loss">Loss</span><span className="no-trade">No trade</span><span className="holiday">Weekend / holiday</span></div>
+              <div className="pnl-calendar-legend"><span className="profit">Profit</span><span className="loss">Loss</span></div>
             </div>
-            <div className="pnl-trade-list">
-              {closedTrades.map((trade) => {
+            <div className="pnl-trade-list" ref={pnlTradeListRef}>
+              {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Show all</button></div>}
+              {visiblePnlTrades.map((trade) => {
                 const menuOpen = pnlTradeMenuId === trade.id;
                 return (
                   <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
@@ -1923,7 +1953,7 @@ export function TradingDashboard() {
                   </div>
                 );
               })}
-              {!closedTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades yet</b><span>Close a paper position to build your P&amp;L history.</span></div>}
+              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all history." : "Close a paper position to build your P&amp;L history."}</span></div>}
             </div>
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>

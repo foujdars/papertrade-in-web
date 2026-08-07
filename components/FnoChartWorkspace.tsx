@@ -47,6 +47,7 @@ export function FnoChartWorkspace({
   orderTool,
   onOrderToolChange,
   onOrderToolClose,
+  onOrderToolExit,
   chartTheme,
 }: {
   topInstrument: Instrument;
@@ -77,6 +78,7 @@ export function FnoChartWorkspace({
   orderTool?: ChartOrderTool;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
+  onOrderToolExit?: () => void;
   chartTheme: "light" | "neon";
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
@@ -192,6 +194,7 @@ export function FnoChartWorkspace({
               orderTool={orderTool}
               onOrderToolChange={onOrderToolChange}
               onOrderToolClose={onOrderToolClose}
+              onOrderToolExit={onOrderToolExit}
               onFeedStatus={onFeedStatus}
             />
           </div>

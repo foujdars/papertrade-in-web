@@ -311,6 +311,7 @@ export function MarketChart({
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
+  onOrderToolExit,
   onChartTap,
   onPrice,
   onFeedStatus,
@@ -333,6 +334,7 @@ export function MarketChart({
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
+  onOrderToolExit?: () => void;
   onChartTap?: () => void;
   onPrice?: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
@@ -1370,10 +1372,11 @@ export function MarketChart({
             >
               <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.stopLossPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
             </div>}
-            <div className="risk-reward-summary">
+            <div className={`risk-reward-summary ${onOrderToolExit ? "has-exit" : ""}`}>
               <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · Qty {orderTool.quantity}</span>
               <b>Risk {formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
               <b>Reward {formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
+              {onOrderToolExit && <button type="button" className="risk-tool-exit" onClick={onOrderToolExit}>Close trade</button>}
             </div>
           </div>
         )}
