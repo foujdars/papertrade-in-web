@@ -38,7 +38,6 @@ import {
 import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
-import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
 import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
@@ -305,10 +304,6 @@ export function TradingDashboard() {
   const [fnoListQuoteKeys, setFnoListQuoteKeys] = useState<string[]>([]);
   const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(true);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
-  const [marketScannerLoading, setMarketScannerLoading] = useState(false);
-  const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
-  const [openHighRows, setOpenHighRows] = useState<OpenHighRow[]>([]);
-  const [marketScannerError, setMarketScannerError] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
   const [pnlCalendarMonth, setPnlCalendarMonth] = useState(() => indiaDateParts(Date.now()).month - 1);
@@ -642,47 +637,6 @@ export function TradingDashboard() {
       window.clearInterval(interval);
     };
   }, [quoteKeys, selected.instrumentKey, selected.symbol]);
-
-  useEffect(() => {
-    if (!marketsOpen || !stockUniverse.length) return;
-    const controller = new AbortController();
-
-    async function loadVolumeBreakouts() {
-      setMarketScannerLoading(true);
-      setMarketScannerError("");
-      try {
-        const response = await fetch("/api/market/volume-breakouts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            instruments: stockUniverse
-              .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
-              .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey })),
-          }),
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json() as {
-          ok?: boolean;
-          rows?: VolumeBreakoutRow[];
-          openHighRows?: OpenHighRow[];
-          error?: { message?: string };
-        };
-        if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Volume scanner is unavailable.");
-        if (!controller.signal.aborted) {
-          setVolumeBreakoutRows(payload.rows ?? []);
-          setOpenHighRows(payload.openHighRows ?? []);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) setMarketScannerError(error instanceof Error ? error.message : "Volume scanner is unavailable.");
-      } finally {
-        if (!controller.signal.aborted) setMarketScannerLoading(false);
-      }
-    }
-
-    void loadVolumeBreakouts();
-    return () => controller.abort();
-  }, [marketsOpen, stockUniverse]);
 
   useEffect(() => {
     if (!clock || !orders.length || autoSquareOffInFlightRef.current || Date.now() < autoSquareOffRetryAtRef.current) return;
@@ -1958,14 +1912,9 @@ export function TradingDashboard() {
       )}
       {marketsOpen && (
         <MarketsWorkspace
-          volumeRows={volumeBreakoutRows}
-          openHighRows={openHighRows}
-          volumeLoading={marketScannerLoading}
-          volumeError={marketScannerError}
           stockUniverse={stockUniverse}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onClose={() => setMarketsOpen(false)}
-          showScannerTabs={!isAndroidApp}
         />
       )}
       {optionChainOpen && activeFnoUnderlying && (

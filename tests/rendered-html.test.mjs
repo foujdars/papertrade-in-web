@@ -91,7 +91,12 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(marketsWorkspace, /<h2>Volume Stocker<\/h2>/);
+  assert.match(marketsWorkspace, /<h2>Markets<\/h2>/);
+  const nimbleScanner = await readFile(new URL("../lib/nimble-scanner.ts", import.meta.url), "utf8");
+  assert.match(marketsWorkspace, /NIMBLE_STRATEGIES/);
+  assert.match(nimbleScanner, /EMA 21 Retest/);
+  assert.match(nimbleScanner, /Weekly Fakeout MTF/);
+  assert.match(marketsWorkspace, /Refresh scan/);
   assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
