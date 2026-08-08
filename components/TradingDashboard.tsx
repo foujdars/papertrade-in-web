@@ -42,6 +42,7 @@ import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import { useAuth } from "@/components/AuthProvider";
+import { BrandMark } from "@/components/BrandMark";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
@@ -184,7 +185,7 @@ async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
 function Brand({ onClick }: { onClick: () => void }) {
   return (
     <button className="brand" onClick={onClick} aria-label="Open Trade chart">
-      <span className="brand-mark"><TrendingUp size={20} strokeWidth={3} /></span>
+      <span className="brand-mark"><BrandMark size={34} /></span>
       <span>PaperTrade <b>IN</b></span>
     </button>
   );

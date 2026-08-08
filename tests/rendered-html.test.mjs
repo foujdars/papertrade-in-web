@@ -81,6 +81,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
+  assert.match(dashboard, /<BrandMark size=\{34\}/);
+  assert.match(authProvider, /<BrandMark size=\{58\}/);
   assert.match(dashboard, /holdings-overview-card/);
   assert.match(dashboard, /1D returns/);
   assert.doesNotMatch(dashboard, /Includes brokerage, STT/);
@@ -283,6 +285,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(quoteRoute, /Cache-Control.*no-store/);
   assert.match(readme, /TradingView Lightweight Charts/);
   await access(new URL("../public/papertrade-social.png", import.meta.url));
+  await access(new URL("../public/papertrade-mark.png", import.meta.url));
+  await access(new URL("../public/papertrade-icon-192.png", import.meta.url));
+  await access(new URL("../public/papertrade-icon-512.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });
 

@@ -36,6 +36,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { BrandMark } from "@/components/BrandMark";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -302,7 +303,7 @@ export function AdvancedChartWorkspace({
     <main className="advanced-terminal">
       <header className="advanced-topbar">
         <Link href={`/?symbol=${instrument.symbol}&timeframe=${timeframe}`} onClick={(event) => { event.preventDefault(); window.history.back(); }} className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
-        <div className="advanced-brand"><span><TrendingUp size={18} strokeWidth={3} /></span><b>PaperTrade</b> IN</div>
+        <div className="advanced-brand"><span><BrandMark size={31} /></span><b>PaperTrade</b> IN</div>
         <div ref={symbolPickerRef} className="advanced-symbol-picker">
           <button onClick={() => setShowSymbols((value) => !value)}>
             <span><b>{instrument.symbol}</b><small>{instrument.name} · NSE</small></span>

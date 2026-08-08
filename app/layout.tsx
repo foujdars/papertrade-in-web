@@ -24,8 +24,9 @@ export const metadata: Metadata = {
     images: ["/papertrade-social.png"],
   },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/papertrade-icon-192.png",
+    shortcut: "/papertrade-icon-192.png",
+    apple: "/papertrade-icon-192.png",
   },
 };
 

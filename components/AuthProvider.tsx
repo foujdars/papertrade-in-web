@@ -7,6 +7,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { CandlestickChart, Cloud, LogIn, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
+import { BrandMark } from "@/components/BrandMark";
 
 type SyncStatus = "disabled" | "loading" | "synced" | "saving" | "error";
 
@@ -247,7 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="welcome-market-visual" aria-hidden="true">
               <span /><span /><span /><span /><span /><span /><i><TrendingUp size={22} /></i>
             </div>
-            <span className="auth-logo"><TrendingUp size={28} /></span>
+            <span className="auth-logo"><BrandMark size={58} /></span>
             <span className="auth-welcome-eyebrow"><Sparkles size={14} /> Welcome back</span>
             <b>Getting your trading desk ready</b>
             <small>Restoring your charts, watchlists and paper portfolio securely.</small>
@@ -258,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ) : configured && !session ? (
         <main className="auth-screen">
           <section className="auth-card">
-            <span className="auth-logo"><TrendingUp size={30} /></span>
+            <span className="auth-logo"><BrandMark size={58} /></span>
             <span className="eyebrow">Secure paper trading</span>
             <h1>Welcome to PaperTrade IN</h1>
             <p>Sign in to keep your virtual balance, watchlists, orders and P&amp;L securely connected to your account.</p>

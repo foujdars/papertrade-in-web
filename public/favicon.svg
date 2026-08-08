@@ -1,6 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#5544db"/><stop offset="1" stop-color="#806fff"/></linearGradient></defs>
-  <rect width="64" height="64" rx="18" fill="url(#g)"/>
-  <path d="M14 42l12-13 8 8 15-17" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M39 20h10v10" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="paper" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#5121b9"/><stop offset="1" stop-color="#8b24ff"/></linearGradient>
+    <linearGradient id="rise" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#066bdf"/><stop offset="1" stop-color="#09cfff"/></linearGradient>
+  </defs>
+  <path d="M8 34 26 51 47 38v9c0 7-5 11-12 11H12c-3 0-4-2-4-5Z" fill="url(#paper)"/>
+  <path d="m25 48 7-8V20h7v12l10-13h-5l13-4-2 14-4-5-13 20c-4 6-8 8-13 4Z" fill="url(#rise)"/>
+  <path d="M13 35 25 47l7-8 8 5 14-23" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 31v-8m0 2h5v12h-5m13-15v-8m0 3h6v13h-6" fill="none" stroke="#04aaf4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
