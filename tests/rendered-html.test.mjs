@@ -81,7 +81,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
-  assert.match(dashboard, /Delivery sells are limited to held quantity/);
+  assert.match(dashboard, /holdings-overview-card/);
+  assert.match(dashboard, /1D returns/);
+  assert.doesNotMatch(dashboard, /Includes brokerage, STT/);
   assert.match(dashboard, /BUY BEFORE DELIVERY SELL/);
   assert.match(dashboard, /Est\. delivery charges/);
   assert.match(advancedChart, /LIVE P&amp;L/);
@@ -89,6 +91,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(advancedChart, /Exit quantity/);
   assert.doesNotMatch(advancedChart, /> Candles</);
   assert.match(dashboard, /INTRADAY CLOSED/);
+  assert.match(dashboard, /MARKET CLOSED/);
+  assert.match(dashboard, /if \(!marketOrdersAllowed\)/);
   assert.match(dashboard, /UPSTOX_AUTO_SQUARE_OFF_MINUTES/);
   assert.match(dashboard, /fetchSquareOffPrice/);
   assert.match(dashboard, /corrected from Upstox 3:00 PM candles/);

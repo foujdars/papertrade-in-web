@@ -920,6 +920,7 @@ export function TradingDashboard() {
   }), [openPositions, tradingUniverse]);
   const holdingsSummary = useMemo(() => holdings.reduce((summary, holding) => {
     const instrument = tradingUniverse.find((item) => item.symbol === holding.symbol);
+    const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[holding.symbol] : marketQuotes[holding.symbol];
     const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, {
       side: "SELL",
       product: "DELIVERY",
@@ -930,9 +931,13 @@ export function TradingDashboard() {
       invested: summary.invested + holding.averagePrice * holding.quantity,
       current: summary.current + holding.marketValue,
       pnl: summary.pnl + holding.unrealizedPnl,
+      dayPnl: summary.dayPnl + (quote?.netChange ?? 0) * holding.quantity,
       exitCharges: summary.exitCharges + exitCharges,
     };
-  }, { invested: 0, current: 0, pnl: 0, exitCharges: 0 }), [holdings, tradingUniverse]);
+  }, { invested: 0, current: 0, pnl: 0, dayPnl: 0, exitCharges: 0 }), [holdings, marketQuotes, tradingUniverse]);
+  const holdingsDayBase = holdingsSummary.current - holdingsSummary.dayPnl;
+  const holdingsDayReturnPercent = holdingsDayBase > 0 ? holdingsSummary.dayPnl / holdingsDayBase * 100 : 0;
+  const holdingsTotalReturnPercent = holdingsSummary.invested > 0 ? holdingsSummary.pnl / holdingsSummary.invested * 100 : 0;
   const marketStatus = useMemo(
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
     [clock],
@@ -940,6 +945,7 @@ export function TradingDashboard() {
   const intradayOrdersAllowed = Boolean(
     clock && marketStatus.isOpen && getNseMarketStatus(clock).minutesFromMidnight < UPSTOX_AUTO_SQUARE_OFF_MINUTES,
   );
+  const marketOrdersAllowed = Boolean(clock && marketStatus.isOpen);
   const intradayStatusMessage = marketStatus.isOpen && !intradayOrdersAllowed
     ? "Upstox intraday auto square-off starts at 3:00 PM IST"
     : marketStatus.message;
@@ -1202,6 +1208,11 @@ export function TradingDashboard() {
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
+    if (!marketOrdersAllowed) {
+      setToast(marketStatus.message);
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
     if (product === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
@@ -1283,6 +1294,11 @@ export function TradingDashboard() {
     const executionPrice = verifiedLivePrice;
     if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
       setToast("Live Upstox price unavailable. Position was not exited.");
+      window.setTimeout(() => setToast(""), 3_500);
+      return;
+    }
+    if (!marketOrdersAllowed) {
+      setToast(marketStatus.message);
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
@@ -1654,7 +1670,7 @@ export function TradingDashboard() {
         </div>
       </header>
 
-      <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
+      {!holdingsOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
           <div className="desktop-panel-head"><span className="eyebrow">Indian markets</span><h2>Watchlist</h2></div>
@@ -1857,7 +1873,7 @@ export function TradingDashboard() {
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
-          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div>{isCashDeliveryOrder && <small className="delivery-charge-note">Includes brokerage, STT, exchange and regulatory charges, GST, stamp duty, and DP charges on a sell.</small>}</div>
+          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} units</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -1872,13 +1888,13 @@ export function TradingDashboard() {
               )}
               <div className="ticket-exit-controls">
                 <label>Exit qty<input type="text" inputMode="numeric" value={exitQuantity} onFocus={() => setExitQuantity("")} onChange={(event) => setExitQuantity(event.target.value.replace(/\D/g, ""))} onBlur={() => setExitQuantity(String(safeExitQuantity))} /></label>
-                <button disabled={positionProduct === "INTRADAY" && !intradayOrdersAllowed} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
-                <button disabled={positionProduct === "INTRADAY" && !intradayOrdersAllowed} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
+                <button disabled={!marketOrdersAllowed || (positionProduct === "INTRADAY" && !intradayOrdersAllowed)} onClick={() => exitPosition(safeExitQuantity)}>Exit {safeExitQuantity}</button>
+                <button disabled={!marketOrdersAllowed || (positionProduct === "INTRADAY" && !intradayOrdersAllowed)} onClick={() => exitPosition(selectedPosition.quantity)}>Exit all</button>
               </div>
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={!verifiedLivePrice || (product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={!verifiedLivePrice || !marketOrdersAllowed || (product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : !marketOrdersAllowed ? "MARKET CLOSED" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
@@ -1886,7 +1902,7 @@ export function TradingDashboard() {
             {!todayOrders.length && <div className="no-orders">Today&apos;s simulated trades will appear here.</div>}
           </div>
         </aside>
-      </div>
+      </div>}
 
       {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
@@ -1943,30 +1959,34 @@ export function TradingDashboard() {
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
           <section className="modal holdings-modal navigation-page" role="dialog" aria-modal="true" aria-label="Delivery holdings" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Holdings</h2></div><button className="icon-button" onClick={() => setHoldingsOpen(false)} aria-label="Close holdings"><X size={20} /></button></div>
-            <div className="holdings-summary-grid">
-              <div><span>Invested</span><b>{formatInr(holdingsSummary.invested)}</b></div>
-              <div><span>Current value</span><b>{formatInr(holdingsSummary.current)}</b></div>
-              <div><span>Unrealized P&amp;L</span><b className={holdingsSummary.pnl >= 0 ? "positive" : "negative"}>{holdingsSummary.pnl >= 0 ? "+" : ""}{formatInr(holdingsSummary.pnl)}</b></div>
-              <div><span>Est. sell charges</span><b>{formatInr(holdingsSummary.exitCharges)}</b></div>
-            </div>
-            <div className="holdings-table">
-              <div className="holding-row holdings-head"><span>Holding</span><span>Qty</span><span>Average</span><span>Live price</span><span>Current value</span><span>P&amp;L</span><span /></div>
+            <div className="holdings-layout">
+              <section className="holdings-overview-card">
+                <span className="holdings-asset-tab">Stocks</span>
+                <div className="holdings-value-head"><span>Holdings ({holdings.length})</span><strong>{formatInr(holdingsSummary.current)}</strong></div>
+                <div className="holdings-return-lines">
+                  <div><span>1D returns</span><b className={holdingsSummary.dayPnl >= 0 ? "positive" : "negative"}>{holdingsSummary.dayPnl >= 0 ? "+" : ""}{formatInr(holdingsSummary.dayPnl)} ({holdingsDayReturnPercent.toFixed(2)}%)</b></div>
+                  <div><span>Total returns</span><b className={holdingsSummary.pnl >= 0 ? "positive" : "negative"}>{holdingsSummary.pnl >= 0 ? "+" : ""}{formatInr(holdingsSummary.pnl)} ({holdingsTotalReturnPercent.toFixed(2)}%)</b></div>
+                  <div><span>Invested</span><b>{formatInr(holdingsSummary.invested)}</b></div>
+                  <div><span>Est. sell charges</span><b>{formatInr(holdingsSummary.exitCharges)}</b></div>
+                </div>
+              </section>
+              <section className="holdings-list-card">
+                <div className="holdings-list-title"><b>Your holdings</b><span /><span>Current (Invested)</span><span>Returns</span><span /></div>
               {holdings.map((holding) => {
                 const instrument = tradingUniverse.find((item) => item.symbol === holding.symbol);
                 const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: "SELL", product: "DELIVERY", quantity: holding.quantity, price: holding.livePrice }).total;
+                const holdingReturnPercent = holding.averagePrice > 0 ? (holding.livePrice - holding.averagePrice) / holding.averagePrice * 100 : 0;
                 return <div className="holding-row" key={holding.symbol}>
                   <button className="holding-symbol" onClick={() => openPositionChart(holding.symbol)}><span className="symbol-avatar">{holding.symbol.slice(0, 2)}</span><span><b>{holding.symbol}</b><small>{holding.name}</small></span></button>
-                  <span data-label="Qty"><b>{holding.quantity}</b></span>
-                  <span data-label="Average">{formatInr(holding.averagePrice)}</span>
-                  <span data-label="Live price">{formatInr(holding.livePrice)}</span>
-                  <span data-label="Current value">{formatInr(holding.marketValue)}</span>
-                  <span data-label="P&amp;L"><b className={holding.unrealizedPnl >= 0 ? "positive" : "negative"}>{holding.unrealizedPnl >= 0 ? "+" : ""}{formatInr(holding.unrealizedPnl)}</b><small>Exit charges {formatInr(exitCharges)}</small></span>
+                  <span className="holding-quantity"><b>{holding.quantity} shares</b><small>Avg. {formatInr(holding.averagePrice)}</small></span>
+                  <span className="holding-values"><b>{formatInr(holding.marketValue)}</b><small>({formatInr(holding.averagePrice * holding.quantity)})</small></span>
+                  <span className="holding-return"><b className={holding.unrealizedPnl >= 0 ? "positive" : "negative"}>{holding.unrealizedPnl >= 0 ? "+" : ""}{formatInr(holding.unrealizedPnl)}</b><small className={holdingReturnPercent >= 0 ? "positive" : "negative"}>{holdingReturnPercent >= 0 ? "+" : ""}{holdingReturnPercent.toFixed(2)}% · fees {formatInr(exitCharges)}</small></span>
                   <button className="holding-sell" onClick={() => openHoldingSell(holding.symbol, holding.quantity)}>Sell</button>
                 </div>;
               })}
               {!holdings.length && <div className="holdings-empty"><BriefcaseBusiness size={34} /><b>No delivery holdings</b><span>Buy a stock using Delivery (CNC) and it will appear here.</span><button onClick={() => openNavigationSection("trade")}>Explore stocks</button></div>}
+              </section>
             </div>
-            <p className="holdings-note">Delivery sells are limited to held quantity. Estimated charges include brokerage, STT, exchange and regulatory charges, GST, and DP charges.</p>
           </section>
         </div>
       )}
