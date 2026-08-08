@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankVolumeBreakouts } from "../lib/volume-breakout.ts";
+import { rankOpenHighStocks, rankVolumeBreakouts } from "../lib/volume-breakout.ts";
 
 const history = new Map([
   ["FAST", Array.from({ length: 19 }, (_, index) => ({ date: `2026-07-${String(index + 1).padStart(2, "0")}`, volume: 10 }))],
@@ -42,4 +42,23 @@ test("percentage change ranks ahead of a larger volume multiple", () => {
   ], new Map([["HIGHCHANGE", commonHistory], ["HIGHVOLUME", commonHistory]]));
   assert.equal(rows[0].symbol, "HIGHCHANGE");
   assert.ok(rows[1].volumeMultiple > rows[0].volumeMultiple);
+});
+
+test("returns the 10 most bearish Open = High stocks", () => {
+  const candidates = Array.from({ length: 12 }, (_, index) => ({
+    symbol: `OPENHIGH${index}`,
+    name: `Open High ${index}`,
+    instrumentKey: `NSE_EQ|INEOPEN${String(index).padStart(4, "0")}`,
+    lastPrice: 100 - index,
+    previousClose: 100,
+    open: 105,
+    high: index === 11 ? 105.05 : 105,
+    low: 95 - index,
+    volume: 1_000 + index,
+  }));
+  const rows = rankOpenHighStocks(candidates);
+  assert.equal(rows.length, 10);
+  assert.equal(rows[0].symbol, "OPENHIGH10");
+  assert.ok(rows.every((row) => row.open === row.high));
+  assert.ok(!rows.some((row) => row.symbol === "OPENHIGH11"));
 });

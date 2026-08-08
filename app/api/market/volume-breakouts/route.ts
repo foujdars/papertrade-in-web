@@ -1,6 +1,6 @@
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
-import { rankVolumeBreakouts, type HistoricalVolumePoint, type VolumeBreakoutCandidate } from "@/lib/volume-breakout";
+import { rankOpenHighStocks, rankVolumeBreakouts, type HistoricalVolumePoint, type OpenHighCandidate, type VolumeBreakoutCandidate } from "@/lib/volume-breakout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ type UpstoxQuote = {
   volume?: number;
   timestamp?: string;
   last_trade_time?: string;
-  ohlc?: { close?: number };
+  ohlc?: { open?: number; high?: number; low?: number; close?: number };
 };
 
 type UpstoxQuotePayload = {
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
     const requestedByKey = new Map(instruments.map((item) => [item.instrumentKey, item]));
     const requestedBySymbol = new Map(instruments.map((item) => [item.symbol, item]));
     const candidates: VolumeBreakoutCandidate[] = [];
+    const openHighCandidates: OpenHighCandidate[] = [];
     for (const quote of quotePayloads.flatMap((item) => Object.values(item.data ?? {}))) {
       const instrumentKey = quote.instrument_token ?? "";
       const symbol = quote.symbol?.trim().toUpperCase() ?? "";
@@ -98,7 +99,22 @@ export async function POST(request: Request) {
       const netChange = Number(quote.net_change);
       const previousClose = Number.isFinite(netChange) ? lastPrice - netChange : Number(quote.ohlc?.close);
       const todayVolume = Number(quote.volume);
-      if (!requested || !Number.isFinite(lastPrice) || !Number.isFinite(previousClose) || !Number.isFinite(todayVolume)) continue;
+      if (!requested || !Number.isFinite(lastPrice) || !Number.isFinite(previousClose)) continue;
+      const open = Number(quote.ohlc?.open);
+      const high = Number(quote.ohlc?.high);
+      const low = Number(quote.ohlc?.low);
+      if (Number.isFinite(open) && Number.isFinite(high)) {
+        openHighCandidates.push({
+          ...requested,
+          lastPrice,
+          previousClose,
+          open,
+          high,
+          low: Number.isFinite(low) ? low : lastPrice,
+          volume: Number.isFinite(todayVolume) ? todayVolume : 0,
+        });
+      }
+      if (!Number.isFinite(todayVolume)) continue;
       const quoteTimestamp = quote.timestamp || (Number.isFinite(Number(quote.last_trade_time)) ? Number(quote.last_trade_time) : Date.now());
       candidates.push({
         ...requested,
@@ -133,6 +149,7 @@ export async function POST(request: Request) {
       source: "Upstox live quotes + adjusted daily candles",
       rule: "Daily Volume > 5 × SMA(Volume, 20)",
       rows,
+      openHighRows: rankOpenHighStocks(openHighCandidates),
       scanned: candidates.length,
       historiesScanned,
       fetchedAt: new Date().toISOString(),

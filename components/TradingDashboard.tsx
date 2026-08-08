@@ -38,7 +38,7 @@ import {
 import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
-import type { VolumeBreakoutRow } from "@/lib/volume-breakout";
+import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
 import { useAuth } from "@/components/AuthProvider";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
@@ -307,6 +307,7 @@ export function TradingDashboard() {
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [marketScannerLoading, setMarketScannerLoading] = useState(false);
   const [volumeBreakoutRows, setVolumeBreakoutRows] = useState<VolumeBreakoutRow[]>([]);
+  const [openHighRows, setOpenHighRows] = useState<OpenHighRow[]>([]);
   const [marketScannerError, setMarketScannerError] = useState("");
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
@@ -664,11 +665,13 @@ export function TradingDashboard() {
         const payload = await response.json() as {
           ok?: boolean;
           rows?: VolumeBreakoutRow[];
+          openHighRows?: OpenHighRow[];
           error?: { message?: string };
         };
         if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "Volume scanner is unavailable.");
         if (!controller.signal.aborted) {
           setVolumeBreakoutRows(payload.rows ?? []);
+          setOpenHighRows(payload.openHighRows ?? []);
         }
       } catch (error) {
         if (!controller.signal.aborted) setMarketScannerError(error instanceof Error ? error.message : "Volume scanner is unavailable.");
@@ -1956,11 +1959,13 @@ export function TradingDashboard() {
       {marketsOpen && (
         <MarketsWorkspace
           volumeRows={volumeBreakoutRows}
+          openHighRows={openHighRows}
           volumeLoading={marketScannerLoading}
           volumeError={marketScannerError}
           stockUniverse={stockUniverse}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onClose={() => setMarketsOpen(false)}
+          showScannerTabs={!isAndroidApp}
         />
       )}
       {optionChainOpen && activeFnoUnderlying && (
