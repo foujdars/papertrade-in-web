@@ -147,6 +147,7 @@ export function FnoChartWorkspace({
               timeframe={timeframe}
               activeTool={activeTool}
               toolSignal={toolSignal}
+              onDrawingComplete={() => setActiveTool("cursor")}
               magnet={magnet}
               hiddenDrawings={hiddenDrawings}
               lockedDrawings={lockedDrawings}
@@ -181,6 +182,7 @@ export function FnoChartWorkspace({
               timeframe={timeframe}
               activeTool={activeTool}
               toolSignal={toolSignal}
+              onDrawingComplete={() => setActiveTool("cursor")}
               magnet={magnet}
               hiddenDrawings={hiddenDrawings}
               lockedDrawings={lockedDrawings}

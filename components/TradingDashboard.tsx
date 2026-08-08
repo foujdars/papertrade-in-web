@@ -1833,6 +1833,7 @@ export function TradingDashboard() {
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
+                onDrawingComplete={() => setActiveTool("cursor")}
                 onFeedStatus={handleFeedStatus}
               />
             )}

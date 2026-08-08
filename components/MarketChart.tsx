@@ -352,6 +352,7 @@ export function MarketChart({
   onOrderToolChange,
   onOrderToolClose,
   onOrderToolExit,
+  onDrawingComplete,
   onChartTap,
   onPrice,
   onFeedStatus,
@@ -375,6 +376,7 @@ export function MarketChart({
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
   onOrderToolExit?: () => void;
+  onDrawingComplete?: () => void;
   onChartTap?: () => void;
   onPrice?: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
@@ -422,6 +424,7 @@ export function MarketChart({
   const crosshairVisibleRef = useRef(true);
   const orderToolRef = useRef(orderTool);
   const onChartTapRef = useRef(onChartTap);
+  const onDrawingCompleteRef = useRef(onDrawingComplete);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -434,6 +437,10 @@ export function MarketChart({
   useEffect(() => {
     onChartTapRef.current = onChartTap;
   }, [onChartTap]);
+
+  useEffect(() => {
+    onDrawingCompleteRef.current = onDrawingComplete;
+  }, [onDrawingComplete]);
 
   function refreshRiskCoordinates() {
     const series = candleSeries.current;
@@ -779,6 +786,11 @@ export function MarketChart({
     draftRef.current = null;
     setPlacementHint("");
     persistDrawings(true);
+    activeToolRef.current = "cursor";
+    drawingManager.current?.setActiveTool(null);
+    chartApi.current?.applyOptions({ handleScroll: true, handleScale: true });
+    chartHost.current?.classList.remove("is-drawing");
+    onDrawingCompleteRef.current?.();
   }
 
   function cancelDraft() {

@@ -88,6 +88,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Est\. delivery charges/);
   assert.match(advancedChart, /LIVE P&amp;L/);
   assert.match(advancedChart, /exitPosition/);
+  assert.match(advancedChart, /onDrawingComplete/);
+  assert.match(chart, /onDrawingCompleteRef\.current\?\.\(\)/);
+  assert.match(chart, /activeToolRef\.current = "cursor"/);
   assert.match(advancedChart, /Exit quantity/);
   assert.doesNotMatch(advancedChart, /> Candles</);
   assert.match(dashboard, /INTRADAY CLOSED/);

@@ -356,6 +356,7 @@ export function AdvancedChartWorkspace({
             timeframe={timeframe}
             activeTool={activeTool}
             toolSignal={toolSignal}
+            onDrawingComplete={() => setActiveTool("cursor")}
             magnet={magnet}
             hiddenDrawings={drawingsHidden}
             lockedDrawings={drawingsLocked}
