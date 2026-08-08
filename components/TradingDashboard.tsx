@@ -1680,10 +1680,11 @@ export function TradingDashboard() {
             {LIVE_INDEX_TICKERS.map((item) => {
               const quote = marketQuotes[item.instrumentKey];
               const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
+              const isLive = isFresh && marketStatus.isOpen && feedStatus.mode === "live";
               const change = quote?.changePercent ?? 0;
               const points = quote?.netChange ?? 0;
               return (
-                <button type="button" className={isFresh ? "live" : "stale"} key={item.instrumentKey} title={isFresh ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
+                <button type="button" className={isLive ? "live" : "stale"} key={item.instrumentKey} title={isLive ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
                   openNavigationSection("trade");
                   chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
                 }}>

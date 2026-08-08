@@ -167,6 +167,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /openFnoNormalChart/);
   assert.match(dashboard, /chart-derivatives-link/);
   assert.match(dashboard, /FnoListsWorkspace/);
+  assert.match(dashboard, /marketStatus\.isOpen && feedStatus\.mode === "live"/);
   assert.match(dashboard, /toggleFnoOptionType/);
   assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
   assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
