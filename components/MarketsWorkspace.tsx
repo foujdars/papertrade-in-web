@@ -11,10 +11,10 @@ type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
 
 const STORAGE_KEY = "papertrade-market-scanner-results-v1";
-const scannerOptions: Array<{ id: ScannerId; label: string; description: string }> = [
-  { id: "VOLUME", label: "Volume Shocker", description: "Daily volume above 5× its 20-session average" },
-  { id: "OPEN_HIGH", label: "Open = High", description: "Live NSE stocks whose session open equals the high" },
-  ...Object.entries(NIMBLE_STRATEGIES).map(([id, item]) => ({ id: id as NimbleStrategy, label: item.label, description: item.description })),
+const scannerOptions: Array<{ id: ScannerId; label: string }> = [
+  { id: "VOLUME", label: "Volume Shocker" },
+  { id: "OPEN_HIGH", label: "Open = High" },
+  ...Object.entries(NIMBLE_STRATEGIES).map(([id, item]) => ({ id: id as NimbleStrategy, label: item.label })),
 ];
 
 function compactNumber(value: number) {
@@ -102,7 +102,7 @@ export function MarketsWorkspace({
         {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}>{option.label}</button>)}
       </div>
       <div className="scanner-run-row">
-        <span><b>{selectedOption.label}</b><small>{selectedOption.description}</small>{activeSnapshot?.scannedAt && <small>Last scan {formatScanTime(activeSnapshot.scannedAt)} IST · list stays until refreshed</small>}</span>
+        {activeSnapshot?.scannedAt && <span><small>Last scan {formatScanTime(activeSnapshot.scannedAt)} IST · list stays until refreshed</small></span>}
         <button className="scanner-run-button" onClick={runSelectedScan} disabled={Boolean(loadingScanner)}>
           {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
           {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan"}

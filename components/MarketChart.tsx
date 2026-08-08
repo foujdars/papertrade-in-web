@@ -217,14 +217,34 @@ function normalizeTool(tool: DrawingTool): DrawingToolId | null {
   return LEGACY_TOOL_ALIASES[tool] ?? tool as DrawingToolId;
 }
 
-function drawingStorageKey(instrument: Instrument, timeframe: string) {
+function drawingStorageKey(instrument: Instrument) {
+  return `${DRAWING_STORAGE_PREFIX}:${instrument.instrumentKey}`;
+}
+
+function legacyDrawingStorageKey(instrument: Instrument, timeframe: string) {
   return `${DRAWING_STORAGE_PREFIX}:${instrument.instrumentKey}:${timeframe}`;
 }
 
-function readStoredDrawings(key: string): SerializedDrawing[] {
+function readStoredDrawings(key: string, legacyKey?: string): SerializedDrawing[] {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]") as SerializedDrawing[];
-    return Array.isArray(parsed) ? parsed : [];
+    const current = window.localStorage.getItem(key);
+    if (current !== null) {
+      const parsed = JSON.parse(current) as SerializedDrawing[];
+      return Array.isArray(parsed) ? parsed : [];
+    }
+    const legacyKeys = new Set<string>();
+    if (legacyKey) legacyKeys.add(legacyKey);
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const candidate = window.localStorage.key(index);
+      if (candidate?.startsWith(`${key}:`)) legacyKeys.add(candidate);
+    }
+    const merged = new Map<string, SerializedDrawing>();
+    for (const candidate of legacyKeys) {
+      const parsed = JSON.parse(window.localStorage.getItem(candidate) ?? "[]") as SerializedDrawing[];
+      if (!Array.isArray(parsed)) continue;
+      for (const drawing of parsed) merged.set(drawing.id, drawing);
+    }
+    return [...merged.values()];
   } catch {
     return [];
   }
@@ -266,6 +286,26 @@ function timeToTimestamp(time: Time) {
   if (typeof time === "number") return time;
   if (typeof time === "string") return Math.floor(new Date(time).getTime() / 1_000);
   return Date.UTC(time.year, time.month - 1, time.day) / 1_000;
+}
+
+function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle[]) {
+  if (!candles.length) return snapshot;
+  const candleTimes = candles.map((candle) => Number(candle.time));
+  return snapshot.map((item) => ({
+    ...item,
+    anchors: item.anchors.map((anchor) => {
+      const timestamp = timeToTimestamp(anchor.time);
+      let nearest = candleTimes[0];
+      let distance = Math.abs(nearest - timestamp);
+      for (let index = 1; index < candleTimes.length; index += 1) {
+        const nextDistance = Math.abs(candleTimes[index] - timestamp);
+        if (nextDistance >= distance) continue;
+        nearest = candleTimes[index];
+        distance = nextDistance;
+      }
+      return { ...anchor, time: nearest as UTCTimestamp };
+    }),
+  }));
 }
 
 function indiaTime(time: Time) {
@@ -368,6 +408,7 @@ export function MarketChart({
   const hiddenRef = useRef(hiddenDrawings);
   const [initialData] = useState<Candle[]>([]);
   const dataRef = useRef<Candle[]>(initialData);
+  const storedDrawingsRef = useRef<SerializedDrawing[]>([]);
   const historyRef = useRef<SerializedDrawing[][]>([]);
   const redoRef = useRef<SerializedDrawing[][]>([]);
   const restoringRef = useRef(false);
@@ -376,7 +417,7 @@ export function MarketChart({
   const previousRedo = useRef(redoSignal);
   const visibleBarsRef = useRef(visibleBars);
   const indicatorsRef = useRef(indicators);
-  const storageKeyRef = useRef(drawingStorageKey(instrument, timeframe));
+  const storageKeyRef = useRef(drawingStorageKey(instrument));
   const gridVisibleRef = useRef(true);
   const crosshairVisibleRef = useRef(true);
   const orderToolRef = useRef(orderTool);
@@ -656,6 +697,7 @@ export function MarketChart({
     const manager = drawingManager.current;
     if (!manager || restoringRef.current) return;
     const snapshot = manager.exportDrawings();
+    storedDrawingsRef.current = snapshot;
     window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     if (pushHistory) {
       const previous = historyRef.current.at(-1);
@@ -667,7 +709,7 @@ export function MarketChart({
     }
   }
 
-  function restoreDrawings(snapshot: SerializedDrawing[]) {
+  function restoreDrawings(snapshot: SerializedDrawing[], persist = true) {
     const manager = drawingManager.current;
     const registry = drawingRegistry.current;
     if (!manager || !registry) return;
@@ -681,7 +723,10 @@ export function MarketChart({
       }
     }
     restoringRef.current = false;
-    window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
+    if (persist) {
+      storedDrawingsRef.current = snapshot;
+      window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
+    }
   }
 
   function snapAnchor(rawTime: Time, rawPrice: number): Anchor {
@@ -958,9 +1003,11 @@ export function MarketChart({
       manager.attach(chart, series, host);
       drawingManager.current = manager;
       drawingRegistry.current = drawing.getToolRegistry();
-      storageKeyRef.current = drawingStorageKey(instrument, timeframe);
-      const stored = readStoredDrawings(storageKeyRef.current);
-      restoreDrawings(stored);
+      storageKeyRef.current = drawingStorageKey(instrument);
+      const stored = readStoredDrawings(storageKeyRef.current, legacyDrawingStorageKey(instrument, timeframe));
+      storedDrawingsRef.current = stored;
+      window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
+      restoreDrawings(projectDrawingsToCandles(stored, dataRef.current), false);
       historyRef.current = [stored];
       redoRef.current = [];
 
@@ -1243,6 +1290,7 @@ export function MarketChart({
         setLatestCandle(latest);
         if (latest) onPrice?.(latest.close);
         candleSeries.current?.setData(payload.candles.map(toCandleData));
+        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles), false);
         syncIndicatorData(payload.candles);
         applyVisibleRange(payload.candles);
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";

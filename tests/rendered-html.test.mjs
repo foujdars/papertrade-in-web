@@ -97,6 +97,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(nimbleScanner, /EMA 21 Retest/);
   assert.match(nimbleScanner, /Weekly Fakeout MTF/);
   assert.match(marketsWorkspace, /Refresh scan/);
+  assert.doesNotMatch(marketsWorkspace, /selectedOption\.description/);
   assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
@@ -110,6 +111,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(chart, /Charts by TradingView/);
   assert.match(chart, /lightweight-charts-drawing/);
   assert.match(chart, /DRAWING_TOOL_CATALOG/);
+  assert.match(chart, /return `\$\{DRAWING_STORAGE_PREFIX\}:\$\{instrument\.instrumentKey\}`/);
+  assert.match(chart, /legacyDrawingStorageKey/);
   assert.match(chart, /DrawingManager/);
   assert.match(chart, /chart-risk-tool/);
   assert.match(chart, /entireTextOnly: true/);
