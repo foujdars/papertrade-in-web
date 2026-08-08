@@ -26,6 +26,7 @@ test("server-renders the PaperTrade IN terminal", async () => {
   assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
   assert.match(html, /Broker API/);
   assert.match(html, /No real money/);
+  assert.match(html, /Holdings/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
@@ -80,6 +81,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
+  assert.match(dashboard, /Delivery sells are limited to held quantity/);
+  assert.match(dashboard, /BUY BEFORE DELIVERY SELL/);
+  assert.match(dashboard, /Est\. delivery charges/);
   assert.match(advancedChart, /LIVE P&amp;L/);
   assert.match(advancedChart, /exitPosition/);
   assert.match(advancedChart, /Exit quantity/);

@@ -25,7 +25,8 @@ export function calculateUpstoxEquityCharges({ side, product, quantity, price }:
   const turnover = Math.max(0, quantity * price);
   const brokerage = product === "INTRADAY" ? Math.min(20, turnover * 0.001) : Math.min(20, turnover * 0.025);
   const stt = product === "DELIVERY" ? turnover * 0.001 : side === "SELL" ? turnover * 0.00025 : 0;
-  const transactionCharges = turnover * 0.0000297;
+  // NSE cash-market transaction charges from 1 March 2026: 0.00307% per leg.
+  const transactionCharges = turnover * 0.0000307;
   const ipftCharges = turnover * 0.000001;
   const sebiCharges = turnover * 0.000001;
   const stampDuty = side === "BUY" ? turnover * (product === "DELIVERY" ? 0.00015 : 0.00003) : 0;

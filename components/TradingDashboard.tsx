@@ -26,12 +26,15 @@ import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
   deletePaperTradeOrders,
+  getDeliveryHoldingQuantity,
   getProtectionTrigger,
+  paperOrderCapitalValue,
   readPaperOrders,
   readPaperProtections,
   repairRatnaveerSimulationTrade,
   writePaperOrders,
   writePaperProtections,
+  validateDeliverySell,
   type PaperOrder,
   type PaperProtection,
 } from "@/lib/paper-trading";
@@ -101,7 +104,7 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "trade" | "fno" | "watchlist" | "orders" | "markets" | "pnl";
+type NavigationSection = "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "pnl";
 
 type FnoWorkspaceSnapshot = {
   option: Instrument;
@@ -291,6 +294,7 @@ export function TradingDashboard() {
   const [showApi, setShowApi] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [holdingsOpen, setHoldingsOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [desktopOrderPanelOpen, setDesktopOrderPanelOpen] = useState(true);
   const [positionsOpen, setPositionsOpen] = useState(false);
@@ -807,8 +811,8 @@ export function TradingDashboard() {
       };
       triggeredOrders.push(order);
       clearedProtectionIds.add(protection.id);
-      const releasedMargin = price * position.quantity * 0.2;
-      nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+      const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, price);
+      nextBalance = closingSide === "SELL" ? nextBalance + releasedCapital - charges.total : nextBalance - releasedCapital - charges.total;
     });
 
     if (!triggeredOrders.length && !clearedProtectionIds.size) return;
@@ -844,7 +848,13 @@ export function TradingDashboard() {
   const quantityStep = selected.assetType === "OPTION" ? Math.max(1, selected.lotSize ?? 1) : 1;
   const orderLots = selected.assetType === "OPTION" ? quantity / quantityStep : 0;
   const margin = orderValue * 0.2;
-  const estimatedOrderCharges = useMemo(() => calculateInstrumentCharges(selected, { side, product, quantity, price: visibleLivePrice }), [product, quantity, selected, side, visibleLivePrice]);
+  const isCashDeliveryOrder = product === "DELIVERY" && selected.assetType !== "OPTION" && selected.assetType !== "FUTURE";
+  const estimatedFundsRequired = paperOrderCapitalValue(selected.assetType, product, quantity, visibleLivePrice);
+  const deliveryHoldingQuantity = getDeliveryHoldingQuantity(orders, selected.symbol);
+  const deliverySellError = isCashDeliveryOrder && side === "SELL"
+    ? validateDeliverySell(orders, selected.symbol, quantity)
+    : null;
+  const estimatedOrderCharges = calculateInstrumentCharges(selected, { side, product, quantity, price: visibleLivePrice });
   const selectedPositions = useMemo(
     () => ({
       intraday: calculatePosition(orders, selected.symbol, verifiedLivePrice ?? Number.NaN, "INTRADAY"),
@@ -852,8 +862,10 @@ export function TradingDashboard() {
     }),
     [orders, selected.symbol, verifiedLivePrice],
   );
-  const selectedPosition = selectedPositions.intraday.quantity > 0 ? selectedPositions.intraday : selectedPositions.delivery;
-  const positionProduct: "INTRADAY" | "DELIVERY" = selectedPositions.intraday.quantity > 0 ? "INTRADAY" : "DELIVERY";
+  const preferredPosition = product === "DELIVERY" ? selectedPositions.delivery : selectedPositions.intraday;
+  const alternatePosition = product === "DELIVERY" ? selectedPositions.intraday : selectedPositions.delivery;
+  const selectedPosition = preferredPosition.quantity > 0 ? preferredPosition : alternatePosition;
+  const positionProduct: "INTRADAY" | "DELIVERY" = selectedPosition === selectedPositions.delivery ? "DELIVERY" : "INTRADAY";
   const selectedProtection = protections.find((item) => item.symbol === selected.symbol && item.product === positionProduct);
   const riskToolSide: "BUY" | "SELL" = selectedPosition.quantity > 0 && selectedPosition.side !== "FLAT"
     ? selectedPosition.side === "LONG" ? "BUY" : "SELL"
@@ -902,6 +914,25 @@ export function TradingDashboard() {
     })).filter((position) => position.quantity > 0);
   }), [clock, marketQuoteUpdatedAt, marketQuotes, orders, positionSymbols, selected.symbol, tradingUniverse, verifiedLivePrice]);
   const totalOpenPnl = openPositions.reduce((total, position) => total + position.unrealizedPnl, 0);
+  const holdings = useMemo(() => openPositions.filter((position) => {
+    const assetType = tradingUniverse.find((item) => item.symbol === position.symbol)?.assetType;
+    return position.product === "DELIVERY" && position.side === "LONG" && assetType !== "OPTION" && assetType !== "FUTURE";
+  }), [openPositions, tradingUniverse]);
+  const holdingsSummary = useMemo(() => holdings.reduce((summary, holding) => {
+    const instrument = tradingUniverse.find((item) => item.symbol === holding.symbol);
+    const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, {
+      side: "SELL",
+      product: "DELIVERY",
+      quantity: holding.quantity,
+      price: holding.livePrice,
+    }).total;
+    return {
+      invested: summary.invested + holding.averagePrice * holding.quantity,
+      current: summary.current + holding.marketValue,
+      pnl: summary.pnl + holding.unrealizedPnl,
+      exitCharges: summary.exitCharges + exitCharges,
+    };
+  }, { invested: 0, current: 0, pnl: 0, exitCharges: 0 }), [holdings, tradingUniverse]);
   const marketStatus = useMemo(
     () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
     [clock],
@@ -1176,8 +1207,23 @@ export function TradingDashboard() {
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
+    if (isCashDeliveryOrder && side === "SELL") {
+      const sellError = validateDeliverySell(orders, selected.symbol, quantity);
+      if (sellError) {
+        setToast(sellError);
+        window.setTimeout(() => setToast(""), 3_800);
+        return;
+      }
+    }
+    const executionCharges = calculateInstrumentCharges(selected, { side, product, quantity, price: executionPrice });
+    const executionCapital = paperOrderCapitalValue(selected.assetType, product, quantity, executionPrice);
+    if (side === "BUY" && executionCapital + executionCharges.total > balance) {
+      setToast(`Insufficient virtual cash. Required ${formatInr(executionCapital + executionCharges.total)}.`);
+      window.setTimeout(() => setToast(""), 3_800);
+      return;
+    }
     const intendedDirection = side === "BUY" ? "LONG" : "SHORT";
-    const riskError = protectionError(intendedDirection, executionPrice);
+    const riskError = isCashDeliveryOrder && side === "SELL" ? null : protectionError(intendedDirection, executionPrice);
     if (riskError) {
       setToast(riskError);
       window.setTimeout(() => setToast(""), 3_200);
@@ -1186,7 +1232,7 @@ export function TradingDashboard() {
     const order: PaperOrder = {
       id: `${new Date().getTime()}`, symbol: selected.symbol, side, quantity, price: executionPrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      product, createdAt: new Date().getTime(), charges: calculateInstrumentCharges(selected, { side, product, quantity, price: executionPrice }),
+      product, createdAt: new Date().getTime(), charges: executionCharges,
       priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
       instrumentKey: selected.instrumentKey,
       instrumentName: selected.name,
@@ -1198,10 +1244,8 @@ export function TradingDashboard() {
       underlyingKey: selected.underlyingKey,
       underlyingSymbol: selected.underlyingSymbol,
     };
-    const executionCharges = getOrderCharges(order);
     const nextOrders = [order, ...orders];
-    const executionMargin = executionPrice * quantity * .2;
-    const nextBalance = (side === "BUY" ? balance - executionMargin : balance + executionMargin) - executionCharges.total;
+    const nextBalance = (side === "BUY" ? balance - executionCapital : balance + executionCapital) - executionCharges.total;
     const nextPosition = calculatePosition(nextOrders, selected.symbol, executionPrice, product);
     const requestedProtection = protectionValues();
     const automaticProtection = nextPosition.quantity > 0
@@ -1274,8 +1318,8 @@ export function TradingDashboard() {
       underlyingSymbol: selected.underlyingSymbol,
     };
     const nextOrders = [order, ...orders];
-    const exitMargin = executionPrice * closingQuantity * 0.2;
-    const nextBalance = (closingSide === "BUY" ? balance - exitMargin : balance + exitMargin) - exitCharges.total;
+    const exitCapital = paperOrderCapitalValue(selected.assetType, positionProduct, closingQuantity, executionPrice);
+    const nextBalance = (closingSide === "BUY" ? balance - exitCapital : balance + exitCapital) - exitCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
     setExitQuantity("1");
@@ -1499,6 +1543,7 @@ export function TradingDashboard() {
   function openPositionChart(symbol: string) {
     setSidebarOpen(false);
     setPositionsOpen(false);
+    setHoldingsOpen(false);
     setOrdersOpen(false);
     setMarketsOpen(false);
     setPnlOpen(false);
@@ -1521,17 +1566,28 @@ export function TradingDashboard() {
     }
   }
 
+  function openHoldingSell(symbol: string, heldQuantity: number) {
+    openPositionChart(symbol);
+    setProduct("DELIVERY");
+    setSide("SELL");
+    setQuantityInput(String(heldQuantity));
+    setRiskToolEnabled(false);
+    setTargetPrice("");
+    setStopLossPrice("");
+    setOrderSheetOpen(true);
+  }
+
   function openNavigationSection(section: NavigationSection) {
     setOptionChainOpen(false);
     if (section === "trade") {
-      setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      setSidebarOpen(false); setPositionsOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setFnoListOpen(false);
       if (selected.assetType === "OPTION" && spotInstrument) closeFnoWorkspace();
       else setWorkspaceMode("trade");
       return;
     }
     if (section === "fno") {
-      setSidebarOpen(false); setPositionsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      setSidebarOpen(false); setPositionsOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       if (selected.assetType === "OPTION" && spotInstrument) {
         setWorkspaceMode("fno");
         setFnoListOpen(false);
@@ -1556,6 +1612,7 @@ export function TradingDashboard() {
     setFnoListOpen(false);
     setSidebarOpen(section === "watchlist");
     setPositionsOpen(false);
+    setHoldingsOpen(section === "holdings");
     setOrdersOpen(section === "orders");
     setMarketsOpen(section === "markets");
     if (section === "pnl") {
@@ -1569,20 +1626,22 @@ export function TradingDashboard() {
 
   const activeNavigationSection: NavigationSection = sidebarOpen
     ? "watchlist"
-    : ordersOpen
-      ? "orders"
-      : marketsOpen
-        ? "markets"
-        : pnlOpen
-          ? "pnl"
-          : workspaceMode;
+    : holdingsOpen
+      ? "holdings"
+      : ordersOpen
+        ? "orders"
+        : marketsOpen
+          ? "markets"
+          : pnlOpen
+            ? "pnl"
+            : workspaceMode;
 
   return (
     <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("trade")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
@@ -1786,7 +1845,7 @@ export function TradingDashboard() {
         <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
           <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2>{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
-          <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
+          <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
           <div className="input-grid">
             <label>{selected.assetType === "OPTION" ? "Quantity (lot multiples)" : "Quantity"}<div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{selected.assetType === "OPTION" && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot</small>}</label>
@@ -1797,8 +1856,8 @@ export function TradingDashboard() {
             <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
-          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => setProduct("DELIVERY")} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · no leverage"}</small></span></label></div>
-          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>Est. margin</span><b>{formatInr(margin)}</b></div><div><span>Est. taxes &amp; charges</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
+          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
+          <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div>{isCashDeliveryOrder && <small className="delivery-charge-note">Includes brokerage, STT, exchange and regulatory charges, GST, stamp duty, and DP charges on a sell.</small>}</div>
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} units</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -1819,7 +1878,7 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={!verifiedLivePrice || (product === "INTRADAY" && !intradayOrdersAllowed)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={!verifiedLivePrice || (product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
@@ -1873,12 +1932,44 @@ export function TradingDashboard() {
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
         <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
+        <button className={activeNavigationSection === "holdings" ? "active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness size={19} /><span>Holdings</span></button>
         <button className={activeNavigationSection === "orders" ? "active" : ""} onClick={() => openNavigationSection("orders")}><WalletCards size={19} /><span>Orders</span></button>
         <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
         <button className={activeNavigationSection === "pnl" ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>P&amp;L</span></button>
       </nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
+      {holdingsOpen && (
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
+          <section className="modal holdings-modal navigation-page" role="dialog" aria-modal="true" aria-label="Delivery holdings" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Holdings</h2></div><button className="icon-button" onClick={() => setHoldingsOpen(false)} aria-label="Close holdings"><X size={20} /></button></div>
+            <div className="holdings-summary-grid">
+              <div><span>Invested</span><b>{formatInr(holdingsSummary.invested)}</b></div>
+              <div><span>Current value</span><b>{formatInr(holdingsSummary.current)}</b></div>
+              <div><span>Unrealized P&amp;L</span><b className={holdingsSummary.pnl >= 0 ? "positive" : "negative"}>{holdingsSummary.pnl >= 0 ? "+" : ""}{formatInr(holdingsSummary.pnl)}</b></div>
+              <div><span>Est. sell charges</span><b>{formatInr(holdingsSummary.exitCharges)}</b></div>
+            </div>
+            <div className="holdings-table">
+              <div className="holding-row holdings-head"><span>Holding</span><span>Qty</span><span>Average</span><span>Live price</span><span>Current value</span><span>P&amp;L</span><span /></div>
+              {holdings.map((holding) => {
+                const instrument = tradingUniverse.find((item) => item.symbol === holding.symbol);
+                const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: "SELL", product: "DELIVERY", quantity: holding.quantity, price: holding.livePrice }).total;
+                return <div className="holding-row" key={holding.symbol}>
+                  <button className="holding-symbol" onClick={() => openPositionChart(holding.symbol)}><span className="symbol-avatar">{holding.symbol.slice(0, 2)}</span><span><b>{holding.symbol}</b><small>{holding.name}</small></span></button>
+                  <span data-label="Qty"><b>{holding.quantity}</b></span>
+                  <span data-label="Average">{formatInr(holding.averagePrice)}</span>
+                  <span data-label="Live price">{formatInr(holding.livePrice)}</span>
+                  <span data-label="Current value">{formatInr(holding.marketValue)}</span>
+                  <span data-label="P&amp;L"><b className={holding.unrealizedPnl >= 0 ? "positive" : "negative"}>{holding.unrealizedPnl >= 0 ? "+" : ""}{formatInr(holding.unrealizedPnl)}</b><small>Exit charges {formatInr(exitCharges)}</small></span>
+                  <button className="holding-sell" onClick={() => openHoldingSell(holding.symbol, holding.quantity)}>Sell</button>
+                </div>;
+              })}
+              {!holdings.length && <div className="holdings-empty"><BriefcaseBusiness size={34} /><b>No delivery holdings</b><span>Buy a stock using Delivery (CNC) and it will appear here.</span><button onClick={() => openNavigationSection("trade")}>Explore stocks</button></div>}
+            </div>
+            <p className="holdings-note">Delivery sells are limited to held quantity. Estimated charges include brokerage, STT, exchange and regulatory charges, GST, and DP charges.</p>
+          </section>
+        </div>
+      )}
       {ordersOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setOrdersOpen(false); }}>
           <section className="modal orders-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>

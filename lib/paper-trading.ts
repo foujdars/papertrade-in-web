@@ -93,7 +93,30 @@ function orderCashEffect(order: PaperOrder) {
   const charges = order.assetType === "OPTION" || order.assetType === "FUTURE"
     ? calculatedCharges
     : order.charges ?? calculatedCharges;
-  return (order.side === "SELL" ? 1 : -1) * order.price * order.quantity * .2 - charges.total;
+  return (order.side === "SELL" ? 1 : -1) * paperOrderCapitalValue(order.assetType, order.product ?? "INTRADAY", order.quantity, order.price) - charges.total;
+}
+
+export function paperOrderCapitalValue(
+  assetType: PaperOrder["assetType"],
+  product: "INTRADAY" | "DELIVERY",
+  quantity: number,
+  price: number,
+) {
+  const turnover = Math.max(0, quantity * price);
+  const isCashDelivery = product === "DELIVERY" && assetType !== "OPTION" && assetType !== "FUTURE";
+  return turnover * (isCashDelivery ? 1 : .2);
+}
+
+export function getDeliveryHoldingQuantity(orders: PaperOrder[], symbol: string) {
+  const position = calculatePosition(orders, symbol, Number.NaN, "DELIVERY");
+  return position.side === "LONG" ? position.quantity : 0;
+}
+
+export function validateDeliverySell(orders: PaperOrder[], symbol: string, quantity: number) {
+  const heldQuantity = getDeliveryHoldingQuantity(orders, symbol);
+  if (quantity <= heldQuantity) return null;
+  if (heldQuantity <= 0) return `Delivery sell is unavailable because you do not hold ${symbol}. Buy it first.`;
+  return `You can sell only ${heldQuantity} delivery share${heldQuantity === 1 ? "" : "s"} of ${symbol}.`;
 }
 
 export function deletePaperTradeOrders(orders: PaperOrder[], sourceOrderIds: string[]) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition, deletePaperTradeOrders, getProtectionTrigger, repairRatnaveerSimulationTrade } from "../lib/paper-trading.ts";
+import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
 import { buildClosedTrades } from "../lib/trade-analytics.ts";
 import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
 
@@ -24,6 +24,30 @@ test("calculates current NSE option premium charges", () => {
   assert.equal(buy.ipftCharges, 0.03);
   assert.equal(sell.stt, 9.75);
   assert.ok(sell.total > buy.total);
+});
+
+test("calculates current equity delivery charges on buy and sell", () => {
+  const buy = calculateUpstoxTradingCharges("EQUITY", { side: "BUY", product: "DELIVERY", quantity: 10, price: 1000 });
+  const sell = calculateUpstoxTradingCharges("EQUITY", { side: "SELL", product: "DELIVERY", quantity: 10, price: 1000 });
+  assert.equal(buy.brokerage, 20);
+  assert.equal(buy.stt, 10);
+  assert.equal(buy.transactionCharges, 0.31);
+  assert.equal(buy.stampDuty, 1.5);
+  assert.equal(sell.dpCharges, 20);
+  assert.ok(sell.total > buy.total);
+});
+
+test("requires full cash for delivery and restricts delivery sells to holdings", () => {
+  const deliveryBuy = { ...order(1, "BUY", 10, 100), product: "DELIVERY", assetType: "EQUITY" };
+  const partialSell = { ...order(2, "SELL", 4, 110), product: "DELIVERY", assetType: "EQUITY" };
+  const fills = [deliveryBuy, partialSell];
+
+  assert.equal(paperOrderCapitalValue("EQUITY", "DELIVERY", 10, 100), 1000);
+  assert.equal(paperOrderCapitalValue("EQUITY", "INTRADAY", 10, 100), 200);
+  assert.equal(getDeliveryHoldingQuantity(fills, "RELIANCE"), 6);
+  assert.equal(validateDeliverySell(fills, "RELIANCE", 6), null);
+  assert.match(validateDeliverySell(fills, "RELIANCE", 7), /only 6 delivery shares/);
+  assert.match(validateDeliverySell([], "RELIANCE", 1), /Buy it first/);
 });
 
 test("calculates current NSE futures charges and routes them through the shared F&O model", () => {
