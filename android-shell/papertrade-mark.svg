@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PaperTrade IN logo">
+  <defs>
+    <linearGradient id="violet" x1="82" y1="44" x2="432" y2="468" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="0.55" stop-color="#6d28d9"/>
+      <stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="bull" x1="0" y1="188" x2="0" y2="354" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="bear" x1="0" y1="224" x2="0" y2="382" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff525b"/>
+      <stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+    <filter id="pageGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feFlood flood-color="#7c3aed" flood-opacity="0.30"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="candleGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feOffset dy="2" result="offset"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.24"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="url(#violet)" stroke-linecap="round" stroke-linejoin="round" filter="url(#pageGlow)">
+    <path d="M106 42H346l84 84v316c0 18-14 32-32 32H106c-18 0-32-14-32-32V74c0-18 14-32 32-32Z" stroke-width="12"/>
+    <path d="M346 42v62c0 12 10 22 22 22h62" stroke-width="10"/>
+  </g>
+
+  <g stroke="url(#violet)" stroke-width="2.4" opacity="0.72">
+    <path d="M80 92h272M80 122h302M80 152h344M80 182h344M80 212h344M80 242h344M80 272h344M80 302h344M80 332h344M80 362h344M80 392h344M80 422h344"/>
+  </g>
+
+  <g filter="url(#candleGlow)">
+    <path d="M216 176v202" stroke="#059669" stroke-width="15" stroke-linecap="round"/>
+    <rect x="177" y="214" width="78" height="126" rx="11" fill="url(#bull)"/>
+    <path d="M304 222v182" stroke="#e11d48" stroke-width="15" stroke-linecap="round"/>
+    <rect x="266" y="252" width="76" height="116" rx="11" fill="url(#bear)"/>
+    <path d="M190 226h50" stroke="#ffffff" stroke-opacity="0.32" stroke-width="5" stroke-linecap="round"/>
+    <path d="M279 264h48" stroke="#ffffff" stroke-opacity="0.32" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
