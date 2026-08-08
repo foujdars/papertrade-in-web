@@ -1,12 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PaperTrade IN logo">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="43%" r="72%"><stop stop-color="#17225f"/><stop offset=".52" stop-color="#0b1740"/><stop offset="1" stop-color="#050d22"/></radialGradient>
     <linearGradient id="violet" x1="110" y1="74" x2="404" y2="438" gradientUnits="userSpaceOnUse"><stop stop-color="#a66bff"/><stop offset=".5" stop-color="#7c3aed"/><stop offset="1" stop-color="#5b21b6"/></linearGradient>
     <linearGradient id="bull" x1="0" y1="190" x2="0" y2="350" gradientUnits="userSpaceOnUse"><stop stop-color="#11f0a0"/><stop offset="1" stop-color="#00a96e"/></linearGradient>
     <linearGradient id="bear" x1="0" y1="220" x2="0" y2="382" gradientUnits="userSpaceOnUse"><stop stop-color="#ff5e7c"/><stop offset="1" stop-color="#f00045"/></linearGradient>
     <filter id="glow" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
-  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
   <g fill="none" stroke="url(#violet)" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"><path d="M142 82h204l76 76v270c0 17-14 30-30 30H142c-17 0-30-13-30-30V112c0-17 13-30 30-30Z" stroke-width="10"/><path d="M346 82v53c0 13 10 23 23 23h53" stroke-width="9"/></g>
   <g stroke="#6d28d9" stroke-width="3" opacity=".95"><path d="M118 146h237M118 181h298M118 216h298M118 251h298M118 286h298M118 321h298M118 356h298M118 391h298"/></g>
   <g filter="url(#glow)"><path d="M231 180v200" stroke="#00d88a" stroke-width="12" stroke-linecap="round"/><rect x="194" y="222" width="74" height="119" rx="10" fill="url(#bull)"/><path d="M208 232h46" stroke="#fff" stroke-opacity=".24" stroke-width="4" stroke-linecap="round"/><path d="M318 221v184" stroke="#ff315f" stroke-width="12" stroke-linecap="round"/><rect x="282" y="258" width="72" height="112" rx="10" fill="url(#bear)"/><path d="M295 268h45" stroke="#fff" stroke-opacity=".24" stroke-width="4" stroke-linecap="round"/></g>
