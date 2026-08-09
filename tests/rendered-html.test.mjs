@@ -237,7 +237,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /minimumWidth: 58/);
   assert.match(chart, /minimumFractionDigits: 0, maximumFractionDigits: 2/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
-  assert.match(styles, /height: calc\(100svh - 136px/);
+  assert.match(styles, /height: calc\(100svh - var\(--mobile-header-height\) - 56px/);
   assert.match(functionMenu, /EMA 200/);
   assert.match(functionMenu, /VWAP/);
   assert.match(functionMenu, /MACD/);
