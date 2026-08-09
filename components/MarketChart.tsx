@@ -1248,7 +1248,7 @@ export function MarketChart({
       drawingManager.current = null;
       drawingRegistry.current = null;
     };
-  }, [instrument.instrumentKey, instrument.symbol, timeframe]);
+  }, [chartTheme, instrument.instrumentKey, instrument.symbol, timeframe]);
 
   useEffect(() => {
     if (clearSignal === previousClear.current) return;
