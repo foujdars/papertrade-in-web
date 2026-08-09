@@ -1754,7 +1754,7 @@ export function TradingDashboard() {
               </button>}
               {showTradeSymbols && (
                 <div className="trade-symbol-menu">
-                  <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
+                  <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
                   <div>
                     {tradeSymbolMatches.map((item) => (
                       <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
@@ -1779,7 +1779,7 @@ export function TradingDashboard() {
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
               {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(fnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
-                <label><Search size={16} /><input autoFocus value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
+                <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
                 <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
               </div>}
             </div>

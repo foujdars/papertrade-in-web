@@ -311,7 +311,7 @@ export function AdvancedChartWorkspace({
           </button>
           {showSymbols && (
             <div className="advanced-symbol-menu">
-              <label><Search size={15} /><input autoFocus value={symbolSearch} onChange={(event) => setSymbolSearch(event.target.value)} placeholder="Search NSE symbols" /></label>
+              <label><Search size={15} /><input value={symbolSearch} onChange={(event) => setSymbolSearch(event.target.value)} placeholder="Search NSE symbols" /></label>
               <div>{filteredSymbols.slice(0, 150).map((item) => <button key={item.symbol} onClick={() => chooseInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>{item.price > 0 ? item.price.toFixed(2) : "NSE"}</em></button>)}</div>
             </div>
           )}

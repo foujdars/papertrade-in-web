@@ -22,6 +22,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const NATIVE_AUTH_CALLBACK = "in.papertrade.app://auth/callback";
+const PRODUCTION_WEB_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://papertrade.site").replace(/\/+$/, "");
 const CLOUD_STORAGE_KEYS = [
   "papertrade-orders",
   "papertrade-protections",
@@ -189,7 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError("");
     setSigningIn(true);
     const native = Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "web";
-    const redirectTo = native ? NATIVE_AUTH_CALLBACK : `${window.location.origin}/auth/callback`;
+    const localWeb = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const webOrigin = localWeb ? window.location.origin : PRODUCTION_WEB_ORIGIN;
+    const redirectTo = native ? NATIVE_AUTH_CALLBACK : `${webOrigin}/auth/callback`;
     const { data, error } = await client.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo, skipBrowserRedirect: true },

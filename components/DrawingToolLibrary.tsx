@@ -69,7 +69,7 @@ export function DrawingToolLibrary({
           <div><PenTool size={18} /><span><b>Drawing tools</b><small>{DRAWING_TOOL_CATALOG.length} TradingView-compatible tools</small></span></div>
           <button onClick={onClose} aria-label="Close drawing tools"><X size={18} /></button>
         </header>
-        <label className="drawing-library-search"><Search size={16} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search lines, Fibonacci, Gann, shapes…" /></label>
+        <label className="drawing-library-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search lines, Fibonacci, Gann, shapes…" /></label>
         <nav aria-label="Drawing tool categories">
           {categories.map((item) => <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
         </nav>
