@@ -241,6 +241,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /minimumFractionDigits: 0, maximumFractionDigits: 2/);
   assert.match(chart, /requestedMacdPane = next\.rsi \? 2 : 1/);
   assert.match(styles, /height: calc\(100svh - var\(--mobile-header-height\) - 56px/);
+  assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.fno-focus-workspace \{ inset: var\(--mobile-header-height\)/);
+  assert.match(styles, /\.custom-watchlist-choices > button[^}]+background: var\(--surface\)/);
+  assert.match(styles, /\.welcome-practice-message[^}]+linear-gradient/);
   assert.match(styles, /\.drawing-toolbar \{[^}]*overflow-y: auto/);
   assert.doesNotMatch(styles, /\.drawing-toolbar:not\(\.collapsed\) \{[^}]*overflow: hidden/);
   assert.match(functionMenu, /EMA 200/);
