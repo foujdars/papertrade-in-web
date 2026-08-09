@@ -1570,27 +1570,6 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
     overflow: hidden;
   }
 
-  .drawing-toolbar:not(.collapsed) {
-    gap: 0;
-    padding-block: 2px;
-    overflow: hidden;
-    overscroll-behavior: contain;
-  }
-
-  .drawing-toolbar:not(.collapsed) button {
-    width: 29px;
-    height: 23px;
-  }
-
-  .drawing-toolbar:not(.collapsed) > span {
-    margin-block: 0;
-  }
-
-  .drawing-toolbar .drawing-toolbar-toggle {
-    position: relative;
-    top: auto;
-  }
-
   /* Navigation already identifies these desktop pages, so repeated page titles
      only consume useful list space. */
   .workspace.section-watchlist .desktop-panel-head,
