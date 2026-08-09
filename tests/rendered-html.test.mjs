@@ -75,6 +75,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
   assert.match(authProvider, /Welcome back/);
   assert.match(authProvider, /Getting your trading desk ready/);
+  assert.match(authProvider, /Don’t waste your hard-earned money/);
+  assert.match(authProvider, /Practice\. Feel the thrill\. Learn\. Improve\. Then Trade\./);
+  assert.match(authProvider, /WELCOME_MINIMUM_MS = 5_000/);
   assert.match(supabaseClient, /flowType: "pkce"/);
   assert.match(authMigration, /enable row level security/);
   assert.match(authMigration, /auth\.uid\(\) = user_id/);

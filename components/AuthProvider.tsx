@@ -23,6 +23,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const NATIVE_AUTH_CALLBACK = "in.papertrade.app://auth/callback";
 const PRODUCTION_WEB_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://papertrade.site").replace(/\/+$/, "");
+const WELCOME_MINIMUM_MS = 5_000;
 const CLOUD_STORAGE_KEYS = [
   "papertrade-orders",
   "papertrade-protections",
@@ -62,12 +63,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const configured = isSupabaseConfigured();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(configured);
+  const [welcomeMinimumElapsed, setWelcomeMinimumElapsed] = useState(!configured);
   const [cloudReady, setCloudReady] = useState(!configured);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(configured ? "loading" : "disabled");
   const [authError, setAuthError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
   const lastUploadedState = useRef("");
   const activeUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!configured) return;
+    const timer = window.setTimeout(() => setWelcomeMinimumElapsed(true), WELCOME_MINIMUM_MS);
+    return () => window.clearTimeout(timer);
+  }, [configured]);
 
   const finishNativeSignIn = useCallback(async (url: string) => {
     if (!url.startsWith(NATIVE_AUTH_CALLBACK)) return;
@@ -245,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {configured && (authLoading || (session && !cloudReady)) ? (
+      {configured && (!welcomeMinimumElapsed || authLoading || (session && !cloudReady)) ? (
         <main className="auth-screen auth-loading-screen">
           <section className="auth-welcome-stage">
             <div className="welcome-market-visual" aria-hidden="true">
@@ -255,6 +263,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <span className="auth-welcome-eyebrow"><Sparkles size={14} /> Welcome back</span>
             <b>Getting your trading desk ready</b>
             <small>Restoring your charts, watchlists and paper portfolio securely.</small>
+            <p className="welcome-practice-message">
+              <span>Don’t waste your hard-earned money.</span>
+              <span>Practice. Feel the thrill. Learn. Improve. Then Trade.</span>
+            </p>
             <div className="welcome-loading-pills"><span><CandlestickChart size={14} /> Live charts</span><span><ShieldCheck size={14} /> Paper trades only</span></div>
             <div className="welcome-progress" aria-label="Loading"><i /></div>
           </section>
