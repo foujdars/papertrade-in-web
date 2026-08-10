@@ -1,4 +1,4 @@
-import { isSupportedNseInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
+import { derivePreviousClose, isSupportedNseInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -42,10 +42,12 @@ export async function GET(request: Request) {
       const instrumentKey = quote.instrument_token ?? "";
       const symbol = quote.symbol?.trim().toUpperCase() || UPSTOX_KEY_TO_SYMBOL[instrumentKey] || instrumentKey;
       const lastPrice = Number(quote.last_price);
-      const previousClose = Number(quote.ohlc?.close);
-      const netChange = Number.isFinite(Number(quote.net_change))
-        ? Number(quote.net_change)
-        : lastPrice - previousClose;
+      const fallbackClose = Number(quote.ohlc?.close);
+      const reportedNetChange = Number(quote.net_change);
+      const netChange = Number.isFinite(reportedNetChange)
+        ? reportedNetChange
+        : lastPrice - fallbackClose;
+      const previousClose = derivePreviousClose(lastPrice, netChange, fallbackClose);
       const lastTradeMilliseconds = Number(quote.last_trade_time);
       const lastTradeAt = Number.isFinite(lastTradeMilliseconds)
         ? new Date(lastTradeMilliseconds).toISOString()

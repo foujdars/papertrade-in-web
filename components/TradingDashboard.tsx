@@ -107,6 +107,11 @@ type CustomWatchlist = {
 
 type NavigationSection = "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "pnl";
 
+type ChartHistorySnapshot = {
+  instrument: Instrument;
+  timeframe: string;
+};
+
 type FnoWorkspaceSnapshot = {
   option: Instrument;
   spot: Instrument;
@@ -307,6 +312,7 @@ export function TradingDashboard() {
   const [workspaceMode, setWorkspaceMode] = useState<"trade" | "fno">("trade");
   const [fnoListOpen, setFnoListOpen] = useState(false);
   const [fnoListQuoteKeys, setFnoListQuoteKeys] = useState<string[]>([]);
+  const [marketScannerQuoteKeys, setMarketScannerQuoteKeys] = useState<string[]>([]);
   const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(true);
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [pnlOpen, setPnlOpen] = useState(false);
@@ -478,6 +484,36 @@ export function TradingDashboard() {
   }, [closeFnoWorkspace, workspaceMode]);
 
   useEffect(() => {
+    if (workspaceMode === "fno") return;
+    const restorePreviousChart = (event: PopStateEvent) => {
+      const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
+      if (!snapshot?.instrument?.instrumentKey) return;
+      setSelected(snapshot.instrument);
+      setTimeframe(periods.includes(snapshot.timeframe) ? snapshot.timeframe : "5m");
+      setWorkspaceMode("trade");
+      setSpotInstrument(null);
+      setFnoUnderlying(null);
+      setFnoFutureInstrument(null);
+      setFnoTopMode("SPOT");
+      setOptionChainOpen(false);
+      setFnoTradeDockOpen(false);
+      setChartTradeFooterOpen(false);
+      setSidebarOpen(false);
+    };
+    window.addEventListener("popstate", restorePreviousChart);
+    return () => window.removeEventListener("popstate", restorePreviousChart);
+  }, [workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "trade" || selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
+    const currentState = window.history.state ?? {};
+    const url = new URL(window.location.href);
+    url.searchParams.set("symbol", selected.symbol);
+    url.searchParams.set("timeframe", timeframe);
+    window.history.replaceState({ ...currentState, papertradeChart: { instrument: selected, timeframe } }, "", url);
+  }, [selected, timeframe, workspaceMode]);
+
+  useEffect(() => {
     if (!showTradeSymbols) return;
     const closeSymbolSearch = (event: PointerEvent) => {
       if (!tradeSymbolPickerRef.current?.contains(event.target as Node) && !desktopTradeSymbolPickerRef.current?.contains(event.target as Node)) {
@@ -560,10 +596,11 @@ export function TradingDashboard() {
       fnoTopInstrument?.instrumentKey,
       ...LIVE_INDEX_TICKERS.map((item) => item.instrumentKey),
       ...fnoListQuoteKeys,
+      ...marketScannerQuoteKeys,
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
       ...visibleInstruments.map((item) => item.instrumentKey),
     ].filter((value): value is string => Boolean(value)))].slice(0, 500).join(","),
-    [fnoListQuoteKeys, fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
+    [fnoListQuoteKeys, fnoTopInstrument?.instrumentKey, marketScannerQuoteKeys, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -1354,7 +1391,8 @@ export function TradingDashboard() {
   function chooseTradeInstrument(item: Instrument) {
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
-    setSelected({ ...item, price: price > 0 ? price : 0 });
+    const nextInstrument = { ...item, price: price > 0 ? price : 0 };
+    setSelected(nextInstrument);
     setChartTradeFooterOpen(false);
     if (item.assetType !== "OPTION") {
       setWorkspaceMode("trade");
@@ -1377,7 +1415,16 @@ export function TradingDashboard() {
     if (item.assetType === "OPTION") {
       if (window.history.state?.papertradeFno) window.history.replaceState({ ...window.history.state, papertradeFno: true }, "", url);
       else window.history.pushState({ papertradeFno: true }, "", url);
-    } else window.history.replaceState({}, "", url);
+    } else {
+      const currentState = window.history.state ?? {};
+      const currentSnapshot = currentState.papertradeChart as ChartHistorySnapshot | undefined;
+      if (!currentSnapshot?.instrument?.instrumentKey && selected.assetType !== "OPTION" && selected.assetType !== "FUTURE") {
+        window.history.replaceState({ ...currentState, papertradeChart: { instrument: selected, timeframe } }, "", window.location.href);
+      }
+      const nextState = { ...window.history.state, papertradeChart: { instrument: nextInstrument, timeframe } };
+      if (selected.instrumentKey === nextInstrument.instrumentKey && workspaceMode === "trade") window.history.replaceState(nextState, "", url);
+      else window.history.pushState(nextState, "", url);
+    }
   }
 
   function chooseOptionTradeInstrument(option: Instrument, spot: Instrument) {
@@ -2026,6 +2073,8 @@ export function TradingDashboard() {
       {marketsOpen && (
         <MarketsWorkspace
           stockUniverse={stockUniverse}
+          quotes={marketQuotes}
+          onQuoteKeysChange={setMarketScannerQuoteKeys}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onClose={() => setMarketsOpen(false)}
         />

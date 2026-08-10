@@ -49,3 +49,10 @@ export type NormalizedQuote = {
   lastTradeAt: string;
   updatedAt: string;
 };
+
+export function derivePreviousClose(lastPrice: number, netChange: number, fallbackClose: number) {
+  const derivedClose = lastPrice - netChange;
+  if (Number.isFinite(derivedClose) && derivedClose > 0) return derivedClose;
+  if (Number.isFinite(fallbackClose) && fallbackClose > 0) return fallbackClose;
+  return lastPrice;
+}

@@ -1,9 +1,10 @@
 "use client";
 
 import { Activity, Cable, RefreshCw, ScanSearch, TrendingUp, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatInr, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
+import type { NormalizedQuote } from "@/lib/upstox";
 import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
 
 type ScannerId = "VOLUME" | "OPEN_HIGH" | NimbleStrategy;
@@ -49,10 +50,14 @@ function formatScanTime(value: string) {
 
 export function MarketsWorkspace({
   stockUniverse,
+  quotes,
+  onQuoteKeysChange,
   onSelectCash,
   onClose,
 }: {
   stockUniverse: Instrument[];
+  quotes: Record<string, NormalizedQuote>;
+  onQuoteKeysChange: (keys: string[]) => void;
   onSelectCash: (instrument: Instrument, price: number) => void;
   onClose: () => void;
 }) {
@@ -62,10 +67,16 @@ export function MarketsWorkspace({
 
   const selectedOption = scannerOptions.find((option) => option.id === activeScanner) ?? scannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
-  const activeRows = activeSnapshot?.rows ?? [];
+  const activeRows = useMemo(() => activeSnapshot?.rows ?? [], [activeSnapshot]);
   const instruments = useMemo(() => stockUniverse
     .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey })), [stockUniverse]);
+  const activeQuoteKeys = useMemo(() => activeRows.map((row) => row.instrumentKey).filter(Boolean), [activeRows]);
+
+  useEffect(() => {
+    onQuoteKeysChange(activeQuoteKeys);
+    return () => onQuoteKeysChange([]);
+  }, [activeQuoteKeys, onQuoteKeysChange]);
 
   async function runSelectedScan() {
     if (loadingScanner || !instruments.length) return;
@@ -113,6 +124,9 @@ export function MarketsWorkspace({
         {activeRows.map((row) => {
           const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
           if (!item) return null;
+          const liveQuote = quotes[item.instrumentKey] ?? quotes[row.symbol];
+          const displayPrice = liveQuote?.lastPrice ?? row.lastPrice;
+          const displayChangePercent = liveQuote?.changePercent ?? row.changePercent;
           const detail = isVolumeRow(row)
             ? `Volume ${compactNumber(row.todayVolume)} · SMA20 ${compactNumber(row.sma20Volume)}`
             : isOpenHighRow(row)
@@ -121,10 +135,10 @@ export function MarketsWorkspace({
                 ? `${row.timeframe}m · ${row.signal === "breakdown" ? "Below EMA 21" : `${row.signal.toUpperCase()} ${row.setupStatus ?? "setup"}`}${row.entry ? ` · Entry ${formatInr(row.entry)}` : ""}`
                 : "NSE scanner match";
           return (
-            <button key={row.symbol} className="trend-stock-row" onClick={() => onSelectCash(item, row.lastPrice)}>
+            <button key={row.symbol} className="trend-stock-row" onClick={() => onSelectCash(item, displayPrice)}>
               <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
               <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>{detail}</small></span>
-              <span><b>{formatInr(row.lastPrice)}</b><small className={row.changePercent >= 0 ? "positive" : "negative"}>{row.changePercent >= 0 ? "+" : ""}{row.changePercent.toFixed(2)}%</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
+              <span><b>{formatInr(displayPrice)}</b><small className={displayChangePercent >= 0 ? "positive" : "negative"}>{displayChangePercent >= 0 ? "+" : ""}{displayChangePercent.toFixed(2)}%</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
             </button>
           );
         })}
