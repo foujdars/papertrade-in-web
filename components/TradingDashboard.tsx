@@ -150,6 +150,13 @@ function getPaperOrderTimestamp(order: PaperOrder) {
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
 }
 
+function paperOrderStatusLabel(order: PaperOrder) {
+  if (order.exitReason === "TARGET") return "Target hit";
+  if (order.exitReason === "STOP_LOSS") return "SL hit";
+  if (order.autoSquareOff || order.exitReason === "AUTO_SQUARE_OFF") return "Auto 3:00";
+  return "Complete";
+}
+
 function indiaDateKey(value: Date | number) {
   const date = typeof value === "number" ? new Date(value) : value;
   const parts = new Intl.DateTimeFormat("en", {
@@ -1084,6 +1091,7 @@ export function TradingDashboard() {
   const visiblePnlTrades = useMemo(() => selectedPnlDateKey
     ? closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey)
     : [], [closedTrades, selectedPnlDateKey]);
+  const paperOrdersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
@@ -2045,7 +2053,7 @@ export function TradingDashboard() {
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
-              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{order.exitReason === "TARGET" ? "Target hit" : order.exitReason === "STOP_LOSS" ? "SL hit" : order.autoSquareOff ? "Auto 3:00" : "Complete"}</span></div>)}
+              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{paperOrderStatusLabel(order)}</span></div>)}
               {!todayOrders.length && <div className="order-empty"><WalletCards size={28} /><b>No orders today</b><span>The daily order book resets at midnight; completed trades remain in P&amp;L.</span></div>}
             </div>
           </section>
@@ -2166,11 +2174,27 @@ export function TradingDashboard() {
               <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Hide trades</button></div>
               {visiblePnlTrades.map((trade) => {
                 const menuOpen = pnlTradeMenuId === trade.id;
+                const sourceOrders = trade.sourceOrderIds
+                  .map((orderId) => paperOrdersById.get(orderId))
+                  .filter((order): order is PaperOrder => Boolean(order))
+                  .sort((first, second) => getPaperOrderTimestamp(first) - getPaperOrderTimestamp(second));
                 return (
                   <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
                     <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
                     <span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
+                    {!!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
+                      <div className="pnl-order-positions-head"><b>Order book positions</b><small>{sourceOrders.length} execution{sourceOrders.length === 1 ? "" : "s"}</small></div>
+                      {sourceOrders.map((order) => <div className="pnl-order-position" key={`${trade.id}-${order.id}`}>
+                        <span>{order.time}</span>
+                        <button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button>
+                        <span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span>
+                        <span>{order.quantity}</span>
+                        <span>{formatInr(order.price)}</span>
+                        <span>{formatInr(getOrderCharges(order).total)}</span>
+                        <span className="complete-tag">{paperOrderStatusLabel(order)}</span>
+                      </div>)}
+                    </div>}
                     {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); deleteClosedTrade(trade); }}><Trash2 size={14} /> Delete trade</button></div>}
                   </div>
                 );

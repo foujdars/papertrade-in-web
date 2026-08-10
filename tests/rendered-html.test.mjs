@@ -84,6 +84,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
+  assert.match(dashboard, /Order book positions/);
+  assert.match(dashboard, /trade\.sourceOrderIds/);
   assert.match(dashboard, /<BrandMark size=\{34\}/);
   assert.match(authProvider, /<BrandMark size=\{58\}/);
   assert.match(dashboard, /holdings-overview-card/);
