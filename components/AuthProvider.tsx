@@ -281,7 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <button type="button" className="google-signin" disabled={signingIn} onClick={() => void signInWithGoogle()}><LogIn size={19} /><span>{signingIn ? "Opening Google…" : "Continue with Google"}</span></button>
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
-            <small className="auth-disclaimer">No real exchange orders are placed. Your Google password is never shared with PaperTrade IN.</small>
+            <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
+            <small className="auth-disclaimer">No real exchange orders are placed.</small>
           </section>
         </main>
       ) : children}

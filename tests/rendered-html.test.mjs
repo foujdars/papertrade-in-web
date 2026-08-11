@@ -74,6 +74,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /trading_states/);
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
   assert.match(authProvider, /Welcome back/);
+  assert.match(authProvider, /Your information stays private/);
+  assert.match(authProvider, /encrypted connections/);
+  assert.match(authProvider, /do not sell or share your personal information for advertising/);
   assert.match(authProvider, /Getting your trading desk ready/);
   assert.match(authProvider, /Don’t waste your hard-earned money/);
   assert.match(authProvider, /Practice\. Feel the thrill\. Learn\. Improve\. Then Trade\./);
