@@ -77,6 +77,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /Your information stays private/);
   assert.match(authProvider, /encrypted connections/);
   assert.match(authProvider, /do not sell or share your personal information for advertising/);
+  assert.match(authProvider, /Download the Android beta/);
+  assert.match(dashboard, /Download Android APK/);
+  assert.match(dashboard, /PaperTrade-IN-v1\.10-beta\.apk/);
+  await access(new URL("../public/downloads/PaperTrade-IN-v1.10-beta.apk", import.meta.url));
   assert.match(authProvider, /Getting your trading desk ready/);
   assert.match(authProvider, /Don’t waste your hard-earned money/);
   assert.match(authProvider, /Practice\. Feel the thrill\. Learn\. Improve\. Then Trade\./);

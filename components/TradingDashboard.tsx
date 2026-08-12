@@ -2,7 +2,7 @@
 
 import {
   Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
-  Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, Plus, Radio, Sun,
+  Download, Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, Plus, Radio, ShieldCheck, Smartphone, Sun,
   LogOut, Search, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
 } from "lucide-react";
@@ -328,6 +328,7 @@ export function TradingDashboard() {
   const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
   const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
@@ -1720,6 +1721,7 @@ export function TradingDashboard() {
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
           <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
+          {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Download the Android app"><Download size={16} /> Get Android app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
@@ -2214,6 +2216,22 @@ export function TradingDashboard() {
             <div className="funds-shortcuts">{[[100_000, "₹1L"], [1_000_000, "₹10L"], [10_000_000, "₹1Cr"], [100_000_000, "₹10Cr"]].map(([amount, label]) => <button key={label} onClick={() => setFundsInput(String(amount))}>{label}</button>)}</div>
             <button className="primary-button" disabled={balance >= MAX_VIRTUAL_BALANCE} onClick={addVirtualFunds}>{balance >= MAX_VIRTUAL_BALANCE ? "₹10 CRORE LIMIT REACHED" : "ADD VIRTUAL MONEY"}</button>
             <p className="field-help">Simulation only. This does not deposit real money or connect to your broker balance.</p>
+          </section>
+        </div>
+      )}
+      {downloadOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setDownloadOpen(false)}>
+          <section className="modal download-modal" role="dialog" aria-modal="true" aria-label="Download PaperTrade IN for Android" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Official Android beta</span><h2>Take PaperTrade IN with you</h2></div><button className="icon-button" onClick={() => setDownloadOpen(false)} aria-label="Close Android download"><X size={20} /></button></div>
+            <div className="download-hero"><span><Smartphone size={30} /></span><div><b>PaperTrade IN v1.10</b><small>Android APK · 4.7 MB · Paper trading only</small></div></div>
+            <div className="download-trust">
+              <ShieldCheck size={20} />
+              <span><b>Download confidently from the official source</b><small>This file is served directly from <strong>papertrade.site</strong>. It connects to the same secure account and virtual portfolio as this website and cannot place real exchange orders.</small></span>
+            </div>
+            <a className="download-primary" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={18} /> Download Android APK</a>
+            <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable file</b><small>SHA-256 integrity fingerprint</small></span></div>
+            <code className="download-hash">7F66D9EF7E98445FC142F0E28AB91FB13638844EC62E1A1EC50CC1AF9EEE8B08</code>
+            <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. You can turn that permission off again after installation.</p>
           </section>
         </div>
       )}

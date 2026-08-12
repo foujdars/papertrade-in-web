@@ -37,7 +37,7 @@
 .terminal-shell[data-theme="neon"] .eyebrow,
 .terminal-shell[data-theme="neon"] .main-nav .nav-active,
 .terminal-shell[data-theme="neon"] .mobile-bottom-nav button.active { color: #b48aff; text-shadow: 0 0 14px #a978ff70; }
-.terminal-shell[data-theme="neon"] :is(.funds-button, .api-button, .icon-button, .chart-watchlist-star, .chart-derivatives-link, .star-button) { border-color: #224550; color: #a9c2ca; background: #0c2027; }
+.terminal-shell[data-theme="neon"] :is(.funds-button, .download-button, .api-button, .icon-button, .chart-watchlist-star, .chart-derivatives-link, .star-button) { border-color: #224550; color: #a9c2ca; background: #0c2027; }
 .terminal-shell[data-theme="neon"] .theme-toggle { color: #00f5b0; border-color: #00f5b060; box-shadow: inset 0 0 14px #00f5b014, 0 0 14px #00f5b018; }
 .terminal-shell[data-theme="neon"] :is(.search-box, .custom-list-bar, .trade-symbol-menu, .trade-symbol-menu > div > button, .dashboard-indicator-popover, .modal, .drawing-library, .chart-function-menu, .drawing-library-grid > button, .chart-study-grid > button, .chart-function-grid > button, .chart-scale-options > button, .timeframe-groups button, .watchlist-selector-menu, .watchlist-selector-options button, .compact-selector-trigger) { color: var(--ink); border-color: #1c3a45; background: #0a1b22; }
 .terminal-shell[data-theme="neon"] :is(.chart-function-menu > header b, .watchlist-selector-menu > header b, .compact-selector-trigger b, .watchlist-selector-options b) { color: var(--ink); }
@@ -155,7 +155,8 @@ button { color: inherit; }
 .market-status.simulated, .market-status.error { color: #a56a00; }
 .market-status.simulated span, .market-status.error span { background: #f59e0b; box-shadow: 0 0 0 4px #f59e0b18; }
 @keyframes feed-pulse { 50% { opacity: .35; } }
-.funds-button, .api-button { height: 36px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 0 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.funds-button, .download-button, .api-button { height: 36px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 0 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.download-button { color: #fff; border-color: #5d4ce9; background: linear-gradient(135deg, #6b5cff, #3f9bff); box-shadow: 0 8px 22px #6659ff2c; }
 .api-button { color: var(--purple); background: var(--purple-soft); border-color: #ddd8ff; }
 .icon-button, .profile-button, .star-button { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; }
 .icon-button:hover, .star-button:hover { color: var(--purple); border-color: #ccc5ff; }
@@ -706,6 +707,25 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .pnl-trade-actions small { line-height: 1.4; }
 .pnl-trade-actions button { height: 31px; flex: none; display: flex; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid #f0445840; border-radius: 7px; color: var(--red); background: #fff0f2; font-size: 8px; font-weight: 850; cursor: pointer; }
 .funds-modal { width: min(420px, 100%); }
+.download-modal { width: min(540px, 100%); }
+.download-hero { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 14px; border: 1px solid #dcd7ff; border-radius: 13px; background: linear-gradient(135deg, #f7f5ff, #effbff); }
+.download-hero > span { width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #6b5cff, #00b9d8); box-shadow: 0 10px 25px #6257f444; }
+.download-hero > div, .download-trust > span, .auth-download-link > span { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.download-hero b { font-size: 16px; }
+.download-hero small, .download-trust small, .download-facts small { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.download-trust { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid #2bb98e44; border-radius: 12px; color: #098966; background: #effcf8; }
+.download-trust > svg { flex: 0 0 auto; margin-top: 1px; }
+.download-trust b { color: #086b55; font-size: 10px; }
+.download-primary { height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 13px 0; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #6757f5, #04b99a); font-size: 12px; font-weight: 900; text-decoration: none; box-shadow: 0 12px 28px #6557ed33; }
+.download-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.download-facts > span { display: grid; grid-template-columns: 18px 1fr; gap: 3px 7px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.download-facts > span > svg { grid-row: 1 / 3; color: var(--purple); }
+.download-facts b { font-size: 9px; }
+.download-hash { display: block; margin-top: 10px; padding: 9px; overflow-wrap: anywhere; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); background: var(--soft); font-size: 7px; line-height: 1.5; }
+.download-install-note { margin: 9px 0 0; color: var(--muted); font-size: 8px; line-height: 1.5; text-align: center; }
+.terminal-shell[data-theme="neon"] .download-hero, .terminal-shell[data-theme="neon"] .download-trust, .terminal-shell[data-theme="neon"] .download-facts > span { border-color: #1f4852; background: #092027; }
+.terminal-shell[data-theme="neon"] .download-trust { color: #4fe0bd; }
+.terminal-shell[data-theme="neon"] .download-trust b { color: #a4ffe6; }
 .virtual-balance-card { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; padding: 14px; border: 1px solid #ddd8ff; border-radius: 11px; background: linear-gradient(135deg, #faf9ff, #f2efff); }
 .virtual-balance-card span, .virtual-balance-card small { color: var(--muted); font-size: 9px; }
 .virtual-balance-card b { color: var(--purple); font-size: 20px; }
@@ -736,6 +756,7 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .main-nav, .top-actions > .icon-button { display: none; }
   .top-actions > .theme-toggle { display: grid; }
   .funds-button { width: 36px; justify-content: center; padding: 0; font-size: 0; }
+  .download-button { width: 36px; justify-content: center; padding: 0; font-size: 0; }
   .api-button { width: 36px; justify-content: center; padding: 0; font-size: 0; }
   .terminal-shell[data-platform="web"] .api-button { display: none; }
   .workspace { display: block; }
@@ -1492,6 +1513,10 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .auth-privacy-note > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .auth-privacy-note b { color: #c9fff0; font-size: 10px; }
 .auth-privacy-note small { color: #91b9b2; font-size: 8px; line-height: 1.5; }
+.auth-download-link { width: 100%; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #745fff66; border-radius: 11px; color: #c9c1ff; background: #211c5266; text-align: left; text-decoration: none; }
+.auth-download-link > svg { flex: 0 0 auto; }
+.auth-download-link b { font-size: 10px; }
+.auth-download-link small { color: #98aab5; font-size: 8px; }
 .auth-disclaimer { color: #6f8993; font-size: 8px; line-height: 1.45; }
 .auth-loading-screen { display: flex; flex-direction: column; gap: 7px; color: #eafaff; }
 .auth-loading-screen .auth-logo { margin-bottom: 8px; }
@@ -1541,7 +1566,9 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 
 @media (max-width: 420px) {
   .top-actions { gap: 5px; }
-  .funds-button, .api-button, .icon-button, .profile-button { width: 32px; height: 32px; }
+  .funds-button, .download-button, .api-button, .icon-button, .profile-button { width: 32px; height: 32px; }
+  .download-modal { padding: 17px 14px; }
+  .download-facts { grid-template-columns: 1fr; }
   .auth-card { padding: 28px 21px; }
   .auth-points { flex-direction: column; align-items: center; gap: 7px; }
   .orders-modal { width: 100%; padding: 15px 13px; }
