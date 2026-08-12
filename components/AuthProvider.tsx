@@ -4,7 +4,7 @@ import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import type { Session, User } from "@supabase/supabase-js";
-import { CandlestickChart, Cloud, Download, LogIn, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
+import { CandlestickChart, Cloud, Download, LogIn, ShieldCheck, Smartphone, Sparkles, TrendingUp } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
 import { BrandMark } from "@/components/BrandMark";
@@ -287,7 +287,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
-            {!nativePlatform && <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={17} /><span><b>Download the Android beta</b><small>Official APK from papertrade.site · 4.7 MB</small></span></a>}
+            {!nativePlatform && <div className="auth-download-options">
+              <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · 4.7 MB</small></span></a>
+              <a className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></a>
+            </div>}
             <small className="auth-disclaimer">No real exchange orders are placed.</small>
           </section>
         </main>

@@ -31,8 +31,9 @@ test("server-renders the PaperTrade IN terminal", async () => {
 });
 
 test("ships project assets and removes the starter preview", async () => {
-  const [page, styles, dashboard, authProvider, supabaseClient, authMigration, setupGuide, androidManifest, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, volumeBreakoutRoute, volumeBreakout, readme] = await Promise.all([
+  const [page, layout, styles, dashboard, authProvider, supabaseClient, authMigration, setupGuide, androidManifest, chart, functionMenu, advancedChart, market, paperTrading, serverAdapter, candleRoute, quoteRoute, instrumentRoute, volumeBreakoutRoute, volumeBreakout, readme, webManifest] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/AuthProvider.tsx", import.meta.url), "utf8"),
@@ -52,6 +53,7 @@ test("ships project assets and removes the starter preview", async () => {
     readFile(new URL("../app/api/market/volume-breakouts/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/volume-breakout.ts", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
   ]);
   const [marketsWorkspace, fnoListsWorkspace, optionChainSheet, fnoChartWorkspace, fnoRoute, optionChainRoute, fnoTypes, fnoClient, chartToolbar] = await Promise.all([
     readFile(new URL("../components/MarketsWorkspace.tsx", import.meta.url), "utf8"),
@@ -77,9 +79,18 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /Your information stays private/);
   assert.match(authProvider, /encrypted connections/);
   assert.match(authProvider, /do not sell or share your personal information for advertising/);
-  assert.match(authProvider, /Download the Android beta/);
+  assert.match(authProvider, /Download Android beta/);
+  assert.match(authProvider, /Install on iPhone/);
+  assert.match(authProvider, /Add to Home Screen/);
   assert.match(dashboard, /Download Android APK/);
+  assert.match(dashboard, /iPhone \/ iPad app/);
+  assert.match(dashboard, /Open iOS web app/);
+  assert.match(dashboard, /Add to Home Screen/);
   assert.match(dashboard, /PaperTrade-IN-v1\.10-beta\.apk/);
+  assert.match(layout, /appleWebApp/);
+  assert.match(layout, /manifest: "\/manifest\.webmanifest"/);
+  assert.match(webManifest, /"display": "standalone"/);
+  assert.match(webManifest, /"short_name": "PaperTrade"/);
   await access(new URL("../public/downloads/PaperTrade-IN-v1.10-beta.apk", import.meta.url));
   assert.match(authProvider, /Getting your trading desk ready/);
   assert.match(authProvider, /Don’t waste your hard-earned money/);

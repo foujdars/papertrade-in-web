@@ -15,6 +15,12 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(productionUrl),
+  applicationName: "PaperTrade IN",
+  appleWebApp: {
+    capable: true,
+    title: "PaperTrade IN",
+    statusBarStyle: "black-translucent",
+  },
   title: {
     default: "PaperTrade IN",
     template: "%s · PaperTrade IN",
@@ -36,6 +42,7 @@ export const metadata: Metadata = {
     shortcut: "/papertrade-icon-192.png",
     apple: "/papertrade-icon-192.png",
   },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
