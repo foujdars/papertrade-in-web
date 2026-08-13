@@ -3,7 +3,7 @@
 import {
   Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
   Download, Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, Plus, Radio, ShieldCheck, Smartphone, Sun,
-  LogOut, Search, Star, Target, Trash2, UserRound,
+  LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
@@ -361,6 +361,7 @@ export function TradingDashboard() {
   const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
@@ -1198,6 +1199,12 @@ export function TradingDashboard() {
     });
   }
 
+  function copySuggestionContact(value: string, label: string) {
+    void navigator.clipboard?.writeText(value);
+    setToast(`${label} copied for suggestions`);
+    window.setTimeout(() => setToast(""), 2_500);
+  }
+
   function addVirtualFunds() {
     const requestedAmount = Number(fundsInput);
     if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
@@ -1793,6 +1800,7 @@ export function TradingDashboard() {
           <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
+          <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
@@ -2347,6 +2355,35 @@ export function TradingDashboard() {
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
             <code className="download-hash">7F66D9EF7E98445FC142F0E28AB91FB13638844EC62E1A1EC50CC1AF9EEE8B08</code>
             <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari's Add to Home Screen option.</p>
+          </section>
+        </div>
+      )}
+      {feedbackOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setFeedbackOpen(false)}>
+          <section className="modal feedback-modal" role="dialog" aria-modal="true" aria-label="Send suggestions for PaperTrade IN" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">Help improve PaperTrade IN</span><h2>Send suggestions</h2></div><button className="icon-button" onClick={() => setFeedbackOpen(false)} aria-label="Close suggestions"><X size={20} /></button></div>
+            <p className="feedback-intro">Tell us what feels missing, confusing, or useful for your paper-trading practice. Screenshots and feature ideas are welcome.</p>
+            <div className="feedback-options">
+              <button type="button" className="feedback-option" onClick={() => copySuggestionContact("@foujdars1", "WhatsApp contact")}>
+                <span><MessageCircle size={19} /></span>
+                <strong>WhatsApp</strong>
+                <small>@foujdars1</small>
+                <b>Copy</b>
+              </button>
+              <a className="feedback-option" href="https://t.me/foujdars" target="_blank" rel="noreferrer">
+                <span><Send size={18} /></span>
+                <strong>Telegram</strong>
+                <small>@foujdars</small>
+                <b>Open</b>
+              </a>
+              <a className="feedback-option" href="mailto:foudjars@gmail.com?subject=PaperTrade%20IN%20Suggestion">
+                <span><Mail size={18} /></span>
+                <strong>Email</strong>
+                <small>foudjars@gmail.com</small>
+                <b>Mail</b>
+              </a>
+            </div>
+            <p className="feedback-note">Your broker credentials stay in your browser/app storage. Please do not share OTPs, access tokens, or API secrets in feedback.</p>
           </section>
         </div>
       )}
