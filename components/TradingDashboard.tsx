@@ -2284,7 +2284,7 @@ export function TradingDashboard() {
                     {reviewInstrument && reviewMarkers.length > 0 && (
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
-                          <span><b>{pnlReviewTimeframe} trade review</b><small>Entry and exit candles</small></span>
+                          <span><b>Trade review</b><small>Entry and exit candles</small></span>
                           <button type="button" className="pnl-review-timeframe-trigger" onClick={() => setShowPnlReviewTimeframeMenu(true)}>
                             <small>Timeframe</small><b>{pnlReviewTimeframe}</b><ChevronDown size={13} />
                           </button>
