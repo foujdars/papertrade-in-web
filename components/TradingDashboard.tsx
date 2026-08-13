@@ -304,10 +304,12 @@ export function TradingDashboard() {
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
+  const [pnlReviewTimeframe, setPnlReviewTimeframe] = useState("5m");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false);
+  const [showPnlReviewTimeframeMenu, setShowPnlReviewTimeframeMenu] = useState(false);
   const [showWatchlistSelector, setShowWatchlistSelector] = useState(false);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [drawingsLocked, setDrawingsLocked] = useState(false);
@@ -2273,17 +2275,22 @@ export function TradingDashboard() {
                     </div>}
                     {reviewInstrument && reviewMarkers.length > 0 && (
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
-                        <div className="pnl-trade-review-head"><b>5m trade review</b><small>Entry and exit candles</small></div>
+                        <div className="pnl-trade-review-head">
+                          <span><b>{pnlReviewTimeframe} trade review</b><small>Entry and exit candles</small></span>
+                          <button type="button" className="pnl-review-timeframe-trigger" onClick={() => setShowPnlReviewTimeframeMenu(true)}>
+                            <small>Timeframe</small><b>{pnlReviewTimeframe}</b><ChevronDown size={13} />
+                          </button>
+                        </div>
                         <div className="pnl-trade-review-body">
                           <MarketChart
-                            key={`review-${trade.id}-${reviewInstrument.instrumentKey}`}
+                            key={`review-${trade.id}-${reviewInstrument.instrumentKey}-${pnlReviewTimeframe}`}
                             instrument={reviewInstrument}
-                            timeframe="5m"
+                            timeframe={pnlReviewTimeframe}
                             activeTool="cursor"
                             magnet={false}
                             hiddenDrawings
                             lockedDrawings
-                            visibleBars={46}
+                            visibleBars={pnlReviewTimeframe === "1D" || pnlReviewTimeframe === "1W" || pnlReviewTimeframe === "1M" || pnlReviewTimeframe === "1Y" ? 72 : 46}
                             indicators={DEFAULT_CHART_INDICATORS}
                             chartTheme={theme}
                             tradeMarkers={reviewMarkers}
@@ -2299,6 +2306,7 @@ export function TradingDashboard() {
               })}
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades on this date</b><span>Choose another calendar date.</span></div>}
             </div>}
+            {showPnlReviewTimeframeMenu && <ChartTimeframeMenu current={pnlReviewTimeframe} onSelect={(period) => { setPnlReviewTimeframe(period); setShowPnlReviewTimeframeMenu(false); }} onClose={() => setShowPnlReviewTimeframeMenu(false)} />}
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>
         </div>

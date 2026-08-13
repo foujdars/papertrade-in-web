@@ -267,9 +267,24 @@ function mergeSeries(existing: Candle[], incoming: Candle[]) {
     .slice(-1_600);
 }
 
-function toCandleData(candle: Candle): CandlestickData<Time> {
+const IST_OFFSET_SECONDS = 19_800;
+const CALENDAR_TIMEFRAMES = new Set(["1D", "1W", "1M", "1Y"]);
+
+function usesIntradayAxisShift(timeframe: string) {
+  return !CALENDAR_TIMEFRAMES.has(timeframe);
+}
+
+function chartTimeFromEpoch(epochSeconds: number, timeframe: string): UTCTimestamp {
+  return Math.floor(epochSeconds + (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0)) as UTCTimestamp;
+}
+
+function chartTimeZone(timeframe: string) {
+  return usesIntradayAxisShift(timeframe) ? "UTC" : "Asia/Kolkata";
+}
+
+function toCandleData(candle: Candle, timeframe: string): CandlestickData<Time> {
   return {
-    time: Math.floor(Number(candle.time)) as UTCTimestamp,
+    time: chartTimeFromEpoch(Number(candle.time), timeframe),
     open: candle.open,
     high: candle.high,
     low: candle.low,
@@ -297,9 +312,9 @@ function timeToTimestamp(time: Time) {
   return Date.UTC(time.year, time.month - 1, time.day) / 1_000;
 }
 
-function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle[]) {
+function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle[], timeframe: string) {
   if (!candles.length) return snapshot;
-  const candleTimes = candles.map((candle) => Number(candle.time));
+  const candleTimes = candles.map((candle) => chartTimeFromEpoch(Number(candle.time), timeframe));
   return snapshot.map((item) => ({
     ...item,
     anchors: item.anchors.map((anchor) => {
@@ -312,20 +327,38 @@ function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle
         nearest = candleTimes[index];
         distance = nextDistance;
       }
-      return { ...anchor, time: nearest as UTCTimestamp };
+      return { ...anchor, time: nearest };
     }),
   }));
 }
 
-function indiaTime(time: Time) {
+function chartDisplayTime(time: Time, timeframe: string) {
   const timestamp = timeToTimestamp(time);
   return new Date(timestamp * 1_000).toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
+    timeZone: chartTimeZone(timeframe),
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  });
+}
+
+function chartTickTime(time: Time, timeframe: string) {
+  const timestamp = timeToTimestamp(time);
+  const date = new Date(timestamp * 1_000);
+  if (usesIntradayAxisShift(timeframe)) {
+    return date.toLocaleTimeString("en-IN", {
+      timeZone: "UTC",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+  return date.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
   });
 }
 
@@ -517,7 +550,7 @@ export function MarketChart({
           nearestDistance = distance;
         }
       }
-      const x = chart.timeScale().timeToCoordinate(Math.floor(Number(nearest.time)) as UTCTimestamp);
+      const x = chart.timeScale().timeToCoordinate(chartTimeFromEpoch(Number(nearest.time), timeframe));
       const anchorPrice = marker.side === "BUY"
         ? Math.min(marker.price, nearest.low)
         : Math.max(marker.price, nearest.high);
@@ -655,28 +688,29 @@ export function MarketChart({
   }
 
   function syncIndicatorData(data = dataRef.current) {
-    ema5Series.current?.setData(ema(data, 5).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    ema21Series.current?.setData(ema(data, 21).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    ema50Series.current?.setData(ema(data, 50).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    ema200Series.current?.setData(ema(data, 200).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    sma20Series.current?.setData(sma(data, 20).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    sma50Series.current?.setData(sma(data, 50).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    sma200Series.current?.setData(sma(data, 200).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    vwapSeries.current?.setData(vwap(data).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
-    supertrendSeries.current?.setData(supertrend(data).map((point) => ({ time: point.time as UTCTimestamp, value: point.value, color: point.direction === "up" ? "#00a67e" : "#f04458" })));
+    const indicatorPoint = (point: { time: number; value: number }) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value });
+    ema5Series.current?.setData(ema(data, 5).map(indicatorPoint));
+    ema21Series.current?.setData(ema(data, 21).map(indicatorPoint));
+    ema50Series.current?.setData(ema(data, 50).map(indicatorPoint));
+    ema200Series.current?.setData(ema(data, 200).map(indicatorPoint));
+    sma20Series.current?.setData(sma(data, 20).map(indicatorPoint));
+    sma50Series.current?.setData(sma(data, 50).map(indicatorPoint));
+    sma200Series.current?.setData(sma(data, 200).map(indicatorPoint));
+    vwapSeries.current?.setData(vwap(data).map(indicatorPoint));
+    supertrendSeries.current?.setData(supertrend(data).map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value, color: point.direction === "up" ? "#00a67e" : "#f04458" })));
     const bands = bollingerBands(data);
-    bollingerSeries.current[0]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.upper })));
-    bollingerSeries.current[1]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.middle })));
-    bollingerSeries.current[2]?.setData(bands.map((point) => ({ time: point.time as UTCTimestamp, value: point.lower })));
+    bollingerSeries.current[0]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.upper })));
+    bollingerSeries.current[1]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.middle })));
+    bollingerSeries.current[2]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.lower })));
     const pivots = classicPivotPoints(data);
     for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
-      pivotSeries.current[level]?.setData(pivots.map((point) => ({ time: point.time as UTCTimestamp, value: point.levels![level] })));
+      pivotSeries.current[level]?.setData(pivots.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.levels![level] })));
     }
-    rsiSeries.current?.setData(rsi(data, 14).map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+    rsiSeries.current?.setData(rsi(data, 14).map(indicatorPoint));
     const macdValues = macd(data);
-    macdSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.macd })));
-    macdSignalSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.signal })));
-    macdHistogramSeries.current?.setData(macdValues.map((point) => ({ time: point.time as UTCTimestamp, value: point.histogram, color: point.histogram >= 0 ? "#00a67e80" : "#f0445880" })));
+    macdSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.macd })));
+    macdSignalSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.signal })));
+    macdHistogramSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.histogram, color: point.histogram >= 0 ? "#00a67e80" : "#f0445880" })));
     setIndicatorValues(latestIndicatorValues(data));
   }
 
@@ -723,7 +757,7 @@ export function MarketChart({
       for (const [key, reference, points, color, title] of overlayDefinitions) {
         if (next[key] && !reference.current) {
           reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title });
-          reference.current.setData(points.map((point) => ({ time: point.time as UTCTimestamp, value: point.value })));
+          reference.current.setData(points.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value })));
         } else if (!next[key] && reference.current) {
           chart.removeSeries(reference.current);
           reference.current = null;
@@ -832,9 +866,9 @@ export function MarketChart({
     if (!magnetRef.current || !dataRef.current.length) return { time: rawTime, price: rawPrice };
     const numericTime = timeToTimestamp(rawTime);
     let nearest = dataRef.current[0];
-    let distance = Math.abs(Number(nearest.time) - numericTime);
+    let distance = Math.abs(Number(chartTimeFromEpoch(Number(nearest.time), timeframe)) - numericTime);
     for (const candle of dataRef.current) {
-      const nextDistance = Math.abs(Number(candle.time) - numericTime);
+      const nextDistance = Math.abs(Number(chartTimeFromEpoch(Number(candle.time), timeframe)) - numericTime);
       if (nextDistance < distance) {
         nearest = candle;
         distance = nextDistance;
@@ -842,7 +876,7 @@ export function MarketChart({
     }
     const prices = [nearest.open, nearest.high, nearest.low, nearest.close];
     const price = prices.reduce((best, value) => Math.abs(value - rawPrice) < Math.abs(best - rawPrice) ? value : best, prices[0]);
-    return { time: Number(nearest.time) as UTCTimestamp, price };
+    return { time: chartTimeFromEpoch(Number(nearest.time), timeframe), price };
   }
 
   function pointerAnchor(event: PointerEvent, useMagnet = true): Anchor | null {
@@ -1084,6 +1118,7 @@ export function MarketChart({
           borderColor: neon ? "#1b3b48" : "#dfe3ec",
           timeVisible: true,
           secondsVisible: timeframe === "1m",
+          tickMarkFormatter: (time: Time) => chartTickTime(time, timeframe),
           rightOffset: 8,
           barSpacing: 7,
           minBarSpacing: 2,
@@ -1101,7 +1136,7 @@ export function MarketChart({
         localization: {
           locale: "en-IN",
           priceFormatter: (price: number) => price.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
-          timeFormatter: indiaTime,
+          timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
       const series = chart.addSeries(lwc.CandlestickSeries, {
@@ -1131,7 +1166,7 @@ export function MarketChart({
       });
       chartApi.current = chart;
       candleSeries.current = series;
-      series.setData(dataRef.current.map(toCandleData));
+      series.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
 
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
@@ -1141,7 +1176,7 @@ export function MarketChart({
       const stored = readStoredDrawings(storageKeyRef.current, legacyDrawingStorageKey(instrument, timeframe));
       storedDrawingsRef.current = stored;
       window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
-      restoreDrawings(projectDrawingsToCandles(stored, dataRef.current), false);
+      restoreDrawings(projectDrawingsToCandles(stored, dataRef.current, timeframe), false);
       historyRef.current = [stored];
       redoRef.current = [];
 
@@ -1430,8 +1465,8 @@ export function MarketChart({
         const latest = payload.candles.at(-1);
         setLatestCandle(latest);
         if (latest) onPrice?.(latest.close);
-        candleSeries.current?.setData(payload.candles.map(toCandleData));
-        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles), false);
+        candleSeries.current?.setData(payload.candles.map((candle) => toCandleData(candle, timeframe)));
+        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
         syncIndicatorData(payload.candles);
         applyVisibleRange(payload.candles);
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
@@ -1474,7 +1509,7 @@ export function MarketChart({
         const payload = await response.json() as { ok?: boolean; candles?: Candle[]; fetchedAt?: string; error?: { message?: string } };
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
         dataRef.current = mergeSeries(dataRef.current, payload.candles);
-        candleSeries.current?.setData(dataRef.current.map(toCandleData));
+        candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
         syncIndicatorData();
         const latest = dataRef.current.at(-1);
         if (latest) {
