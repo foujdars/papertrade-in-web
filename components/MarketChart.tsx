@@ -1300,7 +1300,7 @@ export function MarketChart({
           chart.resize(width, height, true);
           fitStudyPanes(indicatorsRef.current);
           applyVisibleRange();
-          refreshOverlays();
+          refreshOverlays?.();
         });
       };
       observer = new ResizeObserver(resizeChart);
