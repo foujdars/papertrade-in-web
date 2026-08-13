@@ -1039,13 +1039,14 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .chart-trade-marker.sell { color: var(--red); }
 .terminal-shell[data-theme="neon"] .chart-trade-marker span { background: rgba(6,18,24,.82); box-shadow: 0 0 18px currentColor; }
 .terminal-shell[data-theme="neon"] .chart-trade-marker em { background: rgba(6,18,24,.66); }
-.pnl-trade-review-chart { grid-column: 1 / -1; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.pnl-trade-review-chart { grid-column: 1 / -1; width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
 .pnl-trade-review-head { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-.pnl-trade-review-head b { font-size: 9px; }
+.pnl-trade-review-head b { font-size: 9px; white-space: nowrap; }
 .pnl-trade-review-head small { color: var(--muted); font-size: 8px; }
-.pnl-trade-review-body { height: 260px; min-height: 260px; }
+.pnl-trade-review-body { position: relative; width: 100%; height: 320px; min-height: 320px; overflow: hidden; }
 .pnl-trade-review-body .chart-stack,
-.pnl-trade-review-body .price-chart-wrap { height: 100%; min-height: 0; }
+.pnl-trade-review-body .price-chart-wrap { width: 100%; height: 100%; min-height: 0; flex: 0 0 100%; }
+.pnl-trade-review-body .chart-stack { min-width: 0; }
 .pnl-trade-review-body .chart-symbol-legend { font-size: 9px; }
 .terminal-shell[data-theme="neon"] .pnl-trade-review-chart { border-color: #1b3a45; background: #071820; }
 

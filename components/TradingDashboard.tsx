@@ -2287,6 +2287,7 @@ export function TradingDashboard() {
                             indicators={DEFAULT_CHART_INDICATORS}
                             chartTheme={theme}
                             tradeMarkers={reviewMarkers}
+                            focusTradeMarkers
                             onFeedStatus={() => undefined}
                           />
                         </div>

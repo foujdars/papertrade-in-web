@@ -358,6 +358,7 @@ export function MarketChart({
   chartTheme = "light",
   orderTool,
   tradeMarkers = [],
+  focusTradeMarkers = false,
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
@@ -383,6 +384,7 @@ export function MarketChart({
   chartTheme?: "light" | "neon";
   orderTool?: ChartOrderTool;
   tradeMarkers?: ChartTradeMarker[];
+  focusTradeMarkers?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -435,6 +437,7 @@ export function MarketChart({
   const crosshairVisibleRef = useRef(true);
   const orderToolRef = useRef(orderTool);
   const tradeMarkersRef = useRef(tradeMarkers);
+  const focusTradeMarkersRef = useRef(focusTradeMarkers);
   const onChartTapRef = useRef(onChartTap);
   const onDrawingCompleteRef = useRef(onDrawingComplete);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
@@ -592,6 +595,35 @@ export function MarketChart({
     const chart = chartApi.current;
     if (!chart || !data.length) return;
     const count = data.length;
+    if (focusTradeMarkersRef.current && tradeMarkersRef.current.length) {
+      const markerIndexes = tradeMarkersRef.current
+        .map((marker) => {
+          const markerTime = marker.time > 1_000_000_000_000 ? Math.floor(marker.time / 1_000) : Math.floor(marker.time);
+          let nearestIndex = 0;
+          let nearestDistance = Math.abs(Number(data[0].time) - markerTime);
+          data.forEach((candle, index) => {
+            const distance = Math.abs(Number(candle.time) - markerTime);
+            if (distance < nearestDistance) {
+              nearestIndex = index;
+              nearestDistance = distance;
+            }
+          });
+          return nearestIndex;
+        })
+        .filter((index) => Number.isFinite(index));
+      if (markerIndexes.length) {
+        const leftMost = Math.min(...markerIndexes);
+        const rightMost = Math.max(...markerIndexes);
+        const padding = Math.max(8, Math.min(18, Math.round(visibleBarsRef.current * 0.22)));
+        const from = Math.max(-0.5, leftMost - padding - 0.5);
+        const toBase = Math.min(count - 1, rightMost + padding);
+        const rightOffset = Math.max(4, Math.min(10, (toBase - from + 1) * 0.08));
+        chart.timeScale().setVisibleLogicalRange({ from, to: toBase + rightOffset });
+        refreshRiskCoordinates();
+        refreshTradeMarkerCoordinates();
+        return;
+      }
+    }
     const bars = Math.max(12, Math.min(visibleBarsRef.current, count));
     const tool = orderToolRef.current;
     const extraRightOffset = tool?.enabled ? Math.max(5, Math.min(10, bars * 0.18)) : Math.max(2, Math.min(4, bars * 0.08));
@@ -872,6 +904,12 @@ export function MarketChart({
   }, [visibleBars]);
 
   useEffect(() => {
+    focusTradeMarkersRef.current = focusTradeMarkers;
+    applyVisibleRange();
+    refreshTradeMarkerCoordinates();
+  }, [focusTradeMarkers]);
+
+  useEffect(() => {
     orderToolRef.current = orderTool;
     candleSeries.current?.applyOptions({});
     applyVisibleRange();
@@ -887,6 +925,7 @@ export function MarketChart({
 
   useEffect(() => {
     tradeMarkersRef.current = tradeMarkers;
+    applyVisibleRange();
     refreshTradeMarkerCoordinates();
   }, [tradeMarkers]);
 
