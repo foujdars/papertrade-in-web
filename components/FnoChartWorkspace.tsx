@@ -5,7 +5,7 @@ import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartOrderTool, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, type Instrument } from "@/lib/market";
 
 const FNO_TIMEFRAME_GROUPS = [
@@ -48,6 +48,7 @@ export function FnoChartWorkspace({
   onOrderToolChange,
   onOrderToolClose,
   onOrderToolExit,
+  tradeMarkers = [],
   chartTheme,
 }: {
   topInstrument: Instrument;
@@ -79,6 +80,7 @@ export function FnoChartWorkspace({
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
   onOrderToolExit?: () => void;
+  tradeMarkers?: ChartTradeMarker[];
   chartTheme: "light" | "neon";
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
@@ -197,6 +199,7 @@ export function FnoChartWorkspace({
               onOrderToolChange={onOrderToolChange}
               onOrderToolClose={onOrderToolClose}
               onOrderToolExit={onOrderToolExit}
+              tradeMarkers={tradeMarkers}
               onFeedStatus={onFeedStatus}
             />
           </div>

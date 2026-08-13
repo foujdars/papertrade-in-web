@@ -698,7 +698,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .pnl-order-positions { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding-top: 9px; border-top: 1px solid var(--line); cursor: default; }
 .pnl-order-positions-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pnl-order-positions-head b { font-size: 8px; }
-.pnl-order-position { display: grid; grid-template-columns: 58px minmax(0, 1fr) 46px 58px 84px 76px auto; align-items: center; gap: 7px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 8px; }
+.pnl-order-position { width: 100%; display: grid; grid-template-columns: 58px minmax(0, 1fr) 46px 58px 84px 76px auto; align-items: center; gap: 7px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: inherit; background: var(--soft); font: inherit; font-size: 8px; text-align: left; cursor: pointer; }
+.pnl-order-position:hover { border-color: #bcb4ff; background: #faf9ff; }
 .pnl-order-position > * { min-width: 0; }
 .pnl-order-position .order-symbol-link { overflow-wrap: anywhere; text-align: left; }
 .pnl-order-position > span:nth-child(4)::before { content: "Qty "; color: var(--muted); }
@@ -1017,6 +1018,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .risk-stop-line::before { content: ""; position: absolute; inset: -11px 0; }
 .risk-stop-line > span, .risk-stop-line > b { color: #e6384e; background: transparent; }
 .risk-line > span, .risk-line > b { min-height: 23px; padding-inline: 7px; border: 1px solid currentColor; border-radius: 5px; background: transparent; box-shadow: none; backdrop-filter: none; text-shadow: 0 1px 2px var(--surface); }
+.risk-target-line > b { transform: translateY(calc(-50% + 10px)); }
+.risk-stop-line > b { transform: translateY(calc(-50% - 10px)); }
 .risk-tool-close { position: absolute; z-index: 2; top: 70px; right: 5px; width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #d9ddea; border-radius: 7px; color: #69738a; background: #ffffffed; font-size: 17px; line-height: 1; pointer-events: auto; cursor: pointer; }
 .risk-reward-summary { position: absolute; top: 70px; right: 36px; max-width: calc(100% - 85px); min-height: 24px; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid #dcd8ff66; border-radius: 7px; color: #667087; background: transparent; box-shadow: none; font-size: 8px; pointer-events: none; }
 .risk-reward-summary span { color: var(--purple); font-weight: 900; }
@@ -1029,6 +1032,22 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .chart-live-pnl b { font-size: 9px; font-variant-numeric: tabular-nums; }
 .chart-live-pnl.positive b { color: var(--green); }
 .chart-live-pnl.negative b { color: var(--red); }
+.chart-trade-marker { position: absolute; z-index: 15; display: flex; flex-direction: column; align-items: center; gap: 1px; transform: translate(-50%, -50%); pointer-events: none; }
+.chart-trade-marker span { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 999px; background: rgba(255,255,255,.9); box-shadow: 0 7px 18px #11182722; font-size: 15px; font-weight: 950; line-height: 1; }
+.chart-trade-marker em { padding: 1px 4px; border-radius: 999px; color: currentColor; background: rgba(255,255,255,.78); font-size: 7px; font-style: normal; font-weight: 900; text-transform: uppercase; letter-spacing: .25px; }
+.chart-trade-marker.buy { color: var(--green); }
+.chart-trade-marker.sell { color: var(--red); }
+.terminal-shell[data-theme="neon"] .chart-trade-marker span { background: rgba(6,18,24,.82); box-shadow: 0 0 18px currentColor; }
+.terminal-shell[data-theme="neon"] .chart-trade-marker em { background: rgba(6,18,24,.66); }
+.pnl-trade-review-chart { grid-column: 1 / -1; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.pnl-trade-review-head { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.pnl-trade-review-head b { font-size: 9px; }
+.pnl-trade-review-head small { color: var(--muted); font-size: 8px; }
+.pnl-trade-review-body { height: 260px; min-height: 260px; }
+.pnl-trade-review-body .chart-stack,
+.pnl-trade-review-body .price-chart-wrap { height: 100%; min-height: 0; }
+.pnl-trade-review-body .chart-symbol-legend { font-size: 9px; }
+.terminal-shell[data-theme="neon"] .pnl-trade-review-chart { border-color: #1b3a45; background: #071820; }
 
 .terminal-shell[data-theme="neon"] :is(.holdings-summary-grid > div, .holdings-table, .holding-row) { border-color: var(--line); background: #08191f; }
 .terminal-shell[data-theme="neon"] .holding-row.holdings-head { background: #0b2027; }

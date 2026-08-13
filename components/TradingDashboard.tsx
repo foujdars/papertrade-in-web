@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Image from "next/image";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
@@ -141,6 +141,25 @@ function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
   };
 }
 
+function instrumentFromPaperOrder(order: PaperOrder, universe: Instrument[]): Instrument {
+  return universe.find((item) => item.instrumentKey === order.instrumentKey || item.symbol === order.symbol) ?? {
+    symbol: order.symbol,
+    name: order.instrumentName || order.symbol,
+    exchange: "NSE",
+    price: order.price,
+    change: 0,
+    instrumentKey: order.instrumentKey || order.symbol,
+    categories: [],
+    assetType: order.assetType ?? "EQUITY",
+    optionType: order.optionType,
+    strikePrice: order.strikePrice,
+    expiry: order.expiry,
+    lotSize: order.lotSize,
+    underlyingKey: order.underlyingKey,
+    underlyingSymbol: order.underlyingSymbol,
+  };
+}
+
 function calculateInstrumentCharges(instrument: Pick<Instrument, "assetType">, input: { side: "BUY" | "SELL"; product: "INTRADAY" | "DELIVERY"; quantity: number; price: number }) {
   return calculateUpstoxTradingCharges(instrument.assetType, input);
 }
@@ -148,6 +167,17 @@ function calculateInstrumentCharges(instrument: Pick<Instrument, "assetType">, i
 function getPaperOrderTimestamp(order: PaperOrder) {
   const idTimestamp = Number(order.id);
   return order.createdAt ?? (Number.isFinite(idTimestamp) && idTimestamp > 1_000_000_000_000 ? idTimestamp : 0);
+}
+
+function orderTradeMarker(order: PaperOrder, role: "ENTRY" | "EXIT"): ChartTradeMarker {
+  return {
+    id: `${order.id}-${role}`,
+    time: getPaperOrderTimestamp(order),
+    price: order.price,
+    side: order.side,
+    role,
+    quantity: order.quantity,
+  };
 }
 
 function paperOrderStatusLabel(order: PaperOrder) {
@@ -1093,6 +1123,19 @@ export function TradingDashboard() {
     ? closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey)
     : [], [closedTrades, selectedPnlDateKey]);
   const paperOrdersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
+  const orderMarkerRoles = useMemo(() => {
+    const roles = new Map<string, "ENTRY" | "EXIT">();
+    closedTrades.forEach((trade) => {
+      trade.sourceOrderIds.forEach((orderId, index) => {
+        roles.set(orderId, index === trade.sourceOrderIds.length - 1 ? "EXIT" : "ENTRY");
+      });
+    });
+    return roles;
+  }, [closedTrades]);
+  const selectedTradeMarkers = useMemo<ChartTradeMarker[]>(() => orders
+    .filter((order) => order.instrumentKey === selected.instrumentKey || order.symbol === selected.symbol)
+    .map((order) => orderTradeMarker(order, orderMarkerRoles.get(order.id) ?? "ENTRY"))
+    .filter((marker) => marker.time > 0), [orders, orderMarkerRoles, selected.instrumentKey, selected.symbol]);
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
@@ -1639,6 +1682,31 @@ export function TradingDashboard() {
     }
   }
 
+  function openPaperOrderChart(order: PaperOrder) {
+    setSidebarOpen(false);
+    setPositionsOpen(false);
+    setHoldingsOpen(false);
+    setOrdersOpen(false);
+    setMarketsOpen(false);
+    setPnlOpen(false);
+    const instrument = instrumentFromPaperOrder(order, tradingUniverse);
+    chooseTradeInstrument(instrument);
+    if (instrument.assetType === "OPTION" && instrument.underlyingKey) {
+      setWorkspaceMode("fno");
+      const knownSpot = stockUniverse.find((item) => item.instrumentKey === instrument.underlyingKey || item.symbol === instrument.underlyingSymbol);
+      setSpotInstrument(knownSpot ?? {
+        symbol: instrument.underlyingSymbol || "SPOT",
+        name: instrument.underlyingSymbol || "Underlying spot",
+        exchange: "NSE",
+        price: 0,
+        change: 0,
+        instrumentKey: instrument.underlyingKey,
+        categories: [],
+        assetType: instrument.underlyingKey.startsWith("NSE_INDEX|") ? "INDEX" : "EQUITY",
+      });
+    }
+  }
+
   function openHoldingSell(symbol: string, heldQuantity: number) {
     openPositionChart(symbol);
     setProduct("DELIVERY");
@@ -1886,6 +1954,7 @@ export function TradingDashboard() {
                 indicators={indicators}
                 chartAction={chartAction}
                 chartTheme={theme}
+                tradeMarkers={selectedTradeMarkers}
                 onChartTap={() => setChartTradeFooterOpen((value) => !value)}
                 orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
@@ -1993,6 +2062,7 @@ export function TradingDashboard() {
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
+          tradeMarkers={selectedTradeMarkers}
           onFeedStatus={handleFeedStatus}
           chartTheme={theme}
         />
@@ -2180,6 +2250,10 @@ export function TradingDashboard() {
                   .map((orderId) => paperOrdersById.get(orderId))
                   .filter((order): order is PaperOrder => Boolean(order))
                   .sort((first, second) => getPaperOrderTimestamp(first) - getPaperOrderTimestamp(second));
+                const reviewInstrument = sourceOrders[0] ? instrumentFromPaperOrder(sourceOrders[0], tradingUniverse) : null;
+                const reviewMarkers = sourceOrders
+                  .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
+                  .filter((marker) => marker.time > 0);
                 return (
                   <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
                     <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
@@ -2187,16 +2261,37 @@ export function TradingDashboard() {
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
                     {!!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
                       <div className="pnl-order-positions-head"><b>Order book positions</b><small>{sourceOrders.length} execution{sourceOrders.length === 1 ? "" : "s"}</small></div>
-                      {sourceOrders.map((order) => <div className="pnl-order-position" key={`${trade.id}-${order.id}`}>
+                      {sourceOrders.map((order) => <button type="button" className="pnl-order-position" key={`${trade.id}-${order.id}`} onClick={() => openPaperOrderChart(order)}>
                         <span>{order.time}</span>
-                        <button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button>
+                        <span className="order-symbol-link">{order.symbol}</span>
                         <span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span>
                         <span>{order.quantity}</span>
                         <span>{formatInr(order.price)}</span>
                         <span>{formatInr(getOrderCharges(order).total)}</span>
                         <span className="complete-tag">{paperOrderStatusLabel(order)}</span>
-                      </div>)}
+                      </button>)}
                     </div>}
+                    {reviewInstrument && reviewMarkers.length > 0 && (
+                      <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
+                        <div className="pnl-trade-review-head"><b>5m trade review</b><small>Entry and exit candles</small></div>
+                        <div className="pnl-trade-review-body">
+                          <MarketChart
+                            key={`review-${trade.id}-${reviewInstrument.instrumentKey}`}
+                            instrument={reviewInstrument}
+                            timeframe="5m"
+                            activeTool="cursor"
+                            magnet={false}
+                            hiddenDrawings
+                            lockedDrawings
+                            visibleBars={46}
+                            indicators={DEFAULT_CHART_INDICATORS}
+                            chartTheme={theme}
+                            tradeMarkers={reviewMarkers}
+                            onFeedStatus={() => undefined}
+                          />
+                        </div>
+                      </div>
+                    )}
                     {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); deleteClosedTrade(trade); }}><Trash2 size={14} /> Delete trade</button></div>}
                   </div>
                 );

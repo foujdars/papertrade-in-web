@@ -156,6 +156,15 @@ export type ChartOrderTool = {
   livePnl?: number;
 };
 
+export type ChartTradeMarker = {
+  id: string;
+  time: number;
+  price: number;
+  side: "BUY" | "SELL";
+  role: "ENTRY" | "EXIT";
+  quantity?: number;
+};
+
 type DraftDrawing = {
   toolType: DrawingToolId;
   requiredAnchors: number;
@@ -348,6 +357,7 @@ export function MarketChart({
   chartAction,
   chartTheme = "light",
   orderTool,
+  tradeMarkers = [],
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
@@ -372,6 +382,7 @@ export function MarketChart({
   chartAction?: ChartActionRequest;
   chartTheme?: "light" | "neon";
   orderTool?: ChartOrderTool;
+  tradeMarkers?: ChartTradeMarker[];
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -423,6 +434,7 @@ export function MarketChart({
   const gridVisibleRef = useRef(true);
   const crosshairVisibleRef = useRef(true);
   const orderToolRef = useRef(orderTool);
+  const tradeMarkersRef = useRef(tradeMarkers);
   const onChartTapRef = useRef(onChartTap);
   const onDrawingCompleteRef = useRef(onDrawingComplete);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
@@ -433,6 +445,7 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number | null; target: number | null; stopLoss: number | null } | null>(null);
+  const [tradeMarkerCoordinates, setTradeMarkerCoordinates] = useState<Array<ChartTradeMarker & { x: number; y: number; direction: "up" | "down" }>>([]);
 
   useEffect(() => {
     onChartTapRef.current = onChartTap;
@@ -473,6 +486,51 @@ export function MarketChart({
         : Math.abs(previous - next) < .3;
       if (current && coordinateMatches(current.entry, nextCoordinates.entry) && coordinateMatches(current.target, nextCoordinates.target) && coordinateMatches(current.stopLoss, nextCoordinates.stopLoss)) return current;
       return nextCoordinates;
+    });
+  }
+
+  function refreshTradeMarkerCoordinates() {
+    const chart = chartApi.current;
+    const series = candleSeries.current;
+    const markers = tradeMarkersRef.current;
+    const candles = dataRef.current;
+    const host = chartHost.current;
+    if (!chart || !series || !host || !markers.length || !candles.length) {
+      setTradeMarkerCoordinates([]);
+      return;
+    }
+    const chartHeight = host.clientHeight;
+    const chartWidth = host.clientWidth;
+    const topPadding = 18;
+    const bottomPadding = Math.max(topPadding, chartHeight - 26);
+    const next = markers.flatMap((marker) => {
+      const markerTime = marker.time > 1_000_000_000_000 ? Math.floor(marker.time / 1_000) : Math.floor(marker.time);
+      let nearest = candles[0];
+      let nearestDistance = Math.abs(Number(nearest.time) - markerTime);
+      for (const candle of candles) {
+        const distance = Math.abs(Number(candle.time) - markerTime);
+        if (distance < nearestDistance) {
+          nearest = candle;
+          nearestDistance = distance;
+        }
+      }
+      const x = chart.timeScale().timeToCoordinate(Math.floor(Number(nearest.time)) as UTCTimestamp);
+      const anchorPrice = marker.side === "BUY"
+        ? Math.min(marker.price, nearest.low)
+        : Math.max(marker.price, nearest.high);
+      const yBase = series.priceToCoordinate(anchorPrice);
+      if (x === null || yBase === null || x < -18 || x > chartWidth + 18) return [];
+      const y = marker.side === "BUY" ? yBase + 18 : yBase - 18;
+      if (y < topPadding || y > bottomPadding) return [];
+      return [{ ...marker, x, y, direction: marker.side === "BUY" ? "up" as const : "down" as const }];
+    });
+    setTradeMarkerCoordinates((current) => {
+      if (current.length !== next.length) return next;
+      const same = current.every((item, index) => {
+        const other = next[index];
+        return item.id === other.id && Math.abs(item.x - other.x) < .4 && Math.abs(item.y - other.y) < .4;
+      });
+      return same ? current : next;
     });
   }
 
@@ -535,9 +593,11 @@ export function MarketChart({
     if (!chart || !data.length) return;
     const count = data.length;
     const bars = Math.max(12, Math.min(visibleBarsRef.current, count));
+    const tool = orderToolRef.current;
+    const extraRightOffset = tool?.enabled ? Math.max(5, Math.min(10, bars * 0.18)) : Math.max(2, Math.min(4, bars * 0.08));
     chart.timeScale().setVisibleLogicalRange({
       from: Math.max(-0.5, count - bars - 0.5),
-      to: count - 1 + Math.max(2, Math.min(4, bars * 0.08)),
+      to: count - 1 + extraRightOffset,
     });
   }
 
@@ -813,11 +873,22 @@ export function MarketChart({
 
   useEffect(() => {
     orderToolRef.current = orderTool;
+    candleSeries.current?.applyOptions({});
+    applyVisibleRange();
     refreshRiskCoordinates();
+    refreshTradeMarkerCoordinates();
     if (!orderTool?.enabled) return;
-    const interval = window.setInterval(refreshRiskCoordinates, 120);
+    const interval = window.setInterval(() => {
+      refreshRiskCoordinates();
+      refreshTradeMarkerCoordinates();
+    }, 120);
     return () => window.clearInterval(interval);
   }, [orderTool?.enabled, orderTool?.entryPrice, orderTool?.quantity, orderTool?.side, orderTool?.stopLossPrice, orderTool?.targetPrice]);
+
+  useEffect(() => {
+    tradeMarkersRef.current = tradeMarkers;
+    refreshTradeMarkerCoordinates();
+  }, [tradeMarkers]);
 
   useEffect(() => {
     const chart = chartApi.current;
@@ -941,6 +1012,7 @@ export function MarketChart({
     let observer: ResizeObserver | null = null;
     let manager: DrawingManager | null = null;
     let resizeChart: (() => void) | null = null;
+    let refreshOverlays: (() => void) | null = null;
     let resizeFrame = 0;
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
@@ -1006,6 +1078,17 @@ export function MarketChart({
         lastValueVisible: true,
         // Keep the symbol in the OHLC legend; the right-axis marker should contain only the price.
         title: "",
+        autoscaleInfoProvider: (baseImplementation: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
+          const base = baseImplementation();
+          const tool = orderToolRef.current;
+          if (!base || !tool?.enabled) return base;
+          const levels = [tool.entryPrice, tool.targetPrice, tool.stopLossPrice].filter((value) => Number.isFinite(value) && value > 0);
+          if (!levels.length) return base;
+          const minValue = Math.min(base.priceRange.minValue, ...levels);
+          const maxValue = Math.max(base.priceRange.maxValue, ...levels);
+          const padding = Math.max((maxValue - minValue) * 0.08, tool.entryPrice * 0.002, 0.05);
+          return { ...base, priceRange: { minValue: Math.max(0, minValue - padding), maxValue: maxValue + padding } };
+        },
       });
       chartApi.current = chart;
       candleSeries.current = series;
@@ -1203,6 +1286,11 @@ export function MarketChart({
 
       syncIndicators(indicatorsRef.current);
       applyVisibleRange();
+      refreshOverlays = () => {
+        refreshRiskCoordinates();
+        refreshTradeMarkerCoordinates();
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(refreshOverlays);
       resizeChart = () => {
         window.cancelAnimationFrame(resizeFrame);
         resizeFrame = window.requestAnimationFrame(() => {
@@ -1212,6 +1300,7 @@ export function MarketChart({
           chart.resize(width, height, true);
           fitStudyPanes(indicatorsRef.current);
           applyVisibleRange();
+          refreshOverlays();
         });
       };
       observer = new ResizeObserver(resizeChart);
@@ -1220,7 +1309,7 @@ export function MarketChart({
       window.visualViewport?.addEventListener("resize", resizeChart);
       resizeChart();
       window.setTimeout(resizeChart, 180);
-      window.setTimeout(refreshRiskCoordinates, 190);
+      window.setTimeout(refreshOverlays, 190);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
       chart.applyOptions({ handleScroll: activeTool === "cursor", handleScale: activeTool === "cursor" });
@@ -1235,6 +1324,7 @@ export function MarketChart({
         window.removeEventListener("resize", resizeChart);
         window.visualViewport?.removeEventListener("resize", resizeChart);
       }
+      if (refreshOverlays) chartApi.current?.timeScale().unsubscribeVisibleLogicalRangeChange(refreshOverlays);
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup?.();
       cancelDraft();
       editRef.current = null;
@@ -1406,6 +1496,17 @@ export function MarketChart({
             <button className={`chart-buy-button ${orderTool?.enabled && orderTool.side === "BUY" ? "active" : ""}`} onClick={() => onOrderSide("BUY")}><span>Buy</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
           </div>
         )}
+        {tradeMarkerCoordinates.map((marker) => (
+          <div
+            key={marker.id}
+            className={`chart-trade-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()}`}
+            style={{ left: marker.x, top: marker.y }}
+            aria-label={`${marker.role === "ENTRY" ? "Entry" : "Exit"} ${marker.side}`}
+          >
+            <span>{marker.direction === "up" ? "↑" : "↓"}</span>
+            <em>{marker.role === "ENTRY" ? "Entry" : "Exit"}</em>
+          </div>
+        ))}
         {orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
             {onOrderToolClose && <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>}
@@ -1420,7 +1521,7 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("target", event)}
               onPointerCancel={(event) => endRiskDrag("target", event)}
             >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.targetPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
             </div>}
             {riskCoordinates.stopLoss !== null && <div
               className="risk-line risk-stop-line"
@@ -1430,7 +1531,7 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("stopLoss", event)}
               onPointerCancel={(event) => endRiskDrag("stopLoss", event)}
             >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.stopLossPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
             </div>}
             <div className={`risk-reward-summary ${onOrderToolExit ? "has-exit" : ""}`}>
               <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · Qty {orderTool.quantity}</span>
