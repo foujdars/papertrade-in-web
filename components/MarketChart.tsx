@@ -551,12 +551,11 @@ export function MarketChart({
         }
       }
       const x = chart.timeScale().timeToCoordinate(chartTimeFromEpoch(Number(nearest.time), timeframe));
-      const anchorPrice = marker.side === "BUY"
-        ? Math.min(marker.price, nearest.low)
-        : Math.max(marker.price, nearest.high);
+      // Keep execution arrows attached to the candle extremum as the chart moves.
+      const anchorPrice = marker.side === "BUY" ? nearest.low : nearest.high;
       const yBase = series.priceToCoordinate(anchorPrice);
       if (x === null || yBase === null || x < -18 || x > chartWidth + 18) return [];
-      const y = marker.side === "BUY" ? yBase + 18 : yBase - 18;
+      const y = yBase;
       if (y < topPadding || y > bottomPadding) return [];
       return [{ ...marker, x, y, direction: marker.side === "BUY" ? "up" as const : "down" as const }];
     });
@@ -946,6 +945,12 @@ export function MarketChart({
   useEffect(() => {
     orderToolRef.current = orderTool;
     candleSeries.current?.applyOptions({});
+    chartApi.current?.priceScale("right").applyOptions({
+      autoScale: true,
+      scaleMargins: orderTool?.enabled
+        ? { top: 0.24, bottom: 0.15 }
+        : { top: 0.10, bottom: 0.10 },
+    });
     applyVisibleRange();
     refreshRiskCoordinates();
     refreshTradeMarkerCoordinates();
@@ -1109,7 +1114,9 @@ export function MarketChart({
         rightPriceScale: {
           visible: true,
           borderColor: neon ? "#1b3b48" : "#dfe3ec",
-          scaleMargins: { top: 0.10, bottom: 0.10 },
+          scaleMargins: orderToolRef.current?.enabled
+            ? { top: 0.24, bottom: 0.15 }
+            : { top: 0.10, bottom: 0.10 },
           minimumWidth: 58,
           entireTextOnly: true,
         },
@@ -1573,7 +1580,7 @@ export function MarketChart({
         {tradeMarkerCoordinates.map((marker) => (
           <div
             key={marker.id}
-            className={`chart-trade-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()}`}
+            className={`chart-trade-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()} ${marker.direction}`}
             style={{ left: marker.x, top: marker.y }}
             aria-label={`${marker.role === "ENTRY" ? "Entry" : "Exit"} ${marker.side}`}
           >
@@ -1585,7 +1592,8 @@ export function MarketChart({
           <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
             {onOrderToolClose && <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>}
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
+              <em title={`Entry price ${orderTool.entryPrice}`}>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
             </div>}
             {riskCoordinates.target !== null && <div
               className="risk-line risk-target-line"
@@ -1595,7 +1603,9 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("target", event)}
               onPointerCancel={(event) => endRiskDrag("target", event)}
             >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
+              <em title={`Target price ${orderTool.targetPrice}`}>₹{orderTool.targetPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
+              <b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
             </div>}
             {riskCoordinates.stopLoss !== null && <div
               className="risk-line risk-stop-line"
@@ -1605,7 +1615,9 @@ export function MarketChart({
               onPointerUp={(event) => endRiskDrag("stopLoss", event)}
               onPointerCancel={(event) => endRiskDrag("stopLoss", event)}
             >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span><b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
+              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
+              <em title={`Stop-loss price ${orderTool.stopLossPrice}`}>₹{orderTool.stopLossPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
+              <b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
             </div>}
             <div className={`risk-reward-summary ${onOrderToolExit ? "has-exit" : ""}`}>
               <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · Qty {orderTool.quantity}</span>

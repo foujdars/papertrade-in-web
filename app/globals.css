@@ -63,13 +63,16 @@
 .terminal-shell[data-theme="neon"] .chart-live-pnl { color: #a8c3cc; border-color: #28505c66; background: transparent; box-shadow: none; }
 .terminal-shell[data-theme="neon"] .risk-entry-line { border-color: #b98aff; }
 .terminal-shell[data-theme="neon"] .risk-entry-line > span,
-.terminal-shell[data-theme="neon"] .risk-entry-line > b { color: #b98aff; background: transparent; box-shadow: none; }
+.terminal-shell[data-theme="neon"] .risk-entry-line > b,
+.terminal-shell[data-theme="neon"] .risk-entry-line > em { color: #b98aff; background: transparent; box-shadow: none; }
 .terminal-shell[data-theme="neon"] .risk-target-line { border-color: #00f5b0; box-shadow: 0 0 8px #00f5b055; }
 .terminal-shell[data-theme="neon"] .risk-target-line > span,
-.terminal-shell[data-theme="neon"] .risk-target-line > b { color: #00dca1; background: transparent; box-shadow: none; }
+.terminal-shell[data-theme="neon"] .risk-target-line > b,
+.terminal-shell[data-theme="neon"] .risk-target-line > em { color: #00dca1; background: transparent; box-shadow: none; }
 .terminal-shell[data-theme="neon"] .risk-stop-line { border-color: #ff4d75; box-shadow: 0 0 8px #ff4d7555; }
 .terminal-shell[data-theme="neon"] .risk-stop-line > span,
-.terminal-shell[data-theme="neon"] .risk-stop-line > b { color: #ff6486; background: transparent; box-shadow: none; }
+.terminal-shell[data-theme="neon"] .risk-stop-line > b,
+.terminal-shell[data-theme="neon"] .risk-stop-line > em { color: #ff6486; background: transparent; box-shadow: none; }
 .terminal-shell[data-theme="neon"] .chart-quick-order-buttons button.active { outline-color: #bafcec; box-shadow: 0 0 0 3px #00f5b033, 0 0 22px #00f5b04d; }
 .terminal-shell[data-theme="neon"] .paper-badge { color: #ffd36a; border-color: #b57c1f; background: #2a210d; }
 
@@ -95,9 +98,9 @@
   .chart-quick-order-buttons { width: calc(100% - 58px); gap: 6px; }
   .chart-quick-order-buttons button { height: 35px; }
   .chart-risk-tool { right: 58px; }
-  .risk-line > em { display: none; }
   .risk-reward-summary { left: 6px; right: auto; max-width: calc(100% - 45px); gap: 5px; font-size: 7px; }
   .risk-line > span { left: 5px; }
+  .risk-line > em { left: 43px; }
   .risk-line > b { right: 3px; }
 }
 
@@ -686,7 +689,7 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .pnl-history-filter { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .pnl-history-filter b { font-size: 9px; }
 .pnl-history-filter button { border: 0; color: var(--purple); background: transparent; font-size: 8px; font-weight: 850; cursor: pointer; }
-.pnl-trade-list { max-height: 300px; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; overflow: auto; }
+.pnl-trade-list { max-height: none; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; overflow: visible; }
 .pnl-trade-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
 .pnl-trade-row { cursor: pointer; }
 .pnl-trade-row.selected { border-color: #bcb4ff; background: #faf9ff; }
@@ -1024,16 +1027,16 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .risk-line > span, .risk-line > b, .risk-line > em { position: absolute; top: 50%; min-height: 22px; display: flex; align-items: center; transform: translateY(-50%); font-size: 8px; font-style: normal; font-weight: 900; letter-spacing: .35px; }
 .risk-line > span { left: 8px; min-width: 29px; justify-content: center; padding: 0 3px; border-radius: 0; color: inherit; }
 .risk-line > b { right: 5px; padding: 0 3px; border-radius: 0; color: inherit; }
-.risk-line > em { left: 74px; color: #748095; }
+.risk-line > em { left: 49px; color: #748095; }
 .risk-entry-line { border-top-style: solid; border-color: #765cff; }
-.risk-entry-line > span, .risk-entry-line > b { color: #6657ee; background: transparent; }
+.risk-entry-line > span, .risk-entry-line > b, .risk-entry-line > em { color: #6657ee; background: transparent; }
 .risk-target-line { border-color: #00c991; pointer-events: auto; cursor: ns-resize; touch-action: none; }
 .risk-target-line::before { content: ""; position: absolute; inset: -11px 0; }
-.risk-target-line > span, .risk-target-line > b { color: #008e6c; background: transparent; }
+.risk-target-line > span, .risk-target-line > b, .risk-target-line > em { color: #008e6c; background: transparent; }
 .risk-stop-line { border-color: #f04458; pointer-events: auto; cursor: ns-resize; touch-action: none; }
 .risk-stop-line::before { content: ""; position: absolute; inset: -11px 0; }
-.risk-stop-line > span, .risk-stop-line > b { color: #e6384e; background: transparent; }
-.risk-line > span, .risk-line > b { min-height: 23px; padding-inline: 7px; border: 1px solid currentColor; border-radius: 5px; background: transparent; box-shadow: none; backdrop-filter: none; text-shadow: 0 1px 2px var(--surface); }
+.risk-stop-line > span, .risk-stop-line > b, .risk-stop-line > em { color: #e6384e; background: transparent; }
+.risk-line > span, .risk-line > b, .risk-line > em { min-height: 23px; padding-inline: 7px; border: 1px solid currentColor; border-radius: 5px; background: transparent; box-shadow: none; backdrop-filter: none; text-shadow: 0 1px 2px var(--surface); }
 .risk-target-line > b { transform: translateY(calc(-50% + 10px)); }
 .risk-stop-line > b { transform: translateY(calc(-50% - 10px)); }
 .risk-tool-close { position: absolute; z-index: 2; top: 70px; right: 5px; width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #d9ddea; border-radius: 7px; color: #69738a; background: #ffffffed; font-size: 17px; line-height: 1; pointer-events: auto; cursor: pointer; }
@@ -1048,13 +1051,15 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .chart-live-pnl b { font-size: 9px; font-variant-numeric: tabular-nums; }
 .chart-live-pnl.positive b { color: var(--green); }
 .chart-live-pnl.negative b { color: var(--red); }
-.chart-trade-marker { position: absolute; z-index: 15; display: flex; flex-direction: column; align-items: center; gap: 1px; transform: translate(-50%, -50%); pointer-events: none; }
-.chart-trade-marker span { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 999px; background: rgba(255,255,255,.9); box-shadow: 0 7px 18px #11182722; font-size: 15px; font-weight: 950; line-height: 1; }
-.chart-trade-marker em { padding: 1px 4px; border-radius: 999px; color: currentColor; background: rgba(255,255,255,.78); font-size: 7px; font-style: normal; font-weight: 900; text-transform: uppercase; letter-spacing: .25px; }
+.chart-trade-marker { position: absolute; z-index: 15; display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none; }
+.chart-trade-marker.up { transform: translate(-50%, 2px); }
+.chart-trade-marker.down { transform: translate(-50%, calc(-100% - 2px)); }
+.chart-trade-marker span { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 999px; background: transparent; box-shadow: none; font-size: 15px; font-weight: 950; line-height: 1; text-shadow: 0 1px 2px var(--surface); }
+.chart-trade-marker em { padding: 1px 4px; border-radius: 999px; color: currentColor; background: transparent; font-size: 7px; font-style: normal; font-weight: 900; text-transform: uppercase; letter-spacing: .25px; text-shadow: 0 1px 2px var(--surface); }
 .chart-trade-marker.buy { color: var(--green); }
 .chart-trade-marker.sell { color: var(--red); }
-.terminal-shell[data-theme="neon"] .chart-trade-marker span { background: rgba(6,18,24,.82); box-shadow: 0 0 18px currentColor; }
-.terminal-shell[data-theme="neon"] .chart-trade-marker em { background: rgba(6,18,24,.66); }
+.terminal-shell[data-theme="neon"] .chart-trade-marker span,
+.terminal-shell[data-theme="neon"] .chart-trade-marker em { background: transparent; box-shadow: none; }
 .pnl-trade-review-chart { grid-column: 1 / -1; width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
 .pnl-trade-review-head { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .pnl-trade-review-head > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -1063,7 +1068,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .pnl-review-timeframe-trigger { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 6px 9px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--soft); font: inherit; cursor: pointer; }
 .pnl-review-timeframe-trigger small { font-size: 7px; text-transform: uppercase; letter-spacing: .06em; }
 .pnl-review-timeframe-trigger b { font-size: 9px; }
-.pnl-trade-review-body { position: relative; width: 100%; height: 320px; min-height: 320px; overflow: hidden; }
+.pnl-trade-review-body { position: relative; width: 100%; height: 320px; min-height: 320px; overflow: hidden; touch-action: pan-y; }
+.pnl-trade-review-body .price-chart { pointer-events: none; }
 .pnl-trade-review-body .chart-stack,
 .pnl-trade-review-body .price-chart-wrap { width: 100%; height: 100%; min-height: 0; flex: 0 0 100%; }
 .pnl-trade-review-body .chart-stack { min-width: 0; }
@@ -1615,6 +1621,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 @media (max-width: 420px) {
   .top-actions { gap: 5px; }
   .funds-button, .download-button, .api-button, .suggestion-button, .icon-button, .profile-button { width: 32px; height: 32px; }
+  .download-button { display: grid; place-items: center; flex: 0 0 32px; padding: 0; border-radius: 10px; }
+  .download-button svg { display: block; margin: 0; }
   .suggestion-button { justify-content: center; padding: 0; }
   .suggestion-button span { display: none; }
   .download-modal { padding: 17px 14px; }
