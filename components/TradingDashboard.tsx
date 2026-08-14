@@ -374,6 +374,17 @@ export function TradingDashboard() {
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
+  const activeNavigationSection: NavigationSection = sidebarOpen
+    ? "watchlist"
+    : holdingsOpen
+      ? "holdings"
+      : ordersOpen
+        ? "orders"
+        : marketsOpen
+          ? "markets"
+          : pnlOpen
+            ? "pnl"
+            : workspaceMode;
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
@@ -382,6 +393,8 @@ export function TradingDashboard() {
   const autoSquareOffRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
   const lastFnoWorkspaceRef = useRef<FnoWorkspaceSnapshot | null>(null);
+  const exitBackDeadlineRef = useRef(0);
+  const exitBackToastTimerRef = useRef<number | null>(null);
 
   const closeFnoWorkspace = useCallback(() => {
     let saved: { instrument?: Instrument; timeframe?: string; fnoUnderlying?: FnoUnderlying } = {};
@@ -408,6 +421,21 @@ export function TradingDashboard() {
     url.searchParams.set("timeframe", restoredTimeframe);
     window.history.replaceState({}, "", url);
   }, []);
+
+  const returnToTradeFromBack = useCallback(() => {
+    setSidebarOpen(false);
+    setPositionsOpen(false);
+    setHoldingsOpen(false);
+    setOrdersOpen(false);
+    setMarketsOpen(false);
+    setPnlOpen(false);
+    setFnoListOpen(false);
+    setOptionChainOpen(false);
+    setOrderSheetOpen(false);
+    setFnoTradeDockOpen(false);
+    if (selected.assetType === "OPTION" && spotInstrument) closeFnoWorkspace();
+    else setWorkspaceMode("trade");
+  }, [closeFnoWorkspace, selected.assetType, spotInstrument]);
 
   useEffect(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return;
@@ -514,15 +542,54 @@ export function TradingDashboard() {
     if (workspaceMode !== "fno") return;
     const handleHistoryBack = () => closeFnoWorkspace();
     window.addEventListener("popstate", handleHistoryBack);
-    let nativeListener: { remove: () => Promise<void> } | undefined;
-    if (Capacitor.isNativePlatform()) {
-      void CapacitorApp.addListener("backButton", () => closeFnoWorkspace()).then((listener) => { nativeListener = listener; });
-    }
     return () => {
       window.removeEventListener("popstate", handleHistoryBack);
-      if (nativeListener) void nativeListener.remove();
     };
   }, [closeFnoWorkspace, workspaceMode]);
+
+  useEffect(() => {
+    if (!isAndroidApp) return;
+    let nativeListener: { remove: () => Promise<void> } | undefined;
+    let disposed = false;
+
+    void CapacitorApp.addListener("backButton", () => {
+      if (activeNavigationSection !== "trade") {
+        exitBackDeadlineRef.current = 0;
+        if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
+        returnToTradeFromBack();
+        setToast("Returned to Trade");
+        exitBackToastTimerRef.current = window.setTimeout(() => setToast(""), 1_800);
+        return;
+      }
+
+      const now = Date.now();
+      if (now <= exitBackDeadlineRef.current) {
+        exitBackDeadlineRef.current = 0;
+        void CapacitorApp.exitApp();
+        return;
+      }
+
+      exitBackDeadlineRef.current = now + 2_500;
+      setToast("Press back again to close PaperTrade IN");
+      if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
+      exitBackToastTimerRef.current = window.setTimeout(() => {
+        exitBackDeadlineRef.current = 0;
+        setToast("");
+      }, 2_500);
+    }).then((listener) => {
+      if (disposed) void listener.remove();
+      else nativeListener = listener;
+    });
+
+    return () => {
+      disposed = true;
+      if (nativeListener) void nativeListener.remove();
+    };
+  }, [activeNavigationSection, isAndroidApp, returnToTradeFromBack]);
+
+  useEffect(() => () => {
+    if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (workspaceMode === "fno") return;
@@ -1773,18 +1840,6 @@ export function TradingDashboard() {
     }
     setPnlOpen(section === "pnl");
   }
-
-  const activeNavigationSection: NavigationSection = sidebarOpen
-    ? "watchlist"
-    : holdingsOpen
-      ? "holdings"
-      : ordersOpen
-        ? "orders"
-        : marketsOpen
-          ? "markets"
-          : pnlOpen
-            ? "pnl"
-            : workspaceMode;
 
   return (
     <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
