@@ -374,6 +374,29 @@ function pointToSegmentDistance(point: { x: number; y: number }, start: { x: num
   return pointDistance(point, { x: start.x + position * dx, y: start.y + position * dy });
 }
 
+function chartInteractionOptions(enabled: boolean, preservePageScroll: boolean) {
+  return {
+    handleScroll: enabled
+      ? preservePageScroll
+        ? {
+            mouseWheel: true,
+            pressedMouseMove: true,
+            horzTouchDrag: true,
+            vertTouchDrag: false,
+          }
+        : true
+      : false,
+    handleScale: enabled
+      ? {
+          mouseWheel: true,
+          pinch: true,
+          axisPressedMouseMove: true,
+          axisDoubleClickReset: true,
+        }
+      : false,
+  };
+}
+
 export function MarketChart({
   instrument,
   timeframe,
@@ -392,6 +415,7 @@ export function MarketChart({
   orderTool,
   tradeMarkers = [],
   focusTradeMarkers = false,
+  preservePageScroll = false,
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
@@ -418,6 +442,7 @@ export function MarketChart({
   orderTool?: ChartOrderTool;
   tradeMarkers?: ChartTradeMarker[];
   focusTradeMarkers?: boolean;
+  preservePageScroll?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -616,7 +641,7 @@ export function MarketChart({
     if (riskDragRef.current !== level) return;
     const price = riskPriceFromPointer(event, level) ?? riskDragPriceRef.current;
     riskDragRef.current = null;
-    chartApi.current?.applyOptions({ handleScroll: activeToolRef.current === "cursor", handleScale: activeToolRef.current === "cursor" });
+    chartApi.current?.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
     if (price > 0) onOrderToolChange?.(level, price, true);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     event.preventDefault();
@@ -1008,16 +1033,13 @@ export function MarketChart({
     const manager = drawingManager.current;
     const drawingType = normalizeTool(activeTool);
     manager?.setActiveTool(drawingType);
-    chart?.applyOptions({
-      handleScroll: activeTool === "cursor",
-      handleScale: activeTool === "cursor",
-    });
+    chart?.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
     chartHost.current?.classList.toggle("is-drawing", activeTool !== "cursor");
     const definition = drawingType ? DRAWING_TOOL_CATALOG.find((tool) => tool.id === drawingType) : undefined;
     const hint = definition ? `Tap ${definition.anchors} ${definition.anchors === 1 ? "point" : "points"} · ${definition.label}` : drawingType ? "Tap on chart" : "";
     const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
     return () => window.clearTimeout(hintTimer);
-  }, [activeTool, toolSignal]);
+  }, [activeTool, preservePageScroll, toolSignal]);
 
   useEffect(() => {
     lockedRef.current = lockedDrawings;
@@ -1137,8 +1159,7 @@ export function MarketChart({
           vertLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
           horzLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
         },
-        handleScroll: true,
-        handleScale: true,
+        ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
         localization: {
           locale: "en-IN",
@@ -1393,7 +1414,7 @@ export function MarketChart({
       window.setTimeout(refreshOverlays, 190);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
-      chart.applyOptions({ handleScroll: activeTool === "cursor", handleScale: activeTool === "cursor" });
+      chart.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
       host.classList.toggle("is-drawing", activeTool !== "cursor");
     });
 
@@ -1419,7 +1440,7 @@ export function MarketChart({
       drawingManager.current = null;
       drawingRegistry.current = null;
     };
-  }, [chartTheme, instrument.instrumentKey, instrument.symbol, timeframe]);
+  }, [chartTheme, instrument.instrumentKey, instrument.symbol, preservePageScroll, timeframe]);
 
   useEffect(() => {
     if (clearSignal === previousClear.current) return;

@@ -2303,6 +2303,7 @@ export function TradingDashboard() {
                             chartTheme={theme}
                             tradeMarkers={reviewMarkers}
                             focusTradeMarkers
+                            preservePageScroll
                             onFeedStatus={() => undefined}
                           />
                         </div>
