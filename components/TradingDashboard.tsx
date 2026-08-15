@@ -395,6 +395,8 @@ export function TradingDashboard() {
   const lastFnoWorkspaceRef = useRef<FnoWorkspaceSnapshot | null>(null);
   const exitBackDeadlineRef = useRef(0);
   const exitBackToastTimerRef = useRef<number | null>(null);
+  const activeNavigationSectionRef = useRef<NavigationSection>(activeNavigationSection);
+  const returnToTradeFromBackRef = useRef<() => void>(() => undefined);
 
   const closeFnoWorkspace = useCallback(() => {
     let saved: { instrument?: Instrument; timeframe?: string; fnoUnderlying?: FnoUnderlying } = {};
@@ -436,6 +438,9 @@ export function TradingDashboard() {
     if (selected.assetType === "OPTION" && spotInstrument) closeFnoWorkspace();
     else setWorkspaceMode("trade");
   }, [closeFnoWorkspace, selected.assetType, spotInstrument]);
+
+  activeNavigationSectionRef.current = activeNavigationSection;
+  returnToTradeFromBackRef.current = returnToTradeFromBack;
 
   useEffect(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return;
@@ -553,10 +558,10 @@ export function TradingDashboard() {
     let disposed = false;
 
     void CapacitorApp.addListener("backButton", () => {
-      if (activeNavigationSection !== "trade") {
+      if (activeNavigationSectionRef.current !== "trade") {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
-        returnToTradeFromBack();
+        returnToTradeFromBackRef.current();
         setToast("Returned to Trade");
         exitBackToastTimerRef.current = window.setTimeout(() => setToast(""), 1_800);
         return;
@@ -585,7 +590,7 @@ export function TradingDashboard() {
       disposed = true;
       if (nativeListener) void nativeListener.remove();
     };
-  }, [activeNavigationSection, isAndroidApp, returnToTradeFromBack]);
+  }, [isAndroidApp]);
 
   useEffect(() => () => {
     if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);

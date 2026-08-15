@@ -382,7 +382,7 @@ function chartInteractionOptions(enabled: boolean, preservePageScroll: boolean) 
             mouseWheel: true,
             pressedMouseMove: true,
             horzTouchDrag: true,
-            vertTouchDrag: false,
+            vertTouchDrag: true,
           }
         : true
       : false,
@@ -594,6 +594,18 @@ export function MarketChart({
     });
   }
 
+  function scheduleOverlayRefresh() {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      refreshRiskCoordinates();
+      refreshTradeMarkerCoordinates();
+      window.requestAnimationFrame(() => {
+        refreshRiskCoordinates();
+        refreshTradeMarkerCoordinates();
+      });
+    });
+  }
+
   function orderToolPnl(tool: ChartOrderTool, price: number) {
     const direction = tool.side === "BUY" ? 1 : -1;
     return (price - tool.entryPrice) * direction * tool.quantity;
@@ -676,8 +688,7 @@ export function MarketChart({
         const toBase = Math.min(count - 1, rightMost + padding);
         const rightOffset = Math.max(4, Math.min(10, (toBase - from + 1) * 0.08));
         chart.timeScale().setVisibleLogicalRange({ from, to: toBase + rightOffset });
-        refreshRiskCoordinates();
-        refreshTradeMarkerCoordinates();
+        scheduleOverlayRefresh();
         return;
       }
     }
@@ -964,7 +975,7 @@ export function MarketChart({
   useEffect(() => {
     focusTradeMarkersRef.current = focusTradeMarkers;
     applyVisibleRange();
-    refreshTradeMarkerCoordinates();
+    scheduleOverlayRefresh();
   }, [focusTradeMarkers]);
 
   useEffect(() => {
@@ -977,8 +988,7 @@ export function MarketChart({
         : { top: 0.10, bottom: 0.10 },
     });
     applyVisibleRange();
-    refreshRiskCoordinates();
-    refreshTradeMarkerCoordinates();
+    scheduleOverlayRefresh();
     if (!orderTool?.enabled) return;
     const interval = window.setInterval(() => {
       refreshRiskCoordinates();
@@ -990,7 +1000,7 @@ export function MarketChart({
   useEffect(() => {
     tradeMarkersRef.current = tradeMarkers;
     applyVisibleRange();
-    refreshTradeMarkerCoordinates();
+    scheduleOverlayRefresh();
   }, [tradeMarkers]);
 
   useEffect(() => {
@@ -1294,6 +1304,7 @@ export function MarketChart({
       };
 
       const onPointerMove = (event: PointerEvent) => {
+        scheduleOverlayRefresh();
         const tap = tapGestureRef.current;
         if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) tap.moved = true;
         const edit = editRef.current;
@@ -1334,6 +1345,7 @@ export function MarketChart({
       };
 
       const onPointerUp = (event: PointerEvent) => {
+        scheduleOverlayRefresh();
         const tap = tapGestureRef.current;
         tapGestureRef.current = null;
         if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) onChartTapRef.current?.();
@@ -1374,6 +1386,7 @@ export function MarketChart({
       host.addEventListener("pointermove", onPointerMove, true);
       host.addEventListener("pointerup", onPointerUp, true);
       host.addEventListener("pointercancel", onPointerUp, true);
+      host.addEventListener("wheel", scheduleOverlayRefresh, { passive: true });
       window.addEventListener("keydown", onKeyDown);
       Object.assign(host.dataset, {
         pointerListeners: "active",
@@ -1383,14 +1396,14 @@ export function MarketChart({
         host.removeEventListener("pointermove", onPointerMove, true);
         host.removeEventListener("pointerup", onPointerUp, true);
         host.removeEventListener("pointercancel", onPointerUp, true);
+        host.removeEventListener("wheel", scheduleOverlayRefresh);
         window.removeEventListener("keydown", onKeyDown);
       };
 
       syncIndicators(indicatorsRef.current);
       applyVisibleRange();
       refreshOverlays = () => {
-        refreshRiskCoordinates();
-        refreshTradeMarkerCoordinates();
+        scheduleOverlayRefresh();
       };
       chart.timeScale().subscribeVisibleLogicalRangeChange(refreshOverlays);
       resizeChart = () => {
@@ -1402,7 +1415,7 @@ export function MarketChart({
           chart.resize(width, height, true);
           fitStudyPanes(indicatorsRef.current);
           applyVisibleRange();
-          refreshOverlays?.();
+          scheduleOverlayRefresh();
         });
       };
       observer = new ResizeObserver(resizeChart);
@@ -1411,7 +1424,9 @@ export function MarketChart({
       window.visualViewport?.addEventListener("resize", resizeChart);
       resizeChart();
       window.setTimeout(resizeChart, 180);
-      window.setTimeout(refreshOverlays, 190);
+      window.setTimeout(scheduleOverlayRefresh, 40);
+      window.setTimeout(scheduleOverlayRefresh, 190);
+      window.setTimeout(scheduleOverlayRefresh, 360);
       activeToolRef.current = activeTool;
       manager.setActiveTool(normalizeTool(activeTool));
       chart.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
@@ -1497,6 +1512,7 @@ export function MarketChart({
         restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
         syncIndicatorData(payload.candles);
         applyVisibleRange(payload.candles);
+        scheduleOverlayRefresh();
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
         const hasCurrentMarketData = historicalOnlyTimeframe || payload.segments?.includes("intraday");
         setFeedMode(hasCurrentMarketData ? "live" : "stale");
@@ -1539,6 +1555,7 @@ export function MarketChart({
         dataRef.current = mergeSeries(dataRef.current, payload.candles);
         candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
         syncIndicatorData();
+        scheduleOverlayRefresh();
         const latest = dataRef.current.at(-1);
         if (latest) {
           setLatestCandle(latest);
