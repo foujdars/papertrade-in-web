@@ -501,6 +501,8 @@ export function MarketChart({
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
+  const riskDragPriceRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const orderToolEnabledRef = useRef(false);
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialData.at(-1));
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
@@ -633,8 +635,13 @@ export function MarketChart({
 
   function beginRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
     riskDragRef.current = level;
+    const priceScale = chartApi.current?.priceScale("right");
+    riskDragPriceRangeRef.current = priceScale?.getVisibleRange() ?? null;
+    priceScale?.setAutoScale(false);
+    if (riskDragPriceRangeRef.current) priceScale?.setVisibleRange(riskDragPriceRangeRef.current);
     event.currentTarget.setPointerCapture?.(event.pointerId);
     chartApi.current?.applyOptions({ handleScroll: false, handleScale: false });
+    event.nativeEvent.stopImmediatePropagation?.();
     event.preventDefault();
     event.stopPropagation();
   }
@@ -645,6 +652,13 @@ export function MarketChart({
     if (price === null) return;
     riskDragPriceRef.current = price;
     onOrderToolChange?.(level, price, false);
+    const frozenRange = riskDragPriceRangeRef.current;
+    if (frozenRange) {
+      const priceScale = chartApi.current?.priceScale("right");
+      priceScale?.setAutoScale(false);
+      priceScale?.setVisibleRange(frozenRange);
+    }
+    event.nativeEvent.stopImmediatePropagation?.();
     event.preventDefault();
     event.stopPropagation();
   }
@@ -655,7 +669,17 @@ export function MarketChart({
     riskDragRef.current = null;
     chartApi.current?.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
     if (price > 0) onOrderToolChange?.(level, price, true);
+    const frozenRange = riskDragPriceRangeRef.current;
+    if (frozenRange) {
+      const priceScale = chartApi.current?.priceScale("right");
+      priceScale?.setAutoScale(false);
+      priceScale?.setVisibleRange(frozenRange);
+    }
+    // Freeze the scale only for the gesture. The user regains normal chart
+    // scaling as soon as the handle is released.
+    riskDragPriceRangeRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
+    event.nativeEvent.stopImmediatePropagation?.();
     event.preventDefault();
     event.stopPropagation();
   }
@@ -981,15 +1005,30 @@ export function MarketChart({
   useEffect(() => {
     orderToolRef.current = orderTool;
     candleSeries.current?.applyOptions({});
-    chartApi.current?.priceScale("right").applyOptions({
-      autoScale: true,
-      scaleMargins: orderTool?.enabled
+    const priceScale = chartApi.current?.priceScale("right");
+    const enabled = Boolean(orderTool?.enabled);
+    const wasEnabled = orderToolEnabledRef.current;
+    orderToolEnabledRef.current = enabled;
+    const frozenRange = riskDragPriceRangeRef.current;
+    priceScale?.applyOptions({
+      autoScale: frozenRange ? false : undefined,
+      scaleMargins: enabled
         ? { top: 0.24, bottom: 0.15 }
         : { top: 0.10, bottom: 0.10 },
     });
-    applyVisibleRange();
+    if (!enabled) {
+      riskDragPriceRangeRef.current = null;
+      priceScale?.setAutoScale(true);
+      if (wasEnabled) applyVisibleRange();
+    } else if (frozenRange) {
+      priceScale?.setAutoScale(false);
+      priceScale?.setVisibleRange(frozenRange);
+    } else if (!wasEnabled) {
+      priceScale?.setAutoScale(true);
+      applyVisibleRange();
+    }
     scheduleOverlayRefresh();
-    if (!orderTool?.enabled) return;
+    if (!enabled) return;
     const interval = window.setInterval(() => {
       refreshRiskCoordinates();
       refreshTradeMarkerCoordinates();
@@ -1162,6 +1201,9 @@ export function MarketChart({
           barSpacing: 7,
           minBarSpacing: 2,
           fixLeftEdge: false,
+          fixRightEdge: false,
+          rightBarStaysOnScroll: false,
+          shiftVisibleRangeOnNewBar: false,
           lockVisibleTimeRangeOnResize: true,
         },
         crosshair: {
@@ -1414,7 +1456,6 @@ export function MarketChart({
           const height = Math.max(1, Math.floor(host.clientHeight));
           chart.resize(width, height, true);
           fitStudyPanes(indicatorsRef.current);
-          applyVisibleRange();
           scheduleOverlayRefresh();
         });
       };
@@ -1448,6 +1489,9 @@ export function MarketChart({
       manager?.detach();
       chartApi.current?.remove();
       chartApi.current = null;
+      riskDragRef.current = null;
+      riskDragPriceRangeRef.current = null;
+      orderToolEnabledRef.current = false;
       candleSeries.current = null;
       ema5Series.current = null;
       ema21Series.current = null;

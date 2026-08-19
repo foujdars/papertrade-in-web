@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, Cable, RefreshCw, ScanSearch, TrendingUp, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatInr, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import type { NormalizedQuote } from "@/lib/upstox";
@@ -12,6 +12,8 @@ type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
 
 const STORAGE_KEY = "papertrade-market-scanner-results-v1";
+const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
+const AUTO_SCAN_INTERVAL_MS = 60_000;
 const scannerOptions: Array<{ id: ScannerId; label: string }> = [
   { id: "VOLUME", label: "Volume Shocker" },
   { id: "OPEN_HIGH", label: "Open = High" },
@@ -48,6 +50,11 @@ function formatScanTime(value: string) {
   return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value));
 }
 
+function readScanMode(): "manual" | "auto" {
+  if (typeof window === "undefined") return "manual";
+  return window.localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "auto" ? "auto" : "manual";
+}
+
 export function MarketsWorkspace({
   stockUniverse,
   quotes,
@@ -64,6 +71,9 @@ export function MarketsWorkspace({
   const [activeScanner, setActiveScanner] = useState<ScannerId>("VOLUME");
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
+  const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
+  const scanInFlightRef = useRef(false);
+  const scanAbortRef = useRef<AbortController | null>(null);
 
   const selectedOption = scannerOptions.find((option) => option.id === activeScanner) ?? scannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
@@ -78,10 +88,16 @@ export function MarketsWorkspace({
     return () => onQuoteKeysChange([]);
   }, [activeQuoteKeys, onQuoteKeysChange]);
 
-  async function runSelectedScan() {
-    if (loadingScanner || !instruments.length) return;
-    const scanner = activeScanner;
+  const runSelectedScan = useCallback(async (requestedScanner?: ScannerId) => {
+    if (scanInFlightRef.current || !instruments.length) return;
+    const scanner = requestedScanner ?? activeScanner;
+    const option = scannerOptions.find((item) => item.id === scanner) ?? scannerOptions[0];
+    const controller = new AbortController();
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = controller;
+    scanInFlightRef.current = true;
     setLoadingScanner(scanner);
+    const timeout = window.setTimeout(() => controller.abort(), 25_000);
     try {
       const technical = scanner !== "VOLUME" && scanner !== "OPEN_HIGH";
       const response = await fetch(technical ? "/api/market/technical-scanner" : "/api/market/volume-breakouts", {
@@ -89,9 +105,10 @@ export function MarketsWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instruments, ...(technical ? { strategy: scanner } : { mode: scanner }) }),
         cache: "no-store",
+        signal: controller.signal,
       });
       const payload = await response.json() as { ok?: boolean; rows?: ScannerRow[]; openHighRows?: OpenHighRow[]; fetchedAt?: string; error?: { message?: string } };
-      if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${selectedOption.label} is unavailable.`);
+      if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${option.label} is unavailable.`);
       const rows = scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []);
       setSnapshots((current) => {
         const next = { ...current, [scanner]: { rows, scannedAt: payload.fetchedAt ?? new Date().toISOString() } };
@@ -99,12 +116,36 @@ export function MarketsWorkspace({
         return next;
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : `${selectedOption.label} is unavailable.`;
+      const message = error instanceof DOMException && error.name === "AbortError"
+        ? `${option.label} timed out. Please try again.`
+        : error instanceof Error ? error.message : `${option.label} is unavailable.`;
       setSnapshots((current) => ({ ...current, [scanner]: { rows: current[scanner]?.rows ?? [], scannedAt: current[scanner]?.scannedAt ?? "", error: message } }));
     } finally {
-      setLoadingScanner(null);
+      window.clearTimeout(timeout);
+      if (scanAbortRef.current === controller) scanAbortRef.current = null;
+      scanInFlightRef.current = false;
+      setLoadingScanner((current) => current === scanner ? null : current);
     }
-  }
+  }, [activeScanner, instruments]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
+    if (scanMode !== "auto" || !instruments.length) return;
+    const scanWhenReady = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) void runSelectedScan(activeScanner);
+    };
+    scanWhenReady();
+    const interval = window.setInterval(scanWhenReady, AUTO_SCAN_INTERVAL_MS);
+    window.addEventListener("online", scanWhenReady);
+    document.addEventListener("visibilitychange", scanWhenReady);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("online", scanWhenReady);
+      document.removeEventListener("visibilitychange", scanWhenReady);
+    };
+  }, [activeScanner, instruments.length, runSelectedScan, scanMode]);
+
+  useEffect(() => () => scanAbortRef.current?.abort(), []);
 
   return (
     <section className="market-discovery-panel" aria-label="NSE market scanners">
@@ -113,10 +154,17 @@ export function MarketsWorkspace({
         {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}>{option.label}</button>)}
       </div>
       <div className="scanner-run-row">
-        {activeSnapshot?.scannedAt && <span><small>Last scan {formatScanTime(activeSnapshot.scannedAt)} IST · list stays until refreshed</small></span>}
-        <button className="scanner-run-button" onClick={runSelectedScan} disabled={Boolean(loadingScanner)}>
+        <span>
+          {activeSnapshot?.scannedAt && <small>Last scan {formatScanTime(activeSnapshot.scannedAt)} IST · list stays until refreshed</small>}
+          <span className="scanner-mode-toggle" role="group" aria-label="Scanner refresh mode">
+            <button type="button" className={scanMode === "manual" ? "active" : ""} onClick={() => setScanMode("manual")}>Manual</button>
+            <button type="button" className={scanMode === "auto" ? "active" : ""} onClick={() => setScanMode("auto")}>Automatic</button>
+          </span>
+          {scanMode === "auto" && <small>Refreshes this scanner every minute while the app is open.</small>}
+        </span>
+        <button className="scanner-run-button" onClick={() => void runSelectedScan()} disabled={Boolean(loadingScanner)}>
           {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
-          {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan"}
+          {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"}
         </button>
       </div>
       {activeSnapshot?.error && <div className="scanner-inline-error"><Cable size={16} /><span>{activeSnapshot.error} The previous result is preserved.</span></div>}

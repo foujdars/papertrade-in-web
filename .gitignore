@@ -42,3 +42,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+# Local Gradle caches created by offline Android builds
+.gradle-local/
+android/.gradle-local/
+android/android/

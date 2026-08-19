@@ -5,8 +5,9 @@ import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { MarketChart, type ChartAction, type ChartActionRequest, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, type Instrument } from "@/lib/market";
+import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 
 const FNO_TIMEFRAME_GROUPS = [
   { label: "Minute", values: ["1m", "2m", "3m", "5m", "10m", "15m", "30m"] },
@@ -87,7 +88,7 @@ export function FnoChartWorkspace({
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
   const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
-  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
+  const [indicators, setIndicators] = usePersistentChartIndicators();
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [toolSignal, setToolSignal] = useState(0);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();

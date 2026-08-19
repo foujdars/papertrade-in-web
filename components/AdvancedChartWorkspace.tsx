@@ -33,10 +33,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { BrandMark } from "@/components/BrandMark";
+import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -108,7 +111,7 @@ export function AdvancedChartWorkspace({
   const [clock, setClock] = useState<Date | null>(null);
   const [showSymbols, setShowSymbols] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
-  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
+  const [indicators, setIndicators] = usePersistentChartIndicators();
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL" | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [exitQuantity, setExitQuantity] = useState(1);
@@ -136,6 +139,26 @@ export function AdvancedChartWorkspace({
     window.addEventListener("popstate", returnToTrade);
     return () => window.removeEventListener("popstate", returnToTrade);
   }, [initialSymbol, initialTimeframe]);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== "android") return;
+    let listener: { remove: () => Promise<void> } | undefined;
+    let disposed = false;
+    const returnToTrade = () => {
+      const params = new URLSearchParams(window.location.search);
+      const symbol = params.get("symbol") ?? instrument.symbol ?? initialSymbol;
+      const period = params.get("timeframe") ?? timeframe ?? initialTimeframe;
+      window.location.replace(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(period)}`);
+    };
+    void CapacitorApp.addListener("backButton", returnToTrade).then((handle) => {
+      if (disposed) void handle.remove();
+      else listener = handle;
+    });
+    return () => {
+      disposed = true;
+      if (listener) void listener.remove();
+    };
+  }, [initialSymbol, initialTimeframe, instrument.symbol, timeframe]);
 
   useEffect(() => {
     const restore = window.setTimeout(() => setOrders(readPaperOrders()), 0);

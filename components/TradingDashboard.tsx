@@ -8,9 +8,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { App as CapacitorApp } from "@capacitor/app";
-import { Capacitor } from "@capacitor/core";
-import { DEFAULT_CHART_INDICATORS, MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
@@ -43,6 +44,7 @@ import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
+import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
@@ -68,6 +70,33 @@ const PNL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DEFAULT_RISK_AMOUNT = 2_000;
 const DEFAULT_REWARD_AMOUNT = 3_000;
 const INDIA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+const NativeTradeAlert = registerPlugin<{
+  requestPermission: () => Promise<{ granted?: boolean } | void>;
+  show: (options: { title: string; body: string }) => Promise<void>;
+}>("TradeAlert");
+
+function prepareProtectionAlerts() {
+  if (typeof window === "undefined") return;
+  if (Capacitor.getPlatform() === "android") {
+    void NativeTradeAlert.requestPermission().catch(() => undefined);
+    return;
+  }
+  if ("Notification" in window && Notification.permission === "default") {
+    void Notification.requestPermission().catch(() => undefined);
+  }
+}
+
+function showProtectionAlert(order: PaperOrder) {
+  if (typeof window === "undefined") return;
+  const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
+  const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
+  navigator.vibrate?.([180, 90, 180]);
+  if (Capacitor.getPlatform() === "android") {
+    void NativeTradeAlert.show({ title: reason, body }).catch(() => undefined);
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(`PaperTrade IN · ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
+  }
+}
 
 function indiaDateParts(timestamp: number) {
   const parts = INDIA_DATE_FORMATTER.formatToParts(new Date(timestamp));
@@ -331,7 +360,7 @@ export function TradingDashboard() {
   const [riskLevelsCustomized, setRiskLevelsCustomized] = useState(false);
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
-  const [indicators, setIndicators] = useState<ChartIndicators>(DEFAULT_CHART_INDICATORS);
+  const [indicators, setIndicators] = usePersistentChartIndicators();
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [protections, setProtections] = useState<PaperProtection[]>([]);
@@ -439,8 +468,10 @@ export function TradingDashboard() {
     else setWorkspaceMode("trade");
   }, [closeFnoWorkspace, selected.assetType, spotInstrument]);
 
-  activeNavigationSectionRef.current = activeNavigationSection;
-  returnToTradeFromBackRef.current = returnToTradeFromBack;
+  useEffect(() => {
+    activeNavigationSectionRef.current = activeNavigationSection;
+    returnToTradeFromBackRef.current = returnToTradeFromBack;
+  }, [activeNavigationSection, returnToTradeFromBack]);
 
   useEffect(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return;
@@ -979,6 +1010,7 @@ export function TradingDashboard() {
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     const reasons = triggeredOrders.map((order) => order.exitReason === "TARGET" ? "target" : "stop loss");
+    triggeredOrders.forEach(showProtectionAlert);
     setToast(`${triggeredOrders.length} position${triggeredOrders.length > 1 ? "s" : ""} exited by ${[...new Set(reasons)].join(" / ")}`);
     window.setTimeout(() => setToast(""), 4_000);
   }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, orders, protections, selected.symbol, tradingUniverse]);
@@ -1411,6 +1443,7 @@ export function TradingDashboard() {
       window.setTimeout(() => setToast(""), 3_200);
       return;
     }
+    prepareProtectionAlerts();
     const order: PaperOrder = {
       id: `${new Date().getTime()}`, symbol: selected.symbol, side, quantity, price: executionPrice,
       status: "COMPLETE", time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -2359,7 +2392,7 @@ export function TradingDashboard() {
                             hiddenDrawings
                             lockedDrawings
                             visibleBars={pnlReviewTimeframe === "1D" || pnlReviewTimeframe === "1W" || pnlReviewTimeframe === "1M" || pnlReviewTimeframe === "1Y" ? 72 : 46}
-                            indicators={DEFAULT_CHART_INDICATORS}
+                            indicators={indicators}
                             chartTheme={theme}
                             tradeMarkers={reviewMarkers}
                             focusTradeMarkers
@@ -2410,12 +2443,12 @@ export function TradingDashboard() {
               <article>
                 <b>iPhone / iPad app</b>
                 <small>Open <strong>papertrade.site</strong> in Safari, tap Share, then choose <strong>Add to Home Screen</strong>. It opens like an iOS app and stays synced with your account.</small>
-                <a className="download-primary ios-install-link" href="/" onClick={() => setDownloadOpen(false)}><Smartphone size={18} /> Open iOS web app</a>
+                <Link className="download-primary ios-install-link" href="/" onClick={() => setDownloadOpen(false)}><Smartphone size={18} /> Open iOS web app</Link>
               </article>
             </div>
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
-            <code className="download-hash">7F66D9EF7E98445FC142F0E28AB91FB13638844EC62E1A1EC50CC1AF9EEE8B08</code>
-            <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari's Add to Home Screen option.</p>
+            <code className="download-hash">001A5768943CD533383A71815AF478C67FA96C6E03BC7AC322CE3E01163CF958</code>
+            <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari&apos;s Add to Home Screen option.</p>
           </section>
         </div>
       )}
