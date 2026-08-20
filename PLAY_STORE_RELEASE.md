@@ -40,11 +40,23 @@ Do this once in Android Studio. Never place the key or its passwords inside this
 ## Production secret checklist
 
 - In Vercel, keep `UPSTOX_ACCESS_TOKEN` server-side. Never rename it with a `NEXT_PUBLIC_` prefix.
+- In Vercel, add `SUPABASE_SERVICE_ROLE_KEY` as a Production-only server secret. It is used only by the authenticated account-deletion route. Never prefix it with `NEXT_PUBLIC_` and never put it in the Android project.
 - `NEXT_PUBLIC_SUPABASE_URL` and the Supabase publishable/anon key are intentionally public client configuration. Never use a Supabase service-role key in the app.
 - Confirm Supabase row-level-security policies from `supabase/migrations/20260806_auth_sync.sql` have been applied.
 - Rotate any credential immediately if it is pasted into source code, committed to Git, shared in a screenshot, or included in an APK/AAB.
 - Do not commit `*.jks`, `*.keystore`, `key.properties`, `local.properties`, `.env.local`, or `google-services.json`.
 - Keep Android Studio, Gradle dependencies, Capacitor, Next.js, and the device WebView updated.
+
+## Play Console privacy and account deletion
+
+Use these public URLs after the production deployment succeeds:
+
+- Privacy policy: `https://papertrade.site/privacy`
+- Account deletion: `https://papertrade.site/delete-account`
+
+The same Privacy Policy and direct account-deletion controls are linked from the Google sign-in screen and the signed-in profile menu. Deleting an account removes the Supabase authentication user; the existing cascading database relationships remove that user's profile and synchronized trading state.
+
+Complete the Play Console **Data safety** form from the behavior of the release you upload. PaperTrade IN processes Google account identity details (identifier, email, display name, and profile image), user-created paper-trading data, and ordinary technical/security data from its service providers. Data is encrypted in transit, no real exchange orders are placed, and account deletion is available in-app and on the public page above.
 
 ## Build verification
 
@@ -53,4 +65,3 @@ The unsigned verification bundle is generated at:
 `android/app/build/outputs/bundle/release/app-release.aab`
 
 For Play Console, generate the signed bundle through Android Studio using the private upload key. Do not upload a debug APK or the unsigned verification bundle.
-

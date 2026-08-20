@@ -9,6 +9,7 @@ import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
 import { BrandMark } from "@/components/BrandMark";
+import { deletePaperTradeAccount } from "@/lib/account-deletion-client";
 
 type SyncStatus = "disabled" | "loading" | "synced" | "saving" | "error";
 
@@ -19,6 +20,7 @@ type AuthContextValue = {
   syncStatus: SyncStatus;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -250,6 +252,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus(configured ? "loading" : "disabled");
   }, [configured, session]);
 
+  const deleteAccount = useCallback(async () => {
+    if (!session?.access_token) throw new Error("Your secure session has expired. Please sign in again.");
+    await deletePaperTradeAccount(session.access_token);
+    lastUploadedState.current = "";
+    setSession(null);
+    setCloudReady(true);
+    setSyncStatus(configured ? "loading" : "disabled");
+  }, [configured, session?.access_token]);
+
   const contextValue = useMemo<AuthContextValue>(() => ({
     configured,
     session,
@@ -257,7 +268,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     syncStatus,
     signInWithGoogle,
     signOut,
-  }), [configured, session, signInWithGoogle, signOut, syncStatus]);
+    deleteAccount,
+  }), [configured, deleteAccount, session, signInWithGoogle, signOut, syncStatus]);
 
   return (
     <AuthContext.Provider value={contextValue}>
@@ -290,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
+            <div className="auth-legal-links"><Link href="/privacy">Privacy Policy</Link><Link href="/delete-account">Delete account</Link></div>
             {!nativePlatform && <div className="auth-download-options">
               <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · 4.7 MB</small></span></a>
               <Link className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></Link>

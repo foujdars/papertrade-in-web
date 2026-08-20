@@ -1572,6 +1572,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .auth-privacy-note > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .auth-privacy-note b { color: #c9fff0; font-size: 10px; }
 .auth-privacy-note small { color: #91b9b2; font-size: 8px; line-height: 1.5; }
+.auth-legal-links { display: flex; align-items: center; justify-content: center; gap: 14px; margin: -2px 0 4px; }
+.auth-legal-links a { color: #b8adff; font-size: 9px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 .auth-download-link { width: 100%; display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #745fff66; border-radius: 11px; color: #c9c1ff; background: #211c5266; text-align: left; text-decoration: none; }
 .auth-download-options { display: flex; flex-direction: column; gap: 8px; }
 .auth-download-link > svg { flex: 0 0 auto; }
@@ -1621,8 +1623,20 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .account-sync.sync-synced { color: var(--green); }
 .account-sync.sync-error { color: var(--red); }
 .signout-button { width: 100%; height: 40px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 14px; border: 1px solid #ff6a8140; border-radius: 10px; color: var(--red); background: #fff1f3; font-size: 10px; font-weight: 800; cursor: pointer; }
+.account-legal-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.account-legal-links a { color: var(--purple); font-size: 9px; font-weight: 800; text-decoration: none; }
+.delete-account-button { width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 8px; border: 1px solid #ff496447; border-radius: 10px; color: var(--red); background: transparent; font-size: 9px; font-weight: 800; cursor: pointer; }
+.account-delete-confirm { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; padding: 11px; border: 1px solid #ff496452; border-radius: 10px; background: #fff5f6; }
+.account-delete-confirm > b { color: var(--red); font-size: 10px; }
+.account-delete-confirm > small { color: var(--muted); font-size: 8px; line-height: 1.45; }
+.account-delete-confirm > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.account-delete-confirm button { height: 32px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--panel); font-size: 8px; font-weight: 800; cursor: pointer; }
+.account-delete-confirm button:last-child { color: #fff; border-color: #d92f4e; background: #d92f4e; }
+.account-delete-confirm button:disabled { opacity: .55; cursor: wait; }
+.account-delete-error { margin: 8px 0 0; color: var(--red); font-size: 8px; line-height: 1.45; }
 .terminal-shell[data-theme="neon"] .account-profile, .terminal-shell[data-theme="neon"] .account-sync { border-color: #1d404c; background: #0b2027; }
 .terminal-shell[data-theme="neon"] .signout-button { background: #2d111a; }
+.terminal-shell[data-theme="neon"] .account-delete-confirm { background: #2a1018; }
 
 @media (max-width: 420px) {
   .top-actions { gap: 5px; }

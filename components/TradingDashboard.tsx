@@ -315,7 +315,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 }
 
 export function TradingDashboard() {
-  const { configured: authConfigured, user, syncStatus, signOut } = useAuth();
+  const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
@@ -392,6 +392,9 @@ export function TradingDashboard() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountDeleteArmed, setAccountDeleteArmed] = useState(false);
+  const [accountDeleteWorking, setAccountDeleteWorking] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState("");
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
@@ -1879,6 +1882,26 @@ export function TradingDashboard() {
     setPnlOpen(section === "pnl");
   }
 
+  function closeAccountModal() {
+    setAccountOpen(false);
+    setAccountDeleteArmed(false);
+    setAccountDeleteError("");
+  }
+
+  async function permanentlyDeleteAccount() {
+    if (accountDeleteWorking) return;
+    setAccountDeleteWorking(true);
+    setAccountDeleteError("");
+    try {
+      await deleteAccount();
+      closeAccountModal();
+    } catch (deletionError) {
+      setAccountDeleteError(deletionError instanceof Error ? deletionError.message : "Account deletion failed. Please try again.");
+    } finally {
+      setAccountDeleteWorking(false);
+    }
+  }
+
   return (
     <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
       <header className="topbar">
@@ -2482,15 +2505,26 @@ export function TradingDashboard() {
         </div>
       )}
       {accountOpen && user && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAccountOpen(false)}>
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeAccountModal}>
           <section className="modal account-modal" role="dialog" aria-modal="true" aria-label="Your PaperTrade account" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Secure account</span><h2>Your profile</h2></div><button className="icon-button" onClick={() => setAccountOpen(false)} aria-label="Close account"><X size={20} /></button></div>
+            <div className="modal-head"><div><span className="eyebrow">Secure account</span><h2>Your profile</h2></div><button className="icon-button" onClick={closeAccountModal} aria-label="Close account"><X size={20} /></button></div>
             <div className="account-profile">
               <span>{user.user_metadata?.avatar_url ? <Image unoptimized width={43} height={43} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={25} />}</span>
               <div><b>{(user.user_metadata?.full_name as string | undefined) ?? "Paper trader"}</b><small>{user.email}</small></div>
             </div>
             <div className={`account-sync sync-${syncStatus}`}>{syncStatus === "synced" ? <CheckCircle2 size={17} /> : <Cloud size={17} />}<span><b>{syncStatus === "synced" ? "Portfolio synced" : syncStatus === "saving" ? "Saving portfolio…" : syncStatus === "error" ? "Cloud setup required" : "Loading portfolio…"}</b><small>Virtual balance, orders, watchlists and preferences</small></span></div>
             <button className="signout-button" onClick={() => void signOut()}><LogOut size={17} /> Sign out</button>
+            <div className="account-legal-links"><Link href="/privacy" target="_blank">Privacy Policy</Link><Link href="/delete-account" target="_blank">Account deletion page</Link></div>
+            {!accountDeleteArmed ? (
+              <button className="delete-account-button" onClick={() => setAccountDeleteArmed(true)}><Trash2 size={16} /> Delete account</button>
+            ) : (
+              <div className="account-delete-confirm">
+                <b>Permanently delete this account?</b>
+                <small>This removes your profile and synchronized portfolio. This cannot be undone.</small>
+                <div><button type="button" onClick={() => { setAccountDeleteArmed(false); setAccountDeleteError(""); }}>Keep account</button><button type="button" disabled={accountDeleteWorking} onClick={() => void permanentlyDeleteAccount()}>{accountDeleteWorking ? "Deleting..." : "Delete forever"}</button></div>
+              </div>
+            )}
+            {accountDeleteError && <p className="account-delete-error">{accountDeleteError}</p>}
           </section>
         </div>
       )}

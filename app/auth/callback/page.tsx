@@ -11,18 +11,21 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     const code = new URLSearchParams(window.location.search).get("code");
+    const requestedReturn = window.sessionStorage.getItem("papertrade-auth-return");
+    window.sessionStorage.removeItem("papertrade-auth-return");
+    const returnTo = requestedReturn === "/delete-account" ? requestedReturn : "/";
     if (!client || !code) {
       queueMicrotask(() => setMessage("The sign-in link is incomplete. Return to PaperTrade IN and try again."));
       return;
     }
     void client.auth.getSession().then(async ({ data }) => {
       if (data.session) {
-        router.replace("/");
+        router.replace(returnTo);
         return;
       }
       const { error } = await client.auth.exchangeCodeForSession(code);
       if (error) setMessage(error.message);
-      else router.replace("/");
+      else router.replace(returnTo);
     });
   }, [router]);
 
