@@ -18,6 +18,7 @@ import type {
   ToolRegistry,
 } from "lightweight-charts-drawing";
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
+import { openUpstoxLiveFeed, type UpstoxLiveTick } from "@/lib/upstox-live-feed";
 
 export const DRAWING_TOOL_CATALOG = [
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
@@ -269,6 +270,32 @@ function mergeSeries(existing: Candle[], incoming: Candle[]) {
 
 const IST_OFFSET_SECONDS = 19_800;
 const CALENDAR_TIMEFRAMES = new Set(["1D", "1W", "1M", "1Y"]);
+const LIVE_TIMEFRAME_SECONDS: Record<string, number> = {
+  "1m": 60,
+  "2m": 120,
+  "3m": 180,
+  "5m": 300,
+  "10m": 600,
+  "15m": 900,
+  "30m": 1_800,
+  "1H": 3_600,
+  "2H": 7_200,
+  "3H": 10_800,
+  "4H": 14_400,
+  "1D": 86_400,
+};
+
+function liveCandleTime(timestampMs: number, timeframe: string) {
+  const epochSeconds = Math.floor(timestampMs / 1_000);
+  const localSeconds = epochSeconds + IST_OFFSET_SECONDS;
+  const localDayStart = Math.floor(localSeconds / 86_400) * 86_400;
+  if (timeframe === "1D") return localDayStart - IST_OFFSET_SECONDS;
+  const intervalSeconds = LIVE_TIMEFRAME_SECONDS[timeframe];
+  if (!intervalSeconds) return null;
+  const marketOpenLocal = localDayStart + 9 * 3_600 + 15 * 60;
+  const elapsed = Math.max(0, localSeconds - marketOpenLocal);
+  return marketOpenLocal + Math.floor(elapsed / intervalSeconds) * intervalSeconds - IST_OFFSET_SECONDS;
+}
 
 function usesIntradayAxisShift(timeframe: string) {
   return !CALENDAR_TIMEFRAMES.has(timeframe);
@@ -502,6 +529,8 @@ export function MarketChart({
   const onDrawingCompleteRef = useRef(onDrawingComplete);
   const onPriceRef = useRef(onPrice);
   const onFeedStatusRef = useRef(onFeedStatus);
+  const liveStreamConnectedRef = useRef(false);
+  const liveIndicatorTimerRef = useRef(0);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -1620,6 +1649,112 @@ export function MarketChart({
   }, [instrument.instrumentKey, timeframe]);
 
   useEffect(() => {
+    if (!LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    const controller = new AbortController();
+    let stopped = false;
+    let reconnectTimer = 0;
+    let closeSocket: (() => void) | undefined;
+    let retryAttempt = 0;
+
+    const updateIndicatorsSoon = () => {
+      if (liveIndicatorTimerRef.current) return;
+      liveIndicatorTimerRef.current = window.setTimeout(() => {
+        liveIndicatorTimerRef.current = 0;
+        syncIndicatorData();
+      }, 400);
+    };
+
+    const applyLiveTick = ({ price, timestampMs }: UpstoxLiveTick) => {
+      const candleTime = liveCandleTime(timestampMs, timeframe);
+      if (candleTime === null) return;
+      const previous = dataRef.current.at(-1);
+      if (previous && candleTime < Number(previous.time)) return;
+
+      const next: Candle = previous && candleTime === Number(previous.time)
+        ? {
+            ...previous,
+            high: Math.max(previous.high, price),
+            low: Math.min(previous.low, price),
+            close: price,
+          }
+        : {
+            time: candleTime,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: 0,
+          };
+
+      if (previous && candleTime === Number(previous.time)) {
+        dataRef.current[dataRef.current.length - 1] = next;
+      } else {
+        dataRef.current = [...dataRef.current, next].slice(-1_600);
+      }
+      candleSeries.current?.update(toCandleData(next, timeframe));
+      setLatestCandle(next);
+      onPriceRef.current?.(price);
+      updateIndicatorsSoon();
+      scheduleOverlayRefresh();
+    };
+
+    const scheduleReconnect = (retryAfterSeconds?: number) => {
+      if (stopped || controller.signal.aborted) return;
+      liveStreamConnectedRef.current = false;
+      retryAttempt += 1;
+      const delaySeconds = retryAfterSeconds
+        ? Math.max(5, Math.min(120, retryAfterSeconds))
+        : Math.min(60, 3 * 2 ** Math.min(retryAttempt - 1, 4));
+      setFeedMode(dataRef.current.length ? "stale" : "loading");
+      onFeedStatusRef.current({
+        mode: dataRef.current.length ? "stale" : "loading",
+        message: `Upstox live stream reconnecting in ${delaySeconds}s`,
+      });
+      reconnectTimer = window.setTimeout(() => void connect(), delaySeconds * 1_000);
+    };
+
+    async function connect() {
+      if (stopped || controller.signal.aborted) return;
+      try {
+        closeSocket?.();
+        closeSocket = await openUpstoxLiveFeed({
+          instrumentKey: instrument.instrumentKey,
+          signal: controller.signal,
+          onTick: applyLiveTick,
+          onDisconnect: () => scheduleReconnect(),
+        });
+        if (stopped) {
+          closeSocket();
+          return;
+        }
+        retryAttempt = 0;
+        liveStreamConnectedRef.current = true;
+        setFeedMode("live");
+        onFeedStatusRef.current({
+          mode: "live",
+          message: "Upstox live tick stream",
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const retryAfterSeconds = Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds) || undefined;
+        scheduleReconnect(retryAfterSeconds);
+      }
+    }
+
+    void connect();
+    return () => {
+      stopped = true;
+      liveStreamConnectedRef.current = false;
+      controller.abort();
+      closeSocket?.();
+      window.clearTimeout(reconnectTimer);
+      window.clearTimeout(liveIndicatorTimerRef.current);
+      liveIndicatorTimerRef.current = 0;
+    };
+  }, [instrument.instrumentKey, timeframe]);
+
+  useEffect(() => {
     if ((feedMode !== "live" && feedMode !== "stale") || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
     let controller: AbortController | null = null;
     async function refreshIntradayCandles() {
@@ -1640,9 +1775,14 @@ export function MarketChart({
           onPriceRef.current?.(latest.close);
         }
         setFeedMode("live");
-        onFeedStatusRef.current({ mode: "live", message: "Upstox historical + intraday candles", updatedAt: payload.fetchedAt });
+        onFeedStatusRef.current({
+          mode: "live",
+          message: liveStreamConnectedRef.current ? "Upstox live tick stream" : "Upstox historical + intraday candles",
+          updatedAt: payload.fetchedAt,
+        });
       } catch (error) {
         if (controller?.signal.aborted) return;
+        if (liveStreamConnectedRef.current) return;
         setFeedMode(dataRef.current.length ? "stale" : "error");
         onFeedStatusRef.current({ mode: dataRef.current.length ? "stale" : "error", message: `${error instanceof Error ? error.message : "Upstox candle refresh failed."} Chart paused · no simulation` });
       }

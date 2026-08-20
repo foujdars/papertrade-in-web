@@ -27,6 +27,55 @@ export function isUpstoxConfigured() {
   return Boolean(process.env.UPSTOX_ACCESS_TOKEN?.trim());
 }
 
+export async function authorizeUpstoxMarketFeed() {
+  const token = process.env.UPSTOX_ACCESS_TOKEN?.trim();
+  if (!token) {
+    throw new UpstoxServerError(
+      503,
+      "TOKEN_MISSING",
+      "UPSTOX_ACCESS_TOKEN is not configured in the production environment.",
+    );
+  }
+
+  const response = await fetch("https://api.upstox.com/v3/feed/market-data-feed/authorize", {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new UpstoxServerError(401, "TOKEN_INVALID", "The Upstox token is invalid or expired.");
+    }
+    if (response.status === 403) {
+      throw new UpstoxServerError(403, "ACCESS_DENIED", "This Upstox token cannot access the live market feed.");
+    }
+    if (response.status === 429) {
+      const retryHeader = Number(response.headers.get("retry-after"));
+      const retryAfterSeconds = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : 30;
+      throw new UpstoxServerError(
+        429,
+        "RATE_LIMITED",
+        `Upstox live-feed authorization is temporarily rate limited. Retrying after ${retryAfterSeconds} seconds.`,
+        retryAfterSeconds,
+      );
+    }
+    throw new UpstoxServerError(502, "UPSTREAM_ERROR", `Upstox live-feed authorization returned HTTP ${response.status}.`);
+  }
+
+  const payload = await response.json() as {
+    status?: string;
+    data?: { authorizedRedirectUri?: string; authorized_redirect_uri?: string };
+  };
+  const authorizedRedirectUri = payload.data?.authorizedRedirectUri ?? payload.data?.authorized_redirect_uri;
+  if (!authorizedRedirectUri?.startsWith("wss://")) {
+    throw new UpstoxServerError(502, "INVALID_FEED_URL", "Upstox did not return a valid live-feed connection URL.");
+  }
+  return authorizedRedirectUri;
+}
+
 export async function upstoxFetch<T>(path: string): Promise<T> {
   const token = process.env.UPSTOX_ACCESS_TOKEN?.trim();
   if (!token) {
