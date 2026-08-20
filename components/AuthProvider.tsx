@@ -5,6 +5,7 @@ import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import type { Session, User } from "@supabase/supabase-js";
 import { CandlestickChart, Cloud, Download, LogIn, ShieldCheck, Smartphone, Sparkles, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
 import { BrandMark } from "@/components/BrandMark";
@@ -73,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const activeUserId = useRef<string | null>(null);
 
   useEffect(() => {
+    // Native runtime detection is intentionally deferred to avoid a server/client hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNativePlatform(Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "web");
   }, []);
 
@@ -289,7 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
             {!nativePlatform && <div className="auth-download-options">
               <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · 4.7 MB</small></span></a>
-              <a className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></a>
+              <Link className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></Link>
             </div>}
             <small className="auth-disclaimer">No real exchange orders are placed.</small>
           </section>

@@ -21,6 +21,15 @@
 # misc
 .DS_Store
 *.pem
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+android/key.properties
+android/keystore.properties
+android/local.properties
+android/app/google-services.json
 
 # debug
 npm-debug.log*
@@ -41,6 +50,8 @@ next-env.d.ts
 /dist/
 /.wrangler/
 /outputs/
+/android/app/release/
+/android/app/build/outputs/
 /work/
 # Local Gradle caches created by offline Android builds
 .gradle-local/

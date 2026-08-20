@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const appUrl = process.env.PAPERTRADE_APP_URL ?? "https://papertrade-in-web.vercel.app";
+const appUrl = process.env.PAPERTRADE_APP_URL ?? "https://papertrade.site";
 
 const config: CapacitorConfig = {
   appId: "in.papertrade.app",
@@ -8,7 +8,8 @@ const config: CapacitorConfig = {
   webDir: "android-shell",
   backgroundColor: "#ffffff",
   zoomEnabled: true,
-  loggingBehavior: "debug",
+  // Never forward console output from the production WebView to Android logs.
+  loggingBehavior: "none",
   server: {
     url: appUrl,
     appStartPath: "/",
