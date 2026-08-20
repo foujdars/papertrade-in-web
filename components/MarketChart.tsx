@@ -496,8 +496,12 @@ export function MarketChart({
   const orderToolRef = useRef(orderTool);
   const tradeMarkersRef = useRef(tradeMarkers);
   const focusTradeMarkersRef = useRef(focusTradeMarkers);
+  const tradeMarkerKeyRef = useRef("");
+  const viewportInteractedRef = useRef(false);
   const onChartTapRef = useRef(onChartTap);
   const onDrawingCompleteRef = useRef(onDrawingComplete);
+  const onPriceRef = useRef(onPrice);
+  const onFeedStatusRef = useRef(onFeedStatus);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -517,6 +521,14 @@ export function MarketChart({
   useEffect(() => {
     onDrawingCompleteRef.current = onDrawingComplete;
   }, [onDrawingComplete]);
+
+  useEffect(() => {
+    onPriceRef.current = onPrice;
+  }, [onPrice]);
+
+  useEffect(() => {
+    onFeedStatusRef.current = onFeedStatus;
+  }, [onFeedStatus]);
 
   function refreshRiskCoordinates() {
     const series = candleSeries.current;
@@ -723,6 +735,11 @@ export function MarketChart({
       from: Math.max(-0.5, count - bars - 0.5),
       to: count - 1 + extraRightOffset,
     });
+  }
+
+  function applyInitialVisibleRange(data = dataRef.current) {
+    if (viewportInteractedRef.current) return;
+    applyVisibleRange(data);
   }
 
   function fitStudyPanes(next = indicatorsRef.current) {
@@ -998,7 +1015,7 @@ export function MarketChart({
 
   useEffect(() => {
     focusTradeMarkersRef.current = focusTradeMarkers;
-    applyVisibleRange();
+    applyInitialVisibleRange();
     scheduleOverlayRefresh();
   }, [focusTradeMarkers]);
 
@@ -1036,11 +1053,19 @@ export function MarketChart({
     return () => window.clearInterval(interval);
   }, [orderTool?.enabled, orderTool?.entryPrice, orderTool?.quantity, orderTool?.side, orderTool?.stopLossPrice, orderTool?.targetPrice]);
 
+  const tradeMarkerKey = tradeMarkers
+    .map((marker) => `${marker.id}:${marker.time}:${marker.side}:${marker.price}`)
+    .join("|");
+
   useEffect(() => {
     tradeMarkersRef.current = tradeMarkers;
-    applyVisibleRange();
+    if (tradeMarkerKeyRef.current !== tradeMarkerKey) {
+      tradeMarkerKeyRef.current = tradeMarkerKey;
+      viewportInteractedRef.current = false;
+      applyInitialVisibleRange();
+    }
     scheduleOverlayRefresh();
-  }, [tradeMarkers]);
+  }, [tradeMarkerKey, tradeMarkers]);
 
   useEffect(() => {
     const chart = chartApi.current;
@@ -1157,6 +1182,7 @@ export function MarketChart({
   useEffect(() => {
     if (!chartHost.current) return;
     const host = chartHost.current;
+    viewportInteractedRef.current = false;
     let cancelled = false;
     let observer: ResizeObserver | null = null;
     let manager: DrawingManager | null = null;
@@ -1348,7 +1374,10 @@ export function MarketChart({
       const onPointerMove = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         const tap = tapGestureRef.current;
-        if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) tap.moved = true;
+        if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) {
+          tap.moved = true;
+          viewportInteractedRef.current = true;
+        }
         const edit = editRef.current;
         if (edit) {
           const current = pointerAnchor(event, false);
@@ -1428,7 +1457,12 @@ export function MarketChart({
       host.addEventListener("pointermove", onPointerMove, true);
       host.addEventListener("pointerup", onPointerUp, true);
       host.addEventListener("pointercancel", onPointerUp, true);
-      host.addEventListener("wheel", scheduleOverlayRefresh, { passive: true });
+      const onWheel = () => {
+        viewportInteractedRef.current = true;
+        scheduleOverlayRefresh();
+      };
+
+      host.addEventListener("wheel", onWheel, { passive: true });
       window.addEventListener("keydown", onKeyDown);
       Object.assign(host.dataset, {
         pointerListeners: "active",
@@ -1438,7 +1472,7 @@ export function MarketChart({
         host.removeEventListener("pointermove", onPointerMove, true);
         host.removeEventListener("pointerup", onPointerUp, true);
         host.removeEventListener("pointercancel", onPointerUp, true);
-        host.removeEventListener("wheel", scheduleOverlayRefresh);
+        host.removeEventListener("wheel", onWheel);
         window.removeEventListener("keydown", onKeyDown);
       };
 
@@ -1530,7 +1564,7 @@ export function MarketChart({
   useEffect(() => {
     const controller = new AbortController();
     let retryTimer = 0;
-    onFeedStatus({ mode: "loading", message: "Connecting to Upstox…" });
+    onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
 
     async function loadUpstoxCandles() {
       try {
@@ -1551,16 +1585,16 @@ export function MarketChart({
         dataRef.current = payload.candles;
         const latest = payload.candles.at(-1);
         setLatestCandle(latest);
-        if (latest) onPrice?.(latest.close);
+        if (latest) onPriceRef.current?.(latest.close);
         candleSeries.current?.setData(payload.candles.map((candle) => toCandleData(candle, timeframe)));
         restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
         syncIndicatorData(payload.candles);
-        applyVisibleRange(payload.candles);
+        applyInitialVisibleRange(payload.candles);
         scheduleOverlayRefresh();
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
         const hasCurrentMarketData = historicalOnlyTimeframe || payload.segments?.includes("intraday");
         setFeedMode(hasCurrentMarketData ? "live" : "stale");
-        onFeedStatus({
+        onFeedStatusRef.current({
           mode: hasCurrentMarketData ? "live" : "stale",
           message: hasCurrentMarketData ? (payload.segments?.includes("intraday") ? "Upstox historical + intraday candles" : "Upstox historical candles") : "Upstox historical candles · live update paused",
           updatedAt: payload.fetchedAt,
@@ -1570,7 +1604,7 @@ export function MarketChart({
         const retryAfterSeconds = Math.max(15, Math.min(120, Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds) || 30));
         const hasVerifiedCandles = dataRef.current.length > 0;
         setFeedMode(hasVerifiedCandles ? "stale" : "error");
-        onFeedStatus({
+        onFeedStatusRef.current({
           mode: hasVerifiedCandles ? "stale" : "error",
           message: `${error instanceof Error ? error.message : "Upstox candles are unavailable."} No simulation · retrying in ${retryAfterSeconds}s`,
         });
@@ -1583,7 +1617,7 @@ export function MarketChart({
       controller.abort();
       window.clearTimeout(retryTimer);
     };
-  }, [instrument.instrumentKey, onFeedStatus, onPrice, timeframe]);
+  }, [instrument.instrumentKey, timeframe]);
 
   useEffect(() => {
     if ((feedMode !== "live" && feedMode !== "stale") || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
@@ -1603,14 +1637,14 @@ export function MarketChart({
         const latest = dataRef.current.at(-1);
         if (latest) {
           setLatestCandle(latest);
-          onPrice?.(latest.close);
+          onPriceRef.current?.(latest.close);
         }
         setFeedMode("live");
-        onFeedStatus({ mode: "live", message: "Upstox historical + intraday candles", updatedAt: payload.fetchedAt });
+        onFeedStatusRef.current({ mode: "live", message: "Upstox historical + intraday candles", updatedAt: payload.fetchedAt });
       } catch (error) {
         if (controller?.signal.aborted) return;
         setFeedMode(dataRef.current.length ? "stale" : "error");
-        onFeedStatus({ mode: dataRef.current.length ? "stale" : "error", message: `${error instanceof Error ? error.message : "Upstox candle refresh failed."} Chart paused · no simulation` });
+        onFeedStatusRef.current({ mode: dataRef.current.length ? "stale" : "error", message: `${error instanceof Error ? error.message : "Upstox candle refresh failed."} Chart paused · no simulation` });
       }
     }
     const interval = window.setInterval(() => void refreshIntradayCandles(), 20_000);
@@ -1618,7 +1652,7 @@ export function MarketChart({
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [feedMode, instrument.instrumentKey, onFeedStatus, onPrice, timeframe]);
+  }, [feedMode, instrument.instrumentKey, timeframe]);
 
   return (
     <div className="chart-stack lightweight-stack">
