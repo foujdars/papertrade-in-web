@@ -302,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
-            <div className="auth-legal-links"><Link href="/privacy">Privacy Policy</Link><Link href="/delete-account">Delete account</Link></div>
+            <div className="auth-legal-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/delete-account">Delete account</Link></div>
             {!nativePlatform && <div className="auth-download-options">
               <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.10-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · 4.7 MB</small></span></a>
               <Link className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></Link>

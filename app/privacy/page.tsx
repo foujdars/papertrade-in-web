@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
+import { LegalFooter, LegalHeader } from "@/components/LegalChrome";
 import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
-        <Link className={styles.brand} href="/"><BrandMark size={38} /><span>PaperTrade <strong>IN</strong></span></Link>
+        <LegalHeader />
         <article className={styles.card}>
           <span className={styles.eyebrow}>Your privacy</span>
           <h1>Privacy Policy</h1>
@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
             <p>We may update this policy when the app or legal requirements change. The effective date shown above will be updated, and material changes will be communicated in the app or on this page.</p>
           </section>
         </article>
-        <footer className={styles.footer}><span>© 2026 PaperTrade IN</span><span><Link href="/">Open app</Link> · <Link href="/delete-account">Delete account</Link></span></footer>
+        <LegalFooter />
       </div>
     </main>
   );

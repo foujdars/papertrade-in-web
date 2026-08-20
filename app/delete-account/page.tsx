@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
 import { DeleteAccountClient } from "@/components/DeleteAccountClient";
+import { LegalFooter, LegalHeader } from "@/components/LegalChrome";
 import styles from "../legal.module.css";
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export default function DeleteAccountPage() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
-        <Link className={styles.brand} href="/"><BrandMark size={38} /><span>PaperTrade <strong>IN</strong></span></Link>
+        <LegalHeader />
         <article className={styles.card}>
           <span className={styles.eyebrow}>Account controls</span>
           <h1>Delete your account</h1>
@@ -29,7 +29,7 @@ export default function DeleteAccountPage() {
             <p>Email <a href="mailto:foudjars@gmail.com?subject=PaperTrade%20IN%20Account%20Deletion">foudjars@gmail.com</a> from your registered email address. Read our <Link href="/privacy">Privacy Policy</Link> for additional information.</p>
           </section>
         </article>
-        <footer className={styles.footer}><span>© 2026 PaperTrade IN</span><span><Link href="/">Open app</Link> · <Link href="/privacy">Privacy policy</Link></span></footer>
+        <LegalFooter />
       </div>
     </main>
   );

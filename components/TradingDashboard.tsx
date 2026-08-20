@@ -2514,7 +2514,7 @@ export function TradingDashboard() {
             </div>
             <div className={`account-sync sync-${syncStatus}`}>{syncStatus === "synced" ? <CheckCircle2 size={17} /> : <Cloud size={17} />}<span><b>{syncStatus === "synced" ? "Portfolio synced" : syncStatus === "saving" ? "Saving portfolio…" : syncStatus === "error" ? "Cloud setup required" : "Loading portfolio…"}</b><small>Virtual balance, orders, watchlists and preferences</small></span></div>
             <button className="signout-button" onClick={() => void signOut()}><LogOut size={17} /> Sign out</button>
-            <div className="account-legal-links"><Link href="/privacy" target="_blank">Privacy Policy</Link><Link href="/delete-account" target="_blank">Account deletion page</Link></div>
+            <div className="account-legal-links"><Link href="/privacy" target="_blank">Privacy</Link><Link href="/terms" target="_blank">Terms</Link><Link href="/delete-account" target="_blank">Delete account</Link></div>
             {!accountDeleteArmed ? (
               <button className="delete-account-button" onClick={() => setAccountDeleteArmed(true)}><Trash2 size={16} /> Delete account</button>
             ) : (
