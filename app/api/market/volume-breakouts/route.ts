@@ -35,6 +35,7 @@ type UpstoxCandlePayload = {
 const HISTORY_BATCH_SIZE = 15;
 const MAX_HISTORY_SCANS = 120;
 const scannerCache = new Map<"VOLUME" | "OPEN_HIGH", { expiresAt: number; payload: Record<string, unknown> }>();
+const volumeHistoryCache = new Map<string, { sessionDate: string; expiresAt: number; points: HistoricalVolumePoint[] }>();
 
 function indiaDateKey(value: Date | number | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -54,14 +55,18 @@ function delay(milliseconds: number) {
 
 async function loadAdjustedVolumeHistory(candidate: VolumeBreakoutCandidate) {
   const toDate = indiaDateKey(Date.now());
+  const cached = volumeHistoryCache.get(candidate.instrumentKey);
+  if (cached && cached.sessionDate === toDate && cached.expiresAt > Date.now()) return cached.points;
   const fromDate = indiaDateKey(Date.now() - 50 * 86_400_000);
   const encodedKey = encodeURIComponent(candidate.instrumentKey);
   const payload = await upstoxFetch<UpstoxCandlePayload>(`/v3/historical-candle/${encodedKey}/days/1/${toDate}/${fromDate}`);
-  return (payload.data?.candles ?? []).flatMap((candle): HistoricalVolumePoint[] => {
+  const points = (payload.data?.candles ?? []).flatMap((candle): HistoricalVolumePoint[] => {
     const volume = Number(candle[5]);
     if (!Number.isFinite(volume) || volume < 0) return [];
     return [{ date: indiaDateKey(candle[0]), volume }];
   });
+  volumeHistoryCache.set(candidate.instrumentKey, { sessionDate: toDate, expiresAt: Date.now() + 6 * 60 * 60_000, points });
+  return points;
 }
 
 export async function POST(request: Request) {

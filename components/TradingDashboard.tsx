@@ -22,7 +22,7 @@ import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
-import { formatInr, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
+import { deriveNetChange, formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
@@ -1939,12 +1939,13 @@ export function TradingDashboard() {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
               const change = quote?.changePercent ?? item.change;
+              const netChange = quote?.netChange ?? deriveNetChange(price, change);
               const saved = customWatchlists.some((list) => list.symbols.includes(item.symbol));
               return (
                 <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
                   <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
-                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={price > 0 ? change >= 0 ? "positive" : "negative" : ""}>{price > 0 ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Quote loading"}</small></span>
+                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? formatSignedMarketMove(netChange, change) : "Quote loading"}</small></span>
                   {activeCustomList?.symbols.includes(item.symbol) ? (
                     <button className="watchlist-star remove" onClick={(event) => { event.stopPropagation(); removeStockFromCustomWatchlist(activeCustomList.id, item.symbol); }} aria-label={`Remove ${item.symbol} from ${activeCustomList.name}`}><X size={15} /></button>
                   ) : (

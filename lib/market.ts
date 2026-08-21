@@ -277,3 +277,18 @@ export function formatInr(value: number) {
     maximumFractionDigits: 2,
   }).format(value);
 }
+
+export function deriveNetChange(lastPrice: number, changePercent: number) {
+  if (!Number.isFinite(lastPrice) || !Number.isFinite(changePercent) || lastPrice <= 0 || changePercent <= -100) return 0;
+  const previousClose = lastPrice / (1 + changePercent / 100);
+  return Number.isFinite(previousClose) ? lastPrice - previousClose : 0;
+}
+
+export function formatSignedMarketMove(netChange: number, changePercent: number) {
+  const safePoints = Number.isFinite(netChange) ? netChange : 0;
+  const safePercent = Number.isFinite(changePercent) ? changePercent : 0;
+  const pointSign = safePoints > 0 ? "+" : safePoints < 0 ? "−" : "";
+  const percentSign = safePercent > 0 ? "+" : safePercent < 0 ? "−" : "";
+  const points = Math.abs(safePoints).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${pointSign}₹${points} (${percentSign}${Math.abs(safePercent).toFixed(2)}%)`;
+}

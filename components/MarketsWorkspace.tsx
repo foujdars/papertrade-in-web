@@ -2,7 +2,7 @@
 
 import { Activity, Cable, RefreshCw, ScanSearch, TrendingUp, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatInr, type Instrument } from "@/lib/market";
+import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
@@ -14,6 +14,8 @@ type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string }
 const STORAGE_KEY = "papertrade-market-scanner-results-v1";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
+const PULL_REFRESH_THRESHOLD = 58;
+const MAX_PULL_DISTANCE = 86;
 const scannerOptions: Array<{ id: ScannerId; label: string }> = [
   { id: "VOLUME", label: "Volume Shocker" },
   { id: "OPEN_HIGH", label: "Open = High" },
@@ -51,8 +53,8 @@ function formatScanTime(value: string) {
 }
 
 function readScanMode(): "manual" | "auto" {
-  if (typeof window === "undefined") return "manual";
-  return window.localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "auto" ? "auto" : "manual";
+  if (typeof window === "undefined") return "auto";
+  return window.localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "manual" ? "manual" : "auto";
 }
 
 export function MarketsWorkspace({
@@ -74,6 +76,10 @@ export function MarketsWorkspace({
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
+  const marketListRef = useRef<HTMLDivElement | null>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const pullDistanceRef = useRef(0);
+  const [pullDistance, setPullDistance] = useState(0);
 
   const selectedOption = scannerOptions.find((option) => option.id === activeScanner) ?? scannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
@@ -147,6 +153,31 @@ export function MarketsWorkspace({
 
   useEffect(() => () => scanAbortRef.current?.abort(), []);
 
+  const resetPullRefresh = useCallback(() => {
+    pullStartYRef.current = null;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+  }, []);
+
+  const handlePullStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    if (loadingScanner || (marketListRef.current?.scrollTop ?? 0) > 0) return;
+    pullStartYRef.current = event.touches[0]?.clientY ?? null;
+  }, [loadingScanner]);
+
+  const handlePullMove = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    if (pullStartYRef.current === null || (marketListRef.current?.scrollTop ?? 0) > 0) return;
+    const rawDistance = (event.touches[0]?.clientY ?? pullStartYRef.current) - pullStartYRef.current;
+    const distance = Math.min(MAX_PULL_DISTANCE, Math.max(0, rawDistance * 0.52));
+    pullDistanceRef.current = distance;
+    setPullDistance(distance);
+  }, []);
+
+  const handlePullEnd = useCallback(() => {
+    const shouldRefresh = pullDistanceRef.current >= PULL_REFRESH_THRESHOLD;
+    resetPullRefresh();
+    if (shouldRefresh) void runSelectedScan();
+  }, [resetPullRefresh, runSelectedScan]);
+
   return (
     <section className="market-discovery-panel" aria-label="NSE market scanners">
       <div className="market-discovery-head"><div><span className="eyebrow">NSE CASH · LIVE SCANNERS</span><h2>Markets</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
@@ -168,13 +199,32 @@ export function MarketsWorkspace({
         </button>
       </div>
       {activeSnapshot?.error && <div className="scanner-inline-error"><Cable size={16} /><span>{activeSnapshot.error} The previous result is preserved.</span></div>}
-      <div className="market-discovery-list">
+      <div
+        ref={marketListRef}
+        className="market-discovery-list"
+        onTouchStart={handlePullStart}
+        onTouchMove={handlePullMove}
+        onTouchEnd={handlePullEnd}
+        onTouchCancel={resetPullRefresh}
+      >
+        <div
+          className={`scanner-pull-indicator ${pullDistance > 0 ? "visible" : ""} ${pullDistance >= PULL_REFRESH_THRESHOLD ? "ready" : ""}`}
+          style={{ height: pullDistance > 0 ? `${pullDistance}px` : undefined }}
+          aria-hidden={pullDistance <= 0}
+        >
+          <RefreshCw size={17} />
+          <span>{pullDistance >= PULL_REFRESH_THRESHOLD ? "Release to refresh" : "Pull to refresh"}</span>
+        </div>
         {activeRows.map((row) => {
           const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
           if (!item) return null;
           const liveQuote = quotes[item.instrumentKey] ?? quotes[row.symbol];
           const displayPrice = liveQuote?.lastPrice ?? row.lastPrice;
           const displayChangePercent = liveQuote?.changePercent ?? row.changePercent;
+          const rowNetChange = "netChange" in row && Number.isFinite(row.netChange)
+            ? row.netChange
+            : deriveNetChange(row.lastPrice, row.changePercent);
+          const displayNetChange = liveQuote?.netChange ?? rowNetChange;
           const detail = isVolumeRow(row)
             ? `Volume ${compactNumber(row.todayVolume)} · SMA20 ${compactNumber(row.sma20Volume)}`
             : isOpenHighRow(row)
@@ -186,7 +236,7 @@ export function MarketsWorkspace({
             <button key={row.symbol} className="trend-stock-row" onClick={() => onSelectCash(item, displayPrice)}>
               <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
               <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>{detail}</small></span>
-              <span><b>{formatInr(displayPrice)}</b><small className={displayChangePercent >= 0 ? "positive" : "negative"}>{displayChangePercent >= 0 ? "+" : ""}{displayChangePercent.toFixed(2)}%</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
+              <span><b>{formatInr(displayPrice)}</b><small className={`market-move-line ${displayChangePercent >= 0 ? "positive" : "negative"}`}>{formatSignedMarketMove(displayNetChange, displayChangePercent)}</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
             </button>
           );
         })}

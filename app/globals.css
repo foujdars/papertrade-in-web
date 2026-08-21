@@ -540,7 +540,13 @@ h1, h2, p { margin: 0; }
 .scanner-inline-error { display: flex; align-items: center; gap: 7px; margin: -5px 0 10px; padding: 8px 10px; border: 1px solid #ff416833; border-radius: 8px; color: var(--red); background: #ff41680c; font-size: 9px; }
 .spin { animation: scanner-spin .8s linear infinite; }
 @keyframes scanner-spin { to { transform: rotate(360deg); } }
-.market-discovery-list { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--line); }
+.market-discovery-list { flex: 1; min-height: 0; overflow: auto; overscroll-behavior-y: contain; border-top: 1px solid var(--line); }
+.scanner-pull-indicator { grid-column: 1 / -1; height: 0; display: flex; align-items: center; justify-content: center; gap: 7px; overflow: hidden; color: var(--muted); font-size: 9px; font-weight: 800; opacity: 0; transition: height .16s ease, opacity .12s ease; }
+.scanner-pull-indicator.visible { opacity: 1; transition: none; }
+.scanner-pull-indicator.ready { color: var(--purple); }
+.scanner-pull-indicator svg { transition: transform .16s ease; }
+.scanner-pull-indicator.ready svg { transform: rotate(180deg); }
+.market-move-line { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .market-search { height: 42px; flex: 0 0 42px; display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: #8992a5; background: var(--soft); }
 .market-search input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 11px; }
 .fno-underlying-row { width: 100%; min-height: 66px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; align-items: center; gap: 11px; padding: 10px 4px; border: 0; border-bottom: 1px solid #edf0f5; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
