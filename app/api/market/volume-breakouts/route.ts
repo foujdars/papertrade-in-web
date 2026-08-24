@@ -71,10 +71,10 @@ async function loadAdjustedVolumeHistory(candidate: VolumeBreakoutCandidate) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json() as { instruments?: unknown; mode?: unknown };
+    const payload = await request.json() as { instruments?: unknown; mode?: unknown; force?: unknown };
     const mode = payload.mode === "OPEN_HIGH" ? "OPEN_HIGH" : "VOLUME";
     const cached = scannerCache.get(mode);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (payload.force !== true && cached && cached.expiresAt > Date.now()) {
       return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
     }
     if (!Array.isArray(payload.instruments) || payload.instruments.length < 1 || payload.instruments.length > 3_000) {
@@ -176,7 +176,9 @@ export async function POST(request: Request) {
       historiesScanned,
       fetchedAt: new Date().toISOString(),
     };
-    scannerCache.set(mode, { expiresAt: Date.now() + 2 * 60_000, payload: responsePayload });
+    // Empty results are refreshed quickly. This prevents a transient partial
+    // quote/history response from leaving the Volume Shocker blank for minutes.
+    scannerCache.set(mode, { expiresAt: Date.now() + (rows.length ? 2 * 60_000 : 15_000), payload: responsePayload });
     return Response.json(responsePayload, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch (error) {
     return upstoxErrorResponse(error);

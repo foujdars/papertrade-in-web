@@ -1,4 +1,4 @@
-import { analyzeNimbleCandles, NIMBLE_STRATEGIES, type NimbleCandle, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
+import { analyzeNimbleCandles, NIMBLE_STRATEGIES, type NimbleCandle, type NimbleStrategy, type ScannerTimeframe, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { UpstoxServerError, upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
@@ -27,8 +27,9 @@ function indiaDateKey(value: Date | number | string) {
   return `${record.year}-${record.month}-${record.day}`;
 }
 
-function parseCandles(payload: CandlePayload, timeframe: 5 | 15) {
-  const completedBefore = Date.now() - timeframe * 60_000;
+function parseCandles(payload: CandlePayload, timeframe: ScannerTimeframe) {
+  const completedBefore = timeframe === "1D" ? Number.POSITIVE_INFINITY : Date.now() - timeframe * 60_000;
+  const currentIndiaDate = indiaDateKey(Date.now());
   return (payload.data?.candles ?? []).flatMap((candle): NimbleCandle[] => {
     const parsed = {
       timestamp: new Date(candle[0]).getTime(),
@@ -38,7 +39,10 @@ function parseCandles(payload: CandlePayload, timeframe: 5 | 15) {
       close: Number(candle[4]),
       volume: Number(candle[5] ?? 0),
     };
-    return Object.values(parsed).every(Number.isFinite) && parsed.timestamp <= completedBefore ? [parsed] : [];
+    const isComplete = timeframe === "1D"
+      ? indiaDateKey(parsed.timestamp) < currentIndiaDate
+      : parsed.timestamp <= completedBefore;
+    return Object.values(parsed).every(Number.isFinite) && isComplete ? [parsed] : [];
   }).sort((left, right) => left.timestamp - right.timestamp);
 }
 
@@ -86,6 +90,12 @@ async function loadLiquidUniverse(instruments: RequestedInstrument[]) {
 async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
   const { timeframe } = NIMBLE_STRATEGIES[strategy];
   const encodedKey = encodeURIComponent(item.instrumentKey);
+  if (timeframe === "1D") {
+    const toDate = indiaDateKey(Date.now());
+    const fromDate = indiaDateKey(Date.now() - 1_100 * 86_400_000);
+    const history = await upstoxFetch<CandlePayload>(`/v3/historical-candle/${encodedKey}/days/1/${toDate}/${fromDate}`);
+    return analyzeNimbleCandles(parseCandles(history, timeframe), strategy, timeframe);
+  }
   const intraday = await upstoxFetch<CandlePayload>(`/v3/historical-candle/intraday/${encodedKey}/minutes/${timeframe}`);
   let candles = parseCandles(intraday, timeframe);
   if (strategy === "weekly-fakeout-mtf" || candles.length < 25) {
@@ -100,11 +110,11 @@ async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { strategy?: unknown; instruments?: unknown };
+    const body = await request.json() as { strategy?: unknown; instruments?: unknown; force?: unknown };
     const strategy = typeof body.strategy === "string" && body.strategy in NIMBLE_STRATEGIES ? body.strategy as NimbleStrategy : null;
     if (!strategy) return Response.json({ ok: false, error: { code: "INVALID_STRATEGY", message: "Choose a supported NimbleScan strategy." } }, { status: 400 });
     const cached = scannerCache.get(strategy);
-    if (cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
+    if (body.force !== true && cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
     if (!Array.isArray(body.instruments) || body.instruments.length < 1 || body.instruments.length > 3_000) {
       return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 3,000 NSE cash instruments." } }, { status: 400 });
     }

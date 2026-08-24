@@ -4,7 +4,11 @@ export type NimbleStrategy =
   | "rsi-divergence-break"
   | "ema-5-reversal"
   | "weekly-fakeout-mtf"
-  | "bollinger-double-reversal";
+  | "bollinger-double-reversal"
+  | "ema-30-50-200"
+  | "rsi-divergence-daily";
+
+export type ScannerTimeframe = 5 | 15 | "1D";
 
 export type NimbleCandle = {
   timestamp: number;
@@ -37,7 +41,7 @@ export type TechnicalScannerRow = {
   lastPrice: number;
   changePercent: number;
   signal: NimbleMatch["signal"];
-  timeframe: 5 | 15;
+  timeframe: ScannerTimeframe;
   setupStatus?: NimbleMatch["setupStatus"];
   entry?: number;
   stopLoss?: number;
@@ -45,13 +49,15 @@ export type TechnicalScannerRow = {
   indicatorValue?: number;
 };
 
-export const NIMBLE_STRATEGIES: Record<NimbleStrategy, { label: string; timeframe: 5 | 15; description: string }> = {
+export const NIMBLE_STRATEGIES: Record<NimbleStrategy, { label: string; timeframe: ScannerTimeframe; description: string }> = {
   "ema-retest": { label: "EMA 21 Retest", timeframe: 5, description: "EMA 21 cross, hold and retest confirmation" },
   "ema-breakdown": { label: "EMA 21 Breakdown", timeframe: 5, description: "Completed candle below EMA 21" },
   "rsi-divergence-break": { label: "RSI Divergence", timeframe: 5, description: "RSI divergence with price-structure break" },
   "ema-5-reversal": { label: "5 EMA Reversal", timeframe: 5, description: "5 EMA reversal alert or trigger" },
   "weekly-fakeout-mtf": { label: "Weekly Fakeout MTF", timeframe: 15, description: "Previous-week range fakeout with 15m trigger" },
   "bollinger-double-reversal": { label: "Bollinger Double Reversal", timeframe: 5, description: "Double reversal at a Bollinger band" },
+  "ema-30-50-200": { label: "30/50/200 EMA", timeframe: "1D", description: "Daily bullish EMA 30, 50 and 200 alignment" },
+  "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Buy-side daily divergence formed below RSI 30" },
 };
 
 function emaSeries(values: number[], period: number) {
@@ -160,7 +166,7 @@ function baseMatch(closes: number[], ema21s: number[], ema5s: number[], rsi14s: 
   return { ema21: ema21s[latestIndex], ema5: ema5s[latestIndex], rsi14: rsi14s[latestIndex] };
 }
 
-export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleStrategy, timeframe: 5 | 15): NimbleMatch | null {
+export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleStrategy, timeframe: ScannerTimeframe): NimbleMatch | null {
   if (candles.length < 25) return null;
   const closes = candles.map((candle) => candle.close);
   const ema21s = emaSeries(closes, 21);
@@ -169,6 +175,61 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
   const latestIndex = candles.length - 1;
   const latest = candles[latestIndex];
   const base = baseMatch(closes, ema21s, ema5s, rsi14s);
+
+  if (strategy === "ema-30-50-200") {
+    if (candles.length < 220) return null;
+    const ema30s = emaSeries(closes, 30);
+    const ema50s = emaSeries(closes, 50);
+    const ema200s = emaSeries(closes, 200);
+    const slopeIndex = latestIndex - 5;
+    const bullishAlignment = latest.close > ema30s[latestIndex]
+      && ema30s[latestIndex] > ema50s[latestIndex]
+      && ema50s[latestIndex] > ema200s[latestIndex];
+    const risingTrend = ema30s[latestIndex] > ema30s[slopeIndex]
+      && ema50s[latestIndex] >= ema50s[slopeIndex]
+      && ema200s[latestIndex] >= ema200s[slopeIndex];
+    return bullishAlignment && risingTrend
+      ? { ...base, signal: "long", setupStatus: "triggered", indicatorValue: ema200s[latestIndex] }
+      : null;
+  }
+
+  if (strategy === "rsi-divergence-daily") {
+    const pivotLows = candles.map((_, index) => index)
+      .filter((index) => isCandlePivot(candles, index, "low"))
+      .slice(-16);
+    for (let secondPosition = pivotLows.length - 1; secondPosition >= 1; secondPosition -= 1) {
+      const second = pivotLows[secondPosition];
+      if (latestIndex - second > 15) continue;
+      for (let firstPosition = secondPosition - 1; firstPosition >= 0; firstPosition -= 1) {
+        const first = pivotLows[firstPosition];
+        if (second - first < 3 || second - first > 60) continue;
+        const lowerPriceLow = candles[second].low < candles[first].low;
+        const higherRsiLow = rsi14s[second] > rsi14s[first];
+        const oversoldBuySetup = rsi14s[second] < 30;
+        if (!lowerPriceLow || !higherRsiLow || !oversoldBuySetup) continue;
+        const between = candles.slice(first + 1, second);
+        if (!between.length) continue;
+        const entry = Math.max(...between.map((candle) => candle.high));
+        const stopLoss = Math.min(candles[first].low, candles[second].low);
+        const risk = entry - stopLoss;
+        if (risk <= 0) continue;
+        const alreadyTriggered = candles.slice(second + 1, latestIndex).some((candle) => candle.close > entry);
+        if (alreadyTriggered) continue;
+        const triggered = latest.close > entry;
+        return {
+          ...base,
+          signal: "long",
+          entry,
+          stopLoss,
+          target1: entry + risk * 1.5,
+          barsSinceCross: latestIndex - second,
+          setupStatus: triggered ? "triggered" : "alert",
+          indicatorValue: rsi14s[second],
+        };
+      }
+    }
+    return null;
+  }
 
   if (strategy === "ema-breakdown") {
     return latest.close < ema21s[latestIndex] ? { ...base, signal: "breakdown" } : null;

@@ -525,6 +525,9 @@ h1, h2, p { margin: 0; }
 .market-discovery-head h2 { margin: 0; font-size: 23px; }
 .market-discovery-head > div { display: flex; flex-direction: column; gap: 3px; }
 .market-discovery-head em { color: #8b93a6; font-size: 8px; font-style: normal; }
+.scanner-family-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 9px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: var(--soft); }
+.scanner-family-tabs button { min-height: 36px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 800; cursor: pointer; }
+.scanner-family-tabs button.active { color: var(--purple); background: var(--panel); box-shadow: 0 3px 12px rgb(31 38 65 / 8%); }
 .trend-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
 .trend-tabs button { flex: none; min-height: 38px; padding: 0 15px; border: 1px solid #dfe2eb; border-radius: 9px; color: #4e566a; background: #fff; font-size: 11px; font-weight: 750; cursor: pointer; }
 .trend-tabs button.active { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); box-shadow: inset 0 0 0 1px var(--purple); }
@@ -894,6 +897,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .market-discovery-head .eyebrow { display: none; }
   .market-discovery-head h2 { font-size: 18px; letter-spacing: -.3px; }
   .market-discovery-head .icon-button { width: 32px; height: 32px; }
+  .scanner-family-tabs { gap: 4px; margin-bottom: 5px; padding: 2px; }
+  .scanner-family-tabs button { min-height: 31px; font-size: 9px; }
   .trend-tabs { gap: 6px; padding-bottom: 5px; }
   .trend-tabs button { min-height: 32px; padding-inline: 12px; font-size: 9px; }
   .market-search { height: 35px; flex-basis: 35px; margin-bottom: 5px; padding-inline: 10px; }

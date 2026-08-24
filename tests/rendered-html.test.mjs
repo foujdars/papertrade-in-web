@@ -215,7 +215,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /toggleFnoOptionType/);
   assert.match(dashboard, /CapacitorApp\.addListener\("backButton"/);
   assert.match(dashboard, /LAST_CASH_CHART_STORAGE_KEY/);
-  assert.match(dashboard, /savedChart\.symbol\?\.toUpperCase\(\) \?\? params\.get\("symbol"\)/);
+  assert.match(dashboard, /params\.get\("symbol"\) \?\? params\.get\("sym"\)/);
+  assert.match(dashboard, /normalizedQuerySymbol \?\? savedSymbol/);
+  assert.match(dashboard, /window\.history\.replaceState/);
   assert.match(dashboard, /else if \(savedChart\.instrument\?\.instrumentKey\)/);
   assert.match(dashboard, /workspaceMode, fnoTopMode/);
   assert.match(dashboard, /quantityStep/);

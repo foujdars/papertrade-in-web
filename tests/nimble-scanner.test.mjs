@@ -21,7 +21,16 @@ test("exposes every requested NimbleScan strategy", () => {
     "ema-5-reversal",
     "weekly-fakeout-mtf",
     "bollinger-double-reversal",
+    "ema-30-50-200",
+    "rsi-divergence-daily",
   ]);
+});
+
+test("daily RSI divergence is a buy-side oversold strategy", () => {
+  const strategy = NIMBLE_STRATEGIES["rsi-divergence-daily"];
+  assert.equal(strategy.timeframe, "1D");
+  assert.match(strategy.description, /buy-side/i);
+  assert.match(strategy.description, /below RSI 30/i);
 });
 
 test("detects a completed candle below EMA 21", () => {

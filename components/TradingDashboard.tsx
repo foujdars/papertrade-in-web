@@ -529,9 +529,32 @@ export function TradingDashboard() {
     const applyRequestedChart = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       let savedChart: { symbol?: string; timeframe?: string; instrument?: Instrument; spotInstrument?: Instrument; fnoUnderlying?: FnoUnderlying; workspaceMode?: "trade" | "fno"; fnoTopMode?: "SPOT" | "FUTURE" } = {};
-      try { savedChart = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}"); } catch { /* Ignore malformed preference. */ }
-      const requestedSymbol = savedChart.symbol?.toUpperCase() ?? params.get("symbol")?.toUpperCase();
-      const requestedTimeframe = savedChart.timeframe ?? params.get("timeframe");
+      try {
+        const parsed = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}") as unknown;
+        if (parsed && typeof parsed === "object") savedChart = parsed as typeof savedChart;
+      } catch {
+        localStorage.removeItem(LAST_CHART_STORAGE_KEY);
+      }
+      const querySymbol = params.get("symbol") ?? params.get("sym");
+      const normalizedQuerySymbol = typeof querySymbol === "string" && /^[A-Z0-9&.-]{1,40}$/i.test(querySymbol.trim())
+        ? querySymbol.trim().toUpperCase()
+        : undefined;
+      const savedSymbol = typeof savedChart.symbol === "string" ? savedChart.symbol.toUpperCase() : undefined;
+      const queryTimeframe = params.get("timeframe");
+      const requestedSymbol = normalizedQuerySymbol ?? savedSymbol;
+      const requestedTimeframe = periods.includes(queryTimeframe ?? "")
+        ? queryTimeframe!
+        : typeof savedChart.timeframe === "string" && periods.includes(savedChart.timeframe) ? savedChart.timeframe : undefined;
+
+      // Convert old ?sym= links to the supported URL and remove malformed
+      // startup parameters without reloading the page.
+      if (params.has("sym") || (params.has("symbol") && !normalizedQuerySymbol)) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("sym");
+        if (normalizedQuerySymbol) cleanUrl.searchParams.set("symbol", normalizedQuerySymbol);
+        else cleanUrl.searchParams.delete("symbol");
+        window.history.replaceState(window.history.state, "", cleanUrl);
+      }
       pendingChartRestoreRef.current = requestedSymbol
         ? { symbol: requestedSymbol, timeframe: periods.includes(requestedTimeframe ?? "") ? requestedTimeframe! : "5m" }
         : null;
@@ -554,7 +577,8 @@ export function TradingDashboard() {
         setFnoFutureInstrument(savedFuture ? futureToInstrument(savedFuture, savedChart.fnoUnderlying) : null);
       }
       if (savedChart.fnoTopMode) setFnoTopMode(savedChart.fnoTopMode);
-      if (requestedSymbol && savedChart.instrument?.symbol.toUpperCase() !== requestedSymbol) {
+      const savedInstrumentSymbol = typeof savedChart.instrument?.symbol === "string" ? savedChart.instrument.symbol.toUpperCase() : "";
+      if (requestedSymbol && savedInstrumentSymbol !== requestedSymbol) {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
         if (fallbackInstrument) {
           setSelected(fallbackInstrument);
@@ -691,8 +715,13 @@ export function TradingDashboard() {
         if (!response.ok || !payload.ok || !payload.instruments?.length) return;
         const merged = mergeInstrumentUniverse(payload.instruments);
         let savedSymbol = "";
-        try { savedSymbol = (JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}") as { symbol?: string }).symbol?.toUpperCase() ?? ""; } catch { /* Ignore malformed preference. */ }
-        const requestedSymbol = new URLSearchParams(window.location.search).get("symbol")?.toUpperCase() ?? savedSymbol;
+        try {
+          const parsed = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}") as { symbol?: unknown };
+          savedSymbol = typeof parsed.symbol === "string" ? parsed.symbol.toUpperCase() : "";
+        } catch { /* Ignore malformed preference. */ }
+        const searchParams = new URLSearchParams(window.location.search);
+        const querySymbol = searchParams.get("symbol") ?? searchParams.get("sym");
+        const requestedSymbol = querySymbol && /^[A-Z0-9&.-]{1,40}$/i.test(querySymbol.trim()) ? querySymbol.trim().toUpperCase() : savedSymbol;
         setStockUniverse(merged);
         setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol ?? current.symbol)) ?? current);
       } catch {

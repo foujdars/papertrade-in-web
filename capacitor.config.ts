@@ -1,6 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const appUrl = process.env.PAPERTRADE_APP_URL ?? "https://papertrade.site";
+// Use the canonical host directly in the Android WebView. Avoiding the apex
+// redirect removes an unnecessary network hop during a cold mobile start.
+const appUrl = process.env.PAPERTRADE_APP_URL ?? "https://www.papertrade.site";
 
 const config: CapacitorConfig = {
   appId: "in.papertrade.app",
