@@ -29,9 +29,20 @@ const investmentScannerOptions: Array<{ id: ScannerId; label: string }> = [
   { id: "rsi-divergence-daily", label: NIMBLE_STRATEGIES["rsi-divergence-daily"].label },
 ];
 const allScannerOptions = [...tradingScannerOptions, ...investmentScannerOptions];
+const nifty500ScannerIds = new Set<ScannerId>([
+  "ema-30-50-100",
+  "rsi-divergence-daily",
+  "macd-orb",
+  "adx-golden-cross",
+  "macd-triple-ema",
+]);
 
 function isInvestmentScanner(scanner: ScannerId) {
   return scanner === "ema-30-50-100" || scanner === "rsi-divergence-daily";
+}
+
+function usesNifty500Universe(scanner: ScannerId) {
+  return nifty500ScannerIds.has(scanner);
 }
 
 function compactNumber(value: number) {
@@ -115,7 +126,7 @@ export function MarketsWorkspace({
   const runSelectedScan = useCallback(async (requestedScanner?: ScannerId, force = false) => {
     if (scanInFlightRef.current) return;
     const scanner = requestedScanner ?? activeScanner;
-    const scanInstruments = isInvestmentScanner(scanner) ? nifty500Instruments : instruments;
+    const scanInstruments = usesNifty500Universe(scanner) ? nifty500Instruments : instruments;
     if (!scanInstruments.length) return;
     const option = allScannerOptions.find((item) => item.id === scanner) ?? allScannerOptions[0];
     const controller = new AbortController();
@@ -123,7 +134,7 @@ export function MarketsWorkspace({
     scanAbortRef.current = controller;
     scanInFlightRef.current = true;
     setLoadingScanner(scanner);
-    const timeout = window.setTimeout(() => controller.abort(), isInvestmentScanner(scanner) ? 75_000 : 45_000);
+    const timeout = window.setTimeout(() => controller.abort(), usesNifty500Universe(scanner) ? 75_000 : 45_000);
     try {
       const technical = scanner !== "VOLUME" && scanner !== "OPEN_HIGH";
       const response = await fetch(technical ? "/api/market/technical-scanner" : "/api/market/volume-breakouts", {
@@ -167,7 +178,7 @@ export function MarketsWorkspace({
   // the user had selected manual mode. Old empty snapshots should never leave
   // the Volume Shocker looking permanently broken.
   useEffect(() => {
-    const universeAvailable = isInvestmentScanner(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
+    const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (!universeAvailable || loadingScanner || activeRows.length > 0 || initialScanAttemptedRef.current.has(activeScanner)) return;
     initialScanAttemptedRef.current.add(activeScanner);
     void runSelectedScan(activeScanner, true);
@@ -175,7 +186,7 @@ export function MarketsWorkspace({
 
   useEffect(() => {
     window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
-    const universeAvailable = isInvestmentScanner(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
+    const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (scanMode !== "auto" || !universeAvailable) return;
     const scanWhenReady = () => {
       if (document.visibilityState === "visible" && navigator.onLine) void runSelectedScan(activeScanner);

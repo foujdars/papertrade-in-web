@@ -106,8 +106,9 @@ async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
   }
   const intraday = await upstoxFetch<CandlePayload>(`/v3/historical-candle/intraday/${encodedKey}/minutes/${timeframe}`);
   let candles = parseCandles(intraday, timeframe);
-  if (strategy === "weekly-fakeout-mtf" || candles.length < 25) {
-    const lookbackDays = strategy === "weekly-fakeout-mtf" ? 22 : 8;
+  const needsExtendedHistory = strategy === "weekly-fakeout-mtf" || strategy === "adx-golden-cross";
+  if (needsExtendedHistory || candles.length < 25) {
+    const lookbackDays = strategy === "adx-golden-cross" ? 30 : strategy === "weekly-fakeout-mtf" ? 22 : 8;
     const toDate = indiaDateKey(Date.now());
     const fromDate = indiaDateKey(Date.now() - lookbackDays * 86_400_000);
     const history = await upstoxFetch<CandlePayload>(`/v3/historical-candle/${encodedKey}/minutes/${timeframe}/${toDate}/${fromDate}`);

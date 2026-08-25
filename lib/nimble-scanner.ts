@@ -5,6 +5,9 @@ export type NimbleStrategy =
   | "ema-5-reversal"
   | "weekly-fakeout-mtf"
   | "bollinger-double-reversal"
+  | "macd-orb"
+  | "adx-golden-cross"
+  | "macd-triple-ema"
   | "ema-30-50-100"
   | "rsi-divergence-daily";
 
@@ -56,6 +59,9 @@ export const NIMBLE_STRATEGIES: Record<NimbleStrategy, { label: string; timefram
   "ema-5-reversal": { label: "5 EMA Reversal", timeframe: 5, description: "5 EMA reversal alert or trigger" },
   "weekly-fakeout-mtf": { label: "Weekly Fakeout MTF", timeframe: 15, description: "Previous-week range fakeout with 15m trigger" },
   "bollinger-double-reversal": { label: "Bollinger Double Reversal", timeframe: 5, description: "Double reversal at a Bollinger band" },
+  "macd-orb": { label: "MACD ORB", timeframe: 5, description: "Opening-range breakout confirmed by MACD" },
+  "adx-golden-cross": { label: "ADX Golden Cross", timeframe: 15, description: "EMA 50/200 bullish cross with ADX above 25" },
+  "macd-triple-ema": { label: "MACD Triple EMA", timeframe: 5, description: "EMA 9/21/50 alignment confirmed by MACD" },
   "ema-30-50-100": { label: "30/50/100 EMA", timeframe: "1D", description: "Daily bullish EMA 30, 50 and 100 alignment" },
   "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Bullish daily price/RSI divergence below RSI 30" },
 };
@@ -99,6 +105,65 @@ function bollingerSeries(values: number[], period = 20, deviations = 2) {
     const width = Math.sqrt(variance) * deviations;
     return { upper: middle + width, lower: middle - width };
   });
+}
+
+function macdSeries(values: number[], fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+  const fast = emaSeries(values, fastPeriod);
+  const slow = emaSeries(values, slowPeriod);
+  const macd = values.map((_, index) => fast[index] - slow[index]);
+  const signal = emaSeries(macd, signalPeriod);
+  return { macd, signal, histogram: macd.map((value, index) => value - signal[index]) };
+}
+
+function adxSeries(candles: NimbleCandle[], period = 14) {
+  const result = Array(candles.length).fill(Number.NaN) as number[];
+  if (candles.length < period * 2 + 1) return result;
+  const trueRanges = Array(candles.length).fill(0) as number[];
+  const plusDm = Array(candles.length).fill(0) as number[];
+  const minusDm = Array(candles.length).fill(0) as number[];
+  for (let index = 1; index < candles.length; index += 1) {
+    const upMove = candles[index].high - candles[index - 1].high;
+    const downMove = candles[index - 1].low - candles[index].low;
+    trueRanges[index] = Math.max(
+      candles[index].high - candles[index].low,
+      Math.abs(candles[index].high - candles[index - 1].close),
+      Math.abs(candles[index].low - candles[index - 1].close),
+    );
+    plusDm[index] = upMove > downMove && upMove > 0 ? upMove : 0;
+    minusDm[index] = downMove > upMove && downMove > 0 ? downMove : 0;
+  }
+  let smoothedTr = trueRanges.slice(1, period + 1).reduce((sum, value) => sum + value, 0);
+  let smoothedPlus = plusDm.slice(1, period + 1).reduce((sum, value) => sum + value, 0);
+  let smoothedMinus = minusDm.slice(1, period + 1).reduce((sum, value) => sum + value, 0);
+  const dx = Array(candles.length).fill(Number.NaN) as number[];
+  for (let index = period; index < candles.length; index += 1) {
+    if (index > period) {
+      smoothedTr = smoothedTr - smoothedTr / period + trueRanges[index];
+      smoothedPlus = smoothedPlus - smoothedPlus / period + plusDm[index];
+      smoothedMinus = smoothedMinus - smoothedMinus / period + minusDm[index];
+    }
+    const plusDi = smoothedTr > 0 ? 100 * smoothedPlus / smoothedTr : 0;
+    const minusDi = smoothedTr > 0 ? 100 * smoothedMinus / smoothedTr : 0;
+    const denominator = plusDi + minusDi;
+    dx[index] = denominator > 0 ? 100 * Math.abs(plusDi - minusDi) / denominator : 0;
+  }
+  const firstAdxIndex = period * 2 - 1;
+  result[firstAdxIndex] = dx.slice(period, firstAdxIndex + 1).reduce((sum, value) => sum + value, 0) / period;
+  for (let index = firstAdxIndex + 1; index < candles.length; index += 1) {
+    result[index] = ((result[index - 1] * (period - 1)) + dx[index]) / period;
+  }
+  return result;
+}
+
+function recentCrossIndex(left: number[], right: number[], latestIndex: number, lookback: number, direction: "above" | "below") {
+  const start = Math.max(1, latestIndex - lookback + 1);
+  for (let index = latestIndex; index >= start; index -= 1) {
+    const crossed = direction === "above"
+      ? left[index - 1] <= right[index - 1] && left[index] > right[index]
+      : left[index - 1] >= right[index - 1] && left[index] < right[index];
+    if (crossed) return index;
+  }
+  return -1;
 }
 
 function isPivot(values: number[], index: number, kind: "high" | "low") {
@@ -175,6 +240,70 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
   const latestIndex = candles.length - 1;
   const latest = candles[latestIndex];
   const base = baseMatch(closes, ema21s, ema5s, rsi14s);
+
+  if (strategy === "macd-orb") {
+    if (timeframe !== 5) return null;
+    const latestSessionKey = istSessionKey(latest.timestamp);
+    const sessionIndexes = candles.map((candle, index) => ({ candle, index }))
+      .filter(({ candle }) => istSessionKey(candle.timestamp) === latestSessionKey);
+    const opening = sessionIndexes.find(({ candle }) => {
+      const minute = istMinuteOfDay(candle.timestamp);
+      return minute >= 555 && minute < 560;
+    });
+    if (!opening || sessionIndexes.length < 2) return null;
+    const openingHigh = opening.candle.high;
+    const openingLow = opening.candle.low;
+    const { macd, signal, histogram } = macdSeries(closes);
+    const recentSessionIndexes = sessionIndexes.slice(-12).map(({ index }) => index);
+    const bullishPriceBreak = recentSessionIndexes.some((index) => index > opening.index
+      && closes[index] > openingHigh
+      && closes[index - 1] <= openingHigh);
+    const bearishPriceBreak = recentSessionIndexes.some((index) => index > opening.index
+      && closes[index] < openingLow
+      && closes[index - 1] >= openingLow);
+    const bullishMacdCross = recentSessionIndexes.some((index) => index > 0
+      && macd[index - 1] <= signal[index - 1]
+      && macd[index] > signal[index]);
+    const bearishMacdCross = recentSessionIndexes.some((index) => index > 0
+      && macd[index - 1] >= signal[index - 1]
+      && macd[index] < signal[index]);
+    if (latest.close > openingHigh && macd[latestIndex] > signal[latestIndex] && bullishPriceBreak && bullishMacdCross) {
+      const risk = latest.close - openingLow;
+      return risk > 0 ? { ...base, signal: "long", entry: latest.close, stopLoss: openingLow, target1: latest.close + risk * 1.5, setupStatus: "triggered", rangeHigh: openingHigh, rangeLow: openingLow, indicatorValue: histogram[latestIndex] } : null;
+    }
+    if (latest.close < openingLow && macd[latestIndex] < signal[latestIndex] && bearishPriceBreak && bearishMacdCross) {
+      const risk = openingHigh - latest.close;
+      return risk > 0 ? { ...base, signal: "short", entry: latest.close, stopLoss: openingHigh, target1: latest.close - risk * 1.5, setupStatus: "triggered", rangeHigh: openingHigh, rangeLow: openingLow, indicatorValue: histogram[latestIndex] } : null;
+    }
+    return null;
+  }
+
+  if (strategy === "adx-golden-cross") {
+    if (timeframe !== 15 || candles.length < 220) return null;
+    const ema50s = emaSeries(closes, 50);
+    const ema200s = emaSeries(closes, 200);
+    const adxs = adxSeries(candles, 14);
+    const emaCrossIndex = recentCrossIndex(ema50s, ema200s, latestIndex, 12, "above");
+    const adxThreshold = candles.map((_, index) => Number.isFinite(adxs[index]) ? 25 : Number.NaN);
+    const adxCrossIndex = recentCrossIndex(adxs, adxThreshold, latestIndex, 12, "above");
+    if (ema50s[latestIndex] <= ema200s[latestIndex] || adxs[latestIndex] <= 25 || emaCrossIndex < 0 || adxCrossIndex < 0) return null;
+    const stopLoss = Math.min(ema200s[latestIndex], ...candles.slice(-12).map((candle) => candle.low));
+    const risk = latest.close - stopLoss;
+    return risk > 0 ? { ...base, signal: "long", entry: latest.close, stopLoss, target1: latest.close + risk * 1.5, barsSinceCross: latestIndex - Math.max(emaCrossIndex, adxCrossIndex), setupStatus: "triggered", indicatorValue: adxs[latestIndex] } : null;
+  }
+
+  if (strategy === "macd-triple-ema") {
+    if (timeframe !== 5 || candles.length < 60) return null;
+    const ema9s = emaSeries(closes, 9);
+    const ema50s = emaSeries(closes, 50);
+    const { macd, signal, histogram } = macdSeries(closes);
+    const emaCrossIndex = recentCrossIndex(ema9s, ema21s, latestIndex, 5, "above");
+    const macdCrossIndex = recentCrossIndex(macd, signal, latestIndex, 5, "above");
+    if (emaCrossIndex < 0 || macdCrossIndex < 0 || ema9s[latestIndex] <= ema21s[latestIndex] || latest.close <= ema50s[latestIndex] || macd[latestIndex] <= signal[latestIndex]) return null;
+    const stopLoss = Math.min(ema50s[latestIndex], ...candles.slice(-10).map((candle) => candle.low));
+    const risk = latest.close - stopLoss;
+    return risk > 0 ? { ...base, signal: "long", entry: latest.close, stopLoss, target1: latest.close + risk * 1.5, barsSinceCross: latestIndex - Math.max(emaCrossIndex, macdCrossIndex), setupStatus: "triggered", indicatorValue: histogram[latestIndex] } : null;
+  }
 
   if (strategy === "ema-30-50-100") {
     if (candles.length < 120) return null;

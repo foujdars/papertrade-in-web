@@ -21,9 +21,21 @@ test("exposes every requested NimbleScan strategy", () => {
     "ema-5-reversal",
     "weekly-fakeout-mtf",
     "bollinger-double-reversal",
+    "macd-orb",
+    "adx-golden-cross",
+    "macd-triple-ema",
     "ema-30-50-100",
     "rsi-divergence-daily",
   ]);
+});
+
+test("new intraday NIFTY 500 scanners expose their intended intervals", () => {
+  assert.equal(NIMBLE_STRATEGIES["macd-orb"].timeframe, 5);
+  assert.equal(NIMBLE_STRATEGIES["adx-golden-cross"].timeframe, 15);
+  assert.equal(NIMBLE_STRATEGIES["macd-triple-ema"].timeframe, 5);
+  assert.match(NIMBLE_STRATEGIES["macd-orb"].description, /MACD/i);
+  assert.match(NIMBLE_STRATEGIES["adx-golden-cross"].description, /ADX above 25/i);
+  assert.match(NIMBLE_STRATEGIES["macd-triple-ema"].description, /EMA 9\/21\/50/i);
 });
 
 test("daily RSI divergence is a buy-side oversold strategy", () => {
