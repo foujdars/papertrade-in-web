@@ -78,6 +78,23 @@ export function isBullishOversoldDivergence(
     && secondRsiLow > firstRsiLow;
 }
 
+export function isActiveBullishOversoldDivergence(
+  firstPriceLow: number,
+  secondPriceLow: number,
+  firstRsiLow: number,
+  secondRsiLow: number,
+  latestRsi: number,
+) {
+  return isBullishOversoldDivergence(
+    firstPriceLow,
+    secondPriceLow,
+    firstRsiLow,
+    secondRsiLow,
+  )
+    && Number.isFinite(latestRsi)
+    && latestRsi < 50;
+}
+
 function emaSeries(values: number[], period: number) {
   const multiplier = 2 / (period + 1);
   const result: number[] = [];
@@ -349,15 +366,15 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
       for (let firstPosition = secondPosition - 1; firstPosition >= 0; firstPosition -= 1) {
         const first = pivotLows[firstPosition];
         if (second - first < 3 || second - first > 60) continue;
-        if (!isBullishOversoldDivergence(
+        if (!isActiveBullishOversoldDivergence(
           candles[first].low,
           candles[second].low,
           rsi14s[first],
           rsi14s[second],
+          latestRsi,
         )) continue;
-        // The divergence is defined by the two completed daily pivot lows.
-        // Do not add a current-RSI threshold: after the second higher RSI low,
-        // RSI may recover above 30 or fluctuate without invalidating the setup.
+        // The first daily RSI pivot must be oversold. The second RSI low may
+        // recover above 30, but the active setup expires at the neutral 50 line.
         const between = candles.slice(first + 1, second);
         if (!between.length) continue;
         const entry = Math.max(...between.map((candle) => candle.high));

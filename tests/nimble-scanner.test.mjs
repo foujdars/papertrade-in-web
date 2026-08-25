@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeNimbleCandles, isBullishOversoldDivergence, NIMBLE_STRATEGIES } from "../lib/nimble-scanner.ts";
+import { analyzeNimbleCandles, isActiveBullishOversoldDivergence, isBullishOversoldDivergence, NIMBLE_STRATEGIES } from "../lib/nimble-scanner.ts";
 
 function candlesFrom(prices) {
   return prices.map((close, index) => ({
@@ -77,6 +77,11 @@ test("daily bullish divergence allows the second RSI low above 30", () => {
   assert.equal(isBullishOversoldDivergence(100, 96, 31, 36), false);
   assert.equal(isBullishOversoldDivergence(100, 101, 24, 34), false);
   assert.equal(isBullishOversoldDivergence(100, 96, 24, 23), false);
+});
+
+test("daily bullish divergence stays active above 30 but expires at neutral RSI", () => {
+  assert.equal(isActiveBullishOversoldDivergence(100, 96, 24, 34, 34.24), true);
+  assert.equal(isActiveBullishOversoldDivergence(100, 96, 24, 34, 59.68), false);
 });
 
 test("detects a completed candle below EMA 21", () => {

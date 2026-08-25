@@ -15,7 +15,7 @@ type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
 
 // Bump this whenever scanner eligibility rules change so that an older result
 // cannot survive in localStorage and contradict the current scanner.
-const STORAGE_KEY = "papertrade-market-scanner-results-v3";
+const STORAGE_KEY = "papertrade-market-scanner-results-v4";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
 const PULL_REFRESH_THRESHOLD = 58;
@@ -73,9 +73,12 @@ function dedupeScannerRows(rows: ScannerRow[]) {
 function validScannerRows(scanner: ScannerId, rows: ScannerRow[]) {
   const uniqueRows = dedupeScannerRows(rows);
   if (scanner !== "rsi-divergence-daily") return uniqueRows;
-  // The API validates the two RSI pivots. Do not require the latest RSI to
-  // remain below 30 because it may recover above 30 at the higher RSI low.
-  return uniqueRows.filter((row) => isTechnicalRow(row) && Number.isFinite(row.indicatorValue));
+  // The first pivot is validated server-side as oversold. The second RSI low
+  // may recover above 30, but the setup is no longer active at neutral RSI 50.
+  return uniqueRows.filter((row) => isTechnicalRow(row)
+    && typeof row.indicatorValue === "number"
+    && Number.isFinite(row.indicatorValue)
+    && row.indicatorValue < 50);
 }
 
 function compactNumber(value: number) {
