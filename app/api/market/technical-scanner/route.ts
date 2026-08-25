@@ -65,7 +65,7 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker:
   return results;
 }
 
-async function loadLiquidUniverse(instruments: RequestedInstrument[]) {
+async function loadLiquidUniverse(instruments: RequestedInstrument[], strategy: NimbleStrategy) {
   const requestedByKey = new Map(instruments.map((item) => [item.instrumentKey, item]));
   const requestedBySymbol = new Map(instruments.map((item) => [item.symbol, item]));
   const batches = Array.from({ length: Math.ceil(instruments.length / 500) }, (_, index) => instruments.slice(index * 500, index * 500 + 500));
@@ -84,7 +84,15 @@ async function loadLiquidUniverse(instruments: RequestedInstrument[]) {
     if (!requested || !Number.isFinite(lastPrice) || !Number.isFinite(previousClose) || previousClose <= 0) continue;
     liquid.push({ ...requested, lastPrice, changePercent: ((lastPrice - previousClose) / previousClose) * 100, volume: Math.max(0, Number(quote.volume) || 0) });
   }
-  return liquid.sort((left, right) => right.volume - left.volume).slice(0, MAX_CANDLE_SCANS);
+  // Historical-candle requests are the expensive part of a scan. For the
+  // buy-side daily RSI strategy, scanning only the highest-volume shares
+  // systematically misses the weak/oversold NIFTY 500 shares where a bullish
+  // divergence is most likely to form. Start with the day's weakest shares;
+  // other strategies continue to favour liquid names.
+  const ranked = strategy === "rsi-divergence-daily"
+    ? liquid.sort((left, right) => left.changePercent - right.changePercent || right.volume - left.volume)
+    : liquid.sort((left, right) => right.volume - left.volume);
+  return ranked.slice(0, MAX_CANDLE_SCANS);
 }
 
 async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
@@ -125,7 +133,7 @@ export async function POST(request: Request) {
     });
     if (instruments.length !== body.instruments.length) return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "The NSE instrument list contains an unsupported entry." } }, { status: 400 });
 
-    const liquid = await loadLiquidUniverse(instruments);
+    const liquid = await loadLiquidUniverse(instruments, strategy);
     let rateLimitError: UpstoxServerError | null = null;
     const scanned = await mapWithConcurrency(liquid, 5, async (item) => {
       try {

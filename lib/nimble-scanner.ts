@@ -5,7 +5,7 @@ export type NimbleStrategy =
   | "ema-5-reversal"
   | "weekly-fakeout-mtf"
   | "bollinger-double-reversal"
-  | "ema-30-50-200"
+  | "ema-30-50-100"
   | "rsi-divergence-daily";
 
 export type ScannerTimeframe = 5 | 15 | "1D";
@@ -56,8 +56,8 @@ export const NIMBLE_STRATEGIES: Record<NimbleStrategy, { label: string; timefram
   "ema-5-reversal": { label: "5 EMA Reversal", timeframe: 5, description: "5 EMA reversal alert or trigger" },
   "weekly-fakeout-mtf": { label: "Weekly Fakeout MTF", timeframe: 15, description: "Previous-week range fakeout with 15m trigger" },
   "bollinger-double-reversal": { label: "Bollinger Double Reversal", timeframe: 5, description: "Double reversal at a Bollinger band" },
-  "ema-30-50-200": { label: "30/50/200 EMA", timeframe: "1D", description: "Daily bullish EMA 30, 50 and 200 alignment" },
-  "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Buy-side daily divergence formed below RSI 30" },
+  "ema-30-50-100": { label: "30/50/100 EMA", timeframe: "1D", description: "Daily bullish EMA 30, 50 and 100 alignment" },
+  "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Bullish daily price/RSI divergence below RSI 30" },
 };
 
 function emaSeries(values: number[], period: number) {
@@ -176,20 +176,20 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
   const latest = candles[latestIndex];
   const base = baseMatch(closes, ema21s, ema5s, rsi14s);
 
-  if (strategy === "ema-30-50-200") {
-    if (candles.length < 220) return null;
+  if (strategy === "ema-30-50-100") {
+    if (candles.length < 120) return null;
     const ema30s = emaSeries(closes, 30);
     const ema50s = emaSeries(closes, 50);
-    const ema200s = emaSeries(closes, 200);
+    const ema100s = emaSeries(closes, 100);
     const slopeIndex = latestIndex - 5;
     const bullishAlignment = latest.close > ema30s[latestIndex]
       && ema30s[latestIndex] > ema50s[latestIndex]
-      && ema50s[latestIndex] > ema200s[latestIndex];
+      && ema50s[latestIndex] > ema100s[latestIndex];
     const risingTrend = ema30s[latestIndex] > ema30s[slopeIndex]
       && ema50s[latestIndex] >= ema50s[slopeIndex]
-      && ema200s[latestIndex] >= ema200s[slopeIndex];
+      && ema100s[latestIndex] >= ema100s[slopeIndex];
     return bullishAlignment && risingTrend
-      ? { ...base, signal: "long", setupStatus: "triggered", indicatorValue: ema200s[latestIndex] }
+      ? { ...base, signal: "long", setupStatus: "triggered", indicatorValue: ema100s[latestIndex] }
       : null;
   }
 
@@ -199,13 +199,17 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
       .slice(-16);
     for (let secondPosition = pivotLows.length - 1; secondPosition >= 1; secondPosition -= 1) {
       const second = pivotLows[secondPosition];
-      if (latestIndex - second > 15) continue;
+      // A daily divergence remains useful for several sessions while price is
+      // forming or confirming the reversal. Restricting this to 15 bars and
+      // requiring the second RSI pivot itself to be below 30 discarded many
+      // textbook bullish divergences where RSI had already started recovering.
+      if (latestIndex - second > 35) continue;
       for (let firstPosition = secondPosition - 1; firstPosition >= 0; firstPosition -= 1) {
         const first = pivotLows[firstPosition];
         if (second - first < 3 || second - first > 60) continue;
         const lowerPriceLow = candles[second].low < candles[first].low;
-        const higherRsiLow = rsi14s[second] > rsi14s[first];
-        const oversoldBuySetup = rsi14s[second] < 30;
+        const higherRsiLow = rsi14s[second] >= rsi14s[first] + 1;
+        const oversoldBuySetup = Math.min(rsi14s[first], rsi14s[second]) < 30;
         if (!lowerPriceLow || !higherRsiLow || !oversoldBuySetup) continue;
         const between = candles.slice(first + 1, second);
         if (!between.length) continue;
@@ -213,9 +217,13 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
         const stopLoss = Math.min(candles[first].low, candles[second].low);
         const risk = entry - stopLoss;
         if (risk <= 0) continue;
-        const alreadyTriggered = candles.slice(second + 1, latestIndex).some((candle) => candle.close > entry);
-        if (alreadyTriggered) continue;
-        const triggered = latest.close > entry;
+        const invalidated = candles.slice(second + 1).some((candle) => candle.low < stopLoss);
+        if (invalidated) continue;
+        const confirmationIndex = candles.findIndex((candle, index) => index > second && candle.close > entry);
+        const triggered = confirmationIndex >= 0 && latest.close > stopLoss;
+        // Keep recent confirmations in the result instead of deleting the
+        // setup immediately after its neckline is crossed.
+        if (triggered && latestIndex - confirmationIndex > 15) continue;
         return {
           ...base,
           signal: "long",

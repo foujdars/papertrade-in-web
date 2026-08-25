@@ -21,7 +21,7 @@ test("exposes every requested NimbleScan strategy", () => {
     "ema-5-reversal",
     "weekly-fakeout-mtf",
     "bollinger-double-reversal",
-    "ema-30-50-200",
+    "ema-30-50-100",
     "rsi-divergence-daily",
   ]);
 });
@@ -29,8 +29,32 @@ test("exposes every requested NimbleScan strategy", () => {
 test("daily RSI divergence is a buy-side oversold strategy", () => {
   const strategy = NIMBLE_STRATEGIES["rsi-divergence-daily"];
   assert.equal(strategy.timeframe, "1D");
-  assert.match(strategy.description, /buy-side/i);
+  assert.match(strategy.description, /bullish/i);
   assert.match(strategy.description, /below RSI 30/i);
+});
+
+test("investment EMA strategy uses 30, 50 and 100 on daily candles", () => {
+  const strategy = NIMBLE_STRATEGIES["ema-30-50-100"];
+  assert.equal(strategy.label, "30/50/100 EMA");
+  assert.equal(strategy.timeframe, "1D");
+  const candles = candlesFrom(Array.from({ length: 140 }, (_, index) => 100 + index * 0.8));
+  const match = analyzeNimbleCandles(candles, "ema-30-50-100", "1D");
+  assert.equal(match?.signal, "long");
+  assert.equal(match?.setupStatus, "triggered");
+});
+
+test("daily RSI scanner detects a bullish NIFTY 500 buy-side divergence below RSI 30", () => {
+  const prices = [
+    ...Array.from({ length: 31 }, (_, index) => 100 - index),
+    ...Array.from({ length: 10 }, (_, index) => 71.5 + index * 1.5),
+    ...Array.from({ length: 15 }, (_, index) => 85 - index * 1.4),
+    ...Array.from({ length: 10 }, (_, index) => 66 + index * 2.5),
+  ];
+  const match = analyzeNimbleCandles(candlesFrom(prices), "rsi-divergence-daily", "1D");
+  assert.equal(match?.signal, "long");
+  assert.equal(match?.setupStatus, "triggered");
+  assert.ok((match?.indicatorValue ?? 100) < 30);
+  assert.ok((match?.target1 ?? 0) > (match?.entry ?? Number.POSITIVE_INFINITY));
 });
 
 test("detects a completed candle below EMA 21", () => {

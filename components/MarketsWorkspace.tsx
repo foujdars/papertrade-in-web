@@ -21,17 +21,17 @@ const tradingScannerOptions: Array<{ id: ScannerId; label: string }> = [
   { id: "VOLUME", label: "Volume Shocker" },
   { id: "OPEN_HIGH", label: "Open = High" },
   ...Object.entries(NIMBLE_STRATEGIES)
-    .filter(([id]) => id !== "ema-30-50-200" && id !== "rsi-divergence-daily")
+    .filter(([id]) => id !== "ema-30-50-100" && id !== "rsi-divergence-daily")
     .map(([id, item]) => ({ id: id as NimbleStrategy, label: item.label })),
 ];
 const investmentScannerOptions: Array<{ id: ScannerId; label: string }> = [
-  { id: "ema-30-50-200", label: NIMBLE_STRATEGIES["ema-30-50-200"].label },
+  { id: "ema-30-50-100", label: NIMBLE_STRATEGIES["ema-30-50-100"].label },
   { id: "rsi-divergence-daily", label: NIMBLE_STRATEGIES["rsi-divergence-daily"].label },
 ];
 const allScannerOptions = [...tradingScannerOptions, ...investmentScannerOptions];
 
 function isInvestmentScanner(scanner: ScannerId) {
-  return scanner === "ema-30-50-200" || scanner === "rsi-divergence-daily";
+  return scanner === "ema-30-50-100" || scanner === "rsi-divergence-daily";
 }
 
 function compactNumber(value: number) {
@@ -239,7 +239,7 @@ export function MarketsWorkspace({
           className={scannerGroup === "INVESTMENT" ? "active" : ""}
           onClick={() => {
             setScannerGroup("INVESTMENT");
-            if (!isInvestmentScanner(activeScanner)) setActiveScanner("ema-30-50-200");
+            if (!isInvestmentScanner(activeScanner)) setActiveScanner("ema-30-50-100");
           }}
           role="tab"
           aria-selected={scannerGroup === "INVESTMENT"}
