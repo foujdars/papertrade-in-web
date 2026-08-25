@@ -259,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setCloudReady(true);
     setSyncStatus(configured ? "loading" : "disabled");
-  }, [configured, session?.access_token]);
+  }, [configured, session]);
 
   const contextValue = useMemo<AuthContextValue>(() => ({
     configured,

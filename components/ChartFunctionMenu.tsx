@@ -20,7 +20,9 @@ import type { ChartAction, ChartIndicators } from "@/components/MarketChart";
 const studies: Array<{ key: keyof ChartIndicators; name: string; detail: string; color: string }> = [
   { key: "ema5", name: "EMA 5", detail: "Fast exponential average", color: "#0ea5e9" },
   { key: "ema21", name: "EMA 21", detail: "Short trend average", color: "#ff8a00" },
+  { key: "ema30", name: "EMA 30", detail: "30-candle exponential average", color: "#22c55e" },
   { key: "ema50", name: "EMA 50", detail: "Medium trend average", color: "#8b5cf6" },
+  { key: "ema100", name: "EMA 100", detail: "100-candle exponential average", color: "#f97316" },
   { key: "ema200", name: "EMA 200", detail: "Long trend average", color: "#e11d48" },
   { key: "sma20", name: "SMA 20", detail: "20-candle simple average", color: "#14b8a6" },
   { key: "sma50", name: "SMA 50", detail: "50-candle simple average", color: "#64748b" },

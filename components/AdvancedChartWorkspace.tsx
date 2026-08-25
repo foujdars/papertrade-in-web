@@ -198,7 +198,7 @@ export function AdvancedChartWorkspace({
     const controller = new AbortController();
     async function loadInstrumentUniverse() {
       try {
-        const response = await fetch("/api/upstox/instruments", { signal: controller.signal });
+        const response = await fetch("/api/upstox/instruments", { cache: "no-store", signal: controller.signal });
         const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
         if (!response.ok || !payload.ok || !payload.instruments?.length) return;
         const merged = mergeInstrumentUniverse(payload.instruments);

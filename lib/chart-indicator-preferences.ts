@@ -6,7 +6,7 @@ import type { ChartIndicators } from "@/components/MarketChart";
 const STORAGE_KEY = "papertrade-chart-indicators-v1";
 const CHANGE_EVENT = "papertrade:chart-indicators-change";
 const EMPTY_INDICATORS: ChartIndicators = {
-  ema5: false, ema21: false, ema50: false, ema200: false,
+  ema5: false, ema21: false, ema30: false, ema50: false, ema100: false, ema200: false,
   sma20: false, sma50: false, sma200: false,
   bollinger: false, vwap: false, supertrend: false,
   rsi: false, macd: false, pivots: false,

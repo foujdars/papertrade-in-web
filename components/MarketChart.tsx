@@ -102,7 +102,9 @@ export type FeedStatus = {
 export type ChartIndicators = {
   ema5: boolean;
   ema21: boolean;
+  ema30: boolean;
   ema50: boolean;
+  ema100: boolean;
   ema200: boolean;
   sma20: boolean;
   sma50: boolean;
@@ -118,7 +120,9 @@ export type ChartIndicators = {
 export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
   ema5: false,
   ema21: false,
+  ema30: false,
   ema50: false,
+  ema100: false,
   ema200: false,
   sma20: false,
   sma50: false,
@@ -323,7 +327,9 @@ function latestIndicatorValues(data: Candle[]) {
   return {
     ema5: ema(data, 5).at(-1)?.value ?? 0,
     ema21: ema(data, 21).at(-1)?.value ?? 0,
+    ema30: ema(data, 30).at(-1)?.value ?? 0,
     ema50: ema(data, 50).at(-1)?.value ?? 0,
+    ema100: ema(data, 100).at(-1)?.value ?? 0,
     ema200: ema(data, 200).at(-1)?.value ?? 0,
     sma20: sma(data, 20).at(-1)?.value ?? 0,
     sma50: sma(data, 50).at(-1)?.value ?? 0,
@@ -484,7 +490,9 @@ export function MarketChart({
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const ema5Series = useRef<ISeriesApi<"Line"> | null>(null);
   const ema21Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema30Series = useRef<ISeriesApi<"Line"> | null>(null);
   const ema50Series = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema100Series = useRef<ISeriesApi<"Line"> | null>(null);
   const ema200Series = useRef<ISeriesApi<"Line"> | null>(null);
   const sma20Series = useRef<ISeriesApi<"Line"> | null>(null);
   const sma50Series = useRef<ISeriesApi<"Line"> | null>(null);
@@ -796,7 +804,9 @@ export function MarketChart({
     const indicatorPoint = (point: { time: number; value: number }) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value });
     ema5Series.current?.setData(ema(data, 5).map(indicatorPoint));
     ema21Series.current?.setData(ema(data, 21).map(indicatorPoint));
+    ema30Series.current?.setData(ema(data, 30).map(indicatorPoint));
     ema50Series.current?.setData(ema(data, 50).map(indicatorPoint));
+    ema100Series.current?.setData(ema(data, 100).map(indicatorPoint));
     ema200Series.current?.setData(ema(data, 200).map(indicatorPoint));
     sma20Series.current?.setData(sma(data, 20).map(indicatorPoint));
     sma50Series.current?.setData(sma(data, 50).map(indicatorPoint));
@@ -851,7 +861,9 @@ export function MarketChart({
         ema21Series.current = null;
       }
       const overlayDefinitions = [
+        ["ema30", ema30Series, ema(dataRef.current, 30), "#22c55e", "EMA 30"],
         ["ema50", ema50Series, ema(dataRef.current, 50), "#8b5cf6", "EMA 50"],
+        ["ema100", ema100Series, ema(dataRef.current, 100), "#f97316", "EMA 100"],
         ["ema200", ema200Series, ema(dataRef.current, 200), "#e11d48", "EMA 200"],
         ["sma20", sma20Series, sma(dataRef.current, 20), "#14b8a6", "SMA 20"],
         ["sma50", sma50Series, sma(dataRef.current, 50), "#64748b", "SMA 50"],
@@ -1558,7 +1570,21 @@ export function MarketChart({
       candleSeries.current = null;
       ema5Series.current = null;
       ema21Series.current = null;
+      ema30Series.current = null;
+      ema50Series.current = null;
+      ema100Series.current = null;
+      ema200Series.current = null;
+      sma20Series.current = null;
+      sma50Series.current = null;
+      sma200Series.current = null;
+      vwapSeries.current = null;
+      supertrendSeries.current = null;
+      bollingerSeries.current = [];
+      pivotSeries.current = {};
       rsiSeries.current = null;
+      macdSeries.current = null;
+      macdSignalSeries.current = null;
+      macdHistogramSeries.current = null;
       drawingManager.current = null;
       drawingRegistry.current = null;
     };
@@ -1813,7 +1839,9 @@ export function MarketChart({
           <div className="indicator-legend lightweight-indicator-legend">
             {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
             {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
+            {indicators.ema30 && <span><i style={{ background: "#22c55e" }} />EMA 30 <b>{indicatorValues.ema30.toFixed(2)}</b></span>}
             {indicators.ema50 && <span><i style={{ background: "#8b5cf6" }} />EMA 50 <b>{indicatorValues.ema50.toFixed(2)}</b></span>}
+            {indicators.ema100 && <span><i style={{ background: "#f97316" }} />EMA 100 <b>{indicatorValues.ema100.toFixed(2)}</b></span>}
             {indicators.ema200 && <span><i style={{ background: "#e11d48" }} />EMA 200 <b>{indicatorValues.ema200.toFixed(2)}</b></span>}
             {indicators.sma20 && <span><i style={{ background: "#14b8a6" }} />SMA 20 <b>{indicatorValues.sma20.toFixed(2)}</b></span>}
             {indicators.sma50 && <span><i style={{ background: "#64748b" }} />SMA 50 <b>{indicatorValues.sma50.toFixed(2)}</b></span>}

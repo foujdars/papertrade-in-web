@@ -92,9 +92,9 @@ function showProtectionAlert(order: PaperOrder) {
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
-    void NativeTradeAlert.show({ title: reason, body }).catch(() => undefined);
+    void NativeTradeAlert.show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(`PaperTrade IN · ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
+    new Notification(`PaperTrade IN - ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
   }
 }
 
@@ -425,6 +425,7 @@ export function TradingDashboard() {
   const autoSquareOffRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
   const lastFnoWorkspaceRef = useRef<FnoWorkspaceSnapshot | null>(null);
+  const instrumentUniverseLoadRef = useRef({ loaded: false, lastRefreshAt: 0, lastForcedAt: 0 });
   const exitBackDeadlineRef = useRef(0);
   const exitBackToastTimerRef = useRef<number | null>(null);
   const activeNavigationSectionRef = useRef<NavigationSection>(activeNavigationSection);
@@ -706,33 +707,51 @@ export function TradingDashboard() {
     };
   }, [showTradeSymbols]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function loadInstrumentUniverse() {
-      try {
-        const response = await fetch("/api/upstox/instruments", { signal: controller.signal });
-        const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
-        if (!response.ok || !payload.ok || !payload.instruments?.length) return;
-        const merged = mergeInstrumentUniverse(payload.instruments);
-        let savedSymbol = "";
+  const loadInstrumentUniverse = useCallback(async ({ force = false, signal }: { force?: boolean; signal?: AbortSignal } = {}) => {
+    try {
+      const endpoint = force ? "/api/upstox/instruments?refresh=1" : "/api/upstox/instruments";
+      const response = await fetch(endpoint, { cache: "no-store", signal });
+      const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
+      if (!response.ok || !payload.ok || !payload.instruments?.length) return;
+      const merged = mergeInstrumentUniverse(payload.instruments);
+      const isInitialLoad = !instrumentUniverseLoadRef.current.loaded;
+      let requestedSymbol = "";
+      if (isInitialLoad) {
         try {
           const parsed = JSON.parse(localStorage.getItem(LAST_CHART_STORAGE_KEY) ?? "{}") as { symbol?: unknown };
-          savedSymbol = typeof parsed.symbol === "string" ? parsed.symbol.toUpperCase() : "";
+          requestedSymbol = typeof parsed.symbol === "string" ? parsed.symbol.toUpperCase() : "";
         } catch { /* Ignore malformed preference. */ }
         const searchParams = new URLSearchParams(window.location.search);
         const querySymbol = searchParams.get("symbol") ?? searchParams.get("sym");
-        const requestedSymbol = querySymbol && /^[A-Z0-9&.-]{1,40}$/i.test(querySymbol.trim()) ? querySymbol.trim().toUpperCase() : savedSymbol;
-        setStockUniverse(merged);
-        setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol ?? current.symbol)) ?? current);
-      } catch {
-        // Keep the built-in liquid-stock list available while the daily master is unavailable.
-      } finally {
-        if (!controller.signal.aborted) setWatchlistLoading(false);
+        if (querySymbol && /^[A-Z0-9&.-]{1,40}$/i.test(querySymbol.trim())) requestedSymbol = querySymbol.trim().toUpperCase();
       }
+      instrumentUniverseLoadRef.current.loaded = true;
+      instrumentUniverseLoadRef.current.lastRefreshAt = Date.now();
+      setStockUniverse(merged);
+      setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol || current.symbol)) ?? current);
+    } catch {
+      // Keep the built-in liquid-stock list available while the current master is unavailable.
     }
-    void loadInstrumentUniverse();
-    return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const refreshIfStale = () => {
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - instrumentUniverseLoadRef.current.lastRefreshAt < 30 * 60 * 1_000) return;
+      void loadInstrumentUniverse({ signal: controller.signal });
+    };
+    void loadInstrumentUniverse({ signal: controller.signal }).finally(() => {
+      if (!controller.signal.aborted) setWatchlistLoading(false);
+    });
+    document.addEventListener("visibilitychange", refreshIfStale);
+    window.addEventListener("online", refreshIfStale);
+    return () => {
+      controller.abort();
+      document.removeEventListener("visibilitychange", refreshIfStale);
+      window.removeEventListener("online", refreshIfStale);
+    };
+  }, [loadInstrumentUniverse]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -749,6 +768,20 @@ export function TradingDashboard() {
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
   }, [customWatchlists, derivativeInstruments, search, stockUniverse, watchlist]);
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2 || filtered.length || watchlistLoading) return;
+    if (Date.now() - instrumentUniverseLoadRef.current.lastForcedAt < 10 * 60 * 1_000) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      instrumentUniverseLoadRef.current.lastForcedAt = Date.now();
+      void loadInstrumentUniverse({ force: true, signal: controller.signal });
+    }, 650);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [filtered.length, loadInstrumentUniverse, search, watchlistLoading]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
     return stockUniverse
@@ -1043,8 +1076,11 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     const reasons = triggeredOrders.map((order) => order.exitReason === "TARGET" ? "target" : "stop loss");
     triggeredOrders.forEach(showProtectionAlert);
-    setToast(`${triggeredOrders.length} position${triggeredOrders.length > 1 ? "s" : ""} exited by ${[...new Set(reasons)].join(" / ")}`);
-    window.setTimeout(() => setToast(""), 4_000);
+    const alertSummary = triggeredOrders.length === 1
+      ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
+      : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
+    setToast(alertSummary);
+    window.setTimeout(() => setToast(""), 7_000);
   }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];

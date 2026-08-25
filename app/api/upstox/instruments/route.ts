@@ -2,8 +2,16 @@ import type { Instrument } from "@/lib/market";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_TTL = 6 * 60 * 60 * 1_000;
+const CACHE_TTL = 30 * 60 * 1_000;
+const FORCED_REFRESH_MIN_AGE = 5 * 60 * 1_000;
 const NSE_INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
+const EQUITY_SERIES_PRIORITY = new Map([
+  ["EQ", 0],
+  ["BE", 1],
+  ["BZ", 2],
+  ["ST", 3],
+  ["SM", 4],
+] as const);
 const INDEX_URLS = {
   "NIFTY 50": "https://www.niftyindices.com/IndexConstituent/ind_nifty50list.csv",
   "NIFTY 500": "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
@@ -21,7 +29,7 @@ type UpstoxInstrument = {
   security_type?: string;
 };
 
-let cache: { expiresAt: number; instruments: Instrument[] } | null = null;
+let cache: { expiresAt: number; fetchedAt: string; fetchedAtMs: number; instruments: Instrument[] } | null = null;
 
 function parseCsv(text: string) {
   const rows: string[][] = [];
@@ -73,8 +81,9 @@ async function fetchInstrumentMaster() {
   return new Response(decompressed).json() as Promise<UpstoxInstrument[]>;
 }
 
-async function loadInstruments() {
-  if (cache && cache.expiresAt > Date.now()) return cache.instruments;
+async function loadInstruments(forceRefresh = false) {
+  const now = Date.now();
+  if (cache && cache.expiresAt > now && (!forceRefresh || now - cache.fetchedAtMs < FORCED_REFRESH_MIN_AGE)) return cache;
 
   const [master, nifty50Csv, nifty500Csv, bankNiftyCsv] = await Promise.all([
     fetchInstrumentMaster(),
@@ -97,43 +106,58 @@ async function loadInstruments() {
     "NIFTY 500": symbolsFromCsv(nifty500Csv),
     "BANK NIFTY": symbolsFromCsv(bankNiftyCsv),
   };
-  const seen = new Set<string>();
-  const instruments = master
-    .filter((item) =>
-      item.segment === "NSE_EQ" &&
-      item.exchange === "NSE" &&
-      item.instrument_type === "EQ" &&
-      item.instrument_key &&
-      item.trading_symbol,
-    )
-    .map((item) => {
-      const symbol = item.trading_symbol!.trim().toUpperCase();
-      const categories = (Object.keys(membership) as Array<keyof typeof membership>)
-        .filter((category) => membership[category].has(symbol));
-      return {
-        symbol,
-        name: item.short_name?.trim() || item.name?.trim() || symbol,
-        exchange: "NSE" as const,
-        price: 0,
-        change: 0,
-        instrumentKey: item.instrument_key!,
-        categories,
-      };
-    })
-    .filter((item) => {
-      if (seen.has(item.symbol)) return false;
-      seen.add(item.symbol);
-      return true;
-    })
+  const bySymbol = new Map<string, Instrument & { seriesPriority: number }>();
+  for (const item of master) {
+    const series = item.instrument_type?.trim().toUpperCase() ?? "";
+    const instrumentKey = item.instrument_key?.trim() ?? "";
+    const symbol = item.trading_symbol?.trim().toUpperCase() ?? "";
+    const seriesPriority = EQUITY_SERIES_PRIORITY.get(series as "EQ" | "BE" | "BZ" | "ST" | "SM");
+    if (
+      item.segment !== "NSE_EQ" ||
+      item.exchange !== "NSE" ||
+      seriesPriority === undefined ||
+      !/^NSE_EQ\|INE[A-Z0-9]+$/.test(instrumentKey) ||
+      !symbol
+    ) continue;
+
+    const categories = (Object.keys(membership) as Array<keyof typeof membership>)
+      .filter((category) => membership[category].has(symbol));
+    const candidate = {
+      symbol,
+      name: item.short_name?.trim() || item.name?.trim() || symbol,
+      exchange: "NSE" as const,
+      price: 0,
+      change: 0,
+      instrumentKey,
+      categories,
+      seriesPriority,
+    };
+    const existing = bySymbol.get(symbol);
+    if (!existing || candidate.seriesPriority < existing.seriesPriority) bySymbol.set(symbol, candidate);
+  }
+
+  const instruments: Instrument[] = [...bySymbol.values()]
+    .map((instrument) => ({
+      symbol: instrument.symbol,
+      name: instrument.name,
+      exchange: instrument.exchange,
+      price: instrument.price,
+      change: instrument.change,
+      instrumentKey: instrument.instrumentKey,
+      categories: instrument.categories,
+    }))
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-  cache = { expiresAt: Date.now() + CACHE_TTL, instruments };
-  return instruments;
+  const fetchedAtMs = Date.now();
+  cache = { expiresAt: fetchedAtMs + CACHE_TTL, fetchedAt: new Date(fetchedAtMs).toISOString(), fetchedAtMs, instruments };
+  return cache;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const instruments = await loadInstruments();
+    const forceRefresh = new URL(request.url).searchParams.get("refresh") === "1";
+    const result = await loadInstruments(forceRefresh);
+    const { instruments } = result;
     const counts = {
       allNse: instruments.length,
       nifty50: instruments.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -141,8 +165,8 @@ export async function GET() {
       bankNifty: instruments.filter((item) => item.categories.includes("BANK NIFTY")).length,
     };
     return Response.json(
-      { ok: true, source: "Upstox + NSE Indices", instruments, counts, fetchedAt: new Date().toISOString() },
-      { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } },
+      { ok: true, source: "Upstox + NSE Indices", instruments, counts, fetchedAt: result.fetchedAt },
+      { headers: { "Cache-Control": forceRefresh ? "no-store" : "public, s-maxage=1800, stale-while-revalidate=300" } },
     );
   } catch (error) {
     return Response.json(
