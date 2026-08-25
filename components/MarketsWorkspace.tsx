@@ -11,6 +11,7 @@ type ScannerId = "VOLUME" | "OPEN_HIGH" | NimbleStrategy;
 type ScannerGroup = "TRADING" | "INVESTMENT";
 type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
+type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
 
 const STORAGE_KEY = "papertrade-market-scanner-results-v1";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
@@ -43,6 +44,28 @@ function isInvestmentScanner(scanner: ScannerId) {
 
 function usesNifty500Universe(scanner: ScannerId) {
   return nifty500ScannerIds.has(scanner);
+}
+
+function normalizedScannerSymbol(symbol: string) {
+  return symbol.trim().toUpperCase().replace(/-(?:EQ|BE|BZ|SM|ST)$/, "");
+}
+
+function dedupeScanInstruments(items: ScanInstrument[]) {
+  const unique = new Map<string, ScanInstrument>();
+  for (const item of items) {
+    const key = normalizedScannerSymbol(item.symbol) || item.instrumentKey;
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return [...unique.values()];
+}
+
+function dedupeScannerRows(rows: ScannerRow[]) {
+  const unique = new Map<string, ScannerRow>();
+  for (const row of rows) {
+    const key = normalizedScannerSymbol(row.symbol) || row.instrumentKey;
+    if (!unique.has(key)) unique.set(key, row);
+  }
+  return [...unique.values()];
 }
 
 function compactNumber(value: number) {
@@ -109,13 +132,14 @@ export function MarketsWorkspace({
   const scannerOptions = scannerGroup === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const selectedOption = allScannerOptions.find((option) => option.id === activeScanner) ?? allScannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
-  const activeRows = useMemo(() => activeSnapshot?.rows ?? [], [activeSnapshot]);
-  const instruments = useMemo(() => stockUniverse
+  const activeRows = useMemo(() => dedupeScannerRows(activeSnapshot?.rows ?? []), [activeSnapshot]);
+  const instruments = useMemo(() => dedupeScanInstruments(stockUniverse
     .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
-    .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey })), [stockUniverse]);
-  const nifty500Instruments = useMemo(() => stockUniverse
-    .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey) && item.categories.includes("NIFTY 500"))
-    .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey })), [stockUniverse]);
+    .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
+  const nifty500Instruments = useMemo(() => dedupeScanInstruments(stockUniverse
+    .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey)
+      && (item.categories.includes("NIFTY 500") || item.categories.includes("BANK NIFTY")))
+    .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
   const activeQuoteKeys = useMemo(() => activeRows.map((row) => row.instrumentKey).filter(Boolean), [activeRows]);
 
   useEffect(() => {
@@ -146,7 +170,7 @@ export function MarketsWorkspace({
       });
       const payload = await response.json() as { ok?: boolean; rows?: ScannerRow[]; openHighRows?: OpenHighRow[]; fetchedAt?: string; error?: { message?: string } };
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${option.label} is unavailable.`);
-      const rows = scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []);
+      const rows = dedupeScannerRows(scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []));
       setSnapshots((current) => {
         const previousRows = current[scanner]?.rows ?? [];
         const preservePrevious = rows.length === 0 && previousRows.length > 0;

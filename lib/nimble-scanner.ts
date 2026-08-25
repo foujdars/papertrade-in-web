@@ -323,23 +323,29 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
   }
 
   if (strategy === "rsi-divergence-daily") {
+    const latestRsi = rsi14s[latestIndex];
+    // This investment scan is intentionally an early, buy-side setup: the
+    // latest daily RSI must still be oversold while recovering from its newer
+    // low. A historical oversold reading alone must not qualify the stock.
+    if (!Number.isFinite(latestRsi) || latestRsi >= 30) return null;
     const pivotLows = candles.map((_, index) => index)
       .filter((index) => isCandlePivot(candles, index, "low"))
       .slice(-16);
     for (let secondPosition = pivotLows.length - 1; secondPosition >= 1; secondPosition -= 1) {
       const second = pivotLows[secondPosition];
-      // A daily divergence remains useful for several sessions while price is
-      // forming or confirming the reversal. Restricting this to 15 bars and
-      // requiring the second RSI pivot itself to be below 30 discarded many
-      // textbook bullish divergences where RSI had already started recovering.
-      if (latestIndex - second > 35) continue;
+      if (latestIndex - second > 15 || rsi14s[second] >= 30) continue;
       for (let firstPosition = secondPosition - 1; firstPosition >= 0; firstPosition -= 1) {
         const first = pivotLows[firstPosition];
         if (second - first < 3 || second - first > 60) continue;
         const lowerPriceLow = candles[second].low < candles[first].low;
         const higherRsiLow = rsi14s[second] >= rsi14s[first] + 1;
-        const oversoldBuySetup = Math.min(rsi14s[first], rsi14s[second]) < 30;
-        if (!lowerPriceLow || !higherRsiLow || !oversoldBuySetup) continue;
+        // Price only needs to make the lower pivot low; after that low, RSI
+        // must be rising while it is still below 30. Requiring the latest
+        // price to remain under the older pivot rejects the reversal precisely
+        // when it begins to recover.
+        const previousRsi = rsi14s[Math.max(second, latestIndex - 1)];
+        const rsiTurningUp = latestRsi > previousRsi && latestRsi > rsi14s[second];
+        if (!lowerPriceLow || !higherRsiLow || !rsiTurningUp) continue;
         const between = candles.slice(first + 1, second);
         if (!between.length) continue;
         const entry = Math.max(...between.map((candle) => candle.high));
@@ -361,7 +367,7 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
           target1: entry + risk * 1.5,
           barsSinceCross: latestIndex - second,
           setupStatus: triggered ? "triggered" : "alert",
-          indicatorValue: rsi14s[second],
+          indicatorValue: latestRsi,
         };
       }
     }

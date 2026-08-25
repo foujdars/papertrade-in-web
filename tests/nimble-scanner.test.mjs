@@ -57,16 +57,29 @@ test("investment EMA strategy uses 30, 50 and 100 on daily candles", () => {
 
 test("daily RSI scanner detects a bullish NIFTY 500 buy-side divergence below RSI 30", () => {
   const prices = [
+    ...Array.from({ length: 25 }, (_, index) => 120 - index * 0.15),
+    ...Array.from({ length: 10 }, (_, index) => 115.4 - index),
+    ...Array.from({ length: 8 }, (_, index) => 106.9 + index * 0.5),
+    ...Array.from({ length: 18 }, (_, index) => 110.1 - index * 0.3),
+    105.05,
+    105.1,
+    105.15,
+  ];
+  const match = analyzeNimbleCandles(candlesFrom(prices), "rsi-divergence-daily", "1D");
+  assert.equal(match?.signal, "long");
+  assert.equal(match?.setupStatus, "alert");
+  assert.ok((match?.indicatorValue ?? 100) < 30);
+  assert.ok((match?.target1 ?? 0) > (match?.entry ?? Number.POSITIVE_INFINITY));
+});
+
+test("daily RSI scanner rejects an old divergence after RSI has recovered above 30", () => {
+  const prices = [
     ...Array.from({ length: 31 }, (_, index) => 100 - index),
     ...Array.from({ length: 10 }, (_, index) => 71.5 + index * 1.5),
     ...Array.from({ length: 15 }, (_, index) => 85 - index * 1.4),
     ...Array.from({ length: 10 }, (_, index) => 66 + index * 2.5),
   ];
-  const match = analyzeNimbleCandles(candlesFrom(prices), "rsi-divergence-daily", "1D");
-  assert.equal(match?.signal, "long");
-  assert.equal(match?.setupStatus, "triggered");
-  assert.ok((match?.indicatorValue ?? 100) < 30);
-  assert.ok((match?.target1 ?? 0) > (match?.entry ?? Number.POSITIVE_INFINITY));
+  assert.equal(analyzeNimbleCandles(candlesFrom(prices), "rsi-divergence-daily", "1D"), null);
 });
 
 test("detects a completed candle below EMA 21", () => {

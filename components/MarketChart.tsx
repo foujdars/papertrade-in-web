@@ -909,8 +909,10 @@ export function MarketChart({
           title: "RSI 14",
           autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
         }, 1);
-        rsiSeries.current.createPriceLine({ price: 70, color: "#f0445870", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
-        rsiSeries.current.createPriceLine({ price: 30, color: "#00a67e70", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+        // Keep the overbought/oversold guides unbroken and deliberately darker
+        // than the grid so both thresholds remain legible on either theme.
+        rsiSeries.current.createPriceLine({ price: 70, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
+        rsiSeries.current.createPriceLine({ price: 30, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
         chart.panes()[1]?.setHeight(116);
       } else if (!next.rsi && rsiSeries.current) {
         chart.removeSeries(rsiSeries.current);
