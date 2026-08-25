@@ -13,7 +13,9 @@ type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
 type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
 
-const STORAGE_KEY = "papertrade-market-scanner-results-v1";
+// Bump this whenever scanner eligibility rules change so that an older result
+// cannot survive in localStorage and contradict the current scanner.
+const STORAGE_KEY = "papertrade-market-scanner-results-v3";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
 const PULL_REFRESH_THRESHOLD = 58;
@@ -66,6 +68,14 @@ function dedupeScannerRows(rows: ScannerRow[]) {
     if (!unique.has(key)) unique.set(key, row);
   }
   return [...unique.values()];
+}
+
+function validScannerRows(scanner: ScannerId, rows: ScannerRow[]) {
+  const uniqueRows = dedupeScannerRows(rows);
+  if (scanner !== "rsi-divergence-daily") return uniqueRows;
+  // The API validates the two RSI pivots. Do not require the latest RSI to
+  // remain below 30 because it may recover above 30 at the higher RSI low.
+  return uniqueRows.filter((row) => isTechnicalRow(row) && Number.isFinite(row.indicatorValue));
 }
 
 function compactNumber(value: number) {
@@ -132,7 +142,10 @@ export function MarketsWorkspace({
   const scannerOptions = scannerGroup === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const selectedOption = allScannerOptions.find((option) => option.id === activeScanner) ?? allScannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
-  const activeRows = useMemo(() => dedupeScannerRows(activeSnapshot?.rows ?? []), [activeSnapshot]);
+  const activeRows = useMemo(
+    () => validScannerRows(activeScanner, activeSnapshot?.rows ?? []),
+    [activeScanner, activeSnapshot],
+  );
   const instruments = useMemo(() => dedupeScanInstruments(stockUniverse
     .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
@@ -170,10 +183,12 @@ export function MarketsWorkspace({
       });
       const payload = await response.json() as { ok?: boolean; rows?: ScannerRow[]; openHighRows?: OpenHighRow[]; fetchedAt?: string; error?: { message?: string } };
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${option.label} is unavailable.`);
-      const rows = dedupeScannerRows(scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []));
+      const rows = validScannerRows(scanner, scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []));
       setSnapshots((current) => {
         const previousRows = current[scanner]?.rows ?? [];
-        const preservePrevious = rows.length === 0 && previousRows.length > 0;
+        // An empty strict RSI-divergence scan means that there are currently
+        // no eligible setups. Never substitute an old oversold reading here.
+        const preservePrevious = scanner !== "rsi-divergence-daily" && rows.length === 0 && previousRows.length > 0;
         const next = {
           ...current,
           [scanner]: {

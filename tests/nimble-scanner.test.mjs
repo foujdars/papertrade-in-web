@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeNimbleCandles, NIMBLE_STRATEGIES } from "../lib/nimble-scanner.ts";
+import { analyzeNimbleCandles, isBullishOversoldDivergence, NIMBLE_STRATEGIES } from "../lib/nimble-scanner.ts";
 
 function candlesFrom(prices) {
   return prices.map((close, index) => ({
@@ -42,7 +42,7 @@ test("daily RSI divergence is a buy-side oversold strategy", () => {
   const strategy = NIMBLE_STRATEGIES["rsi-divergence-daily"];
   assert.equal(strategy.timeframe, "1D");
   assert.match(strategy.description, /bullish/i);
-  assert.match(strategy.description, /below RSI 30/i);
+  assert.match(strategy.description, /first RSI low falls below 30/i);
 });
 
 test("investment EMA strategy uses 30, 50 and 100 on daily candles", () => {
@@ -72,14 +72,11 @@ test("daily RSI scanner detects a bullish NIFTY 500 buy-side divergence below RS
   assert.ok((match?.target1 ?? 0) > (match?.entry ?? Number.POSITIVE_INFINITY));
 });
 
-test("daily RSI scanner rejects an old divergence after RSI has recovered above 30", () => {
-  const prices = [
-    ...Array.from({ length: 31 }, (_, index) => 100 - index),
-    ...Array.from({ length: 10 }, (_, index) => 71.5 + index * 1.5),
-    ...Array.from({ length: 15 }, (_, index) => 85 - index * 1.4),
-    ...Array.from({ length: 10 }, (_, index) => 66 + index * 2.5),
-  ];
-  assert.equal(analyzeNimbleCandles(candlesFrom(prices), "rsi-divergence-daily", "1D"), null);
+test("daily bullish divergence allows the second RSI low above 30", () => {
+  assert.equal(isBullishOversoldDivergence(100, 96, 24, 34), true);
+  assert.equal(isBullishOversoldDivergence(100, 96, 31, 36), false);
+  assert.equal(isBullishOversoldDivergence(100, 101, 24, 34), false);
+  assert.equal(isBullishOversoldDivergence(100, 96, 24, 23), false);
 });
 
 test("detects a completed candle below EMA 21", () => {

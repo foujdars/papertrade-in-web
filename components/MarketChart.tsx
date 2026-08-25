@@ -912,6 +912,7 @@ export function MarketChart({
         // Keep the overbought/oversold guides unbroken and deliberately darker
         // than the grid so both thresholds remain legible on either theme.
         rsiSeries.current.createPriceLine({ price: 70, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
+        rsiSeries.current.createPriceLine({ price: 50, color: "#c084fc", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
         rsiSeries.current.createPriceLine({ price: 30, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
         chart.panes()[1]?.setHeight(116);
       } else if (!next.rsi && rsiSeries.current) {

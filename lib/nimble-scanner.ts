@@ -63,8 +63,20 @@ export const NIMBLE_STRATEGIES: Record<NimbleStrategy, { label: string; timefram
   "adx-golden-cross": { label: "ADX Golden Cross", timeframe: 15, description: "EMA 50/200 bullish cross with ADX above 25" },
   "macd-triple-ema": { label: "MACD Triple EMA", timeframe: 5, description: "EMA 9/21/50 alignment confirmed by MACD" },
   "ema-30-50-100": { label: "30/50/100 EMA", timeframe: "1D", description: "Daily bullish EMA 30, 50 and 100 alignment" },
-  "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Bullish daily price/RSI divergence below RSI 30" },
+  "rsi-divergence-daily": { label: "Daily RSI Divergence", timeframe: "1D", description: "Bullish daily divergence after the first RSI low falls below 30" },
 };
+
+export function isBullishOversoldDivergence(
+  firstPriceLow: number,
+  secondPriceLow: number,
+  firstRsiLow: number,
+  secondRsiLow: number,
+) {
+  return [firstPriceLow, secondPriceLow, firstRsiLow, secondRsiLow].every(Number.isFinite)
+    && firstRsiLow < 30
+    && secondPriceLow < firstPriceLow
+    && secondRsiLow > firstRsiLow;
+}
 
 function emaSeries(values: number[], period: number) {
   const multiplier = 2 / (period + 1);
@@ -324,28 +336,28 @@ export function analyzeNimbleCandles(candles: NimbleCandle[], strategy: NimbleSt
 
   if (strategy === "rsi-divergence-daily") {
     const latestRsi = rsi14s[latestIndex];
-    // This investment scan is intentionally an early, buy-side setup: the
-    // latest daily RSI must still be oversold while recovering from its newer
-    // low. A historical oversold reading alone must not qualify the stock.
-    if (!Number.isFinite(latestRsi) || latestRsi >= 30) return null;
+    // The oversold requirement belongs to the first daily RSI pivot. The
+    // second RSI low may already be above 30; it only has to be higher while
+    // price prints a lower low.
+    if (!Number.isFinite(latestRsi)) return null;
     const pivotLows = candles.map((_, index) => index)
       .filter((index) => isCandlePivot(candles, index, "low"))
       .slice(-16);
     for (let secondPosition = pivotLows.length - 1; secondPosition >= 1; secondPosition -= 1) {
       const second = pivotLows[secondPosition];
-      if (latestIndex - second > 15 || rsi14s[second] >= 30) continue;
+      if (latestIndex - second > 15 || !Number.isFinite(rsi14s[second])) continue;
       for (let firstPosition = secondPosition - 1; firstPosition >= 0; firstPosition -= 1) {
         const first = pivotLows[firstPosition];
         if (second - first < 3 || second - first > 60) continue;
-        const lowerPriceLow = candles[second].low < candles[first].low;
-        const higherRsiLow = rsi14s[second] >= rsi14s[first] + 1;
-        // Price only needs to make the lower pivot low; after that low, RSI
-        // must be rising while it is still below 30. Requiring the latest
-        // price to remain under the older pivot rejects the reversal precisely
-        // when it begins to recover.
-        const previousRsi = rsi14s[Math.max(second, latestIndex - 1)];
-        const rsiTurningUp = latestRsi > previousRsi && latestRsi > rsi14s[second];
-        if (!lowerPriceLow || !higherRsiLow || !rsiTurningUp) continue;
+        if (!isBullishOversoldDivergence(
+          candles[first].low,
+          candles[second].low,
+          rsi14s[first],
+          rsi14s[second],
+        )) continue;
+        // The divergence is defined by the two completed daily pivot lows.
+        // Do not add a current-RSI threshold: after the second higher RSI low,
+        // RSI may recover above 30 or fluctuate without invalidating the setup.
         const between = candles.slice(first + 1, second);
         if (!between.length) continue;
         const entry = Math.max(...between.map((candle) => candle.high));
