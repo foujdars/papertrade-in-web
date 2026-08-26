@@ -19,6 +19,10 @@ type CandlePayload = { status: string; data?: { candles?: Array<[string | number
 type LiquidInstrument = RequestedInstrument & { lastPrice: number; changePercent: number; volume: number };
 
 const MAX_CANDLE_SCANS = 45;
+// The live Upstox NSE cash master currently contains slightly more than 3,000
+// unique equity symbols. Keep a bounded request, but leave enough headroom for
+// newly listed shares so the full trading universe is not rejected.
+const MAX_NSE_CASH_INSTRUMENTS = 4_000;
 const scannerCache = new Map<NimbleStrategy, { expiresAt: number; payload: Record<string, unknown> }>();
 
 function indiaDateKey(value: Date | number | string) {
@@ -124,8 +128,8 @@ export async function POST(request: Request) {
     if (!strategy) return Response.json({ ok: false, error: { code: "INVALID_STRATEGY", message: "Choose a supported NimbleScan strategy." } }, { status: 400 });
     const cached = scannerCache.get(strategy);
     if (body.force !== true && cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
-    if (!Array.isArray(body.instruments) || body.instruments.length < 1 || body.instruments.length > 3_000) {
-      return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 3,000 NSE cash instruments." } }, { status: 400 });
+    if (!Array.isArray(body.instruments) || body.instruments.length < 1 || body.instruments.length > MAX_NSE_CASH_INSTRUMENTS) {
+      return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: `Provide between 1 and ${MAX_NSE_CASH_INSTRUMENTS.toLocaleString("en-IN")} NSE cash instruments.` } }, { status: 400 });
     }
     const instruments = body.instruments.filter((item): item is RequestedInstrument => {
       if (!item || typeof item !== "object") return false;

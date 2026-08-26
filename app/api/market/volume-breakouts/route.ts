@@ -34,6 +34,10 @@ type UpstoxCandlePayload = {
 
 const HISTORY_BATCH_SIZE = 15;
 const MAX_HISTORY_SCANS = 120;
+// The live Upstox NSE cash master currently contains slightly more than 3,000
+// unique equity symbols. Keep a bounded request, but leave enough headroom for
+// newly listed shares so the full trading universe is not rejected.
+const MAX_NSE_CASH_INSTRUMENTS = 4_000;
 const scannerCache = new Map<"VOLUME" | "OPEN_HIGH", { expiresAt: number; payload: Record<string, unknown> }>();
 const volumeHistoryCache = new Map<string, { sessionDate: string; expiresAt: number; points: HistoricalVolumePoint[] }>();
 
@@ -77,8 +81,8 @@ export async function POST(request: Request) {
     if (payload.force !== true && cached && cached.expiresAt > Date.now()) {
       return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
     }
-    if (!Array.isArray(payload.instruments) || payload.instruments.length < 1 || payload.instruments.length > 3_000) {
-      return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 3,000 NSE cash instruments." } }, { status: 400 });
+    if (!Array.isArray(payload.instruments) || payload.instruments.length < 1 || payload.instruments.length > MAX_NSE_CASH_INSTRUMENTS) {
+      return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: `Provide between 1 and ${MAX_NSE_CASH_INSTRUMENTS.toLocaleString("en-IN")} NSE cash instruments.` } }, { status: 400 });
     }
     const instruments = payload.instruments.filter((item): item is RequestedInstrument => {
       if (!item || typeof item !== "object") return false;
