@@ -3,12 +3,14 @@
 import { load, type Type } from "protobufjs";
 
 export type UpstoxLiveTick = {
+  instrumentKey: string;
   price: number;
   timestampMs: number;
 };
 
 type LiveFeedOptions = {
-  instrumentKey: string;
+  instrumentKey?: string;
+  instrumentKeys?: string[];
   signal: AbortSignal;
   onTick: (tick: UpstoxLiveTick) => void;
   onDisconnect: () => void;
@@ -52,6 +54,7 @@ function extractTick(payload: FeedObject, instrumentKey: string): UpstoxLiveTick
   const price = Number(ltpc?.ltp);
   if (!Number.isFinite(price) || price <= 0) return null;
   return {
+    instrumentKey,
     price,
     timestampMs: normalizeEpochMs(Number(ltpc?.ltt ?? payload.currentTs)),
   };
@@ -64,7 +67,9 @@ async function messageBytes(data: unknown) {
   return null;
 }
 
-export async function openUpstoxLiveFeed({ instrumentKey, signal, onTick, onDisconnect }: LiveFeedOptions) {
+export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: requestedInstrumentKeys, signal, onTick, onDisconnect }: LiveFeedOptions) {
+  const instrumentKeys = [...new Set([instrumentKey, ...(requestedInstrumentKeys ?? [])].filter((value): value is string => Boolean(value)))];
+  if (!instrumentKeys.length) throw new Error("Choose at least one instrument for the Upstox live feed.");
   const [decoder, response] = await Promise.all([
     getDecoder(),
     fetch("/api/upstox/stream-authorize", { cache: "no-store", signal }),
@@ -97,7 +102,7 @@ export async function openUpstoxLiveFeed({ instrumentKey, signal, onTick, onDisc
       socket.send(new TextEncoder().encode(JSON.stringify({
         guid: crypto.randomUUID(),
         method: "sub",
-        data: { mode: "full", instrumentKeys: [instrumentKey] },
+        data: { mode: "full", instrumentKeys },
       })));
       resolve();
     }, { once: true });
@@ -109,8 +114,10 @@ export async function openUpstoxLiveFeed({ instrumentKey, signal, onTick, onDisc
       try {
         const decoded = decoder.decode(bytes);
         const payload = decoder.toObject(decoded, { longs: Number, enums: String }) as FeedObject;
-        const tick = extractTick(payload, instrumentKey);
-        if (tick) onTick(tick);
+        instrumentKeys.forEach((key) => {
+          const tick = extractTick(payload, key);
+          if (tick) onTick(tick);
+        });
       } catch {
         // Ignore malformed/non-feed frames; a REST reconciliation remains active.
       }

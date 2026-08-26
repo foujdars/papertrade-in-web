@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
+import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionExecutionPrice, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
 import { buildClosedTrades } from "../lib/trade-analytics.ts";
 import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
 
@@ -126,6 +126,17 @@ test("triggers target and stop loss correctly for long and short positions", () 
   assert.equal(getProtectionTrigger(shortProtection, 90), "TARGET");
   assert.equal(getProtectionTrigger(shortProtection, 106), "STOP_LOSS");
   assert.equal(getProtectionTrigger(longProtection, 100), null);
+});
+
+test("fills automatic protection at its configured level when a live tick overshoots", () => {
+  const base = { id: "risk-2", symbol: "RELIANCE", product: "INTRADAY", createdAt: 1 };
+  const longProtection = { ...base, side: "LONG", targetPrice: 103, stopLossPrice: 98 };
+  const shortProtection = { ...base, side: "SHORT", targetPrice: 97, stopLossPrice: 102 };
+
+  assert.equal(getProtectionExecutionPrice(longProtection, 104.5, "TARGET"), 103);
+  assert.equal(getProtectionExecutionPrice(longProtection, 96.75, "STOP_LOSS"), 98);
+  assert.equal(getProtectionExecutionPrice(shortProtection, 95.5, "TARGET"), 97);
+  assert.equal(getProtectionExecutionPrice(shortProtection, 103.25, "STOP_LOSS"), 102);
 });
 
 test("removes the corrupted RATNAVEER simulated stop-loss pair and repairs cash", () => {

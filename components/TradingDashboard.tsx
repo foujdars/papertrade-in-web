@@ -28,6 +28,7 @@ import {
   calculatePosition,
   deletePaperTradeOrders,
   getDeliveryHoldingQuantity,
+  getProtectionExecutionPrice,
   getProtectionTrigger,
   paperOrderCapitalValue,
   readPaperOrders,
@@ -42,6 +43,7 @@ import {
 import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
+import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
@@ -798,6 +800,45 @@ export function TradingDashboard() {
     for (const item of [...stockUniverse, ...derivativeInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
   }, [derivativeInstruments, stockUniverse]);
+  const applyRealtimeQuote = useCallback((instrument: Instrument, price: number, timestampMs = Date.now()) => {
+    if (!Number.isFinite(price) || price <= 0) return;
+    const receivedAt = Date.now();
+    const updatedAt = new Date(timestampMs).toISOString();
+    setMarketQuotes((current) => {
+      const previous = current[instrument.instrumentKey] ?? current[instrument.symbol];
+      const changeDivisor = 1 + instrument.change / 100;
+      const fallbackPreviousClose = instrument.price > 0 && Number.isFinite(instrument.change) && changeDivisor > 0
+        ? instrument.price / changeDivisor
+        : price;
+      const previousClose = previous?.previousClose > 0 ? previous.previousClose : fallbackPreviousClose;
+      const next: NormalizedQuote = {
+        instrumentKey: instrument.instrumentKey,
+        symbol: instrument.symbol,
+        lastPrice: price,
+        netChange: price - previousClose,
+        changePercent: previousClose > 0 ? ((price - previousClose) / previousClose) * 100 : 0,
+        open: previous?.open ?? price,
+        high: Math.max(previous?.high ?? price, price),
+        low: Math.min(previous?.low ?? price, price),
+        previousClose,
+        lastTradeAt: updatedAt,
+        updatedAt,
+      };
+      return { ...current, [instrument.instrumentKey]: next, [instrument.symbol]: next };
+    });
+    setMarketQuoteUpdatedAt((current) => ({
+      ...current,
+      [instrument.instrumentKey]: receivedAt,
+      [instrument.symbol]: receivedAt,
+    }));
+  }, []);
+  const handleChartPrice = useCallback((price: number) => {
+    applyRealtimeQuote(selected, price);
+  }, [applyRealtimeQuote, selected]);
+  const protectionFeedInstruments = useMemo(() => [...new Map(protections.flatMap((protection) => {
+    const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
+    return instrument ? [[instrument.instrumentKey, instrument] as const] : [];
+  })).values()], [protections, tradingUniverse]);
   const fnoTopInstrument = fnoTopMode === "FUTURE" && fnoFutureInstrument ? fnoFutureInstrument : spotInstrument;
   const quoteKeys = useMemo(
     () => [...new Set([
@@ -888,6 +929,44 @@ export function TradingDashboard() {
       window.clearInterval(interval);
     };
   }, [quoteKeys, selected.instrumentKey, selected.symbol]);
+
+  useEffect(() => {
+    if (!protectionFeedInstruments.length) return;
+    const controller = new AbortController();
+    const instrumentsByKey = new Map(protectionFeedInstruments.map((instrument) => [instrument.instrumentKey, instrument]));
+    let closeFeed: (() => void) | undefined;
+    let reconnectTimer = 0;
+    let retryCount = 0;
+
+    const scheduleReconnect = () => {
+      if (controller.signal.aborted) return;
+      retryCount += 1;
+      reconnectTimer = window.setTimeout(() => void connect(), Math.min(30_000, 2_000 * 2 ** Math.min(retryCount - 1, 4)));
+    };
+    async function connect() {
+      if (controller.signal.aborted) return;
+      try {
+        closeFeed = await openUpstoxLiveFeed({
+          instrumentKeys: [...instrumentsByKey.keys()],
+          signal: controller.signal,
+          onTick: ({ instrumentKey, price, timestampMs }) => {
+            const instrument = instrumentsByKey.get(instrumentKey);
+            if (instrument) applyRealtimeQuote(instrument, price, timestampMs);
+          },
+          onDisconnect: scheduleReconnect,
+        });
+        retryCount = 0;
+      } catch {
+        scheduleReconnect();
+      }
+    }
+    void connect();
+    return () => {
+      controller.abort();
+      closeFeed?.();
+      window.clearTimeout(reconnectTimer);
+    };
+  }, [applyRealtimeQuote, protectionFeedInstruments]);
 
   useEffect(() => {
     if (!clock || !orders.length || autoSquareOffInFlightRef.current || Date.now() < autoSquareOffRetryAtRef.current) return;
@@ -1040,14 +1119,15 @@ export function TradingDashboard() {
       if (!quoteIsFresh || !price || !Number.isFinite(price)) return;
       const trigger = getProtectionTrigger(protection, price);
       if (!trigger) return;
+      const executionPrice = getProtectionExecutionPrice(protection, price, trigger);
       const closingSide = position.side === "LONG" ? "SELL" : "BUY";
-      const charges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: closingSide, product: protection.product, quantity: position.quantity, price });
+      const charges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: closingSide, product: protection.product, quantity: position.quantity, price: executionPrice });
       const order: PaperOrder = {
         id: `${clock.getTime() + 10_000 + index}`,
         symbol: protection.symbol,
         side: closingSide,
         quantity: position.quantity,
-        price,
+        price: executionPrice,
         status: "COMPLETE",
         time: clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
         product: protection.product,
@@ -1055,10 +1135,19 @@ export function TradingDashboard() {
         charges,
         exitReason: trigger,
         priceSource: "UPSTOX_QUOTE",
+        instrumentKey: instrument?.instrumentKey,
+        instrumentName: instrument?.name,
+        assetType: instrument?.assetType ?? "EQUITY",
+        optionType: instrument?.optionType,
+        strikePrice: instrument?.strikePrice,
+        expiry: instrument?.expiry,
+        lotSize: instrument?.lotSize,
+        underlyingKey: instrument?.underlyingKey,
+        underlyingSymbol: instrument?.underlyingSymbol,
       };
       triggeredOrders.push(order);
       clearedProtectionIds.add(protection.id);
-      const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, price);
+      const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, executionPrice);
       nextBalance = closingSide === "SELL" ? nextBalance + releasedCapital - charges.total : nextBalance - releasedCapital - charges.total;
     });
 
@@ -2152,6 +2241,7 @@ export function TradingDashboard() {
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
+                onPrice={handleChartPrice}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onFeedStatus={handleFeedStatus}
               />

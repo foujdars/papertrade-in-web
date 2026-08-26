@@ -175,6 +175,15 @@ export function getProtectionTrigger(protection: PaperProtection, livePrice: num
   return null;
 }
 
+export function getProtectionExecutionPrice(
+  protection: PaperProtection,
+  livePrice: number,
+  trigger: "TARGET" | "STOP_LOSS",
+) {
+  const configuredPrice = trigger === "TARGET" ? protection.targetPrice : protection.stopLossPrice;
+  return Number.isFinite(configuredPrice) && (configuredPrice ?? 0) > 0 ? configuredPrice! : livePrice;
+}
+
 export function calculatePosition(
   orders: PaperOrder[],
   symbol: string,
