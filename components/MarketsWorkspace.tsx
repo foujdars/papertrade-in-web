@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Cable, RefreshCw, ScanSearch, TrendingUp, X } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Cable, Clock3, Gauge, RefreshCw, ScanSearch, Sparkles, Target, TrendingUp, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
@@ -13,6 +13,7 @@ export type ScannerGroup = "TRADING" | "INVESTMENT" | "IPO";
 type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
 type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
+type ScannerOption = { id: ScannerId; label: string; description: string; cadence: string };
 
 // Bump this whenever scanner eligibility rules change so that an older result
 // cannot survive in localStorage and contradict the current scanner.
@@ -22,16 +23,16 @@ const SCANNER_SELECTION_STORAGE_KEY = "papertrade-market-scanner-selection-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
 const PULL_REFRESH_THRESHOLD = 58;
 const MAX_PULL_DISTANCE = 86;
-const tradingScannerOptions: Array<{ id: ScannerId; label: string }> = [
-  { id: "VOLUME", label: "Volume Shocker" },
-  { id: "OPEN_HIGH", label: "Open = High" },
+const tradingScannerOptions: ScannerOption[] = [
+  { id: "VOLUME", label: "Volume Shocker", description: "Unusual participation versus the 20-day average", cadence: "Live" },
+  { id: "OPEN_HIGH", label: "Open = High", description: "Stocks holding the session high from the opening print", cadence: "1D" },
   ...Object.entries(NIMBLE_STRATEGIES)
     .filter(([id]) => id !== "ema-30-50-100" && id !== "rsi-divergence-daily")
-    .map(([id, item]) => ({ id: id as NimbleStrategy, label: item.label })),
+    .map(([id, item]) => ({ id: id as NimbleStrategy, label: item.label, description: item.description, cadence: item.timeframe === "1D" ? "1D" : `${item.timeframe}m` })),
 ];
-const investmentScannerOptions: Array<{ id: ScannerId; label: string }> = [
-  { id: "ema-30-50-100", label: NIMBLE_STRATEGIES["ema-30-50-100"].label },
-  { id: "rsi-divergence-daily", label: NIMBLE_STRATEGIES["rsi-divergence-daily"].label },
+const investmentScannerOptions: ScannerOption[] = [
+  { id: "ema-30-50-100", label: NIMBLE_STRATEGIES["ema-30-50-100"].label, description: NIMBLE_STRATEGIES["ema-30-50-100"].description, cadence: "1D" },
+  { id: "rsi-divergence-daily", label: NIMBLE_STRATEGIES["rsi-divergence-daily"].label, description: NIMBLE_STRATEGIES["rsi-divergence-daily"].description, cadence: "1D" },
 ];
 const allScannerOptions = [...tradingScannerOptions, ...investmentScannerOptions];
 const nifty500ScannerIds = new Set<ScannerId>([
@@ -161,11 +162,14 @@ export function MarketsWorkspace({
 
   const scannerOptions = scannerGroup === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const selectedOption = allScannerOptions.find((option) => option.id === activeScanner) ?? allScannerOptions[0];
+  const { description: activeStrategyDescription } = selectedOption;
   const activeSnapshot = snapshots[activeScanner];
   const activeRows = useMemo(
     () => validScannerRows(activeScanner, activeSnapshot?.rows ?? []),
     [activeScanner, activeSnapshot],
   );
+  const activeAdvancers = useMemo(() => activeRows.filter((row) => row.changePercent >= 0).length, [activeRows]);
+  const activeDecliners = activeRows.length - activeAdvancers;
   const instruments = useMemo(() => dedupeScanInstruments(stockUniverse
     .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
@@ -299,9 +303,32 @@ export function MarketsWorkspace({
     if (shouldRefresh) void runSelectedScan(undefined, true);
   }, [resetPullRefresh, runSelectedScan]);
 
+  if (scannerGroup === "IPO") {
+    return (
+      <section className="market-discovery-panel ipo-discovery-panel" aria-label="IPO opportunities">
+        <div className="market-discovery-head"><div><span className="eyebrow">PRIMARY MARKET</span><h2>IPOs</h2></div><button className="icon-button" onClick={onClose} aria-label="Close IPOs"><X size={20} /></button></div>
+        <IpoWorkspace />
+      </section>
+    );
+  }
+
   return (
     <section className="market-discovery-panel" aria-label="NSE market scanners">
-      <div className="market-discovery-head"><div><span className="eyebrow">NSE CASH · LIVE SCANNERS</span><h2>Markets</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
+      <div className="market-discovery-head"><div><span className="eyebrow">NSE CASH · OPPORTUNITY DESK</span><h2>Markets</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
+
+      <section className="market-command-hero" aria-label="Market scanner overview">
+        <div className="market-command-copy">
+          <span><Sparkles size={14} /> SIGNAL DESK</span>
+          <h3>Turn the market into a focused shortlist.</h3>
+          <p>Choose a proven setup, scan the right universe and open any match directly on its chart.</p>
+        </div>
+        <div className="market-command-stats">
+          <span><small>UNIVERSE</small><b>{scannerGroup === "INVESTMENT" ? "NIFTY 500" : "NSE CASH"}</b></span>
+          <span><small>MATCHES</small><b>{activeSnapshot?.scannedAt ? activeRows.length : "—"}</b></span>
+          <span className={scanMode === "auto" ? "live" : ""}><small>REFRESH</small><b>{scanMode === "auto" ? "Auto · 1m" : "Manual"}</b></span>
+        </div>
+      </section>
+
       <div className="scanner-family-tabs" role="tablist" aria-label="Scanner category">
         <button
           type="button"
@@ -313,7 +340,7 @@ export function MarketsWorkspace({
           role="tab"
           aria-selected={scannerGroup === "TRADING"}
         >
-          Trading
+          <Zap size={16} /><span><b>Trading setups</b><small>Intraday momentum &amp; structure</small></span>
         </button>
         <button
           type="button"
@@ -325,37 +352,35 @@ export function MarketsWorkspace({
           role="tab"
           aria-selected={scannerGroup === "INVESTMENT"}
         >
-          Investment · NIFTY 500
-        </button>
-        <button
-          type="button"
-          className={scannerGroup === "IPO" ? "active" : ""}
-          onClick={() => setScannerGroup("IPO")}
-          role="tab"
-          aria-selected={scannerGroup === "IPO"}
-        >
-          <span>IPOs</span><small className="new-feature-badge">NEW</small>
+          <TrendingUp size={16} /><span><b>Investment setups</b><small>Daily signals · NIFTY 500</small></span>
         </button>
       </div>
-      {scannerGroup === "IPO" ? <IpoWorkspace /> : <>
+
       <div className="trend-tabs market-scanner-tabs" role="tablist" aria-label="Market scanners">
-        {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}>{option.label}</button>)}
+        {scannerOptions.map((option, index) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><span>{index + 1 < 10 ? `0${index + 1}` : index + 1}</span><b>{option.label}</b><small>{option.cadence}</small></button>)}
       </div>
+
       <div className="scanner-run-row">
-        <span>
-          {activeSnapshot?.scannedAt && <small>Last scan {formatScanTime(activeSnapshot.scannedAt)} IST · list stays until refreshed</small>}
+        <div className="scanner-active-story">
+          <span className="scanner-story-icon">{activeScanner === "VOLUME" ? <BarChart3 size={18} /> : activeScanner === "rsi-divergence-daily" ? <Gauge size={18} /> : <Target size={18} />}</span>
+          <span><small>ACTIVE STRATEGY · {selectedOption.cadence}</small><b>{selectedOption.label}</b><em>{activeStrategyDescription}</em></span>
+        </div>
+        <div className="scanner-run-actions">
           <span className="scanner-mode-toggle" role="group" aria-label="Scanner refresh mode">
             <button type="button" className={scanMode === "manual" ? "active" : ""} onClick={() => setScanMode("manual")}>Manual</button>
             <button type="button" className={scanMode === "auto" ? "active" : ""} onClick={() => setScanMode("auto")}>Automatic</button>
           </span>
-          {scanMode === "auto" && <small>Refreshes this scanner every minute while the app is open.</small>}
-        </span>
-        <button className="scanner-run-button" onClick={() => void runSelectedScan(undefined, true)} disabled={Boolean(loadingScanner)}>
-          {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
-          {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"}
-        </button>
+          <button className="scanner-run-button" onClick={() => void runSelectedScan(undefined, true)} disabled={Boolean(loadingScanner)}>
+            {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
+            {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"}
+          </button>
+        </div>
       </div>
       {activeSnapshot?.error && <div className="scanner-inline-error"><Cable size={16} /><span>{activeSnapshot.error} The previous result is preserved.</span></div>}
+      <div className="market-results-head">
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small>{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : "Run this strategy to build your shortlist"}</small></span>
+        {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
+      </div>
       <div
         ref={marketListRef}
         className="market-discovery-list"
@@ -394,6 +419,7 @@ export function MarketsWorkspace({
               <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
               <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>{detail}</small></span>
               <span><b>{formatInr(displayPrice)}</b><small className={`market-move-line ${displayChangePercent >= 0 ? "positive" : "negative"}`}>{formatSignedMarketMove(displayNetChange, displayChangePercent)}</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
+              <span className="scanner-open-chart"><ArrowRight size={15} /></span>
             </button>
           );
         })}
@@ -401,7 +427,6 @@ export function MarketsWorkspace({
         {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Press Scan to load {selectedOption.label}. Nothing is fetched merely by changing tabs.</span></div>}
         {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass this scan</b><span>The completed Upstox candles returned no current {selectedOption.label} setup.</span></div>}
       </div>
-      </>}
     </section>
   );
 }
