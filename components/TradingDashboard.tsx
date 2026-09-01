@@ -1247,6 +1247,11 @@ export function TradingDashboard() {
   const visibleLivePrice = verifiedLivePrice ?? 0;
   const selectedChange = selectedQuoteIsFresh ? selectedQuote?.changePercent ?? 0 : 0;
   const selectedNetChange = selectedQuoteIsFresh ? selectedQuote?.netChange ?? 0 : 0;
+  const selectedDayLow = selectedQuoteIsFresh ? selectedQuote?.low ?? 0 : 0;
+  const selectedDayHigh = selectedQuoteIsFresh ? selectedQuote?.high ?? 0 : 0;
+  const selectedDayRangeProgress = verifiedLivePrice && selectedDayHigh > selectedDayLow
+    ? Math.min(100, Math.max(0, (verifiedLivePrice - selectedDayLow) / (selectedDayHigh - selectedDayLow) * 100))
+    : 50;
   const topQuote = fnoTopInstrument ? marketQuotes[fnoTopInstrument.instrumentKey] ?? marketQuotes[fnoTopInstrument.symbol] : undefined;
   const topQuoteKey = fnoTopInstrument && marketQuotes[fnoTopInstrument.instrumentKey] ? fnoTopInstrument.instrumentKey : fnoTopInstrument?.symbol ?? "";
   const topQuoteIsFresh = Boolean(topQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[topQuoteKey] ?? 0) <= 45_000);
@@ -2279,62 +2284,61 @@ export function TradingDashboard() {
               );
             })}
           </section>}
-          {activeNavigationSection === "trade" && Object.values(homeCards).some(Boolean) && <section className="home-insights-strip" aria-label="Customisable home cards">
-            {homeCards.market && <article className={`home-insight-card freshness-${marketFreshness.toLowerCase()}`}>
-              <span className="home-insight-icon"><Radio size={15} /></span>
-              <span><small>MARKET DATA</small><b>{marketFreshness}</b></span>
-              <em>{latestQuoteUpdatedAt ? `Updated ${new Date(latestQuoteUpdatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" })}` : "Waiting for Upstox"}</em>
-            </article>}
-            {homeCards.recent && <article className="home-insight-card recent-card">
-              <span><small>RECENT</small><b>Stocks &amp; scanners</b></span>
-              <div>{recentStockItems.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>{item.symbol}</button>)}{recentScanners.slice(0, 2).map((label) => <button key={label} onClick={() => openNavigationSection("markets")}>{label}</button>)}{!recentStockItems.length && !recentScanners.length && <em>Your recently opened items appear here</em>}</div>
-            </article>}
-            {homeCards.portfolio && <button className="home-insight-card portfolio-card" onClick={() => openNavigationSection("holdings")}>
-              <span className="home-insight-icon"><BriefcaseBusiness size={15} /></span>
-              <span><small>TODAY’S PORTFOLIO</small><b className={currentDayPortfolioPnl >= 0 ? "positive" : "negative"}>{currentDayPortfolioPnl >= 0 ? "+" : ""}{formatInr(currentDayPortfolioPnl)}</b></span>
-              <em>{holdings.length} holdings · {openPositions.length} open</em>
-            </button>}
-            <button className="home-cards-customise" onClick={() => setMoreMenuOpen(true)} aria-label="Customise home cards"><SlidersHorizontal size={15} /></button>
-          </section>}
+          <section className="trade-cockpit" aria-label="Trade workspace controls">
           <div className="instrument-header">
-            <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
-              <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
-                <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
-                <p>{selected.name}</p>
-              </button>
-              {selected.assetType !== "OPTION" && <button
-                className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`}
-                onClick={() => openWatchlistPicker(selected)}
-                aria-label={`Add ${selected.symbol} to a custom watchlist`}
-                title="Add to custom watchlist"
-              >
-                <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
-              </button>}
-              {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button
-                className="chart-derivatives-link"
-                disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey}
-                onClick={() => void openFnoUnderlying(fnoUnderlying)}
-                aria-label={`Open ${selected.symbol} option charts`}
-                title="Open option charts"
-              >
-                <Link2 size={19} />
-              </button>}
-              {showTradeSymbols && (
-                <div className="trade-symbol-menu">
-                  <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
-                  <div>
-                    {tradeSymbolMatches.map((item) => (
-                      <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
-                        <span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em>
-                      </button>
-                    ))}
-                    {!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}
+            <div className="trade-identity-cluster">
+              <div className="trade-context-line">
+                <span className={`trade-feed-chip ${selectedQuoteIsFresh ? "live" : "waiting"}`}><i />{selectedQuoteIsFresh ? "LIVE" : "SYNCING"}</span>
+                <span>Paper practice</span>
+              </div>
+              <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
+                <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
+                  <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
+                  <p>{selected.name}</p>
+                </button>
+                {selected.assetType !== "OPTION" && <button
+                  className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`}
+                  onClick={() => openWatchlistPicker(selected)}
+                  aria-label={`Add ${selected.symbol} to a custom watchlist`}
+                  title="Add to custom watchlist"
+                >
+                  <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
+                </button>}
+                {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button
+                  className="chart-derivatives-link"
+                  disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey}
+                  onClick={() => void openFnoUnderlying(fnoUnderlying)}
+                  aria-label={`Open ${selected.symbol} option charts`}
+                  title="Open option charts"
+                >
+                  <Link2 size={19} />
+                </button>}
+                {showTradeSymbols && (
+                  <div className="trade-symbol-menu">
+                    <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
+                    <div>
+                      {tradeSymbolMatches.map((item) => (
+                        <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
+                          <span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em>
+                        </button>
+                      ))}
+                      {!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedQuoteIsFresh ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : "Waiting for Upstox"}</span></div>
-            <div className="ohlc-strip"><span>O <b>{selectedQuoteIsFresh ? selectedQuote?.open?.toFixed(2) ?? "—" : "—"}</b></span><span>H <b>{selectedQuoteIsFresh ? selectedQuote?.high?.toFixed(2) ?? "—" : "—"}</b></span><span>L <b>{selectedQuoteIsFresh ? selectedQuote?.low?.toFixed(2) ?? "—" : "—"}</b></span><span>C <b>{selectedQuoteIsFresh ? selectedQuote?.previousClose?.toFixed(2) ?? "—" : "—"}</b></span></div>
+            <div className="trade-day-range">
+              <header><span>DAY RANGE</span><b>{selectedQuoteIsFresh ? `${Math.round(selectedDayRangeProgress)}%` : "—"}</b></header>
+              <div><i style={{ left: `${selectedDayRangeProgress}%` }} /></div>
+              <footer><span>L {selectedDayLow ? selectedDayLow.toFixed(2) : "—"}</span><span>H {selectedDayHigh ? selectedDayHigh.toFixed(2) : "—"}</span></footer>
+            </div>
+            <div className="trade-journey" aria-label="Trading practice progress">
+              <span className="complete"><i>1</i><b>Plan</b></span>
+              <span className={selectedPosition.quantity > 0 ? "complete" : "active"}><i>2</i><b>Place</b></span>
+              <span className={selectedPosition.quantity > 0 ? "active" : ""}><i>3</i><b>Review</b></span>
+            </div>
             <div className="header-order-buttons"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
 
@@ -2352,11 +2356,13 @@ export function TradingDashboard() {
             </div>
             <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
+            <button type="button" className="trade-risk-promise" onClick={() => activateRiskTool("BUY")} title="Prepare a risk-first paper trade"><ShieldCheck size={15} /><span><small>RISK FIRST</small><b>₹2K SL · ₹3K target</b></span></button>
             <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
               <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
             </button>
             <div className="chart-control-orders"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
+          </section>
 
           <div className="chart-body">
             <ChartDrawingToolbar
