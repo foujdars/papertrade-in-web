@@ -13,19 +13,19 @@ async function render() {
   );
 }
 
-test("server-renders the PaperTrade IN terminal", async () => {
+test("server-renders the PaperTrade IN home dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
-  assert.match(html, /Interactive TradingView Lightweight Charts candlestick chart/);
-  assert.match(html, /Functions/);
-  assert.match(html, /0 active/);
-  assert.doesNotMatch(html, /EMA 5|EMA 21|RSI 14/);
+  assert.match(html, /Build skill before you risk capital/);
+  assert.match(html, /Market pulse/);
+  assert.match(html, /Quick launch/);
+  assert.match(html, /Open chart/);
+  assert.match(html, /IPO RADAR/);
   assert.match(html, /Broker API/);
-  assert.match(html, /No real money/);
   assert.match(html, /Holdings/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });

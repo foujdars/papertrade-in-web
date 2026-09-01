@@ -18,6 +18,7 @@ const inFlightRequests = new Map<string, Promise<unknown>>();
 function cachePolicy(path: string) {
   // Quotes are never served stale because they can execute a paper order or protective exit.
   if (path.includes("market-quote/quotes")) return { freshMs: 5_000, staleMs: 5_000 };
+  if (path.includes("/v2/ipos")) return { freshMs: 30_000, staleMs: 5 * 60_000 };
   if (path.includes("historical-candle/intraday")) return { freshMs: 12_000, staleMs: 10 * 60_000 };
   if (path.includes("historical-candle")) return { freshMs: 5 * 60_000, staleMs: 60 * 60_000 };
   return { freshMs: 10_000, staleMs: 60_000 };

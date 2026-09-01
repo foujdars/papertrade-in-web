@@ -6,9 +6,10 @@ import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } f
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
+import { IpoWorkspace } from "@/components/IpoWorkspace";
 
 type ScannerId = "VOLUME" | "OPEN_HIGH" | NimbleStrategy;
-type ScannerGroup = "TRADING" | "INVESTMENT";
+export type ScannerGroup = "TRADING" | "INVESTMENT" | "IPO";
 type ScannerRow = VolumeBreakoutRow | OpenHighRow | TechnicalScannerRow;
 type ScannerSnapshot = { rows: ScannerRow[]; scannedAt: string; error?: string };
 type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
@@ -17,6 +18,7 @@ type ScanInstrument = Pick<Instrument, "symbol" | "name" | "instrumentKey">;
 // cannot survive in localStorage and contradict the current scanner.
 const STORAGE_KEY = "papertrade-market-scanner-results-v4";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
+const SCANNER_SELECTION_STORAGE_KEY = "papertrade-market-scanner-selection-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
 const PULL_REFRESH_THRESHOLD = 58;
 const MAX_PULL_DISTANCE = 86;
@@ -116,21 +118,36 @@ function readScanMode(): "manual" | "auto" {
   return window.localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "manual" ? "manual" : "auto";
 }
 
+function readSavedScanner(group: ScannerGroup): ScannerId {
+  if (typeof window === "undefined") return group === "INVESTMENT" ? "ema-30-50-100" : "VOLUME";
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(SCANNER_SELECTION_STORAGE_KEY) ?? "{}") as { scannerGroup?: ScannerGroup; activeScanner?: ScannerId };
+    if (saved.scannerGroup === group && allScannerOptions.some((option) => option.id === saved.activeScanner)) return saved.activeScanner!;
+  } catch { /* Ignore malformed device preferences. */ }
+  return group === "INVESTMENT" ? "ema-30-50-100" : "VOLUME";
+}
+
 export function MarketsWorkspace({
   stockUniverse,
   quotes,
   onQuoteKeysChange,
   onSelectCash,
   onClose,
+  initialGroup = "TRADING",
+  onGroupChange,
+  onScannerViewed,
 }: {
   stockUniverse: Instrument[];
   quotes: Record<string, NormalizedQuote>;
   onQuoteKeysChange: (keys: string[]) => void;
   onSelectCash: (instrument: Instrument, price: number) => void;
   onClose: () => void;
+  initialGroup?: ScannerGroup;
+  onGroupChange?: (group: ScannerGroup) => void;
+  onScannerViewed?: (label: string) => void;
 }) {
-  const [scannerGroup, setScannerGroup] = useState<ScannerGroup>("TRADING");
-  const [activeScanner, setActiveScanner] = useState<ScannerId>("VOLUME");
+  const [scannerGroup, setScannerGroup] = useState<ScannerGroup>(initialGroup);
+  const [activeScanner, setActiveScanner] = useState<ScannerId>(() => readSavedScanner(initialGroup));
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
@@ -156,12 +173,21 @@ export function MarketsWorkspace({
     .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey)
       && (item.categories.includes("NIFTY 500") || item.categories.includes("BANK NIFTY")))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
-  const activeQuoteKeys = useMemo(() => activeRows.map((row) => row.instrumentKey).filter(Boolean), [activeRows]);
+  const activeQuoteKeys = useMemo(
+    () => scannerGroup === "IPO" ? [] : activeRows.map((row) => row.instrumentKey).filter(Boolean),
+    [activeRows, scannerGroup],
+  );
 
   useEffect(() => {
     onQuoteKeysChange(activeQuoteKeys);
     return () => onQuoteKeysChange([]);
   }, [activeQuoteKeys, onQuoteKeysChange]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SCANNER_SELECTION_STORAGE_KEY, JSON.stringify({ scannerGroup, activeScanner }));
+    onGroupChange?.(scannerGroup);
+    onScannerViewed?.(scannerGroup === "IPO" ? "IPOs" : selectedOption.label);
+  }, [activeScanner, onGroupChange, onScannerViewed, scannerGroup, selectedOption.label]);
 
   const runSelectedScan = useCallback(async (requestedScanner?: ScannerId, force = false) => {
     if (scanInFlightRef.current) return;
@@ -220,14 +246,16 @@ export function MarketsWorkspace({
   // the user had selected manual mode. Old empty snapshots should never leave
   // the Volume Shocker looking permanently broken.
   useEffect(() => {
+    if (scannerGroup === "IPO") return;
     const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (!universeAvailable || loadingScanner || activeRows.length > 0 || initialScanAttemptedRef.current.has(activeScanner)) return;
     initialScanAttemptedRef.current.add(activeScanner);
     void runSelectedScan(activeScanner, true);
-  }, [activeRows.length, activeScanner, instruments.length, loadingScanner, nifty500Instruments.length, runSelectedScan]);
+  }, [activeRows.length, activeScanner, instruments.length, loadingScanner, nifty500Instruments.length, runSelectedScan, scannerGroup]);
 
   useEffect(() => {
     window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
+    if (scannerGroup === "IPO") return;
     const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (scanMode !== "auto" || !universeAvailable) return;
     const scanWhenReady = () => {
@@ -242,7 +270,7 @@ export function MarketsWorkspace({
       window.removeEventListener("online", scanWhenReady);
       document.removeEventListener("visibilitychange", scanWhenReady);
     };
-  }, [activeScanner, instruments.length, nifty500Instruments.length, runSelectedScan, scanMode]);
+  }, [activeScanner, instruments.length, nifty500Instruments.length, runSelectedScan, scanMode, scannerGroup]);
 
   useEffect(() => () => scanAbortRef.current?.abort(), []);
 
@@ -299,7 +327,17 @@ export function MarketsWorkspace({
         >
           Investment · NIFTY 500
         </button>
+        <button
+          type="button"
+          className={scannerGroup === "IPO" ? "active" : ""}
+          onClick={() => setScannerGroup("IPO")}
+          role="tab"
+          aria-selected={scannerGroup === "IPO"}
+        >
+          <span>IPOs</span><small className="new-feature-badge">NEW</small>
+        </button>
       </div>
+      {scannerGroup === "IPO" ? <IpoWorkspace /> : <>
       <div className="trend-tabs market-scanner-tabs" role="tablist" aria-label="Market scanners">
         {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}>{option.label}</button>)}
       </div>
@@ -359,10 +397,11 @@ export function MarketsWorkspace({
             </button>
           );
         })}
-        {loadingScanner === activeScanner && !activeRows.length && <div className="positions-empty"><TrendingUp size={30} /><b>Scanning {selectedOption.label}</b><span>Only this scanner is running. Other saved lists are unchanged.</span></div>}
+        {loadingScanner === activeScanner && !activeRows.length && <div className="scanner-skeleton-list" aria-label={`Scanning ${selectedOption.label}`}>{Array.from({ length: 7 }, (_, index) => <div className="scanner-skeleton-row" key={`scanner-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
         {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Press Scan to load {selectedOption.label}. Nothing is fetched merely by changing tabs.</span></div>}
         {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass this scan</b><span>The completed Upstox candles returned no current {selectedOption.label} setup.</span></div>}
       </div>
+      </>}
     </section>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud,
-  Download, Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, Plus, Radio, ShieldCheck, Smartphone, Sun,
+  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home,
+  Download, Layers3, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
 } from "lucide-react";
@@ -10,13 +10,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Image from "next/image";
 import Link from "next/link";
 import { App as CapacitorApp } from "@capacitor/app";
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndicators, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
-import { MarketsWorkspace } from "@/components/MarketsWorkspace";
+import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
+import { IpoAlertMonitor } from "@/components/IpoWorkspace";
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
@@ -47,6 +50,8 @@ import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import { getNativeTradeAlert } from "@/lib/native-alert";
+import { addPaperTradeNotification } from "@/lib/notification-center";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
@@ -56,6 +61,8 @@ const getServerAndroidPlatformSnapshot = () => false;
 const CUSTOM_WATCHLIST_STORAGE_KEY = "papertrade-custom-watchlists";
 const LAST_CHART_STORAGE_KEY = "papertrade-last-chart";
 const LAST_CASH_CHART_STORAGE_KEY = "papertrade-last-cash-chart";
+const UI_PREFERENCES_STORAGE_KEY = "papertrade-ui-preferences-v2";
+const HOME_EXPERIENCE_VERSION = 1;
 const RATNAVEER_REPAIR_STORAGE_KEY = "papertrade-repair-ratnaveer-demo-v1";
 const MAX_VIRTUAL_BALANCE = 100_000_000;
 const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
@@ -72,15 +79,10 @@ const PNL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DEFAULT_RISK_AMOUNT = 2_000;
 const DEFAULT_REWARD_AMOUNT = 3_000;
 const INDIA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
-const NativeTradeAlert = registerPlugin<{
-  requestPermission: () => Promise<{ granted?: boolean } | void>;
-  show: (options: { title: string; body: string }) => Promise<void>;
-}>("TradeAlert");
-
 function prepareProtectionAlerts() {
   if (typeof window === "undefined") return;
   if (Capacitor.getPlatform() === "android") {
-    void NativeTradeAlert.requestPermission().catch(() => undefined);
+    void getNativeTradeAlert().requestPermission().catch(() => undefined);
     return;
   }
   if ("Notification" in window && Notification.permission === "default") {
@@ -92,9 +94,10 @@ function showProtectionAlert(order: PaperOrder) {
   if (typeof window === "undefined") return;
   const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
+  addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body });
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
-    void NativeTradeAlert.show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
+    void getNativeTradeAlert().show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
     new Notification(`PaperTrade IN - ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
   }
@@ -136,7 +139,10 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "pnl";
+type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl";
+type HomeCardId = "market" | "recent" | "portfolio";
+type HomeCardPreferences = Record<HomeCardId, boolean>;
+const DEFAULT_HOME_CARDS: HomeCardPreferences = { market: true, recent: true, portfolio: true };
 
 type ChartHistorySnapshot = {
   instrument: Instrument;
@@ -257,7 +263,7 @@ async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
 }
 function Brand({ onClick }: { onClick: () => void }) {
   return (
-    <button className="brand" onClick={onClick} aria-label="Open Trade chart">
+    <button className="brand" onClick={onClick} aria-label="Open PaperTrade home">
       <span className="brand-mark"><BrandMark size={34} /></span>
       <span>PaperTrade <b>IN</b></span>
     </button>
@@ -318,6 +324,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 
 export function TradingDashboard() {
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
+  const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
@@ -362,12 +369,13 @@ export function TradingDashboard() {
   const [riskLevelsCustomized, setRiskLevelsCustomized] = useState(false);
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
-  const [indicators, setIndicators] = usePersistentChartIndicators();
+  const [indicators, setIndicators] = usePersistentChartIndicators(user?.id);
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [protections, setProtections] = useState<PaperProtection[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
+  const [homeOpen, setHomeOpen] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [holdingsOpen, setHoldingsOpen] = useState(false);
@@ -375,6 +383,7 @@ export function TradingDashboard() {
   const [desktopOrderPanelOpen, setDesktopOrderPanelOpen] = useState(true);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
+  const [marketsInitialGroup, setMarketsInitialGroup] = useState<ScannerGroup>("TRADING");
   const [optionChainOpen, setOptionChainOpen] = useState(false);
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
@@ -393,6 +402,11 @@ export function TradingDashboard() {
   const [fundsOpen, setFundsOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
+  const [recentStocks, setRecentStocks] = useState<string[]>([]);
+  const [recentScanners, setRecentScanners] = useState<string[]>([]);
+  const [uiPreferencesReady, setUiPreferencesReady] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountDeleteArmed, setAccountDeleteArmed] = useState(false);
   const [accountDeleteWorking, setAccountDeleteWorking] = useState(false);
@@ -408,14 +422,16 @@ export function TradingDashboard() {
   });
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
-  const activeNavigationSection: NavigationSection = sidebarOpen
+  const activeNavigationSection: NavigationSection = homeOpen
+    ? "home"
+    : sidebarOpen
     ? "watchlist"
     : holdingsOpen
       ? "holdings"
       : ordersOpen
         ? "orders"
         : marketsOpen
-          ? "markets"
+          ? marketsInitialGroup === "IPO" ? "ipo" : "markets"
           : pnlOpen
             ? "pnl"
             : workspaceMode;
@@ -460,6 +476,7 @@ export function TradingDashboard() {
   }, []);
 
   const returnToTradeFromBack = useCallback(() => {
+    setHomeOpen(false);
     setSidebarOpen(false);
     setPositionsOpen(false);
     setHoldingsOpen(false);
@@ -518,6 +535,57 @@ export function TradingDashboard() {
     }, 0);
     return () => window.clearTimeout(restore);
   }, []);
+
+  useEffect(() => {
+    setUiPreferencesReady(false);
+    const restore = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(userPreferenceKey) ?? "{}") as {
+          activeSection?: NavigationSection;
+          watchlist?: string;
+          timeframe?: string;
+          marketGroup?: ScannerGroup;
+          homeCards?: Partial<HomeCardPreferences>;
+          recentStocks?: string[];
+          recentScanners?: string[];
+          homeExperienceVersion?: number;
+        };
+        if (saved.watchlist) setWatchlist(saved.watchlist);
+        if (saved.timeframe && periods.includes(saved.timeframe)) setTimeframe(saved.timeframe);
+        if (saved.marketGroup === "TRADING" || saved.marketGroup === "INVESTMENT" || saved.marketGroup === "IPO") setMarketsInitialGroup(saved.marketGroup);
+        setHomeCards({ ...DEFAULT_HOME_CARDS, ...(saved.homeCards ?? {}) });
+        setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
+        setRecentScanners(Array.isArray(saved.recentScanners) ? saved.recentScanners.slice(0, 4) : []);
+        const validSections: NavigationSection[] = ["home", "trade", "fno", "watchlist", "holdings", "orders", "markets", "ipo", "pnl"];
+        const section = saved.homeExperienceVersion === HOME_EXPERIENCE_VERSION && saved.activeSection && validSections.includes(saved.activeSection) ? saved.activeSection : "home";
+        setHomeOpen(section === "home");
+        setSidebarOpen(section === "watchlist");
+        setHoldingsOpen(section === "holdings");
+        setOrdersOpen(section === "orders");
+        setMarketsOpen(section === "markets" || section === "ipo");
+        if (section === "ipo") setMarketsInitialGroup("IPO");
+        setPnlOpen(section === "pnl");
+        setWorkspaceMode(section === "fno" ? "fno" : "trade");
+        setFnoListOpen(section === "fno");
+      } catch { /* Ignore malformed per-user interface preferences. */ }
+      setUiPreferencesReady(true);
+    }, 0);
+    return () => window.clearTimeout(restore);
+  }, [userPreferenceKey]);
+
+  useEffect(() => {
+    if (!uiPreferencesReady) return;
+    localStorage.setItem(userPreferenceKey, JSON.stringify({
+      activeSection: activeNavigationSection,
+      watchlist,
+      timeframe,
+      marketGroup: marketsInitialGroup,
+      homeCards,
+      recentStocks,
+      recentScanners,
+      homeExperienceVersion: HOME_EXPERIENCE_VERSION,
+    }));
+  }, [activeNavigationSection, homeCards, marketsInitialGroup, recentScanners, recentStocks, timeframe, uiPreferencesReady, userPreferenceKey, watchlist]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -1296,6 +1364,38 @@ export function TradingDashboard() {
     return orders.filter((order) => getPaperOrderTimestamp(order) >= start.getTime());
   }, [clock, orders]);
   const closedTrades = useMemo(() => buildClosedTrades(orders), [orders]);
+  const latestQuoteUpdatedAt = Math.max(0, ...Object.values(marketQuoteUpdatedAt));
+  const marketFreshness = feedStatus.mode === "live" && marketStatus.isOpen && clock && latestQuoteUpdatedAt && clock.getTime() - latestQuoteUpdatedAt <= 45_000
+    ? "Live"
+    : latestQuoteUpdatedAt ? "Delayed" : "Connecting";
+  const recentStockItems = recentStocks.flatMap((symbol) => {
+    const item = tradingUniverse.find((instrument) => instrument.symbol === symbol);
+    return item ? [item] : [];
+  }).slice(0, 4);
+  const todayClosedPnl = useMemo(() => {
+    if (!clock) return 0;
+    const todayKey = indiaDateKey(clock);
+    return closedTrades.filter((trade) => trade.closedAt > 0 && indiaDateKey(trade.closedAt) === todayKey).reduce((sum, trade) => sum + trade.netPnl, 0);
+  }, [clock, closedTrades]);
+  const intradayOpenPnl = openPositions.filter((position) => position.product === "INTRADAY").reduce((sum, position) => sum + position.unrealizedPnl, 0);
+  const currentDayPortfolioPnl = todayClosedPnl + intradayOpenPnl + holdingsSummary.dayPnl;
+
+  useEffect(() => {
+    if (!clock || getNseMarketStatus(clock).minutesFromMidnight < 17 * 60) return;
+    const dateKey = indiaDateKey(clock);
+    const reminderKey = `papertrade-portfolio-summary:${user?.id ?? "guest"}:${dateKey}`;
+    if (localStorage.getItem(reminderKey) === "sent") return;
+    const direction = currentDayPortfolioPnl >= 0 ? "profit" : "loss";
+    const title = `Today’s portfolio ${direction}`;
+    const body = `${currentDayPortfolioPnl >= 0 ? "+" : ""}${formatInr(currentDayPortfolioPnl)} including completed trades, open intraday positions and holdings’ day move.`;
+    addPaperTradeNotification({ id: `portfolio-${dateKey}-${user?.id ?? "guest"}`, kind: "portfolio", title, body });
+    localStorage.setItem(reminderKey, "sent");
+    if (Capacitor.getPlatform() === "android") {
+      void getNativeTradeAlert().show({ title: `PaperTrade IN - ${title}`, body }).catch(() => undefined);
+    } else if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(`PaperTrade IN - ${title}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-portfolio-${dateKey}` });
+    }
+  }, [clock, currentDayPortfolioPnl, user?.id]);
   const pnlStats = useMemo(() => {
     const totalProfit = closedTrades.filter((trade) => trade.netPnl > 0).reduce((sum, trade) => sum + trade.netPnl, 0);
     const totalLoss = Math.abs(closedTrades.filter((trade) => trade.netPnl < 0).reduce((sum, trade) => sum + trade.netPnl, 0));
@@ -1715,6 +1815,7 @@ export function TradingDashboard() {
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
     const nextInstrument = { ...item, price: price > 0 ? price : 0 };
+    setRecentStocks((current) => [item.symbol, ...current.filter((symbol) => symbol !== item.symbol)].slice(0, 6));
     setSelected(nextInstrument);
     setChartTradeFooterOpen(false);
     if (item.assetType !== "OPTION") {
@@ -1991,6 +2092,13 @@ export function TradingDashboard() {
 
   function openNavigationSection(section: NavigationSection) {
     setOptionChainOpen(false);
+    if (section === "home") {
+      setHomeOpen(true);
+      setSidebarOpen(false); setPositionsOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
+      setFnoListOpen(false); setOptionChainOpen(false); setOrderSheetOpen(false); setFnoTradeDockOpen(false);
+      return;
+    }
+    setHomeOpen(false);
     if (section === "trade") {
       setSidebarOpen(false); setPositionsOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setFnoListOpen(false);
@@ -2026,7 +2134,8 @@ export function TradingDashboard() {
     setPositionsOpen(false);
     setHoldingsOpen(section === "holdings");
     setOrdersOpen(section === "orders");
-    setMarketsOpen(section === "markets");
+    if (section === "markets" || section === "ipo") setMarketsInitialGroup(section === "ipo" ? "IPO" : marketsInitialGroup === "IPO" ? "TRADING" : marketsInitialGroup);
+    setMarketsOpen(section === "markets" || section === "ipo");
     if (section === "pnl") {
       const currentDate = indiaDateParts(clock?.getTime() ?? Date.now());
       setPnlCalendarMonth(currentDate.month - 1);
@@ -2034,6 +2143,14 @@ export function TradingDashboard() {
       setSelectedPnlDateKey(null);
     }
     setPnlOpen(section === "pnl");
+  }
+
+  const rememberScanner = useCallback((label: string) => {
+    setRecentScanners((current) => [label, ...current.filter((item) => item !== label)].slice(0, 4));
+  }, []);
+
+  function toggleHomeCard(card: HomeCardId) {
+    setHomeCards((current) => ({ ...current, [card]: !current[card] }));
   }
 
   function closeAccountModal() {
@@ -2058,10 +2175,11 @@ export function TradingDashboard() {
 
   return (
     <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
+      <IpoAlertMonitor />
       <header className="topbar">
-        <Brand onClick={() => openNavigationSection("trade")} />
+        <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}>Home</button><button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
@@ -2071,12 +2189,38 @@ export function TradingDashboard() {
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
+          <button className={`icon-button top-watchlist-button ${activeNavigationSection === "watchlist" ? "active" : ""}`} onClick={() => openNavigationSection("watchlist")} aria-label="Open watchlist" title="Watchlist"><Layers3 size={18} /></button>
+          <NotificationCenter />
+          <div className="more-menu-wrap">
+            <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
+            {moreMenuOpen && <>
+              <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
+              <section className="more-menu-panel" aria-label="More options">
+                <header><SlidersHorizontal size={17} /><span><b>More</b><small>Personalise your home screen</small></span></header>
+                <div className="home-card-toggles">
+                  <b>Home cards</b>
+                  {([['market', 'Market freshness'], ['recent', 'Recently viewed'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
+                </div>
+                <div className="more-menu-actions">
+                  <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("watchlist"); }}><Layers3 size={16} /><span>Watchlists</span></button>
+                  <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("holdings"); }}><BriefcaseBusiness size={16} /><span>Holdings</span></button>
+                  <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("orders"); }}><WalletCards size={16} /><span>Order book</span></button>
+                  <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("pnl"); }}><Activity size={16} /><span>Performance &amp; P&amp;L</span></button>
+                  <button onClick={() => { setMoreMenuOpen(false); setFundsOpen(true); }}><WalletCards size={16} /><span>Virtual funds</span><small>{formatInr(balance)}</small></button>
+                  <button onClick={() => { setMoreMenuOpen(false); toggleTheme(); }}>{theme === "neon" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "neon" ? "Light theme" : "Dark theme"}</span></button>
+                  {!isAndroidApp && <button onClick={() => { setMoreMenuOpen(false); setDownloadOpen(true); }}><Download size={16} /><span>Get app</span></button>}
+                  {!isAndroidApp && <button onClick={() => { setMoreMenuOpen(false); setShowApi(true); }}><Cable size={16} /><span>Broker connection</span></button>}
+                  <button onClick={() => { setMoreMenuOpen(false); setFeedbackOpen(true); }}><MessageCircle size={16} /><span>Suggestions</span></button>
+                </div>
+              </section>
+            </>}
+          </div>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
       </header>
 
-      {!holdingsOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
+      {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
           <div className="desktop-panel-head"><span className="eyebrow">Indian markets</span><h2>Watchlist</h2></div>
@@ -2108,7 +2252,7 @@ export function TradingDashboard() {
                 </div>
               );
             })}
-            {watchlistLoading && <div className="watchlist-loading">Loading complete NSE lists…</div>}
+            {watchlistLoading && <div className="watchlist-skeleton-list" aria-label="Loading NSE stocks">{Array.from({ length: 8 }, (_, index) => <div className="watchlist-skeleton-row" key={`watchlist-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
             {!watchlistLoading && !filtered.length && <div className="empty-list">No matching NSE stocks.</div>}
             {visibleInstruments.length < filtered.length && <button className="load-more-stocks" onClick={() => setWatchlistLimit((value) => value + 60)}>Load 60 more <small>{visibleInstruments.length} of {filtered.length}</small></button>}
           </div>
@@ -2134,6 +2278,23 @@ export function TradingDashboard() {
                 </button>
               );
             })}
+          </section>}
+          {activeNavigationSection === "trade" && Object.values(homeCards).some(Boolean) && <section className="home-insights-strip" aria-label="Customisable home cards">
+            {homeCards.market && <article className={`home-insight-card freshness-${marketFreshness.toLowerCase()}`}>
+              <span className="home-insight-icon"><Radio size={15} /></span>
+              <span><small>MARKET DATA</small><b>{marketFreshness}</b></span>
+              <em>{latestQuoteUpdatedAt ? `Updated ${new Date(latestQuoteUpdatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" })}` : "Waiting for Upstox"}</em>
+            </article>}
+            {homeCards.recent && <article className="home-insight-card recent-card">
+              <span><small>RECENT</small><b>Stocks &amp; scanners</b></span>
+              <div>{recentStockItems.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>{item.symbol}</button>)}{recentScanners.slice(0, 2).map((label) => <button key={label} onClick={() => openNavigationSection("markets")}>{label}</button>)}{!recentStockItems.length && !recentScanners.length && <em>Your recently opened items appear here</em>}</div>
+            </article>}
+            {homeCards.portfolio && <button className="home-insight-card portfolio-card" onClick={() => openNavigationSection("holdings")}>
+              <span className="home-insight-icon"><BriefcaseBusiness size={15} /></span>
+              <span><small>TODAY’S PORTFOLIO</small><b className={currentDayPortfolioPnl >= 0 ? "positive" : "negative"}>{currentDayPortfolioPnl >= 0 ? "+" : ""}{formatInr(currentDayPortfolioPnl)}</b></span>
+              <em>{holdings.length} holdings · {openPositions.length} open</em>
+            </button>}
+            <button className="home-cards-customise" onClick={() => setMoreMenuOpen(true)} aria-label="Customise home cards"><SlidersHorizontal size={15} /></button>
           </section>}
           <div className="instrument-header">
             <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
@@ -2355,14 +2516,42 @@ export function TradingDashboard() {
         else closeFnoWorkspace();
       }} />}
 
+      {homeOpen && <HomeWorkspace
+        firstName={typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined}
+        indices={LIVE_INDEX_TICKERS.map((item) => {
+          const quote = marketQuotes[item.instrumentKey];
+          const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
+          return { label: item.label, price: quote?.lastPrice ?? null, points: quote?.netChange ?? null, changePercent: quote?.changePercent ?? null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live" };
+        })}
+        marketOpen={marketStatus.isOpen}
+        feedLive={feedStatus.mode === "live"}
+        balance={balance}
+        todayPnl={currentDayPortfolioPnl}
+        holdingsCount={holdings.length}
+        openPositionsCount={openPositions.length}
+        recentStocks={recentStocks}
+        recentScanners={recentScanners}
+        onOpenTrade={() => openNavigationSection("trade")}
+        onOpenFno={() => openNavigationSection("fno")}
+        onOpenMarkets={() => openNavigationSection("markets")}
+        onOpenIpo={() => openNavigationSection("ipo")}
+        onOpenWatchlist={() => openNavigationSection("watchlist")}
+        onOpenHoldings={() => openNavigationSection("holdings")}
+        onOpenOrders={() => { setHomeOpen(false); setPositionsOpen(true); }}
+        onOpenPnl={() => openNavigationSection("pnl")}
+        onOpenStock={(symbol) => {
+          const instrument = stockUniverse.find((item) => item.symbol === symbol);
+          openNavigationSection("trade");
+          if (instrument) chooseTradeInstrument(instrument);
+        }}
+      />}
+
       <nav className="mobile-bottom-nav">
+        <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
-        <button className={activeNavigationSection === "watchlist" ? "active" : ""} onClick={() => openNavigationSection("watchlist")}><Layers3 size={19} /><span>Watchlist</span></button>
-        <button className={activeNavigationSection === "holdings" ? "active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness size={19} /><span>Holdings</span></button>
-        <button className={activeNavigationSection === "orders" ? "active" : ""} onClick={() => openNavigationSection("orders")}><WalletCards size={19} /><span>Orders</span></button>
         <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
-        <button className={activeNavigationSection === "pnl" ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>P&amp;L</span></button>
+        <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
 
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
@@ -2439,6 +2628,9 @@ export function TradingDashboard() {
           onQuoteKeysChange={setMarketScannerQuoteKeys}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onClose={() => setMarketsOpen(false)}
+          initialGroup={marketsInitialGroup}
+          onGroupChange={setMarketsInitialGroup}
+          onScannerViewed={rememberScanner}
         />
       )}
       {optionChainOpen && activeFnoUnderlying && (

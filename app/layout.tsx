@@ -39,8 +39,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.svg",
-    shortcut: "/papertrade-icon-192.png",
-    apple: "/papertrade-icon-192.png",
+    shortcut: "/papertrade-icon-192.png?v=1.13",
+    apple: "/papertrade-icon-192.png?v=1.13",
   },
   manifest: "/manifest.webmanifest",
 };

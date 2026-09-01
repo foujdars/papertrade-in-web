@@ -19,17 +19,17 @@ function normalizeIndicators(value: unknown): ChartIndicators {
   ) as unknown as ChartIndicators;
 }
 
-let cachedSerialized = "";
-let cachedIndicators = EMPTY_INDICATORS;
+const indicatorCache = new Map<string, { serialized: string; indicators: ChartIndicators }>();
 
-function readIndicators(): ChartIndicators {
+function readIndicators(storageKey = STORAGE_KEY): ChartIndicators {
   if (typeof window === "undefined") return EMPTY_INDICATORS;
   try {
-    const serialized = window.localStorage.getItem(STORAGE_KEY) ?? "{}";
-    if (serialized === cachedSerialized) return cachedIndicators;
-    cachedSerialized = serialized;
-    cachedIndicators = normalizeIndicators(JSON.parse(serialized));
-    return cachedIndicators;
+    const serialized = window.localStorage.getItem(storageKey) ?? window.localStorage.getItem(STORAGE_KEY) ?? "{}";
+    const cached = indicatorCache.get(storageKey);
+    if (cached?.serialized === serialized) return cached.indicators;
+    const indicators = normalizeIndicators(JSON.parse(serialized));
+    indicatorCache.set(storageKey, { serialized, indicators });
+    return indicators;
   } catch {
     return EMPTY_INDICATORS;
   }
@@ -46,18 +46,18 @@ function subscribeIndicators(onStoreChange: () => void) {
   };
 }
 
-export function usePersistentChartIndicators(): [ChartIndicators, Dispatch<SetStateAction<ChartIndicators>>] {
-  const indicators = useSyncExternalStore(subscribeIndicators, readIndicators, () => EMPTY_INDICATORS);
+export function usePersistentChartIndicators(userKey?: string): [ChartIndicators, Dispatch<SetStateAction<ChartIndicators>>] {
+  const storageKey = userKey ? `${STORAGE_KEY}:${userKey}` : STORAGE_KEY;
+  const indicators = useSyncExternalStore(subscribeIndicators, () => readIndicators(storageKey), () => EMPTY_INDICATORS);
 
   const setIndicators = useCallback<Dispatch<SetStateAction<ChartIndicators>>>((update) => {
-    const current = readIndicators();
+    const current = readIndicators(storageKey);
     const next = normalizeIndicators(typeof update === "function" ? update(current) : update);
     const serialized = JSON.stringify(next);
-    cachedSerialized = serialized;
-    cachedIndicators = next;
-    window.localStorage.setItem(STORAGE_KEY, serialized);
+    indicatorCache.set(storageKey, { serialized, indicators: next });
+    window.localStorage.setItem(storageKey, serialized);
     window.dispatchEvent(new CustomEvent<ChartIndicators>(CHANGE_EVENT, { detail: next }));
-  }, []);
+  }, [storageKey]);
 
   return [indicators, setIndicators];
 }
