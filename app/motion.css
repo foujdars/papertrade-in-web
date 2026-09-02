@@ -1,0 +1,141 @@
+/* Motion stays on UI chrome, never on live prices, chart canvases or drag handles. */
+.motion-preference > small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.terminal-shell :is(button, a, input):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+}
+
+@media (max-width: 940px) {
+  .terminal-shell .mobile-bottom-nav::before {
+    content: "";
+    position: absolute;
+    inset: 5px auto auto 0;
+    width: calc(100% / 6);
+    height: 44px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--purple) 11%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 12%, transparent);
+    transform: translateX(calc(var(--nav-index, 0) * 100%));
+    pointer-events: none;
+  }
+  .terminal-shell .mobile-bottom-nav[data-has-active="false"]::before { opacity: 0; }
+  .terminal-shell .mobile-bottom-nav button { position: relative; }
+}
+
+@keyframes pt-fade-in {
+  from { opacity: .4; }
+  to { opacity: 1; }
+}
+@keyframes pt-rise-in {
+  from { opacity: 0; translate: 0 10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes pt-panel-in {
+  from { opacity: 0; translate: 0 14px; scale: .985; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes pt-icon-in {
+  from { opacity: .4; scale: .8; rotate: -12deg; }
+  to { opacity: 1; scale: 1; rotate: 0deg; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Opacity-only page entrances preserve fixed descendants and chart coordinates. */
+  .terminal-shell[data-motion="full"] :is(.home-workspace, .navigation-page, .market-discovery-panel) {
+    animation: pt-fade-in 180ms ease-out;
+  }
+  .terminal-shell[data-motion="full"] :is(.home-hero-copy, .home-market-orbit, .market-command-copy, .market-command-stats) {
+    animation: pt-rise-in var(--motion-enter) var(--motion-ease) backwards;
+  }
+  .terminal-shell[data-motion="full"] .home-market-orbit { animation-delay: 50ms; }
+
+  /* Short bounded stagger: do not delay large watchlists or restart on quote updates. */
+  .terminal-shell[data-motion="full"] :is(.home-index-card, .home-discovery-card, .home-launchpad > div > button, .home-recent-list > button, .ipo-card, .notification-item) {
+    animation: pt-rise-in var(--motion-enter) var(--motion-ease) backwards;
+  }
+  .terminal-shell[data-motion="full"] :is(.home-index-card, .home-discovery-card, .home-launchpad > div > button, .home-recent-list > button, .ipo-card, .notification-item):nth-child(2) { animation-delay: 35ms; }
+  .terminal-shell[data-motion="full"] :is(.home-index-card, .home-discovery-card, .home-launchpad > div > button, .home-recent-list > button, .ipo-card, .notification-item):nth-child(3) { animation-delay: 70ms; }
+  .terminal-shell[data-motion="full"] :is(.home-launchpad > div > button, .home-recent-list > button, .ipo-card, .notification-item):nth-child(n+4):nth-child(-n+6) { animation-delay: 100ms; }
+
+  .terminal-shell[data-motion="full"] :is(.more-menu-panel, .notification-center-panel, .home-stock-preview, .trade-symbol-menu, .chart-function-menu, .timeframe-menu, .watchlist-selector-menu) {
+    animation: pt-panel-in var(--motion-enter) var(--motion-ease);
+  }
+  .terminal-shell[data-motion="full"] .modal:not(.navigation-page) {
+    animation: pt-fade-in 180ms ease-out;
+  }
+  .terminal-shell[data-motion="full"] :is(.home-stock-preview-backdrop, .order-sheet-backdrop, .home-search-results) {
+    animation: pt-fade-in 160ms ease-out;
+  }
+  .terminal-shell[data-motion="full"] .toast {
+    /* Individual translate preserves the toast's existing horizontal centring. */
+    animation: pt-rise-in var(--motion-enter) var(--motion-ease);
+  }
+
+  .terminal-shell[data-motion="full"] :is(.mobile-bottom-nav, .topbar, .home-section, .market-command-hero, .ipo-card, .home-index-card) {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+  .terminal-shell[data-motion="full"] .mobile-bottom-nav::before {
+    transition: transform var(--motion-enter) var(--motion-ease), opacity var(--motion-fast) ease;
+  }
+  .terminal-shell[data-motion="full"] :is(.mobile-bottom-nav button.active, .main-nav button.nav-active) > svg,
+  .terminal-shell[data-motion="full"] .theme-toggle > svg {
+    animation: pt-icon-in 220ms var(--motion-ease);
+  }
+  .terminal-shell[data-motion="full"] :is(.scanner-family-tabs, .market-scanner-tabs, .ipo-filter-tabs, .density-picker, .scanner-mode-toggle) button {
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .terminal-shell[data-motion="full"] :is(.top-actions .icon-button, .home-hero-actions button, .home-launchpad button, .home-discovery-card, .home-index-card, .home-stock-preview-actions button, .scanner-run-button, .ipo-refresh-button, .mobile-bottom-nav button) {
+    transition: scale var(--motion-fast) var(--motion-ease), translate var(--motion-fast) var(--motion-ease), background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .terminal-shell[data-motion="full"] :is(.top-actions .icon-button, .home-hero-actions button, .home-launchpad button, .home-discovery-card, .home-index-card, .home-stock-preview-actions button, .scanner-run-button, .ipo-refresh-button, .mobile-bottom-nav button):not(:disabled):active {
+    scale: .97;
+  }
+  .terminal-shell[data-motion="full"] :is(.home-global-search, .search-box) {
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .terminal-shell[data-motion="full"] :is(.home-global-search, .search-box):focus-within {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 17%, transparent);
+  }
+}
+
+/* Hover lift is for a mouse only; touching a row must not leave it floating. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .terminal-shell[data-motion="full"] :is(.home-discovery-card, .home-index-card, .home-launchpad button):hover {
+    translate: 0 -2px;
+    border-color: color-mix(in srgb, var(--purple) 40%, var(--line));
+    box-shadow: 0 10px 25px color-mix(in srgb, var(--purple) 10%, transparent);
+  }
+  .terminal-shell[data-motion="full"] .top-actions .icon-button:hover { translate: 0 -1px; }
+}
+
+@media (max-width: 940px) and (prefers-reduced-motion: no-preference) {
+  .terminal-shell[data-motion="full"] .order-ticket {
+    transition: transform var(--motion-enter) var(--motion-ease), opacity 180ms ease, visibility var(--motion-enter);
+  }
+  .terminal-shell[data-motion="full"] .watchlist-panel.mobile-open {
+    animation: pt-fade-in 180ms ease-out;
+  }
+}
+
+/* Apply the opt-out to existing spinners/shimmers too, without hiding status text. */
+.terminal-shell[data-motion="reduced"],
+.terminal-shell[data-motion="reduced"] *,
+.terminal-shell[data-motion="reduced"] *::before,
+.terminal-shell[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-shell, .terminal-shell *, .terminal-shell *::before, .terminal-shell *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

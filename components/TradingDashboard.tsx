@@ -6,7 +6,7 @@ import {
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -406,6 +406,7 @@ export function TradingDashboard() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
   const [uiDensity, setUiDensity] = useState<UiDensity>("comfortable");
+  const [motionEnabled, setMotionEnabled] = useState(true);
   const [recentStocks, setRecentStocks] = useState<string[]>([]);
   const [recentScanners, setRecentScanners] = useState<string[]>([]);
   const [uiPreferencesReady, setUiPreferencesReady] = useState(false);
@@ -551,6 +552,7 @@ export function TradingDashboard() {
           recentStocks?: string[];
           recentScanners?: string[];
           density?: UiDensity;
+          motionEnabled?: boolean;
           homeExperienceVersion?: number;
         };
         if (saved.watchlist) setWatchlist(saved.watchlist);
@@ -560,6 +562,7 @@ export function TradingDashboard() {
         setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
         setRecentScanners(Array.isArray(saved.recentScanners) ? saved.recentScanners.slice(0, 4) : []);
         setUiDensity(saved.density === "compact" ? "compact" : "comfortable");
+        setMotionEnabled(saved.motionEnabled !== false);
         const validSections: NavigationSection[] = ["home", "trade", "fno", "watchlist", "holdings", "orders", "markets", "ipo", "pnl"];
         const section = saved.homeExperienceVersion === HOME_EXPERIENCE_VERSION && saved.activeSection && validSections.includes(saved.activeSection) ? saved.activeSection : "home";
         setHomeOpen(section === "home");
@@ -588,9 +591,10 @@ export function TradingDashboard() {
       recentStocks,
       recentScanners,
       density: uiDensity,
+      motionEnabled,
       homeExperienceVersion: HOME_EXPERIENCE_VERSION,
     }));
-  }, [activeNavigationSection, homeCards, marketsInitialGroup, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
+  }, [activeNavigationSection, homeCards, marketsInitialGroup, motionEnabled, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -2214,7 +2218,7 @@ export function TradingDashboard() {
   }
 
   return (
-    <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-platform={isAndroidApp ? "android" : "web"}>
+    <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <IpoAlertMonitor />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
@@ -2244,6 +2248,11 @@ export function TradingDashboard() {
                 <div className="density-picker">
                   <b>Display density</b>
                   <div><button className={uiDensity === "comfortable" ? "active" : ""} onClick={() => setUiDensity("comfortable")}>Comfortable</button><button className={uiDensity === "compact" ? "active" : ""} onClick={() => setUiDensity("compact")}>Compact</button></div>
+                </div>
+                <div className="home-card-toggles motion-preference">
+                  <b>Motion</b>
+                  <button type="button" className={motionEnabled ? "active" : ""} onClick={() => setMotionEnabled((value) => !value)} role="switch" aria-checked={motionEnabled} aria-describedby="motion-preference-help"><span>Animations</span><i aria-hidden="true" /></button>
+                  <small id="motion-preference-help">Quick, gentle transitions. Your device’s reduced-motion setting always takes priority.</small>
                 </div>
                 <div className="more-menu-actions">
                   <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("watchlist"); }}><Layers3 size={16} /><span>Watchlists</span></button>
@@ -2594,7 +2603,7 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav">
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "watchlist"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : activeNavigationSection === "trade" ? 1 : activeNavigationSection === "fno" ? 2 : activeNavigationSection === "markets" ? 3 : activeNavigationSection === "ipo" ? 4 : 5 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>

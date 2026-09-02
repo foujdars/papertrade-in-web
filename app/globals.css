@@ -10,6 +10,9 @@
   --purple-soft: #eeecff;
   --green: #00a67e;
   --red: #f04458;
+  --motion-fast: 140ms;
+  --motion-enter: 260ms;
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
 }
 
 /* Home dashboard */
