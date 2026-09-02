@@ -300,9 +300,12 @@
 
 @media (max-width: 940px) {
   .top-actions { gap: 6px; }
-  .top-actions > :is(.funds-button, .download-button, .api-button, .suggestion-button, .theme-toggle) { display: none !important; }
+  .top-actions > :is(.funds-button, .download-button, .api-button, .suggestion-button) { display: none !important; }
   .top-actions > .top-watchlist-button, .top-actions > .more-menu-wrap, .top-actions > .notification-center-wrap { display: flex !important; }
-  .top-actions > .top-watchlist-button, .more-menu-trigger, .notification-center-trigger, .top-actions > .profile-button { width: 40px; height: 40px; min-width: 40px; border-radius: 11px; }
+  .top-actions > .theme-toggle { display: grid !important; }
+  .top-actions > .top-watchlist-button, .top-actions > .theme-toggle, .more-menu-trigger, .notification-center-trigger, .top-actions > .profile-button { width: 40px; height: 40px; min-width: 40px; place-items: center; padding: 0; border-radius: 11px; line-height: 0; }
+  .top-actions > :is(.notification-center-wrap, .more-menu-wrap) { width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; }
+  .top-actions :is(.top-watchlist-button, .theme-toggle, .notification-center-trigger, .more-menu-trigger) > svg { display: block; margin: auto; }
   .notification-center-panel, .more-menu-panel { top: calc(var(--mobile-header-height) + 5px); right: 7px; width: calc(100vw - 14px); max-height: calc(100svh - var(--mobile-header-height) - 68px - env(safe-area-inset-bottom, 0px)); border-radius: 15px; }
   .home-insights-strip { min-height: 50px; flex-basis: 50px; padding-inline: 6px; }
   .home-insight-card { min-width: 176px; }
@@ -315,7 +318,8 @@
 @media (max-width: 560px) {
   .brand { max-width: 145px; }
   .top-actions { margin-left: 0; }
-  .top-actions > .top-watchlist-button, .more-menu-trigger, .notification-center-trigger, .top-actions > .profile-button { width: 37px; height: 37px; min-width: 37px; }
+  .top-actions > .top-watchlist-button, .top-actions > .theme-toggle, .more-menu-trigger, .notification-center-trigger, .top-actions > .profile-button { width: 37px; height: 37px; min-width: 37px; }
+  .top-actions > :is(.notification-center-wrap, .more-menu-wrap) { width: 37px; height: 37px; flex-basis: 37px; }
   .home-insight-card { min-width: 168px; }
   .home-insight-card > em { display: none; }
   .recent-card { min-width: 262px; }
@@ -2030,6 +2034,7 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 
 @media (max-width: 420px) {
   .top-actions { gap: 5px; }
+  .top-actions > :is(.notification-center-wrap, .more-menu-wrap) { width: 32px; height: 32px; flex-basis: 32px; }
   .funds-button, .download-button, .api-button, .suggestion-button, .icon-button, .profile-button { width: 32px; height: 32px; }
   .download-button { display: grid; place-items: center; flex: 0 0 32px; padding: 0; border-radius: 10px; }
   .download-button svg { display: block; margin: 0; }
