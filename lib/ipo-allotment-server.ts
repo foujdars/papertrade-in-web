@@ -3,7 +3,7 @@ import { classifyAllotment, identifyRegistrar, normalizeIssuerName, parseMufgCom
 import { indiaDateKey } from "./ipo";
 import { upstoxFetch } from "./upstox-server";
 
-type Issue = { id?: string; name?: string; symbol?: string; status?: string; bidding_end_date?: string };
+type Issue = { id?: string; name?: string; symbol?: string; status?: string; bidding_end_date?: string; issue_type?: string };
 type Details = Issue & { timeline?: { allotment_date?: string; listing_date?: string }; registrar_info?: { name?: string; registrar?: string } };
 type Payload<T> = { data?: T };
 const TTL = 5 * 60_000;
@@ -75,6 +75,7 @@ export async function loadAllotments() {
         const issue = issues[next++];
         const base: IpoAllotment = {
           id: issue.id!, name: issue.name || issue.symbol || "IPO", symbol: issue.symbol || "",
+          issueType: issue.issue_type === "sme" ? "sme" : issue.issue_type === "regular" ? "regular" : "unknown",
           closeDate: validIpoDate(issue.bidding_end_date), allotmentDate: "", listingDate: "",
           registrarName: "Registrar details unavailable", registrar: "bse", state: "unavailable", checkedAt: fetchedAt,
         };
@@ -87,6 +88,7 @@ export async function loadAllotments() {
           const allotmentDate = validIpoDate(data.timeline?.allotment_date);
           const evidenceUrl = registrar === "mufg" ? await publishedBasis(base.name, companies) : undefined;
           allotments.push({ ...base, registrarName, registrar, allotmentDate, listingDate: validIpoDate(data.timeline?.listing_date),
+            issueType: data.issue_type === "sme" ? "sme" : data.issue_type === "regular" ? "regular" : base.issueType,
             state: classifyAllotment(data.status ?? issue.status!, allotmentDate, today, Boolean(evidenceUrl)), evidenceUrl });
         } catch { partial = true; allotments.push(base); }
       }

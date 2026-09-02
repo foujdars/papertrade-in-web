@@ -17,7 +17,7 @@ import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
-import { IpoAlertMonitor } from "@/components/IpoWorkspace";
+import { IpoAlertMonitor, IpoWorkspace } from "@/components/IpoWorkspace";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
@@ -386,6 +386,10 @@ export function TradingDashboard() {
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [marketsInitialGroup, setMarketsInitialGroup] = useState<ScannerGroup>("TRADING");
+  const lastScannerGroupRef = useRef<"TRADING" | "INVESTMENT">("TRADING");
+  useEffect(() => {
+    if (marketsInitialGroup !== "IPO") lastScannerGroupRef.current = marketsInitialGroup;
+  }, [marketsInitialGroup]);
   const [optionChainOpen, setOptionChainOpen] = useState(false);
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
@@ -2100,6 +2104,10 @@ export function TradingDashboard() {
   }
 
   function openPaperOrderChart(order: PaperOrder) {
+    setHomeOpen(false);
+    setFnoListOpen(false);
+    setOptionChainOpen(false);
+    setOrderSheetOpen(false);
     setSidebarOpen(false);
     setPositionsOpen(false);
     setHoldingsOpen(false);
@@ -2179,7 +2187,7 @@ export function TradingDashboard() {
     setPositionsOpen(false);
     setHoldingsOpen(section === "holdings");
     setOrdersOpen(section === "orders");
-    if (section === "markets" || section === "ipo") setMarketsInitialGroup(section === "ipo" ? "IPO" : marketsInitialGroup === "IPO" ? "TRADING" : marketsInitialGroup);
+    if (section === "markets" || section === "ipo") setMarketsInitialGroup(section === "ipo" ? "IPO" : lastScannerGroupRef.current);
     setMarketsOpen(section === "markets" || section === "ipo");
     if (section === "pnl") {
       const currentDate = indiaDateParts(clock?.getTime() ?? Date.now());
@@ -2597,6 +2605,10 @@ export function TradingDashboard() {
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
         onOpenOrders={() => { setHomeOpen(false); setPositionsOpen(true); }}
+        onOpenActivity={(orderId) => {
+          const order = todayOrders.find((item) => item.id === orderId);
+          if (order) openPaperOrderChart(order);
+        }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
           const instrument = stockUniverse.find((item) => item.symbol === symbol);
@@ -2681,14 +2693,21 @@ export function TradingDashboard() {
           </section>
         </div>
       )}
-      {marketsOpen && (
+      {marketsOpen && marketsInitialGroup === "IPO" && (
+        <section className="market-discovery-panel ipo-discovery-panel" aria-label="IPO opportunities">
+          <div className="market-discovery-head"><div><span className="eyebrow">PRIMARY MARKET</span><h2>IPOs</h2></div><button className="icon-button" onClick={() => setMarketsOpen(false)} aria-label="Close IPOs"><X size={20} /></button></div>
+          <IpoWorkspace />
+        </section>
+      )}
+      {marketsOpen && marketsInitialGroup !== "IPO" && (
         <MarketsWorkspace
+          key={marketsInitialGroup}
           stockUniverse={stockUniverse}
           quotes={marketQuotes}
           onQuoteKeysChange={setMarketScannerQuoteKeys}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onClose={() => setMarketsOpen(false)}
-          initialGroup={marketsInitialGroup}
+          group={marketsInitialGroup}
           onGroupChange={setMarketsInitialGroup}
           onScannerViewed={rememberScanner}
         />

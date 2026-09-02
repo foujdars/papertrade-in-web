@@ -4,6 +4,8 @@ import { Bell, BellRing, CalendarDays, ExternalLink, FileCheck2, RefreshCw, Shie
 import { useCallback, useEffect, useState } from "react";
 import { ALLOTMENT_ALERT_EVENT, allotmentLink, type AllotmentResponse, type IpoAllotment } from "@/lib/ipo-allotment";
 import { processAllotmentAlerts, readAllotmentAlertEnabled, setAllotmentAlertEnabled } from "@/lib/ipo-allotment-alerts";
+import { filterIpoBoard, type IpoBoard, type IpoDirectoryEntry } from "@/lib/ipo-directory";
+import { IpoCompanyLogo, IpoResearchLink } from "@/components/IpoCompany";
 
 const CHECK_INTERVAL = 5 * 60_000;
 let pending: Promise<AllotmentResponse> | undefined;
@@ -57,7 +59,7 @@ const stateLabels = {
   unconfirmed: "Awaiting confirmation", unavailable: "Details unavailable",
 };
 
-export function IpoAllotments() {
+export function IpoAllotments({ board, directory }: { board: IpoBoard; directory: IpoDirectoryEntry[] }) {
   const [items, setItems] = useState<IpoAllotment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -65,6 +67,7 @@ export function IpoAllotments() {
   const [updatedAt, setUpdatedAt] = useState("");
   const [enabled, setEnabled] = useState(readAllotmentAlertEnabled);
   const [changing, setChanging] = useState(false);
+  const visibleItems = filterIpoBoard(items, board);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -120,16 +123,17 @@ export function IpoAllotments() {
     {error && <div className="scanner-inline-error" role="status">{error} {items.length > 0 && "Previously loaded information remains below."}</div>}
     {partial && <p className="allotment-explainer" role="status">Some registrar details could not be verified. Those issues are marked “Details unavailable”; no release alert is sent for them.</p>}
     <div className="allotment-list" aria-busy={loading}>
-      {items.map((ipo) => <article className={`allotment-card state-${ipo.state}`} key={ipo.id}>
-        <header><span className="allotment-mark"><FileCheck2 size={20} /></span><div><h4>{ipo.name}</h4><small>{ipo.symbol}</small></div></header>
+      {visibleItems.map((ipo) => <article className={`allotment-card state-${ipo.state}`} key={ipo.id}>
+        <header><IpoCompanyLogo name={ipo.name} entries={directory} /><div><h4>{ipo.name}</h4><small>{ipo.symbol} · {board === "regular" ? "Mainboard" : "SME"}</small></div></header>
         <span className="allotment-state">{stateLabels[ipo.state]}</span>
         <dl><div><dt><CalendarDays size={13} />Expected allotment</dt><dd>{displayDate(ipo.allotmentDate)}</dd></div><div><dt>Listing date</dt><dd>{displayDate(ipo.listingDate)}</dd></div></dl>
         <p className="allotment-registrar">Registrar <b>{ipo.registrarName}</b></p>
         {allotmentLink(ipo.registrar) && <a className="allotment-result-link" href={allotmentLink(ipo.registrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{ipo.registrar === "bse" ? "Check on BSE" : "Check allotment"}<ExternalLink size={16} /></a>}
         <small className="allotment-link-note">{ipo.registrar === "bse" ? "BSE fallback: only issues available on BSE can be checked here." : "Opens the registrar’s website in a new tab."}</small>
+        <IpoResearchLink name={ipo.name} entries={directory} />
       </article>)}
-      {loading && !items.length && Array.from({ length: 4 }, (_, i) => <div className="ipo-card ipo-card-skeleton" key={i} aria-hidden="true"><span /><span /><span /><span /></div>)}
-      {!loading && !error && !items.length && <div className="positions-empty"><FileCheck2 size={28} /><b>No recent allotments to track</b><span>Recently closed IPOs will appear here automatically.</span></div>}
+      {loading && !visibleItems.length && Array.from({ length: 4 }, (_, i) => <div className="ipo-card ipo-card-skeleton" key={i} aria-hidden="true"><span /><span /><span /><span /></div>)}
+      {!loading && !error && !visibleItems.length && <div className="positions-empty"><FileCheck2 size={28} /><b>No recent {board === "regular" ? "Mainboard" : "SME"} allotments to track</b><span>Recently closed IPOs will appear here automatically once their board is confirmed.</span></div>}
     </div>
   </section>;
 }

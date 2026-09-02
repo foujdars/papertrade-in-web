@@ -6,7 +6,6 @@ import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } f
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { OpenHighRow, VolumeBreakoutRow } from "@/lib/volume-breakout";
-import { IpoWorkspace } from "@/components/IpoWorkspace";
 
 type ScannerId = "VOLUME" | "OPEN_HIGH" | NimbleStrategy;
 export type ScannerGroup = "TRADING" | "INVESTMENT" | "IPO";
@@ -134,7 +133,7 @@ export function MarketsWorkspace({
   onQuoteKeysChange,
   onSelectCash,
   onClose,
-  initialGroup = "TRADING",
+  group,
   onGroupChange,
   onScannerViewed,
 }: {
@@ -143,12 +142,13 @@ export function MarketsWorkspace({
   onQuoteKeysChange: (keys: string[]) => void;
   onSelectCash: (instrument: Instrument, price: number) => void;
   onClose: () => void;
-  initialGroup?: ScannerGroup;
-  onGroupChange?: (group: ScannerGroup) => void;
+  group: "TRADING" | "INVESTMENT";
+  onGroupChange: (group: "TRADING" | "INVESTMENT") => void;
   onScannerViewed?: (label: string) => void;
 }) {
-  const [scannerGroup, setScannerGroup] = useState<ScannerGroup>(initialGroup);
-  const [activeScanner, setActiveScanner] = useState<ScannerId>(() => readSavedScanner(initialGroup));
+  const scannerGroup = group;
+  const setScannerGroup = onGroupChange;
+  const [activeScanner, setActiveScanner] = useState<ScannerId>(() => readSavedScanner(group));
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
@@ -178,7 +178,7 @@ export function MarketsWorkspace({
       && (item.categories.includes("NIFTY 500") || item.categories.includes("BANK NIFTY")))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
   const activeQuoteKeys = useMemo(
-    () => scannerGroup === "IPO" ? [] : activeRows.map((row) => row.instrumentKey).filter(Boolean),
+    () => activeRows.map((row) => row.instrumentKey).filter(Boolean),
     [activeRows, scannerGroup],
   );
 
@@ -189,8 +189,7 @@ export function MarketsWorkspace({
 
   useEffect(() => {
     window.localStorage.setItem(SCANNER_SELECTION_STORAGE_KEY, JSON.stringify({ scannerGroup, activeScanner }));
-    onGroupChange?.(scannerGroup);
-    onScannerViewed?.(scannerGroup === "IPO" ? "IPOs" : selectedOption.label);
+    onScannerViewed?.(selectedOption.label);
   }, [activeScanner, onGroupChange, onScannerViewed, scannerGroup, selectedOption.label]);
 
   const runSelectedScan = useCallback(async (requestedScanner?: ScannerId, force = false) => {
@@ -250,7 +249,6 @@ export function MarketsWorkspace({
   // the user had selected manual mode. Old empty snapshots should never leave
   // the Volume Shocker looking permanently broken.
   useEffect(() => {
-    if (scannerGroup === "IPO") return;
     const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (!universeAvailable || loadingScanner || activeRows.length > 0 || initialScanAttemptedRef.current.has(activeScanner)) return;
     initialScanAttemptedRef.current.add(activeScanner);
@@ -259,7 +257,6 @@ export function MarketsWorkspace({
 
   useEffect(() => {
     window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
-    if (scannerGroup === "IPO") return;
     const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
     if (scanMode !== "auto" || !universeAvailable) return;
     const scanWhenReady = () => {
@@ -302,15 +299,6 @@ export function MarketsWorkspace({
     resetPullRefresh();
     if (shouldRefresh) void runSelectedScan(undefined, true);
   }, [resetPullRefresh, runSelectedScan]);
-
-  if (scannerGroup === "IPO") {
-    return (
-      <section className="market-discovery-panel ipo-discovery-panel" aria-label="IPO opportunities">
-        <div className="market-discovery-head"><div><span className="eyebrow">PRIMARY MARKET</span><h2>IPOs</h2></div><button className="icon-button" onClick={onClose} aria-label="Close IPOs"><X size={20} /></button></div>
-        <IpoWorkspace />
-      </section>
-    );
-  }
 
   return (
     <section className="market-discovery-panel" aria-label="NSE market scanners">

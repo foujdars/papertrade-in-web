@@ -83,6 +83,7 @@ export function HomeWorkspace({
   onOpenWatchlist,
   onOpenHoldings,
   onOpenOrders,
+  onOpenActivity,
   onOpenPnl,
   onOpenStock,
 }: {
@@ -107,6 +108,7 @@ export function HomeWorkspace({
   onOpenWatchlist: () => void;
   onOpenHoldings: () => void;
   onOpenOrders: () => void;
+  onOpenActivity: (orderId: string) => void;
   onOpenPnl: () => void;
   onOpenStock: (symbol: string) => void;
 }) {
@@ -218,7 +220,7 @@ export function HomeWorkspace({
         <section className="home-section home-timeline-section">
           <header><span><Clock3 size={17} /><b>Today</b></span><small>Your paper-trading timeline</small></header>
           <div className="home-timeline-list">
-            {timeline.map((item) => <button key={item.id} onClick={onOpenOrders}>
+            {timeline.map((item) => <button key={item.id} onClick={() => onOpenActivity(item.id)} aria-label={`Open chart: ${item.title}, ${item.detail}`}>
               <i className={item.tone} />
               <time>{item.time}</time>
               <span><b>{item.title}</b><small>{item.detail}</small></span>

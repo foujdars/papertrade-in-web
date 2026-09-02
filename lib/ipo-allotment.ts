@@ -15,6 +15,7 @@ export type IpoAllotment = {
   id: string;
   name: string;
   symbol: string;
+  issueType?: "regular" | "sme" | "unknown";
   closeDate: string;
   allotmentDate: string;
   listingDate: string;

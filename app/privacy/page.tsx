@@ -38,6 +38,7 @@ export default function PrivacyPolicyPage() {
           <section className={styles.section}>
             <h2>3. Service providers and sharing</h2>
             <p>Google provides sign-in, Supabase provides authentication and cloud database services, Vercel hosts the website and secure server routes, and Upstox supplies market data. These providers process limited information needed to perform their services under their own privacy terms. We do not sell your information or share it for third-party advertising.</p>
+            <p>IPO company logos are loaded from Chittorgarh’s image service. Loading these images sends ordinary connection information, such as your IP address, to that service; we omit referrer information and cross-origin credentials. Research links open Chittorgarh in a new tab. We do not attach your account, portfolio, PAN, or payment information to these requests or links.</p>
           </section>
 
           <section className={styles.section}>
