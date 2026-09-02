@@ -15,9 +15,10 @@ import {
 } from "@/lib/ipo";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
+import { IpoAllotments } from "@/components/IpoAllotments";
 
 const IPO_REFRESH_INTERVAL_MS = 60_000;
-type IpoFilter = "active" | "open" | "upcoming";
+type IpoFilter = "active" | "open" | "upcoming" | "allotments";
 type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string }>;
 
 function readAlertEnabled() {
@@ -226,7 +227,7 @@ export function IpoWorkspace() {
     <div className="ipo-workspace">
       <section className="ipo-overview-banner">
         <span className="ipo-overview-icon"><Rocket size={21} /></span>
-        <div><small>IPO RADAR</small><h3>Track the issue, not the noise.</h3><p>Compare price bands and dates, then use an optional daily alert when unofficial GMP is above 15%.</p></div>
+        <div><small>IPO RADAR</small><h3>From opening day to allotment.</h3><p>Track upcoming issues, daily GMP alerts and official allotment results in one place.</p></div>
         <aside><BadgeIndianRupee size={16} /><span><small>ALERT RULE</small><b>GMP &gt; 15%</b></span></aside>
       </section>
       <div className="ipo-toolbar">
@@ -234,8 +235,9 @@ export function IpoWorkspace() {
           <button type="button" className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>All active <small>{ipos.length}</small></button>
           <button type="button" className={filter === "open" ? "active" : ""} onClick={() => setFilter("open")}>Open <small>{openCount}</small></button>
           <button type="button" className={filter === "upcoming" ? "active" : ""} onClick={() => setFilter("upcoming")}>Upcoming <small>{upcomingCount}</small></button>
+          <button type="button" className={filter === "allotments" ? "active" : ""} onClick={() => setFilter("allotments")}>Allotments</button>
         </div>
-        <div className="ipo-toolbar-actions">
+        {filter !== "allotments" && <div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
             {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
             <span>{alertsEnabled ? "Daily GMP alert on" : "Alert above 15% GMP"}</span>
@@ -243,9 +245,10 @@ export function IpoWorkspace() {
           <button type="button" className="scanner-run-button ipo-refresh-button" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh
           </button>
-        </div>
+        </div>}
       </div>
 
+      {filter === "allotments" ? <IpoAllotments /> : <>
       <div className="ipo-source-line">
         <span><ShieldCheck size={14} /> IPO dates and prices from Upstox · GMP {gmpFeedConfigured ? "from IPOAlerts" : "feed not connected"}</span>
         {fetchedAt && <small>Updated {formatRefreshTime(fetchedAt)} IST · GMP checked periodically</small>}
@@ -280,6 +283,7 @@ export function IpoWorkspace() {
         {loading && !visibleIpos.length && Array.from({ length: 5 }, (_, index) => <div className="ipo-card ipo-card-skeleton" key={`ipo-skeleton-${index}`} aria-hidden="true"><span /><span /><span /><span /></div>)}
         {!loading && !error && !visibleIpos.length && <div className="positions-empty"><Rocket size={30} /><b>No {filter === "active" ? "active" : filter} IPOs</b><span>This section will update automatically when a new IPO becomes available.</span></div>}
       </div>
+      </>}
       <p className="ipo-disclaimer">GMP is unofficial, speculative and can change without notice. Verify information independently. PaperTrade IN provides educational information and does not recommend applying to an IPO.</p>
     </div>
   );

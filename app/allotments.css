@@ -1,0 +1,39 @@
+.allotment-workspace { display: flex; flex-direction: column; gap: 15px; min-width: 0; padding: 8px 2px 20px; }
+.allotment-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.allotment-heading > div > span { color: var(--purple); font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+.allotment-heading h3 { margin: 5px 0; font-size: clamp(19px, 2vw, 25px); letter-spacing: -.04em; color: var(--ink); }
+.allotment-heading p { margin: 0; font-size: 12px; color: var(--muted); }
+.allotment-controls { display: flex; gap: 8px; align-items: center; }
+.allotment-controls > button { min-height: 44px; }
+.allotment-privacy { display: flex; align-items: center; gap: 12px; border: 1px solid color-mix(in srgb, var(--allotment-accent) 24%, var(--line)); background: color-mix(in srgb, var(--allotment-accent) 7%, var(--panel)); padding: 13px 15px; border-radius: 13px; }
+.allotment-privacy svg { color: var(--allotment-accent); flex: 0 0 auto; }
+.allotment-privacy p { margin: 0; font-size: 11px; line-height: 1.65; color: var(--ink); }
+.allotment-privacy b { display: block; }
+.allotment-explainer, .allotment-updated { margin: 0; font-size: 11px; line-height: 1.65; color: var(--muted); }
+.allotment-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 14px; align-items: stretch; }
+.allotment-card { display: flex; flex-direction: column; gap: 13px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: var(--panel); color: var(--ink); }
+.allotment-card > header { display: flex; align-items: center; gap: 11px; }
+.allotment-card h4 { font-size: 14px; margin: 0 0 3px; line-height: 1.5; overflow-wrap: anywhere; }
+.allotment-card > header small { font-size: 10px; color: var(--muted); }
+.allotment-mark { width: 40px; height: 40px; border-radius: 12px; background: color-mix(in srgb, var(--purple) 11%, var(--panel)); color: var(--purple); display: grid; place-items: center; flex: 0 0 auto; }
+.allotment-state { align-self: flex-start; border-radius: 7px; padding: 5px 8px; font-size: 10px; font-weight: 750; color: var(--muted); background: color-mix(in srgb, var(--muted) 8%, var(--panel)); }
+.state-published .allotment-state { color: var(--allotment-accent); background: color-mix(in srgb, var(--allotment-accent) 11%, var(--panel)); }
+.state-listed .allotment-state { color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, var(--panel)); }
+.allotment-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; padding-block: 12px; border-block: 1px solid var(--line); }
+.allotment-card dt { color: var(--muted); font-size: 10px; display: flex; gap: 4px; align-items: center; }
+.allotment-card dd { margin: 6px 0 0; font-size: 12px; font-weight: 700; }
+.allotment-registrar { margin: 0 0 auto; display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: var(--muted); }
+.allotment-registrar b { font-weight: 650; font-size: 11px; color: var(--ink); }
+.allotment-result-link { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--purple) 27%, var(--line)); border-radius: 10px; color: var(--purple); background: color-mix(in srgb, var(--purple) 7%, var(--panel)); text-decoration: none; font-size: 12px; font-weight: 750; }
+.allotment-result-link:hover { background: color-mix(in srgb, var(--purple) 14%, var(--panel)); }
+.allotment-link-note { text-align: center; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.notification-result-link { margin-top: 10px; }
+.terminal-shell[data-theme="neon"] { --allotment-accent: #4ed9b6; }
+@media (max-width: 640px) {
+  .allotment-heading { align-items: stretch; flex-direction: column; gap: 13px; }
+  .allotment-controls > button:first-child { flex: 1; }
+  .allotment-list { grid-template-columns: minmax(0, 1fr); }
+  .allotment-card { padding: 15px; }
+  .ipo-filter-tabs { overflow-x: auto; max-width: 100%; }
+  .ipo-filter-tabs button { flex-shrink: 0; }
+}

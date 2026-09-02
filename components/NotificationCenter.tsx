@@ -1,6 +1,7 @@
 "use client";
 
-import { Activity, Bell, BellRing, BriefcaseBusiness, CheckCheck, Rocket, ShieldCheck, Trash2, X } from "lucide-react";
+import { Activity, Bell, BellRing, BriefcaseBusiness, CheckCheck, ExternalLink, Rocket, ShieldCheck, Trash2, X } from "lucide-react";
+import { allotmentLink } from "@/lib/ipo-allotment";
 import { useEffect, useMemo, useState } from "react";
 import {
   clearPaperTradeNotifications,
@@ -73,7 +74,9 @@ export function NotificationCenter() {
           <div className="notification-center-list">
             {items.map((item) => <article key={item.id} className={`notification-item kind-${item.kind}`}>
               <span className="notification-item-icon"><NotificationIcon item={item} /></span>
-              <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small></div>
+              <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small>
+                {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
+              </div>
             </article>)}
             {!items.length && <div className="notification-empty"><Bell size={28} /><b>No alerts yet</b><span>Stop-loss, target, portfolio and IPO alerts will appear here.</span></div>}
           </div>

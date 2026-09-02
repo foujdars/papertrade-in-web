@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
         <article className={styles.card}>
           <span className={styles.eyebrow}>Your privacy</span>
           <h1>Privacy Policy</h1>
-          <p className={styles.updated}>Effective 20 August 2026</p>
+          <p className={styles.updated}>Effective 2 September 2026</p>
           <p className={styles.summary}>PaperTrade IN is a paper-trading simulator. We do not sell personal information, display behavioural advertising, see your Google password, or place real exchange orders.</p>
 
           <section className={styles.section}>
@@ -26,6 +26,7 @@ export default function PrivacyPolicyPage() {
               <li><b>Paper-trading information:</b> virtual balance, simulated orders and positions, holdings, watchlists, chart preferences, protections, and P&amp;L records that you save or generate.</li>
               <li><b>Technical information:</b> ordinary security and diagnostic information processed by our hosting and authentication providers, such as request timestamps, IP address, browser or device type, and error information.</li>
               <li><b>Optional notifications:</b> if you permit notifications, the Android app can show local alerts when a simulated target or stop-loss is reached.</li>
+              <li><b>IPO allotment alerts:</b> when enabled, the website checks public IPO information while it is open. The alert preference and records used to avoid duplicate alerts are saved on your device, along with the notification centre history.</li>
             </ul>
           </section>
 
@@ -42,6 +43,7 @@ export default function PrivacyPolicyPage() {
           <section className={styles.section}>
             <h2>4. Broker and market data</h2>
             <p>Paper orders remain simulations and are not sent to Upstox, a broker, or an exchange. The production Upstox credential is held on the server and is not included in the Android application or sent to your browser.</p>
+            <p>IPO allotment buttons open an official registrar or exchange website. Enter your PAN or application details only on that external website; PaperTrade does not request, receive or store those details. The external website handles information you enter under its own privacy policy.</p>
           </section>
 
           <section className={styles.section}>

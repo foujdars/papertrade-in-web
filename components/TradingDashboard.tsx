@@ -52,6 +52,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
+import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
@@ -2220,6 +2221,7 @@ export function TradingDashboard() {
   return (
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <IpoAlertMonitor />
+      <IpoAllotmentMonitor />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
