@@ -1,0 +1,14 @@
+/* Shared by Trade, advanced charts, trade reviews and the F&O split charts. */
+.chart-symbol-legend.lightweight-symbol-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.chart-symbol-legend > b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-symbol-legend .candle-ohlc { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 7px; font-variant-numeric: tabular-nums; }
+.chart-symbol-legend .candle-stat { display: inline-flex; flex-wrap: nowrap; gap: 3px; white-space: nowrap; font-size: inherit; }
+.chart-symbol-legend .candle-change { display: inline-block; white-space: nowrap; padding-left: 4px; border-left: 1px solid var(--line); font-size: 10px; }
+.chart-symbol-legend i.positive { color: var(--green); }
+.chart-symbol-legend i.negative { color: var(--red); }
+.chart-symbol-legend i.neutral { color: var(--muted); }
+.fno-clean-chart .chart-symbol-legend.lightweight-symbol-legend { display: flex !important; top: 4px; left: 6px; }
+.fno-clean-chart .chart-symbol-legend > b { display: none; }
+@media (min-width: 761px) {
+  .price-chart-wrap .risk-reward-summary, .price-chart-wrap .risk-reward-summary.has-exit { top: 62px; }
+}

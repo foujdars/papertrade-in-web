@@ -5,6 +5,7 @@ import type {
   CandlestickData,
   IChartApi,
   ISeriesApi,
+  MouseEventParams,
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
@@ -19,6 +20,7 @@ import type {
 } from "lightweight-charts-drawing";
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
 import { openUpstoxLiveFeed, type UpstoxLiveTick } from "@/lib/upstox-live-feed";
+import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
 
 export const DRAWING_TOOL_CATALOG = [
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
@@ -545,6 +547,9 @@ export function MarketChart({
   const riskDragPriceRangeRef = useRef<{ from: number; to: number } | null>(null);
   const orderToolEnabledRef = useRef(false);
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialData.at(-1));
+  const [hoveredCandle, setHoveredCandle] = useState<{ scope: string; time: number | null } | null>(null);
+  const legendScope = `${instrument.instrumentKey}|${timeframe}`;
+  const legend = selectCandleLegend(dataRef.current, hoveredCandle?.scope === legendScope ? hoveredCandle.time : null);
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
@@ -1232,6 +1237,7 @@ export function MarketChart({
     let manager: DrawingManager | null = null;
     let resizeChart: (() => void) | null = null;
     let refreshOverlays: (() => void) | null = null;
+    let crosshairMove: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
@@ -1317,6 +1323,18 @@ export function MarketChart({
       chartApi.current = chart;
       candleSeries.current = series;
       series.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
+
+      crosshairMove = (event) => {
+        // Series data works in price and indicator panes, and for touch crosshairs.
+        // Never feed a hovered historical price back into execution or live quotes.
+        const bar = event.point ? event.seriesData.get(series) : undefined;
+        const time = bar && "close" in bar && typeof bar.time === "number"
+          ? bar.time - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0)
+          : null;
+        setHoveredCandle((previous) => previous?.scope === legendScope && previous.time === time
+          ? previous : { scope: legendScope, time });
+      };
+      chart.subscribeCrosshairMove(crosshairMove);
 
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
@@ -1561,6 +1579,7 @@ export function MarketChart({
         window.visualViewport?.removeEventListener("resize", resizeChart);
       }
       if (refreshOverlays) chartApi.current?.timeScale().unsubscribeVisibleLogicalRangeChange(refreshOverlays);
+      if (crosshairMove) chartApi.current?.unsubscribeCrosshairMove(crosshairMove);
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup?.();
       cancelDraft();
       editRef.current = null;
@@ -1829,12 +1848,16 @@ export function MarketChart({
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         <div className="chart-symbol-legend lightweight-symbol-legend">
           <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
-          {latestCandle && (
-            <span>
-              O <i>{latestCandle.open.toFixed(2)}</i>
-              H <i>{latestCandle.high.toFixed(2)}</i>
-              L <i>{latestCandle.low.toFixed(2)}</i>
-              C <i className={latestCandle.close >= latestCandle.open ? "positive" : "negative"}>{latestCandle.close.toFixed(2)}</i>
+          {legend && (
+            <span className="candle-ohlc" aria-label={`Candle OHLC and change from previous ${timeframe} candle close`}>
+              <span className="candle-stat">O <i>{legend.candle.open.toFixed(2)}</i></span>
+              <span className="candle-stat">H <i>{legend.candle.high.toFixed(2)}</i></span>
+              <span className="candle-stat">L <i>{legend.candle.low.toFixed(2)}</i></span>
+              <span className="candle-stat">C <i className={legend.candle.close >= legend.candle.open ? "positive" : "negative"}>{legend.candle.close.toFixed(2)}</i></span>
+              <i className={`candle-change ${legend.changePercent === null || legend.changePercent === 0 ? "neutral" : legend.changePercent > 0 ? "positive" : "negative"}`}
+                aria-label={legend.changePercent === null ? "Previous candle close unavailable" : `${formatCandleChange(legend.changePercent)} from previous ${timeframe} candle close`}>
+                {formatCandleChange(legend.changePercent)}
+              </i>
             </span>
           )}
         </div>

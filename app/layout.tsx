@@ -3,6 +3,7 @@ import "./globals.css";
 import "./motion.css";
 import "./allotments.css";
 import "./ipo-directory.css";
+import "./candle-legend.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
