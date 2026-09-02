@@ -142,6 +142,7 @@ type CustomWatchlist = {
 type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl";
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
+type UiDensity = "comfortable" | "compact";
 const DEFAULT_HOME_CARDS: HomeCardPreferences = { market: true, recent: true, portfolio: true };
 
 type ChartHistorySnapshot = {
@@ -404,6 +405,7 @@ export function TradingDashboard() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
+  const [uiDensity, setUiDensity] = useState<UiDensity>("comfortable");
   const [recentStocks, setRecentStocks] = useState<string[]>([]);
   const [recentScanners, setRecentScanners] = useState<string[]>([]);
   const [uiPreferencesReady, setUiPreferencesReady] = useState(false);
@@ -548,6 +550,7 @@ export function TradingDashboard() {
           homeCards?: Partial<HomeCardPreferences>;
           recentStocks?: string[];
           recentScanners?: string[];
+          density?: UiDensity;
           homeExperienceVersion?: number;
         };
         if (saved.watchlist) setWatchlist(saved.watchlist);
@@ -556,6 +559,7 @@ export function TradingDashboard() {
         setHomeCards({ ...DEFAULT_HOME_CARDS, ...(saved.homeCards ?? {}) });
         setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
         setRecentScanners(Array.isArray(saved.recentScanners) ? saved.recentScanners.slice(0, 4) : []);
+        setUiDensity(saved.density === "compact" ? "compact" : "comfortable");
         const validSections: NavigationSection[] = ["home", "trade", "fno", "watchlist", "holdings", "orders", "markets", "ipo", "pnl"];
         const section = saved.homeExperienceVersion === HOME_EXPERIENCE_VERSION && saved.activeSection && validSections.includes(saved.activeSection) ? saved.activeSection : "home";
         setHomeOpen(section === "home");
@@ -583,9 +587,10 @@ export function TradingDashboard() {
       homeCards,
       recentStocks,
       recentScanners,
+      density: uiDensity,
       homeExperienceVersion: HOME_EXPERIENCE_VERSION,
     }));
-  }, [activeNavigationSection, homeCards, marketsInitialGroup, recentScanners, recentStocks, timeframe, uiPreferencesReady, userPreferenceKey, watchlist]);
+  }, [activeNavigationSection, homeCards, marketsInitialGroup, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -1377,6 +1382,36 @@ export function TradingDashboard() {
     const item = tradingUniverse.find((instrument) => instrument.symbol === symbol);
     return item ? [item] : [];
   }).slice(0, 4);
+  const homeStockOptions = useMemo(() => stockUniverse.filter((instrument) => instrument.assetType !== "INDEX" && instrument.assetType !== "OPTION" && instrument.assetType !== "FUTURE").map((instrument) => {
+    const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
+    return {
+      symbol: instrument.symbol,
+      name: instrument.name,
+      price: quote?.lastPrice ?? instrument.price,
+      changePercent: quote?.changePercent ?? instrument.change,
+      categories: instrument.categories,
+    };
+  }), [marketQuotes, stockUniverse]);
+  const homeRiskSummary = useMemo(() => {
+    const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
+    const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
+    return {
+      exposure: holdingsSummary.current,
+      topSymbol: topHolding.symbol,
+      topConcentration,
+      label: (topConcentration >= 40 ? "High" : topConcentration >= 25 ? "Moderate" : "Low") as "Low" | "Moderate" | "High",
+    };
+  }, [holdings, holdingsSummary.current]);
+  const homeTimeline = useMemo(() => [...todayOrders].sort((a, b) => getPaperOrderTimestamp(b) - getPaperOrderTimestamp(a)).slice(0, 6).map((order) => {
+    const reason = order.exitReason === "TARGET" ? "Target reached" : order.exitReason === "STOP_LOSS" ? "Stop-loss reached" : order.exitReason === "AUTO_SQUARE_OFF" ? "Session exit" : order.exitReason === "MANUAL" ? "Position closed" : `${order.side === "BUY" ? "Bought" : "Sold"} ${order.symbol}`;
+    return {
+      id: order.id,
+      time: order.time,
+      title: reason,
+      detail: `${order.symbol} · ${order.quantity} unit${order.quantity === 1 ? "" : "s"} at ${formatInr(order.price)}`,
+      tone: (order.exitReason === "TARGET" || (!order.exitReason && order.side === "BUY") ? "positive" : order.exitReason === "STOP_LOSS" ? "negative" : "neutral") as "positive" | "negative" | "neutral",
+    };
+  }), [todayOrders]);
   const todayClosedPnl = useMemo(() => {
     if (!clock) return 0;
     const todayKey = indiaDateKey(clock);
@@ -2179,7 +2214,7 @@ export function TradingDashboard() {
   }
 
   return (
-    <main className="terminal-shell" data-theme={theme} data-platform={isAndroidApp ? "android" : "web"}>
+    <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-platform={isAndroidApp ? "android" : "web"}>
       <IpoAlertMonitor />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
@@ -2205,6 +2240,10 @@ export function TradingDashboard() {
                 <div className="home-card-toggles">
                   <b>Home cards</b>
                   {([['market', 'Market freshness'], ['recent', 'Recently viewed'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
+                </div>
+                <div className="density-picker">
+                  <b>Display density</b>
+                  <div><button className={uiDensity === "comfortable" ? "active" : ""} onClick={() => setUiDensity("comfortable")}>Comfortable</button><button className={uiDensity === "compact" ? "active" : ""} onClick={() => setUiDensity("compact")}>Compact</button></div>
                 </div>
                 <div className="more-menu-actions">
                   <button onClick={() => { setMoreMenuOpen(false); openNavigationSection("watchlist"); }}><Layers3 size={16} /><span>Watchlists</span></button>
@@ -2536,6 +2575,10 @@ export function TradingDashboard() {
         openPositionsCount={openPositions.length}
         recentStocks={recentStocks}
         recentScanners={recentScanners}
+        stockOptions={homeStockOptions}
+        timeline={homeTimeline}
+        cards={homeCards}
+        riskSummary={homeRiskSummary}
         onOpenTrade={() => openNavigationSection("trade")}
         onOpenFno={() => openNavigationSection("fno")}
         onOpenMarkets={() => openNavigationSection("markets")}
