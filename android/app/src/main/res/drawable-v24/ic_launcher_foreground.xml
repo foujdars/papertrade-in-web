@@ -1,21 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M27,72 L45,53 L57,65 L81,38"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="7" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M68,38 L81,38 L81,51"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="7" />
+<!-- Generated from assets/brand/papertrade-launcher-foreground.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M39.5 31h22l12 12v29c0 3-2 5-5 5h-29c-3 0-5-2-5-5V36c0-3 2-5 5-5Z" android:fillColor="#FFFFFF" android:strokeColor="#6050B7" android:strokeWidth="2" android:strokeLineJoin="round" />
+    <path android:pathData="M61.5 31v9c0 2 1 3 3 3h9" android:fillColor="#ECE9FB" android:strokeColor="#6050B7" android:strokeWidth="2" android:strokeLineJoin="round" />
+    <path android:pathData="M39.5 47h29M39.5 55h29M39.5 63h29M39.5 71h29" android:fillColor="#00000000" android:strokeColor="#E1E5F0" android:strokeWidth="1" />
+    <path android:pathData="M48.5 44v24" android:fillColor="#00000000" android:strokeColor="#008C56" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M45.5 50h6q2 0 2 2v9q0 2-2 2h-6q-2 0-2-2v-9q0-2 2-2Z" android:fillColor="#0DA66D" />
+    <path android:pathData="M60.5 50v22" android:fillColor="#00000000" android:strokeColor="#D93245" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M57.5 55h6q2 0 2 2v7q0 2-2 2h-6q-2 0-2-2v-7q0-2 2-2Z" android:fillColor="#EF4444" />
 </vector>

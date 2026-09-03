@@ -470,11 +470,6 @@ button { color: inherit; }
 .brand b { color: var(--purple); }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px; }
 .brand-logo-image { display: block; width: 100%; height: 100%; object-fit: contain; }
-.brand-logo-dark { display: none; }
-.terminal-shell[data-theme="neon"] .brand-logo-light, .auth-screen .brand-logo-light { display: none; }
-.terminal-shell[data-theme="neon"] .brand-logo-dark, .auth-screen .brand-logo-dark { display: block; }
-.terminal-shell[data-theme="light"] .brand { color: #1d2948; }
-.terminal-shell[data-theme="light"] .brand b { color: #5b49bf; background: linear-gradient(120deg, #6451ce, #007d73); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .main-nav { height: 100%; display: flex; align-items: stretch; gap: 2px; }
 .main-nav button { position: relative; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 650; cursor: pointer; }
 .main-nav button:hover, .main-nav .nav-active { color: var(--ink); }

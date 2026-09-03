@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 18 72 72"><defs><clipPath id="mask"><rect x="18" y="18" width="72" height="72" rx="16"/></clipPath></defs><g clip-path="url(#mask)"><path d="M18 18h72v72H18Z" fill="#F5F4FC"/>
+  <path d="M39.5 31h22l12 12v29c0 3-2 5-5 5h-29c-3 0-5-2-5-5V36c0-3 2-5 5-5Z" fill="#FFFFFF" stroke="#6050B7" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M61.5 31v9c0 2 1 3 3 3h9" fill="#ECE9FB" stroke="#6050B7" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M39.5 47h29M39.5 55h29M39.5 63h29M39.5 71h29" fill="none" stroke="#E1E5F0" stroke-width="1"/>
+  <path d="M48.5 44v24" fill="none" stroke="#008C56" stroke-width="2" stroke-linecap="round"/>
+  <path d="M45.5 50h6q2 0 2 2v9q0 2-2 2h-6q-2 0-2-2v-9q0-2 2-2Z" fill="#0DA66D"/>
+  <path d="M60.5 50v22" fill="none" stroke="#D93245" stroke-width="2" stroke-linecap="round"/>
+  <path d="M57.5 55h6q2 0 2 2v7q0 2-2 2h-6q-2 0-2-2v-7q0-2 2-2Z" fill="#EF4444"/>
+</g></svg>
