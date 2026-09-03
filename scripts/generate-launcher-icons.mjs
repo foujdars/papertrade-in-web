@@ -6,7 +6,7 @@ import sharp from "sharp";
 
 const root = new URL("../", import.meta.url);
 const asset = (path) => new URL(path, root);
-export const launcherBackground = "#F5F4FC";
+export const launcherBackground = "#6D28D9";
 export const densities = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
 export function launcherVector(svg) {

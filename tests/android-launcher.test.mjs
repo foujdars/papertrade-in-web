@@ -99,14 +99,23 @@ test("vector conversion rejects unsupported artwork instead of losing it silentl
 });
 
 test("both website download links serve the new APK with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.15-beta.apk";
+  const name = "PaperTrade-IN-v1.16-beta.apk";
   const apk = await file(`public/downloads/${name}`);
   const checksum = createHash("sha256").update(apk).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
     assert.ok(content.includes(`/downloads/${name}`));
     assert.ok(!content.includes("PaperTrade-IN-v1.10-beta.apk"));
+    assert.ok(!content.includes("PaperTrade-IN-v1.15-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1.15"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1.16"/);
+});
+
+test("launcher background is purple in both adaptive and legacy icons", async () => {
+  assert.equal(launcherBackground, "#6D28D9");
+  assert.match(await source("android/app/src/main/res/values/ic_launcher_background.xml"), /#6D28D9/);
+  const { data } = await sharp(await file("assets/brand/papertrade-launcher-512.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const i = (30 * 512 + 256) * 4;
+  assert.deepEqual([...data.subarray(i, i + 4)], [109, 40, 217, 255]);
 });
