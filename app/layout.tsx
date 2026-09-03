@@ -5,6 +5,7 @@ import "./allotments.css";
 import "./ipo-directory.css";
 import "./candle-legend.css";
 import "./compact-workspaces.css";
+import "./studio-theme.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

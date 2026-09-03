@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BellRing, CalendarDays, RefreshCw, Rocket } from "lucide-react";
+import { Bell, BellRing, Building2, CalendarDays, Clock3, RefreshCw, Rocket, Store } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -226,15 +226,15 @@ export function IpoWorkspace() {
   return (
     <div className="ipo-workspace">
       <div className="ipo-board-tabs" role="group" aria-label="IPO market segment">
-        <button type="button" className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => setBoard("regular")} title="Mainboard IPOs · NSE & BSE"><b>Mainboard</b></button>
-        <button type="button" className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => setBoard("sme")} title="SME IPOs · NSE Emerge & BSE SME"><b>SME</b></button>
+        <button type="button" className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => setBoard("regular")} title="Mainboard IPOs · NSE & BSE"><Building2 size={19} aria-hidden="true" /><b>Mainboard</b></button>
+        <button type="button" className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => setBoard("sme")} title="SME IPOs · NSE Emerge & BSE SME"><Store size={19} aria-hidden="true" /><b>SME</b></button>
       </div>
       <div className="ipo-toolbar">
-        <div className="ipo-filter-tabs" role="tablist" aria-label="IPO status">
-          <button type="button" className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>All active <small>{boardIpos.length}</small></button>
-          <button type="button" className={filter === "open" ? "active" : ""} onClick={() => setFilter("open")}>Open <small>{openCount}</small></button>
-          <button type="button" className={filter === "upcoming" ? "active" : ""} onClick={() => setFilter("upcoming")}>Upcoming <small>{upcomingCount}</small></button>
-          <button type="button" className={filter === "allotments" ? "active" : ""} onClick={() => setFilter("allotments")}>Allotments</button>
+        <div className="ipo-filter-tabs" role="group" aria-label="IPO status">
+          <button type="button" className={filter === "active" ? "active" : ""} aria-pressed={filter === "active"} onClick={() => setFilter("active")}>All active <small>{boardIpos.length}</small></button>
+          <button type="button" className={filter === "open" ? "active" : ""} aria-pressed={filter === "open"} onClick={() => setFilter("open")}>Open <small>{openCount}</small></button>
+          <button type="button" className={filter === "upcoming" ? "active" : ""} aria-pressed={filter === "upcoming"} onClick={() => setFilter("upcoming")}>Upcoming <small>{upcomingCount}</small></button>
+          <button type="button" className={filter === "allotments" ? "active" : ""} aria-pressed={filter === "allotments"} onClick={() => setFilter("allotments")}>Allotments</button>
         </div>
         {filter !== "allotments" && <div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
@@ -248,7 +248,7 @@ export function IpoWorkspace() {
       </div>
 
       {filter === "allotments" ? <IpoAllotments board={board} directory={directory} /> : <>
-      {fetchedAt && <p className="ipo-updated-caption">Updated {formatRefreshTime(fetchedAt)} IST</p>}
+      {fetchedAt && <p className="ipo-updated-caption"><Clock3 size={12} aria-hidden="true" />Updated {formatRefreshTime(fetchedAt)} IST</p>}
       {error && <div className="scanner-inline-error ipo-error"><Bell size={16} /><span>{error}</span></div>}
 
       <div className="ipo-card-list">

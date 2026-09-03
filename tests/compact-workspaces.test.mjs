@@ -75,3 +75,49 @@ test("compact styling uses theme colours and preserves readable, scrollable cont
   assert.match(style, /\.ipo-workspace \.ipo-filter-tabs { width: 100%; display: flex; overflow-x: auto/);
   assert.match(await source("app/globals.css"), /\.ipo-card-list[^}]*grid-auto-rows: max-content/);
 });
+
+test("studio theme covers every workspace without replacing navigation or scroll geometry", async () => {
+  const style = await source("app/studio-theme.css");
+  const tree = postcss.parse(style);
+  const layout = await source("app/layout.tsx");
+  assert.ok(layout.indexOf('import "./studio-theme.css"') > layout.indexOf('import "./compact-workspaces.css"'));
+  for (const selector of [".home-workspace", ".trade-cockpit", ".fno-focus-workspace", ".market-discovery-panel", ".ipo-workspace", ".holdings-overview-card", ".pnl-calendar-card", ".notification-center-panel", ".more-menu-panel", ".auth-screen"]) {
+    assert.ok(style.includes(selector), `Missing themed surface: ${selector}`);
+  }
+  // This skin must not reintroduce collapsing IPO rows or override fixed overlays.
+  tree.walkDecls((decl) => assert.ok(!["position", "z-index", "overflow", "display", "inset"].includes(decl.prop) || decl.parent.selector === ".ipo-updated-caption", `${decl.prop} must stay in the layout styles`));
+  assert.match(style, /grid-auto-rows: max-content/);
+  assert.match(style, /flex-shrink: 0/);
+  assert.match(style, /\.ipo-facts b[^}]*white-space: normal/);
+  assert.doesNotMatch(style, /animation:|!important/);
+});
+
+test("light and dark studio text meet normal-text contrast on their surfaces", async () => {
+  const light = postcss.parse(await source("app/globals.css"));
+  const dark = postcss.parse(await source("app/studio-theme.css"));
+  const values = (tree, selector) => {
+    const result = {};
+    tree.walkRules(selector, (rule) => rule.walkDecls((decl) => { result[decl.prop] = decl.value; }));
+    return result;
+  };
+  const luminance = (hex) => {
+    const rgb = hex.slice(1).match(/../g).map((pair) => parseInt(pair, 16) / 255).map((c) => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+    return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+  };
+  for (const theme of [values(light, ":root"), values(dark, '.terminal-shell[data-theme="neon"]')]) {
+    for (const text of ["--ink", "--muted", "--purple"]) {
+      for (const surface of ["--studio-canvas", "--studio-panel", "--studio-raised"]) {
+        const pair = [luminance(theme[text]), luminance(theme[surface])].sort((a, b) => b - a);
+        assert.ok((pair[0] + .05) / (pair[1] + .05) >= 4.5, `${text} on ${surface} must be readable`);
+      }
+    }
+  }
+});
+
+test("chart creation and theme changes both use the navy canvas and preserve candle colours", async () => {
+  const chart = await source("components/MarketChart.tsx");
+  assert.equal(chart.match(/color: neon \? "#0c142b" : "#ffffff"/g)?.length, 2);
+  assert.equal(chart.match(/textColor: neon \? "#a4adc7"/g)?.length, 2);
+  assert.match(chart, /upColor: "#00a67e"/);
+  assert.match(chart, /downColor: "#f04458"/);
+});

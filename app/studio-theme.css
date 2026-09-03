@@ -1,0 +1,336 @@
+/* One visual language across the terminal. Geometry and scrolling remain in the
+   workspace styles; these surfaces also apply inside the Android WebView. */
+.terminal-shell[data-theme="neon"] {
+  --ink: #eef0ff;
+  --muted: #a4adc7;
+  --line: #26314e;
+  --surface: #0c142b;
+  --panel: var(--surface);
+  --soft: #111a33;
+  --purple: #bf9aff;
+  --purple-soft: #281d49;
+  --green: #23dba5;
+  --red: #ff6885;
+  --studio-canvas: #070d20;
+  --studio-panel: #0c142b;
+  --studio-raised: #121d37;
+  --studio-border: #2c3859;
+  --studio-highlight: #342353;
+  --studio-accent: linear-gradient(115deg, #8137dc, #5652ed);
+  --studio-card: linear-gradient(135deg, #111832, #0b142b 75%);
+  --studio-shadow: 0 8px 28px #00000020, inset 0 1px 0 #d7c8ff06;
+}
+
+.terminal-shell[data-theme] {
+  color: var(--ink);
+  background: var(--studio-canvas);
+}
+.terminal-shell[data-theme] :is(.home-workspace, .market-discovery-panel, .navigation-page) {
+  color: var(--ink);
+  background: radial-gradient(ellipse at 85% 0, color-mix(in srgb, var(--purple) 7%, transparent), transparent 42%), var(--studio-canvas);
+}
+.terminal-shell[data-theme] :is(.topbar, .mobile-bottom-nav) {
+  color: var(--ink);
+  background: var(--studio-canvas);
+  border-color: var(--studio-border);
+  box-shadow: none;
+}
+.terminal-shell[data-theme] .brand b { color: var(--purple); text-shadow: none; }
+.terminal-shell[data-theme] .brand-mark { filter: none; }
+.terminal-shell[data-theme] :is(.icon-button, .api-button, .funds-button, .download-button, .chart-watchlist-star, .chart-derivatives-link, .star-button) {
+  color: var(--muted);
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+  box-shadow: inset 0 1px 0 #ffffff08;
+}
+.terminal-shell[data-theme] .theme-toggle {
+  color: var(--purple);
+  border-color: color-mix(in srgb, var(--purple) 55%, var(--line));
+  background: var(--purple-soft);
+  box-shadow: none;
+}
+.terminal-shell[data-theme="neon"] .theme-toggle { color: #ffe39b; }
+.terminal-shell[data-theme] :is(.topbar nav button.active, .mobile-bottom-nav button.active) {
+  color: var(--purple);
+  text-shadow: none;
+  background: var(--purple-soft);
+}
+.terminal-shell[data-theme] .mobile-bottom-nav button.active::before {
+  background: var(--studio-accent);
+  box-shadow: 0 0 12px #8b5cf640;
+}
+.terminal-shell[data-theme] :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+}
+
+/* Home: soft light, strong hierarchy, no extra promotional sections. */
+.terminal-shell[data-theme] .home-hero {
+  border-color: #9676d960;
+  background: radial-gradient(ellipse at 95% 0, #8d52de80, transparent 55%), linear-gradient(120deg, #1c1943, #372365);
+  box-shadow: 0 12px 32px #35225b18;
+}
+.terminal-shell[data-theme] :is(.home-section, .home-index-card, .home-discovery-card, .home-recent-list > button, .home-launchpad > div > button, .home-insight-card, .home-cards-customise) {
+  color: var(--ink);
+  border-color: var(--studio-border);
+  background: var(--studio-card);
+  box-shadow: var(--studio-shadow);
+}
+.terminal-shell[data-theme] :is(.home-portfolio-stats button, .home-stock-preview, .home-stock-preview-actions, .home-risk-meter, .home-insights-strip, .home-card-toggles button) {
+  color: var(--ink);
+  background: var(--studio-raised);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] :is(.home-section h2, .home-index-card strong, .home-launchpad b, .home-discovery-card b, .home-recent-list b) { color: var(--ink); }
+.terminal-shell[data-theme] :is(.home-section small, .home-section-head > span, .home-index-card > span, .home-insight-card > span) { color: var(--muted); }
+
+/* Trade and F&O: quiet chrome around the chart, semantic buy/sell colours. */
+.terminal-shell[data-theme] :is(.watchlist-panel, .order-ticket, .chart-area, .drawing-toolbar) {
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] :is(.chart-controls, .instrument-header, .chart-statusbar, .mobile-panel-head) {
+  color: var(--ink);
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] :is(.search-box, .custom-list-bar, .compact-selector-trigger, .chart-function-trigger, .chart-timeframe-trigger, .side-switch, .stepper, .protection-grid, .margin-card, .ticket-live-position, .active-protection) {
+  color: var(--ink);
+  background: var(--studio-raised);
+  border-color: var(--studio-border);
+  box-shadow: none;
+}
+.terminal-shell[data-theme] :is(.order-ticket input, .order-ticket select, .modal input, .modal select, .modal textarea) {
+  color: var(--ink);
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] :is(.live-index-strip, .live-index-strip button) {
+  background: var(--studio-card);
+  border-color: var(--studio-border);
+  box-shadow: none;
+}
+.terminal-shell[data-theme] .chart-legend { background: color-mix(in srgb, var(--studio-panel) 92%, transparent); }
+.terminal-shell[data-theme] .chart-symbol-legend { background: transparent; }
+.terminal-shell[data-theme] .instrument-row { border-color: var(--line); }
+.terminal-shell[data-theme] .instrument-row.selected { background: var(--purple-soft); box-shadow: inset 2px 0 var(--purple); }
+.terminal-shell[data-theme] .symbol-avatar { color: var(--purple); background: var(--purple-soft); }
+.terminal-shell[data-theme] :is(.instrument-row b, .instrument-header h2, .ticket-heading h2) { color: var(--ink); }
+
+/* Markets: a compact control strip with unmistakable selected states. */
+.terminal-shell[data-theme] :is(.market-section-tabs, .scanner-mode-toggle, .market-group-tabs, .fno-list-tabs) {
+  border-color: var(--studio-border);
+  background: var(--studio-panel);
+}
+.terminal-shell[data-theme] :is(.market-section-tabs button, .market-scanner-tabs button, .market-group-tabs button, .fno-list-tabs button) {
+  color: var(--muted);
+  border-color: var(--studio-border);
+  background: var(--studio-panel);
+  box-shadow: none;
+}
+.terminal-shell[data-theme] :is(.market-section-tabs button.active, .market-group-tabs button.active, .fno-list-tabs button.active) {
+  color: #fff;
+  background: var(--studio-accent);
+  border-color: #9967df;
+  box-shadow: inset 0 1px 0 #ffffff24;
+}
+.terminal-shell[data-theme] .compact-market-panel .market-scanner-tabs button.active {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-color: var(--purple);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 40%, transparent);
+}
+.terminal-shell[data-theme] :is(.scanner-run-button, .scanner-mode-toggle button.active) {
+  color: #fff;
+  background: var(--studio-accent);
+  border-color: #9967df;
+  box-shadow: inset 0 1px 0 #ffffff24;
+}
+.terminal-shell[data-theme] :is(.scanner-info-button, .scanner-strategy-details, .market-result-card, .market-stock-card) {
+  color: var(--ink);
+  background: var(--studio-card);
+  border-color: var(--studio-border);
+}
+
+/* Portfolio, notification centre and every shared dialog/popover. */
+.terminal-shell[data-theme] .trade-cockpit {
+  background: var(--studio-card);
+  border-color: var(--studio-border);
+  box-shadow: inset 0 1px 0 #ffffff08;
+}
+.terminal-shell[data-theme] .trade-cockpit :is(.instrument-header, .chart-controls) { background: transparent; border-color: var(--studio-border); }
+.terminal-shell[data-theme] .trade-cockpit :is(.trade-day-range, .trade-journey, .compact-selector-trigger) { background: var(--studio-raised); border-color: var(--studio-border); }
+.terminal-shell[data-theme] .trade-cockpit + .chart-body { background: var(--studio-panel); }
+.terminal-shell[data-theme] :is(.navigation-page-backdrop, .workspace.section-watchlist) { background: var(--studio-canvas); }
+.terminal-shell[data-theme] .navigation-page .modal-head { background: var(--studio-panel); border-color: var(--studio-border); }
+.terminal-shell[data-theme] :is(.holdings-overview-card, .holdings-list-card, .orders-modal .order-row) { background: var(--studio-card); border-color: var(--studio-border); box-shadow: var(--studio-shadow); }
+.terminal-shell[data-theme] .workspace.section-watchlist .instrument-row,
+.terminal-shell[data-theme] .market-discovery-panel .trend-stock-row { background: var(--studio-panel); border-color: var(--studio-border); }
+.terminal-shell[data-theme] .scanner-open-chart { color: var(--purple); background: var(--purple-soft); border-color: var(--studio-border); }
+.terminal-shell[data-theme] .fno-focus-workspace {
+  --ink: inherit;
+  --muted: inherit;
+  --line: inherit;
+  --surface: inherit;
+  --soft: inherit;
+  --green: inherit;
+  --red: inherit;
+  color: var(--ink);
+  background: var(--studio-canvas);
+  color-scheme: inherit;
+}
+.terminal-shell[data-theme] :is(.fno-focus-charts, .fno-trade-dock, .fno-chart-underlay) { color: var(--ink); background: var(--studio-canvas); }
+.terminal-shell[data-theme] :is(.fno-chart-card, .fno-chart-card > header, .fno-drawing-toolbar, .fno-symbol-list-link, .fno-timeframe-menu) { color: var(--ink); background: var(--studio-panel); border-color: var(--studio-border); box-shadow: none; }
+.terminal-shell[data-theme] :is(.fno-order-modes, .fno-lot-stepper, .fno-timeframe-trigger) { color: var(--ink); background: var(--studio-raised); border-color: var(--studio-border); box-shadow: none; }
+.terminal-shell[data-theme] :is(.fno-instrument-switch, .fno-option-chain-link) { color: var(--ink); }
+.terminal-shell[data-theme] :is(.fno-lot-stepper button, .fno-timeframe-menu nav button, .fno-chart-menu-tabs > button) { color: var(--muted); background: var(--studio-raised); border-color: var(--studio-border); }
+.terminal-shell[data-theme] :is(.fno-order-modes button.active, .fno-chart-menu-tabs > button.active, .fno-timeframe-menu nav button.active) { color: #fff; background: var(--studio-accent); }
+.terminal-shell[data-theme] :is(.fno-underlying-row, .option-chain-row, .option-chain-list) { color: var(--ink); background: var(--studio-panel); border-color: var(--studio-border); }
+.terminal-shell[data-theme] :is(.market-search, .option-chain-actions select, .option-chain-legend, .dual-chart-pane > header, .option-chain-sheet, .option-sheet-header select, .option-chain-trigger) { color: var(--ink); background: var(--studio-panel); border-color: var(--studio-border); }
+.terminal-shell[data-theme] :is(.option-sheet-row, .option-sheet-header, .option-sheet-columns) { border-color: var(--studio-border); }
+.terminal-shell[data-theme] .option-chart-divider { background: var(--studio-raised); border-color: var(--studio-border); }
+.terminal-shell[data-theme] .fno-window-slider span { background: var(--muted); box-shadow: none; }
+.terminal-shell[data-theme] :is(.modal, .notification-center-panel, .more-menu-panel, .trade-symbol-menu, .dashboard-indicator-popover, .drawing-library, .chart-function-menu, .watchlist-selector-menu) {
+  color: var(--ink);
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+  box-shadow: 0 20px 65px #00000025;
+}
+.terminal-shell[data-theme] :is(.modal-head, .notification-center-actions, .notification-item, .more-menu-actions) { border-color: var(--studio-border); }
+.terminal-shell[data-theme] :is(.positions-summary, .position-row, .holdings-summary, .holding-row, .pnl-stat-grid > div, .pnl-calendar-card, .pnl-equity-card, .pnl-win-card, .pnl-metric-card, .pnl-trade-row, .pnl-order-positions, .account-sync) {
+  background: var(--studio-card);
+  border-color: var(--studio-border);
+  box-shadow: var(--studio-shadow);
+}
+.terminal-shell[data-theme] :is(.drawing-library-grid > button, .chart-study-grid > button, .chart-function-grid > button, .chart-scale-options > button, .timeframe-groups button, .watchlist-selector-options button, .density-picker, .order-row, .pnl-calendar-selectors select) {
+  color: var(--ink);
+  background: var(--studio-raised);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] :is(.drawing-library-grid > button.active, .chart-study-grid > button.active, .chart-function-grid > button.active, .timeframe-groups button.active, .density-picker button.active) {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-color: var(--purple);
+}
+.terminal-shell[data-theme] :is(.positions-empty, .holdings-empty, .notification-empty) { color: var(--muted); }
+.terminal-shell[data-theme] :is(.positions-empty b, .holdings-empty b, .modal-head h2) { color: var(--ink); }
+
+/* IPO: reference-inspired cards, without fictitious GMP or decorative controls. */
+.terminal-shell[data-theme] .ipo-workspace .ipo-board-tabs button {
+  gap: 9px;
+  color: var(--muted);
+  border: 1px solid var(--studio-border);
+  background: var(--studio-panel);
+  box-shadow: none;
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-board-tabs button.active {
+  color: #fff;
+  background: var(--studio-accent);
+  border-color: #9d6ee1;
+  box-shadow: inset 0 1px 0 #ffffff30;
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-filter-tabs button {
+  color: var(--muted);
+  background: var(--studio-panel);
+  border-color: var(--studio-border);
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-filter-tabs button.active {
+  color: var(--ink);
+  background: var(--purple-soft);
+  border-color: var(--purple);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 25%, transparent);
+}
+.terminal-shell[data-theme] .ipo-filter-tabs button small { color: var(--muted); background: var(--studio-raised); }
+.terminal-shell[data-theme] .ipo-filter-tabs button.active small { color: #fff; background: var(--studio-accent); }
+.terminal-shell[data-theme] .ipo-workspace .ipo-alert-toggle {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-color: color-mix(in srgb, var(--purple) 55%, var(--line));
+  box-shadow: none;
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-alert-toggle.active { box-shadow: inset 3px 0 var(--purple); }
+.terminal-shell[data-theme] .ipo-workspace .ipo-refresh-button { color: #fff; background: var(--studio-accent); }
+.ipo-updated-caption { display: flex; align-items: center; gap: 5px; }
+.terminal-shell[data-theme] .ipo-card-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px;
+  padding-top: 4px;
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-card,
+.terminal-shell[data-theme] .allotment-card {
+  flex-shrink: 0;
+  height: auto;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--studio-border);
+  border-radius: 16px;
+  background: var(--studio-card);
+  box-shadow: var(--studio-shadow);
+}
+.terminal-shell[data-theme] .ipo-card::before { background: linear-gradient(180deg, #c489ff, #6261db80); width: 3px; }
+.terminal-shell[data-theme] .ipo-card.open::before { background: linear-gradient(180deg, var(--green), #6261db80); }
+.terminal-shell[data-theme] .ipo-card > header { grid-template-columns: 46px minmax(0, 1fr) auto; align-items: start; }
+.terminal-shell[data-theme] .ipo-card > header > div > b { color: var(--ink); font-size: 13px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.terminal-shell[data-theme] .ipo-card > header > div > small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.terminal-shell[data-theme] .ipo-company-mark {
+  width: 46px;
+  height: 46px;
+  color: #fff;
+  background: linear-gradient(145deg, #8237dd, #4d268d);
+  border: 1px solid #b383e94d;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 #ffffff24;
+}
+.terminal-shell[data-theme] .ipo-company-mark img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.terminal-shell[data-theme] .ipo-status-badge { margin-top: 2px; padding: 5px 7px; border: 1px solid var(--line); font-size: 8px; letter-spacing: .035em; }
+.terminal-shell[data-theme] .ipo-status-badge.upcoming { color: var(--purple); background: var(--purple-soft); }
+.terminal-shell[data-theme] .ipo-status-badge.open { color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--surface)); }
+.terminal-shell[data-theme] .ipo-workspace .ipo-subscription-block {
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.terminal-shell[data-theme] .ipo-workspace .ipo-subscription-block > small { color: var(--muted); font-size: 10px; }
+.terminal-shell[data-theme] .ipo-workspace .ipo-subscription-block .ipo-gmp-pending { color: var(--muted); font-size: 10px; font-weight: 400; }
+.terminal-shell[data-theme] .ipo-workspace .ipo-facts { gap: 9px; }
+.terminal-shell[data-theme] .ipo-facts > span + span { padding-left: 10px; border-left: 1px solid var(--line); }
+.terminal-shell[data-theme] .ipo-facts small { color: var(--muted); font-size: 10px; }
+.terminal-shell[data-theme] .ipo-facts b { color: var(--ink); font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+.terminal-shell[data-theme] .ipo-card > footer { color: var(--muted); border-color: var(--line); font-size: 10px; }
+.terminal-shell[data-theme] .ipo-research-link {
+  color: var(--purple);
+  border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--line));
+  background: linear-gradient(115deg, var(--purple-soft), var(--studio-raised));
+  border-radius: 10px;
+  min-height: 48px;
+  padding: 9px 11px;
+}
+.terminal-shell[data-theme] .ipo-research-link small { color: var(--muted); }
+.terminal-shell[data-theme] .ipo-research-link > svg { flex: none; width: 30px; height: 30px; padding: 7px; color: #fff; background: var(--studio-accent); border-radius: 8px; }
+.terminal-shell[data-theme] .ipo-disclaimer { color: var(--muted); border-top: 1px solid var(--line); padding-top: 9px; font-size: 9px; line-height: 1.5; }
+.terminal-shell[data-theme] :is(.allotment-privacy, .allotment-explainer, .allotment-alert-toggle, .allotment-refresh) { color: var(--muted); background: var(--studio-raised); border-color: var(--studio-border); }
+.terminal-shell[data-theme] .allotment-card header b { color: var(--ink); }
+
+/* Restrained interaction: no moving chart, pulsing prices or perpetual glow. */
+@media (hover: hover) {
+  .terminal-shell[data-theme] :is(.home-recent-list > button, .home-discovery-card, .instrument-row, .position-row, .notification-item, .trade-symbol-menu > div > button):hover {
+    background: var(--purple-soft);
+  }
+  .terminal-shell[data-theme] :is(.ipo-research-link, .icon-button, .ipo-filter-tabs button, .ipo-card):hover { border-color: color-mix(in srgb, var(--purple) 65%, var(--line)); }
+}
+.auth-screen { color: #eef0ff; background: radial-gradient(ellipse at 80% 0, #5b2d8140, transparent 50%), #070d20; }
+.auth-screen .auth-card { color: #eef0ff; border-color: #2c3859; background: linear-gradient(145deg, #111832, #0b142b); box-shadow: 0 20px 80px #00000035; }
+.auth-screen :is(.auth-privacy-note, .auth-download-link) { color: #d5c3ff; border-color: #2c3859; background: #121d37; }
+.auth-screen :is(.auth-disclaimer, .auth-download-link small, .auth-privacy-note small) { color: #a4adc7; }
+@media (max-width: 600px) {
+  .terminal-shell[data-theme] .ipo-workspace .ipo-card { padding: 13px; gap: 10px; border-radius: 13px; }
+  .terminal-shell[data-theme] .ipo-card > header { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; }
+  .terminal-shell[data-theme] .ipo-company-mark { width: 40px; height: 40px; }
+  .terminal-shell[data-theme] .ipo-card > header > div > b { font-size: 12px; }
+  .terminal-shell[data-theme] .ipo-facts b { font-size: 11px; }
+  .terminal-shell[data-theme] .ipo-status-badge { font-size: 7px; padding: 4px 5px; }
+}

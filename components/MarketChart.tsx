@@ -1122,20 +1122,20 @@ export function MarketChart({
     const neon = chartTheme === "neon";
     chart.applyOptions({
       layout: {
-        background: { type: ColorType.Solid, color: neon ? "#061014" : "#ffffff" },
-        textColor: neon ? "#8fb3bf" : "#65708a",
+        background: { type: ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+        textColor: neon ? "#a4adc7" : "#65708a",
         attributionLogo: true,
-        panes: { separatorColor: neon ? "#173541" : "#e3e6ee", separatorHoverColor: neon ? "#00f5b0" : "#d8d3ff", enableResize: true },
+        panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
       },
       grid: {
-        vertLines: { color: neon ? "#102a33" : "#edf0f6" },
-        horzLines: { color: neon ? "#102a33" : "#edf0f6" },
+        vertLines: { color: neon ? "#19233c" : "#edf0f6" },
+        horzLines: { color: neon ? "#19233c" : "#edf0f6" },
       },
-      rightPriceScale: { borderColor: neon ? "#1b3b48" : "#dfe3ec" },
-      timeScale: { borderColor: neon ? "#1b3b48" : "#dfe3ec" },
+      rightPriceScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
+      timeScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
       crosshair: {
-        vertLine: { color: neon ? "#00f5b0" : "#8c96aa", labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
-        horzLine: { color: neon ? "#00f5b0" : "#8c96aa", labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
+        vertLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+        horzLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
       },
     });
   }, [chartTheme]);
@@ -1248,19 +1248,19 @@ export function MarketChart({
         width: Math.max(1, Math.floor(host.clientWidth)),
         height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
-          background: { type: lwc.ColorType.Solid, color: neon ? "#061014" : "#ffffff" },
-          textColor: neon ? "#8fb3bf" : "#65708a",
+          background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+          textColor: neon ? "#a4adc7" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
           attributionLogo: true,
-          panes: { separatorColor: neon ? "#173541" : "#e3e6ee", separatorHoverColor: neon ? "#00f5b0" : "#d8d3ff", enableResize: true },
+          panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
         grid: {
-          vertLines: { color: neon ? "#102a33" : "#edf0f6", style: lwc.LineStyle.Dashed },
-          horzLines: { color: neon ? "#102a33" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          vertLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          horzLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
         },
         rightPriceScale: {
           visible: true,
-          borderColor: neon ? "#1b3b48" : "#dfe3ec",
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
@@ -1269,7 +1269,7 @@ export function MarketChart({
         },
         leftPriceScale: { visible: false },
         timeScale: {
-          borderColor: neon ? "#1b3b48" : "#dfe3ec",
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           timeVisible: true,
           secondsVisible: timeframe === "1m",
           tickMarkFormatter: (time: Time) => chartTickTime(time, timeframe),
@@ -1284,8 +1284,8 @@ export function MarketChart({
         },
         crosshair: {
           mode: magnetRef.current ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
-          vertLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
-          horzLine: { color: neon ? "#00f5b0" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#083c38" : "#252b3d" },
+          vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
         },
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
