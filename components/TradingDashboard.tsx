@@ -17,6 +17,7 @@ import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
+import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { IpoAlertMonitor, IpoWorkspace } from "@/components/IpoWorkspace";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { HomeWorkspace } from "@/components/HomeWorkspace";
@@ -443,6 +444,7 @@ export function TradingDashboard() {
           : pnlOpen
             ? "pnl"
             : workspaceMode;
+  const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
@@ -2233,7 +2235,7 @@ export function TradingDashboard() {
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}>Home</button><button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "watchlist" ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button><button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}>Home</button><button className={activeNavigationSection === "trade" ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Trade</button><button className={activeNavigationSection === "fno" ? "nav-active" : ""} onClick={() => openNavigationSection("fno")}>F&amp;O</button><button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button><button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button><button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Markets</button><button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button><button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
@@ -2243,7 +2245,6 @@ export function TradingDashboard() {
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
-          <button className={`icon-button top-watchlist-button ${activeNavigationSection === "watchlist" ? "active" : ""}`} onClick={() => openNavigationSection("watchlist")} aria-label="Open watchlist" title="Watchlist"><Layers3 size={18} /></button>
           <NotificationCenter />
           <div className="more-menu-wrap">
             <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
@@ -2285,8 +2286,14 @@ export function TradingDashboard() {
 
       {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
-          <div className="mobile-panel-head"><b>Watchlist</b><button className="icon-button" onClick={() => setSidebarOpen(false)} aria-label="Close watchlist"><X size={20} /></button></div>
-          <div className="desktop-panel-head"><span className="eyebrow">Indian markets</span><h2>Watchlist</h2></div>
+          {sidebarOpen && <div className="watchlist-market-header">
+            <div className="market-discovery-head"><h2>Markets</h2><small>SAVED STOCKS</small></div>
+            <MarketSectionTabs active="WATCHLIST" onChange={(section) => {
+              if (section === "WATCHLIST") return;
+              openNavigationSection("markets");
+              setMarketsInitialGroup(section);
+            }} />
+          </div>}
           <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
           <div className="desktop-watchlist-tabs" role="tablist" aria-label="Watchlists">
             {watchlistChoices.map((choice) => <button type="button" role="tab" aria-selected={watchlist === choice.id} className={watchlist === choice.id ? "active" : ""} key={choice.id} onClick={() => { setWatchlist(choice.id); setWatchlistLimit(60); }}><span>{choice.name}</span><small>{choice.count}</small></button>)}
@@ -2586,7 +2593,6 @@ export function TradingDashboard() {
           const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
           return { label: item.label, price: quote?.lastPrice ?? null, points: quote?.netChange ?? null, changePercent: quote?.changePercent ?? null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live" };
         })}
-        marketOpen={marketStatus.isOpen}
         feedLive={feedStatus.mode === "live"}
         balance={balance}
         todayPnl={currentDayPortfolioPnl}
@@ -2617,11 +2623,11 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "watchlist"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : activeNavigationSection === "trade" ? 1 : activeNavigationSection === "fno" ? 2 : activeNavigationSection === "markets" ? 3 : activeNavigationSection === "ipo" ? 4 : 5 } as CSSProperties}>
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={true} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : activeNavigationSection === "trade" ? 1 : activeNavigationSection === "fno" ? 2 : marketNavigationActive ? 3 : activeNavigationSection === "ipo" ? 4 : 5 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Trade</span></button>
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
-        <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><TrendingUp size={19} /><span>Markets</span></button>
+        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><TrendingUp size={19} /><span>Markets</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
@@ -2706,7 +2712,7 @@ export function TradingDashboard() {
           quotes={marketQuotes}
           onQuoteKeysChange={setMarketScannerQuoteKeys}
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
-          onClose={() => setMarketsOpen(false)}
+          onOpenWatchlist={() => openNavigationSection("watchlist")}
           group={marketsInitialGroup}
           onGroupChange={setMarketsInitialGroup}
           onScannerViewed={rememberScanner}

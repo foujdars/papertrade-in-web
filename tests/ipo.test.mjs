@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateGmpPercent,
   dedupeIpos,
+  formatIpoGmp,
   indiaDateKey,
   normalizeSubscription,
   shouldSendDailyGmpAlert,
@@ -39,6 +40,15 @@ test("calculates GMP percentage from the upper issue price", () => {
   assert.equal(calculateGmpPercent(15, 110), 13.64);
   assert.equal(calculateGmpPercent(null, 110), null);
   assert.equal(calculateGmpPercent(20, 0), null);
+});
+
+test("GMP presentation separates missing data from a real zero or negative premium", () => {
+  assert.equal(formatIpoGmp(ipo()), null);
+  assert.equal(formatIpoGmp(ipo({ gmpAmount: 5 })), null);
+  assert.equal(formatIpoGmp(ipo({ gmpAmount: NaN, gmpPercent: 5 })), null);
+  assert.equal(formatIpoGmp(ipo({ gmpAmount: 0, gmpPercent: 0 })), "₹0 (0.00%)");
+  assert.equal(formatIpoGmp(ipo({ gmpAmount: 20, gmpPercent: 18.18 })), "+₹20 (+18.18%)");
+  assert.equal(formatIpoGmp(ipo({ gmpAmount: -10, gmpPercent: -9.09 })), "₹-10 (-9.09%)");
 });
 
 test("alerts once per India day only while an IPO is open and GMP is above 15%", () => {

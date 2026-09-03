@@ -23,7 +23,8 @@ test("server-renders the PaperTrade IN home dashboard", async () => {
   assert.match(html, /Build skill before you risk capital/);
   assert.match(html, /Market pulse/);
   assert.match(html, /Quick launch/);
-  assert.match(html, /Open chart/);
+  assert.match(html, /Search any NSE stock/);
+  assert.doesNotMatch(html, /home-hero-actions|home-market-orbit|Check the market pulse, practise a setup/);
   assert.match(html, /IPO RADAR/);
   assert.match(html, /Broker API/);
   assert.match(html, /Holdings/);

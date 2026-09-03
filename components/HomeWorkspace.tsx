@@ -11,7 +11,6 @@ import {
   Clock3,
   Layers3,
   LineChart,
-  Radio,
   Rocket,
   ScanSearch,
   Search,
@@ -64,7 +63,6 @@ export type HomeRiskSummary = {
 export function HomeWorkspace({
   firstName,
   indices,
-  marketOpen,
   feedLive,
   balance,
   todayPnl,
@@ -89,7 +87,6 @@ export function HomeWorkspace({
 }: {
   firstName?: string;
   indices: HomeIndexQuote[];
-  marketOpen: boolean;
   feedLive: boolean;
   balance: number;
   todayPnl: number;
@@ -130,7 +127,6 @@ export function HomeWorkspace({
           <div className="home-hero-copy">
             <span className="home-kicker"><Sparkles size={14} /> {greeting}{safeName ? `, ${safeName}` : ""}</span>
             <h1>Build skill before you risk capital.</h1>
-            <p>Check the market pulse, practise a setup or review your paper portfolio—all from one calm starting point.</p>
             <div className="home-global-search">
               <Search size={18} />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search any NSE stock" aria-label="Search any NSE stock" />
@@ -142,15 +138,6 @@ export function HomeWorkspace({
                 </button>)}
               </div>}
             </div>
-            <div className="home-hero-actions">
-              <button className="home-primary-action" onClick={onOpenTrade}><CandlestickChart size={18} /><span><b>Open chart</b><small>Search and paper trade</small></span><ArrowRight size={17} /></button>
-              <button className="home-secondary-action" onClick={onOpenMarkets}><ScanSearch size={18} /><span><b>Find setups</b><small>Trading &amp; investment scans</small></span></button>
-            </div>
-          </div>
-          <div className="home-market-orbit" aria-label="Market connection status">
-            <div><Radio size={18} /><span><small>MARKET FEED</small><b>{feedLive ? "Connected" : "Waiting"}</b></span></div>
-            <strong>{marketOpen ? "Market open" : "Market closed"}</strong>
-            <small><ShieldCheck size={13} /> Paper trades only</small>
           </div>
         </section>
 

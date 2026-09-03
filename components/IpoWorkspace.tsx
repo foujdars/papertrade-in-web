@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeIndianRupee, Bell, BellRing, CalendarDays, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
+import { Bell, BellRing, CalendarDays, RefreshCw, Rocket } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -9,6 +9,7 @@ import {
   IPO_ALERT_STATE_STORAGE_KEY,
   IPO_GMP_ALERT_THRESHOLD_PERCENT,
   indiaDateKey,
+  formatIpoGmp,
   shouldSendDailyGmpAlert,
   type IpoListResponse,
   type IpoSummary,
@@ -60,12 +61,6 @@ function formatPriceBand(ipo: IpoSummary) {
   return `₹${ipo.minimumPrice.toLocaleString("en-IN")} – ₹${ipo.maximumPrice.toLocaleString("en-IN")}`;
 }
 
-function formatGmp(ipo: IpoSummary) {
-  if (ipo.gmpAmount === null || ipo.gmpPercent === null) return "Not available";
-  const sign = ipo.gmpAmount > 0 ? "+" : "";
-  return `${sign}₹${ipo.gmpAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} (${sign}${ipo.gmpPercent.toFixed(2)}%)`;
-}
-
 function formatRefreshTime(value: string) {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" }).format(new Date(value));
@@ -93,7 +88,7 @@ async function setIpoAlertEnabled(enabled: boolean) {
 function showIpoAlert(ipo: IpoSummary) {
   const today = indiaDateKey();
   const title = `${ipo.symbol || ipo.name} IPO GMP is above ${IPO_GMP_ALERT_THRESHOLD_PERCENT}%`;
-  const body = `Current GMP is ${formatGmp(ipo)} of the upper issue price. Bidding closes ${formatIpoDate(ipo.biddingEndDate)}.`;
+  const body = `Current GMP is ${formatIpoGmp(ipo)} of the upper issue price. Bidding closes ${formatIpoDate(ipo.biddingEndDate)}.`;
   addPaperTradeNotification({ id: `ipo-gmp-${ipo.id}-${today}`, kind: "ipo", title, body });
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
@@ -230,14 +225,9 @@ export function IpoWorkspace() {
 
   return (
     <div className="ipo-workspace">
-      <section className="ipo-overview-banner">
-        <span className="ipo-overview-icon"><Rocket size={21} /></span>
-        <div><small>IPO RADAR</small><h3>From opening day to allotment.</h3><p>Track upcoming issues, daily GMP alerts and official allotment results in one place.</p></div>
-        <aside><BadgeIndianRupee size={16} /><span><small>ALERT RULE</small><b>GMP &gt; 15%</b></span></aside>
-      </section>
       <div className="ipo-board-tabs" role="group" aria-label="IPO market segment">
-        <button type="button" className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => setBoard("regular")}><b>Mainboard</b><small>NSE &amp; BSE</small></button>
-        <button type="button" className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => setBoard("sme")}><b>SME</b><small>NSE Emerge &amp; BSE SME</small></button>
+        <button type="button" className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => setBoard("regular")} title="Mainboard IPOs · NSE & BSE"><b>Mainboard</b></button>
+        <button type="button" className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => setBoard("sme")} title="SME IPOs · NSE Emerge & BSE SME"><b>SME</b></button>
       </div>
       <div className="ipo-toolbar">
         <div className="ipo-filter-tabs" role="tablist" aria-label="IPO status">
@@ -258,17 +248,13 @@ export function IpoWorkspace() {
       </div>
 
       {filter === "allotments" ? <IpoAllotments board={board} directory={directory} /> : <>
-      <p className="ipo-directory-note">Company logos and verified issue-page links from Chittorgarh. Initials appear when a logo is unavailable.</p>
-      <div className="ipo-source-line">
-        <span><ShieldCheck size={14} /> IPO dates and prices from Upstox · GMP {gmpFeedConfigured ? "from IPOAlerts" : "feed not connected"}</span>
-        {fetchedAt && <small>Updated {formatRefreshTime(fetchedAt)} IST · GMP checked periodically</small>}
-      </div>
-      {!gmpFeedConfigured && <div className="ipo-feed-note"><Bell size={16} /><span><b>GMP feed not connected</b><small>IPO dates and price bands remain available. GMP values and alerts will begin after the secure server feed is configured.</small></span></div>}
+      {fetchedAt && <p className="ipo-updated-caption">Updated {formatRefreshTime(fetchedAt)} IST</p>}
       {error && <div className="scanner-inline-error ipo-error"><Bell size={16} /><span>{error}</span></div>}
 
       <div className="ipo-card-list">
         {visibleIpos.map((ipo) => {
           const thresholdReached = ipo.gmpPercent !== null && ipo.gmpPercent > IPO_GMP_ALERT_THRESHOLD_PERCENT;
+          const gmp = formatIpoGmp(ipo);
           return (
             <article className={`ipo-card ${ipo.status} ${thresholdReached ? "threshold-reached" : ""}`} key={ipo.id}>
               <header>
@@ -276,9 +262,11 @@ export function IpoWorkspace() {
                 <div><b>{ipo.name}</b><small>{ipo.symbol || ipo.isin} · {ipo.industry || "Industry not stated"}</small></div>
                 <span className={`ipo-status-badge ${ipo.status}`}>{ipo.status}</span>
               </header>
-              <div className="ipo-subscription-block">
+              <div className={`ipo-subscription-block ${gmp === null ? "gmp-missing" : ""}`}>
                 <small>Grey Market Premium (GMP)</small>
-                <strong>{ipo.status === "upcoming" ? "Not open" : formatGmp(ipo)}</strong>
+                {gmp === null
+                  ? <span className="ipo-gmp-pending">{gmpFeedConfigured ? "GMP not yet reported" : "GMP feed not connected"}</span>
+                  : <strong>{gmp}</strong>}
                 {thresholdReached && <em><BellRing size={13} /> Above 15% GMP alert level</em>}
               </div>
               <div className="ipo-facts">

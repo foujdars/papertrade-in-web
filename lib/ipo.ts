@@ -44,6 +44,14 @@ export function normalizeGmp(value: unknown) {
   return Number.isFinite(normalized) ? normalized : null;
 }
 
+/** Missing GMP is distinct from a reported zero; callers render a small status. */
+export function formatIpoGmp(ipo: Pick<IpoSummary, "gmpAmount" | "gmpPercent">) {
+  const amount = normalizeGmp(ipo.gmpAmount);
+  const percent = normalizeGmp(ipo.gmpPercent);
+  if (amount === null || percent === null) return null;
+  return `${amount > 0 ? "+" : ""}₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} (${percent > 0 ? "+" : ""}${percent.toFixed(2)}%)`;
+}
+
 export function calculateGmpPercent(gmpAmount: unknown, upperIssuePrice: unknown) {
   const amount = normalizeGmp(gmpAmount);
   const issuePrice = Number(upperIssuePrice);

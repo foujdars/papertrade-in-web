@@ -1,6 +1,7 @@
 "use client";
 
-import { Activity, ArrowRight, BarChart3, Cable, Clock3, Gauge, RefreshCw, ScanSearch, Sparkles, Target, TrendingUp, X, Zap } from "lucide-react";
+import { Activity, ArrowRight, Cable, Clock3, Info, RefreshCw, ScanSearch } from "lucide-react";
+import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
@@ -41,10 +42,6 @@ const nifty500ScannerIds = new Set<ScannerId>([
   "adx-golden-cross",
   "macd-triple-ema",
 ]);
-
-function isInvestmentScanner(scanner: ScannerId) {
-  return scanner === "ema-30-50-100" || scanner === "rsi-divergence-daily";
-}
 
 function usesNifty500Universe(scanner: ScannerId) {
   return nifty500ScannerIds.has(scanner);
@@ -132,7 +129,7 @@ export function MarketsWorkspace({
   quotes,
   onQuoteKeysChange,
   onSelectCash,
-  onClose,
+  onOpenWatchlist,
   group,
   onGroupChange,
   onScannerViewed,
@@ -141,7 +138,7 @@ export function MarketsWorkspace({
   quotes: Record<string, NormalizedQuote>;
   onQuoteKeysChange: (keys: string[]) => void;
   onSelectCash: (instrument: Instrument, price: number) => void;
-  onClose: () => void;
+  onOpenWatchlist: () => void;
   group: "TRADING" | "INVESTMENT";
   onGroupChange: (group: "TRADING" | "INVESTMENT") => void;
   onScannerViewed?: (label: string) => void;
@@ -152,6 +149,7 @@ export function MarketsWorkspace({
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
+  const [showStrategyInfo, setShowStrategyInfo] = useState(false);
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
   const initialScanAttemptedRef = useRef<Set<ScannerId>>(new Set());
@@ -301,69 +299,31 @@ export function MarketsWorkspace({
   }, [resetPullRefresh, runSelectedScan]);
 
   return (
-    <section className="market-discovery-panel" aria-label="NSE market scanners">
-      <div className="market-discovery-head"><div><span className="eyebrow">NSE CASH · OPPORTUNITY DESK</span><h2>Markets</h2></div><button className="icon-button" onClick={onClose} aria-label="Close markets"><X size={20} /></button></div>
-
-      <section className="market-command-hero" aria-label="Market scanner overview">
-        <div className="market-command-copy">
-          <span><Sparkles size={14} /> SIGNAL DESK</span>
-          <h3>Turn the market into a focused shortlist.</h3>
-          <p>Choose a proven setup, scan the right universe and open any match directly on its chart.</p>
-        </div>
-        <div className="market-command-stats">
-          <span><small>UNIVERSE</small><b>{scannerGroup === "INVESTMENT" ? "NIFTY 500" : "NSE CASH"}</b></span>
-          <span><small>MATCHES</small><b>{activeSnapshot?.scannedAt ? activeRows.length : "—"}</b></span>
-          <span className={scanMode === "auto" ? "live" : ""}><small>REFRESH</small><b>{scanMode === "auto" ? "Auto · 1m" : "Manual"}</b></span>
-        </div>
-      </section>
-
-      <div className="scanner-family-tabs" role="tablist" aria-label="Scanner category">
-        <button
-          type="button"
-          className={scannerGroup === "TRADING" ? "active" : ""}
-          onClick={() => {
-            setScannerGroup("TRADING");
-            if (isInvestmentScanner(activeScanner)) setActiveScanner("VOLUME");
-          }}
-          role="tab"
-          aria-selected={scannerGroup === "TRADING"}
-        >
-          <Zap size={16} /><span><b>Trading setups</b><small>Intraday momentum &amp; structure</small></span>
-        </button>
-        <button
-          type="button"
-          className={scannerGroup === "INVESTMENT" ? "active" : ""}
-          onClick={() => {
-            setScannerGroup("INVESTMENT");
-            if (!isInvestmentScanner(activeScanner)) setActiveScanner("ema-30-50-100");
-          }}
-          role="tab"
-          aria-selected={scannerGroup === "INVESTMENT"}
-        >
-          <TrendingUp size={16} /><span><b>Investment setups</b><small>Daily signals · NIFTY 500</small></span>
-        </button>
-      </div>
+    <section className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
+      <div className="market-discovery-head"><h2>Markets</h2><small>{usesNifty500Universe(activeScanner) ? "NIFTY 500" : "NSE CASH"}</small></div>
+      <MarketSectionTabs active={scannerGroup} onChange={(section) => {
+        if (section === "WATCHLIST") onOpenWatchlist();
+        else setScannerGroup(section);
+      }} />
 
       <div className="trend-tabs market-scanner-tabs" role="tablist" aria-label="Market scanners">
-        {scannerOptions.map((option, index) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><span>{index + 1 < 10 ? `0${index + 1}` : index + 1}</span><b>{option.label}</b><small>{option.cadence}</small></button>)}
+        {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><b>{option.label}</b><small>{option.cadence}</small></button>)}
       </div>
 
       <div className="scanner-run-row">
-        <div className="scanner-active-story">
-          <span className="scanner-story-icon">{activeScanner === "VOLUME" ? <BarChart3 size={18} /> : activeScanner === "rsi-divergence-daily" ? <Gauge size={18} /> : <Target size={18} />}</span>
-          <span><small>ACTIVE STRATEGY · {selectedOption.cadence}</small><b>{selectedOption.label}</b><em>{activeStrategyDescription}</em></span>
-        </div>
         <div className="scanner-run-actions">
           <span className="scanner-mode-toggle" role="group" aria-label="Scanner refresh mode">
-            <button type="button" className={scanMode === "manual" ? "active" : ""} onClick={() => setScanMode("manual")}>Manual</button>
-            <button type="button" className={scanMode === "auto" ? "active" : ""} onClick={() => setScanMode("auto")}>Automatic</button>
+            <button type="button" className={scanMode === "manual" ? "active" : ""} aria-pressed={scanMode === "manual"} onClick={() => setScanMode("manual")}>Manual</button>
+            <button type="button" className={scanMode === "auto" ? "active" : ""} aria-pressed={scanMode === "auto"} onClick={() => setScanMode("auto")} title="Refresh every minute while the app is open">Auto · 1m</button>
           </span>
-          <button className="scanner-run-button" onClick={() => void runSelectedScan(undefined, true)} disabled={Boolean(loadingScanner)}>
+          <button className="scanner-run-button" aria-label={activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"} onClick={() => void runSelectedScan(undefined, true)} disabled={Boolean(loadingScanner)}>
             {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
-            {activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"}
+            {activeSnapshot?.scannedAt ? "Refresh" : "Scan now"}
           </button>
+          <button type="button" className="scanner-info-button" aria-label="Strategy details" aria-expanded={showStrategyInfo} aria-controls="scanner-strategy-details" onClick={() => setShowStrategyInfo((value) => !value)}><Info size={17} /></button>
         </div>
       </div>
+      {showStrategyInfo && <p className="scanner-strategy-details" id="scanner-strategy-details"><b>{selectedOption.label} · {selectedOption.cadence}</b> {activeStrategyDescription}</p>}
       {activeSnapshot?.error && <div className="scanner-inline-error"><Cable size={16} /><span>{activeSnapshot.error} The previous result is preserved.</span></div>}
       <div className="market-results-head">
         <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small>{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : "Run this strategy to build your shortlist"}</small></span>
