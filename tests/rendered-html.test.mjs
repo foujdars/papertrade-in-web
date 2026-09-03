@@ -87,12 +87,13 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /iPhone \/ iPad app/);
   assert.match(dashboard, /Open iOS web app/);
   assert.match(dashboard, /Add to Home Screen/);
-  assert.match(dashboard, /PaperTrade-IN-v1\.10-beta\.apk/);
+  const apkPath = dashboard.match(/href="(\/downloads\/PaperTrade-IN-v\d+\.\d+-beta\.apk)"/)?.[1];
+  assert.ok(apkPath, "dashboard links to a versioned Android beta");
   assert.match(layout, /appleWebApp/);
   assert.match(layout, /manifest: "\/manifest\.webmanifest"/);
   assert.match(webManifest, /"display": "standalone"/);
   assert.match(webManifest, /"short_name": "PaperTrade"/);
-  await access(new URL("../public/downloads/PaperTrade-IN-v1.10-beta.apk", import.meta.url));
+  await access(new URL(`../public${apkPath}`, import.meta.url));
   assert.match(authProvider, /Getting your trading desk ready/);
   assert.match(authProvider, /Don’t waste your hard-earned money/);
   assert.match(authProvider, /Practice\. Feel the thrill\. Learn\. Improve\. Then Trade\./);
