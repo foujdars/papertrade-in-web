@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import sharp from "sharp";
 import ts from "typescript";
@@ -95,4 +96,17 @@ test("standalone launcher export matches the APK artwork", async () => {
 test("vector conversion rejects unsupported artwork instead of losing it silently", () => {
   assert.throws(() => launcherVector('<svg viewBox="0 0 108 108"><rect/></svg>'), /only paths/);
   assert.throws(() => launcherVector('<svg viewBox="0 0 108 108"><path d="M1 1" transform="scale(2)"/></svg>'), /Unsupported/);
+});
+
+test("both website download links serve the new APK with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.15-beta.apk";
+  const apk = await file(`public/downloads/${name}`);
+  const checksum = createHash("sha256").update(apk).digest("hex").toUpperCase();
+  for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
+    const content = await source(path);
+    assert.ok(content.includes(`/downloads/${name}`));
+    assert.ok(!content.includes("PaperTrade-IN-v1.10-beta.apk"));
+  }
+  assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
+  assert.match(await source("android/app/build.gradle"), /versionName "1.15"/);
 });
