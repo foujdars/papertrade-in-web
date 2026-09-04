@@ -1,4 +1,5 @@
 "use client";
+import { StockLogo } from "@/components/StockLogo";
 
 import {
   Activity,
@@ -41,6 +42,7 @@ export type HomeStockOption = {
 
 export type HomeTimelineItem = {
   id: string;
+  symbol?: string;
   time: string;
   title: string;
   detail: string;
@@ -133,7 +135,7 @@ export function HomeWorkspace({
               {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
               {matches.length > 0 && <div className="home-search-results">
                 {matches.map((stock) => <button key={stock.symbol} onClick={() => { setPreview(stock); setSearch(""); }}>
-                  <span><b>{stock.symbol}</b><small>{stock.name}</small></span>
+                  <span className="stock-identity"><StockLogo symbol={stock.symbol} size={32} /><span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
                   <em className={stock.changePercent >= 0 ? "positive" : "negative"}>{stock.changePercent >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%</em>
                 </button>)}
               </div>}
@@ -208,7 +210,7 @@ export function HomeWorkspace({
           <header><span><Clock3 size={17} /><b>Today</b></span><small>Your paper-trading timeline</small></header>
           <div className="home-timeline-list">
             {timeline.map((item) => <button key={item.id} onClick={() => onOpenActivity(item.id)} aria-label={`Open chart: ${item.title}, ${item.detail}`}>
-              <i className={item.tone} />
+              {item.symbol ? <StockLogo symbol={item.symbol} size={28} /> : <i className={item.tone} />}
               <time>{item.time}</time>
               <span><b>{item.title}</b><small>{item.detail}</small></span>
               <ChevronRight size={14} />
@@ -220,7 +222,7 @@ export function HomeWorkspace({
         {cards.recent && <section className="home-section home-continue-section">
           <header><span><Clock3 size={17} /><b>Continue where you left off</b></span><small>Recent activity on this device</small></header>
           <div className="home-recent-list">
-            {recentStocks.slice(0, 5).map((symbol) => <button key={symbol} onClick={() => setPreview(stockOptions.find((stock) => stock.symbol === symbol) ?? null)}><CandlestickChart size={15} /><span><b>{symbol}</b><small>Quick preview</small></span><ChevronRight size={14} /></button>)}
+            {recentStocks.slice(0, 5).map((symbol) => <button key={symbol} onClick={() => setPreview(stockOptions.find((stock) => stock.symbol === symbol) ?? null)}><StockLogo symbol={symbol} size={28} /><span><b>{symbol}</b><small>Quick preview</small></span><ChevronRight size={14} /></button>)}
             {recentScanners.slice(0, 3).map((scanner) => <button key={scanner} onClick={onOpenMarkets}><Activity size={15} /><span><b>{scanner}</b><small>Open scanner</small></span><ChevronRight size={14} /></button>)}
             {!recentStocks.length && !recentScanners.length && <div className="home-recent-empty"><BellRing size={19} /><span><b>Your activity will appear here</b><small>Open a chart or scanner and it becomes a one-tap shortcut.</small></span></div>}
           </div>
@@ -229,7 +231,7 @@ export function HomeWorkspace({
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>
         <section className="home-stock-preview" role="dialog" aria-modal="true" aria-label={`${preview.symbol} stock preview`} onClick={(event) => event.stopPropagation()}>
-          <header><span className="symbol-avatar">{preview.symbol.slice(0, 2)}</span><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
+          <header><StockLogo symbol={preview.symbol} /><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
           <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{preview.price > 0 ? formatInr(preview.price) : "Quote loading"}</strong></span><b className={preview.changePercent >= 0 ? "positive" : "negative"}>{preview.changePercent >= 0 ? "+" : ""}{preview.changePercent.toFixed(2)}%</b></div>
           <div className="home-stock-preview-tags">{preview.categories.length ? preview.categories.map((category) => <span key={category}>{category}</span>) : <span>ALL NSE</span>}</div>
           <p>Preview the stock first, then open its remembered chart setup when you are ready.</p>

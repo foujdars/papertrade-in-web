@@ -2,6 +2,7 @@
 
 import { Activity, ArrowRight, Cable, Clock3, Info, RefreshCw, ScanSearch } from "lucide-react";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
+import { StockLogo } from "@/components/StockLogo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
@@ -359,13 +360,11 @@ export function MarketsWorkspace({
             ? `Volume ${compactNumber(row.todayVolume)} · SMA20 ${compactNumber(row.sma20Volume)}`
             : isOpenHighRow(row)
               ? `Open ${formatInr(row.open)} · High ${formatInr(row.high)}`
-              : isTechnicalRow(row)
-                ? `${row.timeframe === "1D" ? "1D" : `${row.timeframe}m`} · ${row.signal === "breakdown" ? "Below EMA 21" : `${row.signal.toUpperCase()} ${row.setupStatus ?? "setup"}`}${row.entry ? ` · Entry ${formatInr(row.entry)}` : ""}`
-                : "NSE scanner match";
+              : null;
           return (
             <button key={row.symbol} className="trend-stock-row" onClick={() => onSelectCash(item, displayPrice)}>
-              <span className="symbol-avatar">{row.symbol.slice(0, 2)}</span>
-              <span><b>{row.symbol}</b><small>{row.name} · NSE</small><small>{detail}</small></span>
+              <StockLogo symbol={row.symbol} instrumentKey={item.instrumentKey} />
+              <span><b>{row.symbol}</b><small>{row.name} · NSE</small>{detail && <small>{detail}</small>}</span>
               <span><b>{formatInr(displayPrice)}</b><small className={`market-move-line ${displayChangePercent >= 0 ? "positive" : "negative"}`}>{formatSignedMarketMove(displayNetChange, displayChangePercent)}</small>{isVolumeRow(row) && <small>{row.volumeMultiple.toFixed(2)}× volume</small>}</span>
               <span className="scanner-open-chart"><ArrowRight size={15} /></span>
             </button>

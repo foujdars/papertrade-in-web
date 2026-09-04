@@ -1,4 +1,5 @@
 "use client";
+import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 
 import {
   Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home,
@@ -96,7 +97,7 @@ function showProtectionAlert(order: PaperOrder) {
   if (typeof window === "undefined") return;
   const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
-  addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body });
+  addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body, symbol: order.symbol, instrumentKey: order.instrumentKey });
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
     void getNativeTradeAlert().show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
@@ -1418,6 +1419,7 @@ export function TradingDashboard() {
     return {
       id: order.id,
       time: order.time,
+      symbol: order.symbol,
       title: reason,
       detail: `${order.symbol} · ${order.quantity} unit${order.quantity === 1 ? "" : "s"} at ${formatInr(order.price)}`,
       tone: (order.exitReason === "TARGET" || (!order.exitReason && order.side === "BUY") ? "positive" : order.exitReason === "STOP_LOSS" ? "negative" : "neutral") as "positive" | "negative" | "neutral",
@@ -2229,6 +2231,7 @@ export function TradingDashboard() {
   }
 
   return (
+    <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <IpoAlertMonitor />
       <IpoAllotmentMonitor />
@@ -2311,7 +2314,7 @@ export function TradingDashboard() {
               const saved = customWatchlists.some((list) => list.symbols.includes(item.symbol));
               return (
                 <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
-                  <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
+                  <StockLogo {...item} />
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
                   <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? formatSignedMarketMove(netChange, change) : "Quote loading"}</small></span>
                   {activeCustomList?.symbols.includes(item.symbol) ? (
@@ -2358,7 +2361,7 @@ export function TradingDashboard() {
               </div>
               <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
                 <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
-                  <div className="title-line"><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
+                  <div className="title-line"><StockLogo {...selected} size={28} /><h1>{selected.symbol}</h1><span>NSE</span><ChevronDown size={16} /></div>
                   <p>{selected.name}</p>
                 </button>
                 {selected.assetType !== "OPTION" && <button
@@ -2384,7 +2387,7 @@ export function TradingDashboard() {
                     <div>
                       {tradeSymbolMatches.map((item) => (
                         <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
-                          <span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em>
+                          <span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em>
                         </button>
                       ))}
                       {!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}
@@ -2410,13 +2413,13 @@ export function TradingDashboard() {
           <div className="chart-controls">
             <div ref={desktopTradeSymbolPickerRef} className="desktop-chart-symbol trade-symbol-picker">
               <button className="desktop-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
-                <span>{selected.symbol}</span><small>NSE</small><ChevronDown size={15} />
+                <StockLogo {...selected} size={24} /><span>{selected.symbol}</span><small>NSE</small><ChevronDown size={15} />
               </button>
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
               {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(fnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
                 <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
-                <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
+                <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
               </div>}
             </div>
             <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
@@ -2501,7 +2504,7 @@ export function TradingDashboard() {
         <button type="button" className="desktop-order-panel-toggle" onClick={() => setDesktopOrderPanelOpen((value) => !value)} aria-label={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"} title={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"}><ChevronRight size={16} /></button>
         <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
-          <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2>{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
+          <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2 className="stock-identity"><StockLogo {...selected} size={26} />{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
           <div className="input-grid">
@@ -2539,7 +2542,7 @@ export function TradingDashboard() {
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
-            {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><button className="mini-order-symbol" onClick={() => openPositionChart(order.symbol)}><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></button><small>{order.time}</small></div>)}
+            {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><button className="mini-order-symbol stock-identity" onClick={() => openPositionChart(order.symbol)}><StockLogo {...order} size={28} /><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span></button><small>{order.time}</small></div>)}
             {!todayOrders.length && <div className="no-orders">Today&apos;s simulated trades will appear here.</div>}
           </div>
         </aside>
@@ -2655,7 +2658,7 @@ export function TradingDashboard() {
                 const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: "SELL", product: "DELIVERY", quantity: holding.quantity, price: holding.livePrice }).total;
                 const holdingReturnPercent = holding.averagePrice > 0 ? (holding.livePrice - holding.averagePrice) / holding.averagePrice * 100 : 0;
                 return <div className="holding-row" key={holding.symbol}>
-                  <button className="holding-symbol" onClick={() => openPositionChart(holding.symbol)}><span className="symbol-avatar">{holding.symbol.slice(0, 2)}</span><span><b>{holding.symbol}</b><small>{holding.name}</small></span></button>
+                  <button className="holding-symbol" onClick={() => openPositionChart(holding.symbol)}><StockLogo symbol={holding.symbol} /><span><b>{holding.symbol}</b><small>{holding.name}</small></span></button>
                   <span className="holding-quantity"><b>{holding.quantity} shares</b><small>Avg. {formatInr(holding.averagePrice)}</small></span>
                   <span className="holding-values"><b>{formatInr(holding.marketValue)}</b><small>({formatInr(holding.averagePrice * holding.quantity)})</small></span>
                   <span className="holding-return"><b className={holding.unrealizedPnl >= 0 ? "positive" : "negative"}>{holding.unrealizedPnl >= 0 ? "+" : ""}{formatInr(holding.unrealizedPnl)}</b><small className={holdingReturnPercent >= 0 ? "positive" : "negative"}>{holdingReturnPercent >= 0 ? "+" : ""}{holdingReturnPercent.toFixed(2)}% · fees {formatInr(exitCharges)}</small></span>
@@ -2674,7 +2677,7 @@ export function TradingDashboard() {
             <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
-              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}>{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{paperOrderStatusLabel(order)}</span></div>)}
+              {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}><StockLogo {...order} size={22} />{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{paperOrderStatusLabel(order)}</span></div>)}
               {!todayOrders.length && <div className="order-empty"><WalletCards size={28} /><b>No orders today</b><span>The daily order book resets at midnight; completed trades remain in P&amp;L.</span></div>}
             </div>
           </section>
@@ -2689,7 +2692,7 @@ export function TradingDashboard() {
               {openPositions.map((position) => (
                 <button key={`${position.symbol}-${position.product}`} className="position-row" onClick={() => openPositionChart(position.symbol)}>
                   <span className={position.side === "LONG" ? "buy-tag" : "sell-tag"}>{position.side}</span>
-                  <span><b>{position.symbol}</b><small>{position.name} · {position.product} · {position.quantity} units</small></span>
+                  <span className="stock-identity"><StockLogo symbol={position.symbol} size={32} /><span><b>{position.symbol}</b><small>{position.name} · {position.product} · {position.quantity} units</small></span></span>
                   <span><b className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</b><small>{formatInr(position.livePrice)} · {position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small></span>
                   <ChevronRight size={17} />
                 </button>
@@ -2816,13 +2819,13 @@ export function TradingDashboard() {
                 return (
                   <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
                     <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
-                    <span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span>
+                    <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
                     {!!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
                       <div className="pnl-order-positions-head"><b>Order book positions</b><small>{sourceOrders.length} execution{sourceOrders.length === 1 ? "" : "s"}</small></div>
                       {sourceOrders.map((order) => <button type="button" className="pnl-order-position" key={`${trade.id}-${order.id}`} onClick={() => openPaperOrderChart(order)}>
                         <span>{order.time}</span>
-                        <span className="order-symbol-link">{order.symbol}</span>
+                        <span className="order-symbol-link"><StockLogo {...order} size={22} />{order.symbol}</span>
                         <span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span>
                         <span>{order.quantity}</span>
                         <span>{formatInr(order.price)}</span>
@@ -2963,5 +2966,6 @@ export function TradingDashboard() {
       )}
       {toast && <div className="toast"><Target size={18} /> {toast}</div>}
     </main>
+    </StockLogoProvider>
   );
 }

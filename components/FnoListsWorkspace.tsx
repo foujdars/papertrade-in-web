@@ -1,4 +1,5 @@
 "use client";
+import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, Cable, Search, Star, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -68,7 +69,7 @@ export function FnoListsWorkspace({
           const starred = starredSymbols.has(item.symbol);
           return (
             <div key={item.instrumentKey} className="trend-stock-row fno-symbol-row" role="button" tabIndex={0} onClick={() => onSelect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(item); }} aria-label={`Open ${item.symbol} chart`}>
-              <span className="symbol-avatar">{item.symbol.slice(0, 2)}</span>
+              <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} />
               <span><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
               <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{quote ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : "Loading"}</small></span>
               <button type="button" className={`watchlist-star ${starred ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); onStar(item); }} aria-label={`${starred ? "Manage" : "Add"} ${item.symbol} custom watchlists`}><Star size={16} fill={starred ? "currentColor" : "none"} /></button>

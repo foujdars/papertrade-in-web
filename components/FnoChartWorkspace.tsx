@@ -1,4 +1,5 @@
 "use client";
+import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, ChevronDown, ChevronsUpDown, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -135,7 +136,7 @@ export function FnoChartWorkspace({
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={!canToggleFuture} onClick={(event) => { event.stopPropagation(); onToggleTopMode(); }}>
-                <b>{underlyingSymbol}</b><span>{topMode === "FUTURE" ? "Fut" : "Spot"}</span>{canToggleFuture && <ChevronsUpDown size={13} />}
+                <StockLogo {...topInstrument} size={24} /><b>{underlyingSymbol}</b><span>{topMode === "FUTURE" ? "Fut" : "Spot"}</span>{canToggleFuture && <ChevronsUpDown size={13} />}
               </button>
               <span>{topPrice > 0 ? topPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={topChange >= 0 ? "positive" : "negative"}>{signedPercent(topChange)}</i></span>
             </div>
@@ -172,7 +173,7 @@ export function FnoChartWorkspace({
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={optionSwitching} onClick={(event) => { event.stopPropagation(); onToggleOptionType(); }}>
-                <b>{optionLabel}</b><span>{option.optionType === "CE" ? "Call" : "Put"}</span><ChevronsUpDown size={13} />
+                <StockLogo {...option} size={24} /><b>{optionLabel}</b><span>{option.optionType === "CE" ? "Call" : "Put"}</span><ChevronsUpDown size={13} />
               </button>
               <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChange >= 0 ? "positive" : "negative"}>{signedPercent(optionChange)}</i></span>
             </div>

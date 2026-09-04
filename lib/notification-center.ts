@@ -9,6 +9,8 @@ export type PaperTradeNotification = {
   body: string;
   createdAt: number;
   read: boolean;
+  symbol?: string;
+  instrumentKey?: string;
   allotmentRegistrar?: AllotmentRegistrar;
 };
 
@@ -38,6 +40,7 @@ export function addPaperTradeNotification(input: Omit<PaperTradeNotification, "i
   const id = input.id ?? `${input.kind}-${createdAt}-${Math.random().toString(36).slice(2, 7)}`;
   const current = readPaperTradeNotifications().filter((item) => item.id !== id);
   savePaperTradeNotifications([{ id, kind: input.kind, title: input.title, body: input.body, createdAt, read: false,
+    ...(input.kind === "trade" && input.symbol ? { symbol: input.symbol, instrumentKey: input.instrumentKey } : {}),
     ...(input.kind === "ipo" && allotmentLink(input.allotmentRegistrar) ? { allotmentRegistrar: input.allotmentRegistrar } : {}),
   }, ...current]);
 }

@@ -1,4 +1,5 @@
 "use client";
+import { StockLogo } from "@/components/StockLogo";
 
 import {
   Activity,
@@ -329,13 +330,13 @@ export function AdvancedChartWorkspace({
         <div className="advanced-brand"><span><BrandMark size={31} /></span><b>PaperTrade</b> IN</div>
         <div ref={symbolPickerRef} className="advanced-symbol-picker">
           <button onClick={() => setShowSymbols((value) => !value)}>
-            <span><b>{instrument.symbol}</b><small>{instrument.name} · NSE</small></span>
+            <span className="stock-identity"><StockLogo {...instrument} size={28} /><span><b>{instrument.symbol}</b><small>{instrument.name} · NSE</small></span></span>
             <ChevronDown size={16} />
           </button>
           {showSymbols && (
             <div className="advanced-symbol-menu">
               <label><Search size={15} /><input value={symbolSearch} onChange={(event) => setSymbolSearch(event.target.value)} placeholder="Search NSE symbols" /></label>
-              <div>{filteredSymbols.slice(0, 150).map((item) => <button key={item.symbol} onClick={() => chooseInstrument(item)}><span><b>{item.symbol}</b><small>{item.name}</small></span><em>{item.price > 0 ? item.price.toFixed(2) : "NSE"}</em></button>)}</div>
+              <div>{filteredSymbols.slice(0, 150).map((item) => <button key={item.symbol} onClick={() => chooseInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={28} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>{item.price > 0 ? item.price.toFixed(2) : "NSE"}</em></button>)}</div>
             </div>
           )}
         </div>
@@ -397,7 +398,7 @@ export function AdvancedChartWorkspace({
             <aside className="live-position-card" aria-live="polite">
               <div className="live-position-head">
                 <span className={position.side === "SHORT" ? "short" : position.side === "LONG" ? "long" : "flat"}>{position.side}</span>
-                <div><b>{instrument.symbol}</b><small>{position.quantity > 0 ? `${position.quantity} shares · Intraday` : "Position closed"}</small></div>
+                <div className="stock-identity"><StockLogo {...instrument} size={26} /><span><b>{instrument.symbol}</b><small>{position.quantity > 0 ? `${position.quantity} shares · Intraday` : "Position closed"}</small></span></div>
                 <em>LIVE P&amp;L</em>
               </div>
               <div className="live-position-pnl">
@@ -435,7 +436,7 @@ export function AdvancedChartWorkspace({
           <section className="advanced-order-dock" role="dialog" aria-modal="true" aria-label={`Place ${orderSide.toLowerCase()} paper order`} onPointerDown={(event) => event.stopPropagation()}>
           <button className="advanced-dock-close" onClick={() => setOrderSide(null)} aria-label="Close order"><X size={17} /></button>
           <span className={orderSide === "BUY" ? "buy-tag" : "sell-tag"}>{orderSide}</span>
-          <div><b>{instrument.symbol}</b><small>Market · Intraday · Paper order</small></div>
+          <div className="stock-identity"><StockLogo {...instrument} size={26} /><span><b>{instrument.symbol}</b><small>Market · Intraday · Paper order</small></span></div>
           <label>Qty <input type="number" min="1" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} /></label>
           <div><small>Estimated amount</small><b>{formatInr(livePrice * quantity)}</b></div>
           <button className="advanced-dock-cancel" onClick={() => setOrderSide(null)}>Cancel</button>

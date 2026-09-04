@@ -2653,10 +2653,6 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .scanner-active-story em { display: none; }
   .scanner-run-actions { gap: 5px; }
   .market-discovery-panel .scanner-mode-toggle button { min-width: 0; width: 31px; height: 28px; overflow: hidden; padding: 0; color: transparent; font-size: 0; }
-  .market-discovery-panel .scanner-mode-toggle button::after { color: var(--muted); font-size: 7px; font-weight: 900; }
-  .market-discovery-panel .scanner-mode-toggle button:first-child::after { content: "M"; }
-  .market-discovery-panel .scanner-mode-toggle button:last-child::after { content: "A"; }
-  .market-discovery-panel .scanner-mode-toggle button.active::after { color: #fff; }
   .market-discovery-panel .scanner-run-button { min-width: 78px; height: 34px; padding-inline: 8px; font-size: 8px; }
   .market-results-head { min-height: 38px; padding-inline: 3px; }
   .market-results-head > div { display: none; }
