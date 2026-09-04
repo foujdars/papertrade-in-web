@@ -90,7 +90,7 @@ test("ships project assets and removes the starter preview", async () => {
   const apkPath = dashboard.match(/href="(\/downloads\/PaperTrade-IN-v\d+\.\d+-beta\.apk)"/)?.[1];
   assert.ok(apkPath, "dashboard links to a versioned Android beta");
   assert.match(layout, /appleWebApp/);
-  assert.match(layout, /manifest: "\/manifest\.webmanifest"/);
+  assert.match(layout, /manifest: "\/manifest\.webmanifest(?:\?v=[\d.]+)?"/);
   assert.match(webManifest, /"display": "standalone"/);
   assert.match(webManifest, /"short_name": "PaperTrade"/);
   await access(new URL(`../public${apkPath}`, import.meta.url));

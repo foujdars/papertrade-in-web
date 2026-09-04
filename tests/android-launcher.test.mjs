@@ -5,32 +5,31 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import sharp from "sharp";
 import ts from "typescript";
-import { densities, launcherBackground, launcherSvg, launcherVector } from "../scripts/generate-launcher-icons.mjs";
+import { densities, launcherBackground, launcherPng, paddedArtwork, brandSource } from "../scripts/generate-brand-assets.mjs";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url));
-const foregroundPath = "assets/brand/papertrade-launcher-foreground.svg";
 
-test("in-app branding remains the original single logo in both themes", async () => {
+test("website branding uses the approved shared artwork in both themes", async () => {
   const input = await source("components/BrandMark.tsx");
   const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const exports = {};
   new Function("require", "exports", compiled.outputText)(createRequire(import.meta.url), exports);
   const { props } = exports.BrandMark({ size: 34, className: "custom-logo" });
-  assert.equal(props.src, "/papertrade-mark.svg");
+  assert.equal(props.src, "/papertrade-mark-v117.png");
   assert.equal(props.width, 34);
   assert.equal(props.height, 34);
   assert.equal(props.alt, "");
   assert.equal(props["aria-hidden"], "true");
   assert.equal(props.className, "brand-logo-image custom-logo");
-  assert.doesNotMatch(await source("app/globals.css"), /brand-logo-light|brand-logo-dark|#007d73/);
-  const favicon = await source("public/favicon.svg");
-  assert.match(favicon, /#00c781/);
-  assert.match(favicon, /#ff315f/);
-  assert.match(await source("app/layout.tsx"), /favicon.svg\?v=original-20260903/);
+  const expected = await sharp(await file(brandSource)).resize(512, 512).png().toBuffer();
+  assert.deepEqual(await file("public/papertrade-mark-v117.png"), expected);
+  for (const path of ["public/papertrade-mark.svg", "public/papertrade-mark-light.svg", "public/favicon.svg", "android-shell/papertrade-mark.svg"]) {
+    assert.ok((await source(path)).includes(expected.toString("base64")), path);
+  }
 });
 
-test("adaptive square and round launcher resources use the native vector", async () => {
+test("adaptive square and round icons use the approved density-specific bitmap", async () => {
   const root = "android/app/src/main/res/";
   const manifest = await source("android/app/src/main/AndroidManifest.xml");
   assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
@@ -41,81 +40,76 @@ test("adaptive square and round launcher resources use the native vector", async
     assert.match(xml, /background android:drawable="@color\/ic_launcher_background"/);
   }
   assert.ok((await source(`${root}values/ic_launcher_background.xml`)).includes(launcherBackground));
-  const svg = await source(foregroundPath);
-  const vector = await source(`${root}drawable-v24/ic_launcher_foreground.xml`);
-  assert.equal(vector, launcherVector(svg));
-  assert.match(vector, /android:fillColor="#0DA66D"/);
-  assert.match(vector, /android:fillColor="#EF4444"/);
-  assert.equal([...vector.matchAll(/<path /g)].length, 7);
-  assert.doesNotMatch(svg, /<image\b|<script\b|<filter\b|href=/);
+  assert.match(await source(`${root}drawable-v24/ic_launcher_foreground.xml`), /android:src="@mipmap\/ic_launcher_foreground"/);
 });
 
-test("launcher foreground is centered and fits the adaptive 66dp safe circle", async () => {
-  const { data, info } = await sharp(Buffer.from(await source(foregroundPath))).resize(432, 432).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+test("document and green/red candles fit within the adaptive safe circle", async () => {
+  const { data, info } = await sharp(await paddedArtwork(432, 2 / 3)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   let minX = 432, maxX = 0, minY = 432, maxY = 0, green = 0, red = 0;
-  for (let y = 0; y < info.height; y++) {
-    for (let x = 0; x < info.width; x++) {
-      const i = (y * info.width + x) * 4;
-      if (data[i + 3] < 16) continue;
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      assert.ok(Math.hypot((x + .5) / 4 - 54, (y + .5) / 4 - 54) <= 33, `outside safe zone at ${x},${y}`);
-      if (data[i + 1] > data[i] * 2 && data[i + 1] > data[i + 2]) green++;
-      if (data[i] > data[i + 1] * 2 && data[i] > data[i + 2] * 2) red++;
-    }
+  for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) {
+    const i = (y * info.width + x) * 3;
+    const [r, g, b] = data.subarray(i, i + 3);
+    const isGreen = g > r * 1.8 && g > b * 1.5;
+    const isRed = r > g * 1.8 && r > b * 1.5;
+    const isPaper = (r > 210 && g > 210 && b > 210) || (r < 55 && g < 55 && b < 55);
+    if (!isPaper && !isGreen && !isRed) continue;
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    assert.ok(Math.hypot((x + .5) / 4 - 54, (y + .5) / 4 - 54) <= 33, `outside safe zone: ${x},${y}`);
+    if (isGreen) green++;
+    if (isRed) red++;
   }
   assert.ok(Math.abs((minX + maxX + 1) / 8 - 54) < 1);
   assert.ok(Math.abs((minY + maxY + 1) / 8 - 54) < 1);
-  assert.ok(green > 1000 && red > 1000, "both green and red candles remain visible");
+  assert.ok(green > 1000 && red > 1000);
 });
 
-test("all Android density fallbacks match the same vector artwork", async () => {
-  const svg = await source(foregroundPath);
+test("all Android density fallbacks derive from the same master artwork", async () => {
   for (const [density, scale] of Object.entries(densities)) {
     const root = `android/app/src/main/res/mipmap-${density}/`;
     for (const [name, shape] of [["ic_launcher", "square"], ["ic_launcher_round", "round"]]) {
-      const png = await file(`${root}${name}.png`);
-      const metadata = await sharp(png).metadata();
-      assert.equal(metadata.width, 48 * scale);
-      assert.equal(metadata.height, 48 * scale);
-      assert.deepEqual(await sharp(png).raw().toBuffer(), await sharp(Buffer.from(launcherSvg(svg, shape))).resize(48 * scale, 48 * scale).raw().toBuffer());
+      assert.deepEqual(await file(`${root}${name}.png`), await launcherPng(48 * scale, shape));
     }
-    const foreground = await file(`${root}ic_launcher_foreground.png`);
-    assert.equal((await sharp(foreground).metadata()).width, 108 * scale);
+    assert.deepEqual(await file(`${root}ic_launcher_foreground.png`), await paddedArtwork(108 * scale, 2 / 3));
+  }
+  assert.deepEqual(await file("assets/brand/papertrade-launcher-512.png"), await launcherPng(512));
+});
+
+test("PWA maskable icons are full-bleed and separate from rounded icons", async () => {
+  const manifest = JSON.parse(await source("public/manifest.webmanifest"));
+  assert.equal(manifest.icons.length, 4);
+  for (const icon of manifest.icons) {
+    const png = await file(`public${icon.src.split("?")[0]}`);
+    const metadata = await sharp(png).metadata();
+    assert.equal(`${metadata.width}x${metadata.height}`, icon.sizes);
+    if (icon.purpose === "maskable") {
+      const { data } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      for (let i = 3; i < data.length; i += 4) assert.equal(data[i], 255);
+    }
+  }
+  assert.match(await source("app/layout.tsx"), /favicon-32-v117.png/);
+  assert.match(await source("app/layout.tsx"), /apple-touch-icon-v117.png/);
+});
+
+test("native notifications include the updated brand image", async () => {
+  for (const name of ["TradeAlertPlugin", "IpoGmpAlertWorker"]) {
+    assert.match(await source(`android/app/src/main/java/in/papertrade/app/${name}.java`), /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(context.getResources\(\), R.mipmap.ic_launcher\)\)/);
   }
 });
 
-test("standalone launcher export matches the APK artwork", async () => {
-  const svg = await source(foregroundPath);
-  assert.equal(await source("assets/brand/papertrade-launcher.svg"), launcherSvg(svg) + "\n");
-  const metadata = await sharp(await file("assets/brand/papertrade-launcher-512.png")).metadata();
-  assert.equal(metadata.width, 512);
-  assert.equal(metadata.height, 512);
-});
-
-test("vector conversion rejects unsupported artwork instead of losing it silently", () => {
-  assert.throws(() => launcherVector('<svg viewBox="0 0 108 108"><rect/></svg>'), /only paths/);
-  assert.throws(() => launcherVector('<svg viewBox="0 0 108 108"><path d="M1 1" transform="scale(2)"/></svg>'), /Unsupported/);
-});
-
-test("both website download links serve the new APK with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.16-beta.apk";
-  const apk = await file(`public/downloads/${name}`);
-  const checksum = createHash("sha256").update(apk).digest("hex").toUpperCase();
+test("both website download links serve v1.17 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.17-beta.apk";
+  const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
     assert.ok(content.includes(`/downloads/${name}`));
-    assert.ok(!content.includes("PaperTrade-IN-v1.10-beta.apk"));
-    assert.ok(!content.includes("PaperTrade-IN-v1.15-beta.apk"));
+    assert.ok(!content.includes("PaperTrade-IN-v1.16-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1.16"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1.17"/);
 });
 
-test("launcher background is purple in both adaptive and legacy icons", async () => {
-  assert.equal(launcherBackground, "#6D28D9");
-  assert.match(await source("android/app/src/main/res/values/ic_launcher_background.xml"), /#6D28D9/);
-  const { data } = await sharp(await file("assets/brand/papertrade-launcher-512.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const i = (30 * 512 + 256) * 4;
-  assert.deepEqual([...data.subarray(i, i + 4)], [109, 40, 217, 255]);
+test("launcher padding uses the same violet as the app's light-theme accent", async () => {
+  assert.equal(launcherBackground.toLowerCase(), "#6840d9");
+  assert.ok((await source("app/globals.css")).includes(`--purple: ${launcherBackground.toLowerCase()}`));
 });

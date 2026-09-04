@@ -44,11 +44,14 @@ export const metadata: Metadata = {
     images: ["/papertrade-social.png"],
   },
   icons: {
-    icon: "/favicon.svg?v=original-20260903",
-    shortcut: "/papertrade-icon-192.png?v=1.13",
-    apple: "/papertrade-icon-192.png?v=1.13",
+    icon: [
+      { url: "/favicon-32-v117.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-64-v117.png", sizes: "64x64", type: "image/png" },
+    ],
+    shortcut: "/papertrade-icon-192.png?v=1.17",
+    apple: "/apple-touch-icon-v117.png",
   },
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.webmanifest?v=1.17",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

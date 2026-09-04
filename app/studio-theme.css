@@ -37,6 +37,7 @@
 }
 .terminal-shell[data-theme] .brand b { color: var(--purple); text-shadow: none; }
 .terminal-shell[data-theme] .brand-mark { filter: none; }
+.brand-logo-image { border-radius: 22%; object-fit: contain; }
 .terminal-shell[data-theme] :is(.icon-button, .api-button, .funds-button, .download-button, .chart-watchlist-star, .chart-derivatives-link, .star-button) {
   color: var(--muted);
   background: var(--studio-panel);
