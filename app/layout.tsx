@@ -7,6 +7,7 @@ import "./candle-legend.css";
 import "./compact-workspaces.css";
 import "./studio-theme.css";
 import "./stock-logos.css";
+import "./interface-cleanup.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
@@ -46,13 +47,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon-32-v117.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-64-v117.png", sizes: "64x64", type: "image/png" },
+      { url: "/favicon-32-v118.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-64-v118.png", sizes: "64x64", type: "image/png" },
     ],
-    shortcut: "/papertrade-icon-192.png?v=1.17",
-    apple: "/apple-touch-icon-v117.png",
+    shortcut: "/papertrade-icon-192.png?v=1.18",
+    apple: "/apple-touch-icon-v118.png",
   },
-  manifest: "/manifest.webmanifest?v=1.17",
+  manifest: "/manifest.webmanifest?v=1.18",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

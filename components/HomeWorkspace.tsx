@@ -2,18 +2,11 @@
 import { StockLogo } from "@/components/StockLogo";
 
 import {
-  Activity,
   ArrowRight,
-  BellRing,
-  BookOpenCheck,
   BriefcaseBusiness,
   CandlestickChart,
   ChevronRight,
-  Clock3,
   Layers3,
-  LineChart,
-  Rocket,
-  ScanSearch,
   Search,
   ShieldCheck,
   Sparkles,
@@ -38,15 +31,8 @@ export type HomeStockOption = {
   price: number;
   changePercent: number;
   categories: string[];
-};
-
-export type HomeTimelineItem = {
-  id: string;
-  symbol?: string;
-  time: string;
-  title: string;
-  detail: string;
-  tone: "positive" | "negative" | "neutral";
+  instrumentKey?: string;
+  assetType?: "EQUITY" | "INDEX";
 };
 
 export type HomeCardPreferences = {
@@ -70,20 +56,13 @@ export function HomeWorkspace({
   todayPnl,
   holdingsCount,
   openPositionsCount,
-  recentStocks,
-  recentScanners,
   stockOptions,
-  timeline,
   cards,
   riskSummary,
   onOpenTrade,
-  onOpenFno,
-  onOpenMarkets,
-  onOpenIpo,
   onOpenWatchlist,
   onOpenHoldings,
   onOpenOrders,
-  onOpenActivity,
   onOpenPnl,
   onOpenStock,
 }: {
@@ -94,20 +73,13 @@ export function HomeWorkspace({
   todayPnl: number;
   holdingsCount: number;
   openPositionsCount: number;
-  recentStocks: string[];
-  recentScanners: string[];
   stockOptions: HomeStockOption[];
-  timeline: HomeTimelineItem[];
   cards: HomeCardPreferences;
   riskSummary: HomeRiskSummary;
   onOpenTrade: () => void;
-  onOpenFno: () => void;
-  onOpenMarkets: () => void;
-  onOpenIpo: () => void;
   onOpenWatchlist: () => void;
   onOpenHoldings: () => void;
   onOpenOrders: () => void;
-  onOpenActivity: (orderId: string) => void;
   onOpenPnl: () => void;
   onOpenStock: (symbol: string) => void;
 }) {
@@ -131,11 +103,11 @@ export function HomeWorkspace({
             <h1>Build skill before you risk capital.</h1>
             <div className="home-global-search">
               <Search size={18} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search any NSE stock" aria-label="Search any NSE stock" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search stocks and indices" aria-label="Search stocks and indices" />
               {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
               {matches.length > 0 && <div className="home-search-results">
                 {matches.map((stock) => <button key={stock.symbol} onClick={() => { setPreview(stock); setSearch(""); }}>
-                  <span className="stock-identity"><StockLogo symbol={stock.symbol} size={32} /><span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
+                  <span className="stock-identity">{stock.assetType === "INDEX" ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
                   <em className={stock.changePercent >= 0 ? "positive" : "negative"}>{stock.changePercent >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%</em>
                 </button>)}
               </div>}
@@ -159,7 +131,7 @@ export function HomeWorkspace({
           </div>
         </section>}
 
-        <div className="home-main-grid">
+        <div className="home-main-grid home-main-grid-clean">
           {cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></header>
             <div className="home-portfolio-value">
@@ -177,56 +149,7 @@ export function HomeWorkspace({
             </div>
           </section>}
 
-          <section className="home-section home-launchpad">
-            <header><span><Sparkles size={17} /><b>Quick launch</b></span><small>Jump straight to the task</small></header>
-            <div>
-              <button onClick={onOpenTrade}><span className="violet"><Search size={18} /></span><b>Search &amp; trade</b><small>All NSE stocks</small></button>
-              <button onClick={onOpenFno}><span className="blue"><LineChart size={18} /></span><b>F&amp;O desk</b><small>Chains and contracts</small></button>
-              <button onClick={onOpenMarkets}><span className="green"><ScanSearch size={18} /></span><b>Market scanners</b><small>Rule-based setups</small></button>
-              <button onClick={onOpenWatchlist}><span className="amber"><Layers3 size={18} /></span><b>Watchlists</b><small>Your saved stocks</small></button>
-            </div>
-          </section>
         </div>
-
-        <section className="home-discovery-grid">
-          <button className="home-discovery-card scanners" onClick={onOpenMarkets}>
-            <span className="home-discovery-icon"><ScanSearch size={21} /></span>
-            <span><small>DISCOVER</small><b>NIFTY 500 strategy ideas</b><p>Explore daily EMA alignment, bullish RSI divergence and intraday setups.</p></span>
-            <ChevronRight size={18} />
-          </button>
-          <button className="home-discovery-card ipo" onClick={onOpenIpo}>
-            <span className="home-discovery-icon"><Rocket size={21} /></span>
-            <span><small>IPO RADAR</small><b>Open &amp; upcoming issues</b><p>Review price bands, dates and optional daily GMP alerts above 15%.</p></span>
-            <ChevronRight size={18} />
-          </button>
-          <button className="home-discovery-card learn" onClick={onOpenPnl}>
-            <span className="home-discovery-icon"><BookOpenCheck size={21} /></span>
-            <span><small>LEARN</small><b>Review what worked</b><p>Study your entry, exit, charges and trade-review chart.</p></span>
-            <ChevronRight size={18} />
-          </button>
-        </section>
-
-        <section className="home-section home-timeline-section">
-          <header><span><Clock3 size={17} /><b>Today</b></span><small>Your paper-trading timeline</small></header>
-          <div className="home-timeline-list">
-            {timeline.map((item) => <button key={item.id} onClick={() => onOpenActivity(item.id)} aria-label={`Open chart: ${item.title}, ${item.detail}`}>
-              {item.symbol ? <StockLogo symbol={item.symbol} size={28} /> : <i className={item.tone} />}
-              <time>{item.time}</time>
-              <span><b>{item.title}</b><small>{item.detail}</small></span>
-              <ChevronRight size={14} />
-            </button>)}
-            {!timeline.length && <div className="home-timeline-empty"><Clock3 size={18} /><span><b>No activity yet today</b><small>Your orders, targets and stop-loss exits will appear here.</small></span></div>}
-          </div>
-        </section>
-
-        {cards.recent && <section className="home-section home-continue-section">
-          <header><span><Clock3 size={17} /><b>Continue where you left off</b></span><small>Recent activity on this device</small></header>
-          <div className="home-recent-list">
-            {recentStocks.slice(0, 5).map((symbol) => <button key={symbol} onClick={() => setPreview(stockOptions.find((stock) => stock.symbol === symbol) ?? null)}><StockLogo symbol={symbol} size={28} /><span><b>{symbol}</b><small>Quick preview</small></span><ChevronRight size={14} /></button>)}
-            {recentScanners.slice(0, 3).map((scanner) => <button key={scanner} onClick={onOpenMarkets}><Activity size={15} /><span><b>{scanner}</b><small>Open scanner</small></span><ChevronRight size={14} /></button>)}
-            {!recentStocks.length && !recentScanners.length && <div className="home-recent-empty"><BellRing size={19} /><span><b>Your activity will appear here</b><small>Open a chart or scanner and it becomes a one-tap shortcut.</small></span></div>}
-          </div>
-        </section>}
       </div>
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>

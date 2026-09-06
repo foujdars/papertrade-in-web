@@ -39,12 +39,13 @@ test("Watchlist stays in Markets navigation and retains saved-list controls", as
   assert.match(markets, /if \(section === "WATCHLIST"\) onOpenWatchlist\(\)/);
 });
 
-test("scanner controls have no duplicate hero and keep optional strategy details and refresh", async () => {
+test("scanner controls use one compact automatic switch and refresh", async () => {
   const markets = await source("components/MarketsWorkspace.tsx");
   assert.doesNotMatch(markets, /market-command-hero|scanner-active-story|ACTIVE STRATEGY|Close markets/);
-  assert.match(markets, /aria-expanded={showStrategyInfo}/);
-  assert.match(markets, /activeStrategyDescription/);
-  assert.match(markets, /Auto · 1m/);
+  assert.match(markets, /className={`scanner-auto-switch/);
+  assert.match(markets, /role="switch" aria-checked={scanMode === "auto"}/);
+  assert.match(markets, /scanMode === "auto" \? "ON" : "OFF"/);
+  assert.doesNotMatch(markets, /showStrategyInfo|activeStrategyDescription|scanner-strategy-details|scanner-inline-error/);
   assert.match(markets, /runSelectedScan\(undefined, true\)/);
   assert.match(markets, /onTouchEnd={handlePullEnd}/);
 });

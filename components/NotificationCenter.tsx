@@ -75,7 +75,7 @@ export function NotificationCenter() {
           <div className="notification-center-list">
             {items.map((item) => <article key={item.id} className={`notification-item kind-${item.kind}`}>
               {item.kind === "trade" && item.symbol ? <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} size={32} /> : <span className="notification-item-icon"><NotificationIcon item={item} /></span>}
-              <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small>
+              <div><b>{item.title}</b>{item.kind !== "ipo" && <p>{item.body}</p>}<small>{formatNotificationTime(item.createdAt)} IST</small>
                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
               </div>
             </article>)}

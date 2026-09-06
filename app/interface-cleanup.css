@@ -1,0 +1,47 @@
+/* Requested compact interaction pass. Kept last so legacy responsive rules cannot
+   place chart chrome above the global alert and settings panels. */
+.terminal-shell .topbar { position: relative; z-index: 210; }
+.terminal-shell .notification-center-scrim,
+.terminal-shell .more-menu-scrim { z-index: 998; }
+.terminal-shell .notification-center-panel,
+.terminal-shell .more-menu-panel { z-index: 999; }
+
+.brand-logo-pair { position: relative; display: block; flex: none; }
+.brand-logo-pair .brand-logo-image { position: absolute; inset: 0; }
+.brand-logo-pair .brand-logo-dark { display: none; }
+.terminal-shell[data-theme="neon"] .brand-logo-pair .brand-logo-light { display: none; }
+.terminal-shell[data-theme="neon"] .brand-logo-pair .brand-logo-dark { display: block; }
+
+.home-main-grid-clean { grid-template-columns: minmax(0, 1fr); }
+.home-main-grid-clean > .home-portfolio-card { grid-column: 1; }
+
+.scanner-auto-switch {
+  width: 64px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--studio-raised);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.scanner-auto-switch i { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 7px #0002; transition: transform .18s ease; }
+.scanner-auto-switch.active { color: #fff; border-color: transparent; background: linear-gradient(135deg, #a43eff, #6837ee); }
+.scanner-auto-switch:not(.active) { flex-direction: row-reverse; padding: 3px 8px 3px 4px; }
+.index-symbol-spacer { width: 38px; height: 38px; display: block; }
+
+@media (max-width: 940px) {
+  .terminal-shell:has(input:focus) .mobile-bottom-nav { display: none !important; }
+  .terminal-shell:has(input:focus) .home-workspace,
+  .terminal-shell:has(input:focus) .market-discovery-panel,
+  .terminal-shell:has(input:focus) .watchlist-panel { bottom: env(safe-area-inset-bottom, 0px); }
+  .terminal-shell .notification-center-panel,
+  .terminal-shell .more-menu-panel { top: calc(var(--mobile-header-height) + 5px); }
+}

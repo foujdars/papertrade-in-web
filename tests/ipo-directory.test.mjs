@@ -93,11 +93,9 @@ test("Markets and IPO have mutually exclusive top-level screens", async () => {
   assert.match(markets, /const scannerGroup = group/);
 });
 
-test("activity rows open their exact paper order chart, including closed trades", async () => {
+test("home omits the redundant activity feed while paper-order charts remain exact", async () => {
   const home = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
   const dashboard = await readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8");
-  assert.match(home, /onClick={\(\) => onOpenActivity\(item.id\)}/);
-  assert.doesNotMatch(home, /timeline.map[\s\S]{0,100}onClick={onOpenOrders}/);
-  assert.match(dashboard, /onOpenActivity={[\s\S]*?todayOrders.find\(\(item\) => item.id === orderId\)[\s\S]*?openPaperOrderChart\(order\)/);
+  assert.doesNotMatch(home, /timeline\.map|onOpenActivity\(item\.id\)|No activity yet/);
   assert.match(dashboard, /function openPaperOrderChart\(order: PaperOrder\) {[\s\S]*?setHomeOpen\(false\)[\s\S]*?instrumentFromPaperOrder\(order, tradingUniverse\)/);
 });

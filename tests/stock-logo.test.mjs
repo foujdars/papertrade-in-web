@@ -61,7 +61,7 @@ test("stock surfaces share company artwork while scanner rows omit repeated sign
   assert.match(dashboard, /<StockLogoProvider instruments={tradingUniverse}>/);
   const markets = await source("components/MarketsWorkspace.tsx");
   assert.doesNotMatch(markets, /row\.setupStatus|Entry \$\{formatInr\(row\.entry\)\}/);
-  assert.match(markets, /detail && <small>{detail}<\/small>/);
+  assert.doesNotMatch(markets, /volumeMultiple\.toFixed|SMA20|detail && <small>/);
   assert.doesNotMatch(await source("app/globals.css"), /scanner-mode-toggle button:(first|last)-child::after/);
 });
 

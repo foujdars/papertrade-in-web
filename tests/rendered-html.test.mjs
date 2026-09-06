@@ -22,12 +22,11 @@ test("server-renders the PaperTrade IN home dashboard", async () => {
   assert.match(html, /PaperTrade IN/);
   assert.match(html, /Build skill before you risk capital/);
   assert.match(html, /Market pulse/);
-  assert.match(html, /Quick launch/);
-  assert.match(html, /Search any NSE stock/);
+  assert.match(html, /Search stocks and indices/);
+  assert.doesNotMatch(html, /Quick launch/);
   assert.doesNotMatch(html, /home-hero-actions|home-market-orbit|Check the market pulse, practise a setup/);
-  assert.match(html, /IPO RADAR/);
-  assert.match(html, /Broker API/);
-  assert.match(html, /Holdings/);
+  assert.doesNotMatch(html, /IPO RADAR|Continue where you left off|No activity yet/);
+  assert.match(html, /Your paper portfolio/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
@@ -129,7 +128,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(marketsWorkspace, /<h2>Markets<\/h2>/);
+  assert.match(marketsWorkspace, /<h2>Watchlist<\/h2>/);
   const nimbleScanner = await readFile(new URL("../lib/nimble-scanner.ts", import.meta.url), "utf8");
   assert.match(marketsWorkspace, /NIMBLE_STRATEGIES/);
   assert.match(nimbleScanner, /EMA 21 Retest/);
