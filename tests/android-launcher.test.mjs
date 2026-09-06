@@ -8,10 +8,10 @@ import { densities, launcherBackground, launcherPng, paddedArtwork, launcherSour
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url));
 
-test("website header uses dedicated approved light and dark marks", async () => {
+test("website header uses the approved white document mark in both themes", async () => {
   const brand = await source("components/BrandMark.tsx");
-  assert.match(brand, /papertrade-mark-light-v118\.png/);
-  assert.match(brand, /papertrade-mark-dark-v118\.png/);
+  assert.equal(brand.match(/papertrade-mark-light-v118\.png/g)?.length, 2);
+  assert.doesNotMatch(brand, /src="\/papertrade-mark-dark-v118\.png"/);
   assert.match(brand, /brand-logo-pair/);
   for (const path of [launcherSource, lightBrandSource, darkBrandSource, "public/papertrade-mark-light-v118.png", "public/papertrade-mark-dark-v118.png"]) {
     const metadata = await sharp(await file(path)).metadata();
