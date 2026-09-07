@@ -2586,7 +2586,7 @@ export function TradingDashboard() {
         indices={LIVE_INDEX_TICKERS.map((item) => {
           const quote = marketQuotes[item.instrumentKey];
           const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
-          return { label: item.label, price: quote?.lastPrice ?? null, points: quote?.netChange ?? null, changePercent: quote?.changePercent ?? null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live" };
+          return { symbol: item.symbol, label: item.label, price: quote?.lastPrice ?? null, points: quote?.netChange ?? null, changePercent: quote?.changePercent ?? null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live" };
         })}
         feedLive={feedStatus.mode === "live"}
         balance={balance}
@@ -2596,7 +2596,6 @@ export function TradingDashboard() {
         stockOptions={homeStockOptions}
         cards={homeCards}
         riskSummary={homeRiskSummary}
-        onOpenTrade={() => openNavigationSection("trade")}
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
         onOpenOrders={() => { setHomeOpen(false); setPositionsOpen(true); }}

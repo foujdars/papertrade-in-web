@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import { formatInr } from "@/lib/market";
 
 export type HomeIndexQuote = {
+  symbol: string;
   label: string;
   price: number | null;
   points: number | null;
@@ -59,7 +60,6 @@ export function HomeWorkspace({
   stockOptions,
   cards,
   riskSummary,
-  onOpenTrade,
   onOpenWatchlist,
   onOpenHoldings,
   onOpenOrders,
@@ -76,7 +76,6 @@ export function HomeWorkspace({
   stockOptions: HomeStockOption[];
   cards: HomeCardPreferences;
   riskSummary: HomeRiskSummary;
-  onOpenTrade: () => void;
   onOpenWatchlist: () => void;
   onOpenHoldings: () => void;
   onOpenOrders: () => void;
@@ -121,7 +120,7 @@ export function HomeWorkspace({
             {indices.map((index) => {
               const positive = (index.points ?? 0) >= 0;
               return (
-                <button key={index.label} className="home-index-card" onClick={onOpenTrade}>
+                <button key={index.symbol} className="home-index-card" onClick={() => onOpenStock(index.symbol)}>
                   <span><b>{index.label}</b><i className={index.live ? "live" : ""}>{index.live ? "LIVE" : "LAST"}</i></span>
                   <strong>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
                   <small className={positive ? "positive" : "negative"}>{index.points === null ? "Waiting for data" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>

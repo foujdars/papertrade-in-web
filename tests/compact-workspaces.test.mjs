@@ -7,6 +7,136 @@ import postcss from "postcss";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
+// Render the real component functions with deterministic hooks. This exercises
+// their actual event handlers and state transitions without a browser or feed.
+async function componentHarness(path, name, initialStates = []) {
+  const require = createRequire(import.meta.url);
+  const states = [...initialStates];
+  const refs = [];
+  let stateIndex = 0;
+  let refIndex = 0;
+  let effects = [];
+  const react = {
+    ...require("react"),
+    useState(initial) {
+      const index = stateIndex++;
+      if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+      return [states[index], (next) => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
+    },
+    useRef(initial) { const index = refIndex++; return refs[index] ??= { current: initial }; },
+    useMemo: (callback) => callback(),
+    useCallback: (callback) => callback,
+    useEffect: (callback) => effects.push(callback),
+  };
+  const mocks = {
+    react,
+    "@/components/StockLogo": { StockLogo: () => null },
+    "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
+    "@/lib/market": { formatInr: String, deriveNetChange: () => 0, formatSignedMarketMove: String },
+    "@/lib/nimble-scanner": { NIMBLE_STRATEGIES: {
+      "ema-30-50-100": { label: "EMA", description: "EMA", timeframe: "1D" },
+      "rsi-divergence-daily": { label: "RSI", description: "RSI", timeframe: "1D" },
+    } },
+  };
+  const compiled = ts.transpileModule(await source(path), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
+  const exports = {};
+  new Function("require", "exports", compiled.outputText)((id) => mocks[id] ?? require(id), exports);
+  return {
+    states,
+    render(props) { stateIndex = 0; refIndex = 0; effects = []; return exports[name](props); },
+    runEffects() { return effects.map((effect) => effect()); },
+  };
+}
+
+function elements(view) {
+  if (Array.isArray(view)) return view.flatMap(elements);
+  if (!view || typeof view !== "object") return [];
+  return [view, ...elements(view.props?.children)];
+}
+
+function viewText(view) {
+  if (Array.isArray(view)) return view.map(viewText).join("");
+  if (view && typeof view === "object") return viewText(view.props?.children);
+  return typeof view === "string" || typeof view === "number" ? String(view) : "";
+}
+
+test("each Home market-pulse card opens its own index, not the last chart", async () => {
+  const harness = await componentHarness("components/HomeWorkspace.tsx", "HomeWorkspace");
+  const selected = [];
+  const symbols = ["NIFTY", "BANKNIFTY", "SENSEX"];
+  const view = harness.render({
+    indices: symbols.map((symbol) => ({ symbol, label: symbol, price: null, points: null, changePercent: null, live: false })),
+    stockOptions: [], cards: { market: true, portfolio: false },
+    onOpenStock: (symbol) => selected.push(symbol),
+  });
+  const cards = elements(view).filter((node) => node.props?.className === "home-index-card");
+  assert.equal(cards.length, 3);
+  cards.forEach((card) => card.props.onClick());
+  assert.deepEqual(selected, symbols);
+});
+
+test("index row keyboard navigation does not swallow the watchlist-star action", async () => {
+  const item = { symbol: "NIFTY", name: "Nifty 50", instrumentKey: "NSE_INDEX|Nifty 50", underlyingType: "INDEX" };
+  const harness = await componentHarness("components/FnoListsWorkspace.tsx", "FnoListsWorkspace", ["indices", [item], false]);
+  const selected = [];
+  const starred = [];
+  const view = harness.render({ quotes: {}, starredSymbols: new Set(), onSelect: (value) => selected.push(value), onStar: (value) => starred.push(value) });
+  const row = elements(view).find((node) => node.props?.role === "button");
+  const star = elements(row).find((node) => node.type === "button");
+  const rowTarget = {};
+  for (const key of ["Enter", " "]) {
+    row.props.onKeyDown({ key, target: star, currentTarget: rowTarget, preventDefault: () => assert.fail("Do not consume the star's key") });
+  }
+  star.props.onClick({ stopPropagation() {} });
+  assert.deepEqual(starred, [item]);
+  assert.deepEqual(selected, []);
+  let prevented = 0;
+  for (const key of ["Enter", " "]) row.props.onKeyDown({ key, target: rowTarget, currentTarget: rowTarget, preventDefault: () => prevented++ });
+  assert.deepEqual(selected, [item, item]);
+  assert.equal(prevented, 2, "Space should activate without scrolling");
+  assert.ok(elements(row).some((node) => node.props?.className === "fno-symbol-identity"));
+});
+
+test("scanner OFF never fetches automatically; empty success clears old matches; failure keeps their original date", async (t) => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const storage = new Map([["papertrade-market-scanner-mode-v1", "manual"]]);
+  Object.defineProperty(globalThis, "window", { configurable: true, value: {
+    localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
+    setTimeout, clearTimeout,
+  } });
+  t.after(() => { if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else delete globalThis.window; });
+  let payload = { ok: true, rows: [], fetchedAt: "2026-09-07T10:00:00.000Z" };
+  const fetchMock = t.mock.method(globalThis, "fetch", async () => ({ ok: payload.ok, json: async () => payload }));
+  const props = { group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
+  const harness = await componentHarness("components/MarketsWorkspace.tsx", "MarketsWorkspace");
+  const render = () => harness.render(props);
+  const refresh = async () => {
+    elements(render()).find((node) => node.props?.className === "scanner-run-button").props.onClick();
+    await new Promise(setImmediate);
+  };
+  const initial = render();
+  assert.equal(elements(initial).find((node) => node.props?.role === "switch").props["aria-checked"], false);
+  const cleanups = harness.runEffects();
+  assert.equal(fetchMock.mock.callCount(), 0, "OFF must not run an initial scan, even with no saved matches");
+
+  const previous = { rows: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", lastPrice: 100, changePercent: 1 }], scannedAt: "2026-09-07T09:00:00.000Z" };
+  harness.states[1] = { VOLUME: previous };
+  await refresh();
+  assert.deepEqual(harness.states[1].VOLUME.rows, []);
+  assert.equal(harness.states[1].VOLUME.scannedAt, payload.fetchedAt);
+  assert.equal(harness.states[1].VOLUME.error, undefined);
+  assert.match(viewText(render()), /0 matches/);
+
+  harness.states[1] = { VOLUME: previous };
+  payload = { ok: false, error: { message: "Feed temporarily unavailable" } };
+  await refresh();
+  assert.deepEqual(harness.states[1].VOLUME.rows, previous.rows);
+  assert.equal(harness.states[1].VOLUME.scannedAt, previous.scannedAt);
+  assert.equal(harness.states[1].VOLUME.error, payload.error.message);
+  assert.match(viewText(render()), /Refresh failed/);
+  cleanups.forEach((cleanup) => { if (typeof cleanup === "function") cleanup(); });
+});
+
 test("Markets has Trading, Investment and Watchlist actions with a single active section", async () => {
   const input = await source("components/MarketSectionTabs.tsx");
   const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });

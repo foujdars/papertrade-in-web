@@ -140,7 +140,6 @@ export function MarketsWorkspace({
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
-  const initialScanAttemptedRef = useRef<Set<ScannerId>>(new Set());
   const marketListRef = useRef<HTMLDivElement | null>(null);
   const pullStartYRef = useRef<number | null>(null);
   const pullDistanceRef = useRef(0);
@@ -202,16 +201,13 @@ export function MarketsWorkspace({
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${option.label} is unavailable.`);
       const rows = validScannerRows(scanner, scanner === "OPEN_HIGH" ? (payload.openHighRows ?? payload.rows ?? []) : (payload.rows ?? []));
       setSnapshots((current) => {
-        const previousRows = current[scanner]?.rows ?? [];
-        // An empty strict RSI-divergence scan means that there are currently
-        // no eligible setups. Never substitute an old oversold reading here.
-        const preservePrevious = scanner !== "rsi-divergence-daily" && rows.length === 0 && previousRows.length > 0;
+        // A successful empty result is current data, not a failed request.
+        // Only failures retain the last successful snapshot and its timestamp.
         const next = {
           ...current,
           [scanner]: {
-            rows: preservePrevious ? previousRows : rows,
+            rows,
             scannedAt: payload.fetchedAt ?? new Date().toISOString(),
-            ...(preservePrevious ? { error: "No fresh matches were returned. The last successful list is still shown." } : {}),
           },
         };
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -229,16 +225,6 @@ export function MarketsWorkspace({
       setLoadingScanner((current) => current === scanner ? null : current);
     }
   }, [activeScanner, instruments, nifty500Instruments]);
-
-  // Refresh a missing/previously-empty scanner once per app session even when
-  // the user had selected manual mode. Old empty snapshots should never leave
-  // the Volume Shocker looking permanently broken.
-  useEffect(() => {
-    const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
-    if (!universeAvailable || loadingScanner || activeRows.length > 0 || initialScanAttemptedRef.current.has(activeScanner)) return;
-    initialScanAttemptedRef.current.add(activeScanner);
-    void runSelectedScan(activeScanner, true);
-  }, [activeRows.length, activeScanner, instruments.length, loadingScanner, nifty500Instruments.length, runSelectedScan, scannerGroup]);
 
   useEffect(() => {
     window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
@@ -307,7 +293,7 @@ export function MarketsWorkspace({
         </div>
       </div>
       <div className="market-results-head">
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small>{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : "Run this strategy to build your shortlist"}</small></span>
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Tap Scan now to retry" : "Run this strategy to build your shortlist"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
       <div
@@ -347,7 +333,7 @@ export function MarketsWorkspace({
         })}
         {loadingScanner === activeScanner && !activeRows.length && <div className="scanner-skeleton-list" aria-label={`Scanning ${selectedOption.label}`}>{Array.from({ length: 7 }, (_, index) => <div className="scanner-skeleton-row" key={`scanner-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
         {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Press Scan to load {selectedOption.label}. Nothing is fetched merely by changing tabs.</span></div>}
-        {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>No stocks pass this scan</b><span>The completed Upstox candles returned no current {selectedOption.label} setup.</span></div>}
+        {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>{activeSnapshot.error ? "No saved matches" : "No stocks pass this scan"}</b><span>{activeSnapshot.error ? "Refresh to check for current setups." : `The completed Upstox candles returned no current ${selectedOption.label} setup.`}</span></div>}
       </div>
     </section>
   );
