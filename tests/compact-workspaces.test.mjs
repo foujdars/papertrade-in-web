@@ -252,3 +252,16 @@ test("chart creation and theme changes both use the navy canvas and preserve can
   assert.match(chart, /upColor: "#00a67e"/);
   assert.match(chart, /downColor: "#f04458"/);
 });
+
+test("portfolio exposes complete history filters and a separate open-position exit action", async () => {
+  const dashboard = await source("components/TradingDashboard.tsx");
+  const home = await source("components/HomeWorkspace.tsx");
+  assert.match(home, /Closed trades/);
+  assert.match(home, /onOpenTradeHistory/);
+  assert.match(dashboard, /pnlHistoryFilter === "profit"/);
+  assert.match(dashboard, /pnlHistoryFilter === "loss"/);
+  assert.match(dashboard, /className="position-exit-button"/);
+  assert.match(dashboard, /exitPosition\(position\.quantity, \{ symbol: position\.symbol/);
+  assert.match(dashboard, /aria-expanded={menuOpen}/);
+  assert.doesNotMatch(dashboard, /selectedPnlDateKey && <div className="pnl-trade-list"/);
+});

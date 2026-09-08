@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionExecutionPrice, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
-import { buildClosedTrades } from "../lib/trade-analytics.ts";
+import { buildClosedTrades, filterClosedTradesByOutcome } from "../lib/trade-analytics.ts";
 import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
 
 function order(id, side, quantity, price) {
@@ -15,6 +15,17 @@ function order(id, side, quantity, price) {
     time: "10:00",
   };
 }
+
+test("completed-trade history filters all, profitable and losing trades", () => {
+  const trades = [
+    { id: "win", netPnl: 125 },
+    { id: "flat", netPnl: 0 },
+    { id: "loss", netPnl: -75 },
+  ];
+  assert.deepEqual(filterClosedTradesByOutcome(trades, "all").map((trade) => trade.id), ["win", "flat", "loss"]);
+  assert.deepEqual(filterClosedTradesByOutcome(trades, "profit").map((trade) => trade.id), ["win"]);
+  assert.deepEqual(filterClosedTradesByOutcome(trades, "loss").map((trade) => trade.id), ["loss"]);
+});
 
 test("calculates current NSE option premium charges", () => {
   const buy = calculateUpstoxOptionCharges({ side: "BUY", quantity: 65, price: 100 });

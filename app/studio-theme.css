@@ -198,7 +198,7 @@
   box-shadow: 0 20px 65px #00000025;
 }
 .terminal-shell[data-theme] :is(.modal-head, .notification-center-actions, .notification-item, .more-menu-actions) { border-color: var(--studio-border); }
-.terminal-shell[data-theme] :is(.positions-summary, .position-row, .holdings-summary, .holding-row, .pnl-stat-grid > div, .pnl-calendar-card, .pnl-equity-card, .pnl-win-card, .pnl-metric-card, .pnl-trade-row, .pnl-order-positions, .account-sync) {
+.terminal-shell[data-theme] :is(.positions-summary, .position-row, .holdings-summary, .holding-row, .pnl-stat-grid > div, .pnl-stat-grid > button, .pnl-calendar-card, .pnl-equity-card, .pnl-win-card, .pnl-metric-card, .pnl-trade-row, .pnl-order-positions, .account-sync) {
   background: var(--studio-card);
   border-color: var(--studio-border);
   box-shadow: var(--studio-shadow);

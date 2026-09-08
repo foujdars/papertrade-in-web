@@ -45,7 +45,7 @@ import {
   type PaperOrder,
   type PaperProtection,
 } from "@/lib/paper-trading";
-import { buildClosedTrades, getOrderCharges, type ClosedPaperTrade } from "@/lib/trade-analytics";
+import { buildClosedTrades, filterClosedTradesByOutcome, getOrderCharges, type ClosedPaperTrade, type ClosedTradeOutcome } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
@@ -163,6 +163,7 @@ type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
 type UiDensity = "comfortable" | "compact";
+type PnlHistoryFilter = ClosedTradeOutcome;
 const DEFAULT_HOME_CARDS: HomeCardPreferences = { market: true, recent: true, portfolio: true };
 
 type ChartHistorySnapshot = {
@@ -424,6 +425,7 @@ export function TradingDashboard() {
   const [pnlCalendarMonth, setPnlCalendarMonth] = useState(() => indiaDateParts(Date.now()).month - 1);
   const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
   const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
+  const [pnlHistoryFilter, setPnlHistoryFilter] = useState<PnlHistoryFilter>("all");
   const [fundsOpen, setFundsOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -1539,9 +1541,12 @@ export function TradingDashboard() {
       losses: losses.length,
     };
   }, [closedTrades]);
-  const visiblePnlTrades = useMemo(() => selectedPnlDateKey
-    ? closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey)
-    : [], [closedTrades, selectedPnlDateKey]);
+  const visiblePnlTrades = useMemo(() => {
+    if (selectedPnlDateKey) {
+      return closedTrades.filter((trade) => trade.closedAt > 0 && calendarDateKey(indiaDateParts(trade.closedAt).year, indiaDateParts(trade.closedAt).month - 1, indiaDateParts(trade.closedAt).day) === selectedPnlDateKey);
+    }
+    return filterClosedTradesByOutcome(closedTrades, pnlHistoryFilter);
+  }, [closedTrades, pnlHistoryFilter, selectedPnlDateKey]);
   const paperOrdersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
   const orderMarkerRoles = useMemo(() => {
     const roles = new Map<string, "ENTRY" | "EXIT">();
@@ -1806,9 +1811,21 @@ export function TradingDashboard() {
     window.setTimeout(() => setToast(""), 3200);
   }
 
-  function exitPosition(requestedQuantity: number) {
-    if (selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
-    const executionPrice = verifiedLivePrice;
+  function exitPosition(requestedQuantity: number, requestedPosition?: {
+    symbol: string;
+    product: "INTRADAY" | "DELIVERY";
+    side: "LONG" | "SHORT";
+    quantity: number;
+    livePrice: number;
+  }) {
+    const exitInstrument = requestedPosition
+      ? tradingUniverse.find((item) => item.symbol === requestedPosition.symbol)
+      : selected;
+    const exitSide = requestedPosition?.side ?? selectedPosition.side;
+    const exitPositionQuantity = requestedPosition?.quantity ?? selectedPosition.quantity;
+    const exitProduct = requestedPosition?.product ?? positionProduct;
+    const executionPrice = requestedPosition?.livePrice ?? verifiedLivePrice;
+    if (!exitInstrument || exitPositionQuantity <= 0 || exitSide === "FLAT") return;
     if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
       setToast("Live Upstox price unavailable. Position was not exited.");
       window.setTimeout(() => setToast(""), 3_500);
@@ -1819,47 +1836,47 @@ export function TradingDashboard() {
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
-    if (positionProduct === "INTRADAY" && !intradayOrdersAllowed) {
+    if (exitProduct === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
       window.setTimeout(() => setToast(""), 3_500);
       return;
     }
-    const closingQuantity = Math.min(selectedPosition.quantity, Math.max(1, Math.floor(requestedQuantity)));
-    const closingSide = selectedPosition.side === "LONG" ? "SELL" : "BUY";
-    const exitCharges = calculateInstrumentCharges(selected, { side: closingSide, product: positionProduct, quantity: closingQuantity, price: executionPrice });
+    const closingQuantity = Math.min(exitPositionQuantity, Math.max(1, Math.floor(requestedQuantity)));
+    const closingSide = exitSide === "LONG" ? "SELL" : "BUY";
+    const exitCharges = calculateInstrumentCharges(exitInstrument, { side: closingSide, product: exitProduct, quantity: closingQuantity, price: executionPrice });
     const order: PaperOrder = {
       id: `${new Date().getTime()}`,
-      symbol: selected.symbol,
+      symbol: exitInstrument.symbol,
       side: closingSide,
       quantity: closingQuantity,
       price: executionPrice,
       status: "COMPLETE",
       time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-      product: positionProduct,
+      product: exitProduct,
       createdAt: new Date().getTime(),
       charges: exitCharges,
       exitReason: "MANUAL",
-      priceSource: selectedQuote?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
-      instrumentKey: selected.instrumentKey,
-      instrumentName: selected.name,
-      assetType: selected.assetType ?? "EQUITY",
-      optionType: selected.optionType,
-      strikePrice: selected.strikePrice,
-      expiry: selected.expiry,
-      lotSize: selected.lotSize,
-      underlyingKey: selected.underlyingKey,
-      underlyingSymbol: selected.underlyingSymbol,
+      priceSource: marketQuotes[exitInstrument.instrumentKey]?.lastPrice ? "UPSTOX_QUOTE" : "UPSTOX_CANDLE",
+      instrumentKey: exitInstrument.instrumentKey,
+      instrumentName: exitInstrument.name,
+      assetType: exitInstrument.assetType ?? "EQUITY",
+      optionType: exitInstrument.optionType,
+      strikePrice: exitInstrument.strikePrice,
+      expiry: exitInstrument.expiry,
+      lotSize: exitInstrument.lotSize,
+      underlyingKey: exitInstrument.underlyingKey,
+      underlyingSymbol: exitInstrument.underlyingSymbol,
     };
     const nextOrders = [order, ...orders];
-    const exitCapital = paperOrderCapitalValue(selected.assetType, positionProduct, closingQuantity, executionPrice);
+    const exitCapital = paperOrderCapitalValue(exitInstrument.assetType, exitProduct, closingQuantity, executionPrice);
     const nextBalance = (closingSide === "BUY" ? balance - exitCapital : balance + exitCapital) - exitCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
     setExitQuantity("1");
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
-    if (closingQuantity >= selectedPosition.quantity) saveProtection(null, selected.symbol, positionProduct);
-    setToast(`Exited ${closingQuantity} ${selected.symbol} · charges ${formatInr(exitCharges.total)}`);
+    if (closingQuantity >= exitPositionQuantity) saveProtection(null, exitInstrument.symbol, exitProduct);
+    setToast(`Exited ${closingQuantity} ${exitInstrument.symbol} · charges ${formatInr(exitCharges.total)}`);
     window.setTimeout(() => setToast(""), 3_200);
   }
 
@@ -2593,12 +2610,14 @@ export function TradingDashboard() {
         todayPnl={currentDayPortfolioPnl}
         holdingsCount={holdings.length}
         openPositionsCount={openPositions.length}
+        closedTradesCount={closedTrades.length}
         stockOptions={homeStockOptions}
         cards={homeCards}
         riskSummary={homeRiskSummary}
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
-        onOpenOrders={() => { setHomeOpen(false); setPositionsOpen(true); }}
+        onOpenPositions={() => { setHomeOpen(false); setPositionsOpen(true); }}
+        onOpenTradeHistory={() => { setSelectedPnlDateKey(null); setPnlHistoryFilter("all"); openNavigationSection("pnl"); }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
           const stock = stockUniverse.find((item) => item.symbol === symbol);
@@ -2674,15 +2693,24 @@ export function TradingDashboard() {
           <section className="modal positions-modal" role="dialog" aria-modal="true" aria-label="Open positions" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Open positions</h2></div><button className="icon-button" onClick={() => setPositionsOpen(false)} aria-label="Close positions"><X size={20} /></button></div>
             <div className="positions-summary"><span>{openPositions.length} open</span><div><small>Live P&amp;L</small><b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b></div></div>
+            {!!openPositions.length && <p className="positions-help">Tap a position to view its chart. Use Exit to close it at the current live price.</p>}
             <div className="positions-list">
-              {openPositions.map((position) => (
-                <button key={`${position.symbol}-${position.product}`} className="position-row" onClick={() => openPositionChart(position.symbol)}>
-                  <span className={position.side === "LONG" ? "buy-tag" : "sell-tag"}>{position.side}</span>
-                  <span className="stock-identity"><StockLogo symbol={position.symbol} size={32} /><span><b>{position.symbol}</b><small>{position.name} · {position.product} · {position.quantity} units</small></span></span>
-                  <span><b className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</b><small>{formatInr(position.livePrice)} · {position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small></span>
-                  <ChevronRight size={17} />
-                </button>
-              ))}
+              {openPositions.map((position) => {
+                const exitUnavailableReason = !Number.isFinite(position.livePrice) || position.livePrice <= 0
+                  ? "Waiting for a live price"
+                  : !marketOrdersAllowed ? marketStatus.message
+                    : position.product === "INTRADAY" && !intradayOrdersAllowed ? intradayStatusMessage
+                      : "";
+                return <div key={`${position.symbol}-${position.product}`} className="position-row">
+                  <button type="button" className="position-chart-link" onClick={() => openPositionChart(position.symbol)} aria-label={`Open ${position.symbol} chart`}>
+                    <span className={position.side === "LONG" ? "buy-tag" : "sell-tag"}>{position.side}</span>
+                    <span className="stock-identity"><StockLogo symbol={position.symbol} size={32} /><span><b>{position.symbol}</b><small>{position.name} · {position.product} · {position.quantity} units</small></span></span>
+                    <span className="position-live-result"><b className={position.unrealizedPnl >= 0 ? "positive" : "negative"}>{position.unrealizedPnl >= 0 ? "+" : ""}{formatInr(position.unrealizedPnl)}</b><small>{Number.isFinite(position.livePrice) ? formatInr(position.livePrice) : "Live price unavailable"} · {position.returnPercent >= 0 ? "+" : ""}{position.returnPercent.toFixed(2)}%</small></span>
+                    <ChevronRight size={17} />
+                  </button>
+                  <button type="button" className="position-exit-button" disabled={Boolean(exitUnavailableReason)} title={exitUnavailableReason || `Exit all ${position.quantity} units`} onClick={() => exitPosition(position.quantity, { symbol: position.symbol, product: position.product, side: position.side as "LONG" | "SHORT", quantity: position.quantity, livePrice: position.livePrice })}>Exit</button>
+                </div>;
+              })}
               {!openPositions.length && <div className="positions-empty"><BriefcaseBusiness size={30} /><b>No open positions</b><span>Open a paper buy or sell order to track it here.</span></div>}
             </div>
           </section>
@@ -2749,10 +2777,10 @@ export function TradingDashboard() {
             <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
             <div className="pnl-stat-grid">
               <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
-              <div><span>Total trades</span><b>{closedTrades.length}</b></div>
+              <button type="button" className={pnlHistoryFilter === "all" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "all" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("all"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total trades</span><b>{closedTrades.length}</b><small>View all</small></button>
               <div><span>Win rate</span><b>{pnlStats.winRate.toFixed(1)}%</b></div>
-              <div><span>Total profit</span><b className="positive">{formatInr(pnlStats.totalProfit)}</b></div>
-              <div><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b></div>
+              <button type="button" className={pnlHistoryFilter === "profit" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "profit" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("profit"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total profit</span><b className="positive">{formatInr(pnlStats.totalProfit)}</b><small>View winners</small></button>
+              <button type="button" className={pnlHistoryFilter === "loss" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "loss" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("loss"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b><small>View losers</small></button>
               <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
             </div>
             <div className="pnl-analysis-grid">
@@ -2790,8 +2818,13 @@ export function TradingDashboard() {
                 </div>
               </div>
             </div>
-            {selectedPnlDateKey && <div className="pnl-trade-list" ref={pnlTradeListRef}>
-              <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Hide trades</button></div>
+            <div className="pnl-trade-list" ref={pnlTradeListRef}>
+              <div className="pnl-history-toolbar">
+                <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
+                  {(["all", "profit", "loss"] as const).map((filter) => <button type="button" key={filter} className={!selectedPnlDateKey && pnlHistoryFilter === filter ? "active" : ""} aria-pressed={!selectedPnlDateKey && pnlHistoryFilter === filter} onClick={() => { setSelectedPnlDateKey(null); setPnlHistoryFilter(filter); }}>{filter === "all" ? `All ${closedTrades.length}` : filter === "profit" ? `Profit ${pnlVisuals.wins}` : `Loss ${pnlVisuals.losses}`}</button>)}
+                </div>
+                {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Show all dates</button></div>}
+              </div>
               {visiblePnlTrades.map((trade) => {
                 const menuOpen = pnlTradeMenuId === trade.id;
                 const sourceOrders = trade.sourceOrderIds
@@ -2803,11 +2836,11 @@ export function TradingDashboard() {
                   .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
                   .filter((marker) => marker.time > 0);
                 return (
-                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPnlTradeMenuId(menuOpen ? null : trade.id); }}>
+                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={menuOpen} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
                     <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
                     <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
-                    {!!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
+                    {menuOpen && !!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
                       <div className="pnl-order-positions-head"><b>Order book positions</b><small>{sourceOrders.length} execution{sourceOrders.length === 1 ? "" : "s"}</small></div>
                       {sourceOrders.map((order) => <button type="button" className="pnl-order-position" key={`${trade.id}-${order.id}`} onClick={() => openPaperOrderChart(order)}>
                         <span>{order.time}</span>
@@ -2819,7 +2852,7 @@ export function TradingDashboard() {
                         <span className="complete-tag">{paperOrderStatusLabel(order)}</span>
                       </button>)}
                     </div>}
-                    {reviewInstrument && reviewMarkers.length > 0 && (
+                    {menuOpen && reviewInstrument && reviewMarkers.length > 0 && (
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
@@ -2851,8 +2884,8 @@ export function TradingDashboard() {
                   </div>
                 );
               })}
-              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>No completed trades on this date</b><span>Choose another calendar date.</span></div>}
-            </div>}
+              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
+            </div>
             {showPnlReviewTimeframeMenu && <ChartTimeframeMenu current={pnlReviewTimeframe} onSelect={(period) => { setPnlReviewTimeframe(period); setShowPnlReviewTimeframeMenu(false); }} onClose={() => setShowPnlReviewTimeframeMenu(false)} />}
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>

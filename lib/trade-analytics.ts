@@ -15,6 +15,14 @@ export type ClosedPaperTrade = {
   sourceOrderIds: string[];
 };
 
+export type ClosedTradeOutcome = "all" | "profit" | "loss";
+
+export function filterClosedTradesByOutcome(trades: ClosedPaperTrade[], outcome: ClosedTradeOutcome) {
+  if (outcome === "profit") return trades.filter((trade) => trade.netPnl > 0);
+  if (outcome === "loss") return trades.filter((trade) => trade.netPnl < 0);
+  return trades;
+}
+
 type OpenLeg = {
   signedQuantity: number;
   averagePrice: number;

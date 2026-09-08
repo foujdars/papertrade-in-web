@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   CandlestickChart,
+  CheckCircle2,
   ChevronRight,
   Layers3,
   Search,
@@ -57,12 +58,14 @@ export function HomeWorkspace({
   todayPnl,
   holdingsCount,
   openPositionsCount,
+  closedTradesCount,
   stockOptions,
   cards,
   riskSummary,
   onOpenWatchlist,
   onOpenHoldings,
-  onOpenOrders,
+  onOpenPositions,
+  onOpenTradeHistory,
   onOpenPnl,
   onOpenStock,
 }: {
@@ -73,12 +76,14 @@ export function HomeWorkspace({
   todayPnl: number;
   holdingsCount: number;
   openPositionsCount: number;
+  closedTradesCount: number;
   stockOptions: HomeStockOption[];
   cards: HomeCardPreferences;
   riskSummary: HomeRiskSummary;
   onOpenWatchlist: () => void;
   onOpenHoldings: () => void;
-  onOpenOrders: () => void;
+  onOpenPositions: () => void;
+  onOpenTradeHistory: () => void;
   onOpenPnl: () => void;
   onOpenStock: (symbol: string) => void;
 }) {
@@ -139,7 +144,8 @@ export function HomeWorkspace({
             </div>
             <div className="home-portfolio-stats">
               <button onClick={onOpenHoldings}><span><Layers3 size={16} /> Holdings</span><b>{holdingsCount}</b></button>
-              <button onClick={onOpenOrders}><span><WalletCards size={16} /> Open positions</span><b>{openPositionsCount}</b></button>
+              <button onClick={onOpenPositions}><span><WalletCards size={16} /> Open positions</span><b>{openPositionsCount}</b></button>
+              <button onClick={onOpenTradeHistory}><span><CheckCircle2 size={16} /> Closed trades</span><b>{closedTradesCount}</b></button>
             </div>
             <div className="home-risk-meter">
               <span><ShieldCheck size={15} /><b>Portfolio risk</b><em className={`risk-${riskSummary.label.toLowerCase()}`}>{riskSummary.label}</em></span>
