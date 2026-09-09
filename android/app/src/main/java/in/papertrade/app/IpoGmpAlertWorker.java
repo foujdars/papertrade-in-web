@@ -77,21 +77,34 @@ public class IpoGmpAlertWorker extends Worker {
         if (!preferences.getBoolean(ENABLED_KEY, false)) return Result.success();
         try {
             JSONObject payload = fetchPayload();
-            if (!payload.optBoolean("ok", false) || !payload.optBoolean("gmpFeedConfigured", false)) return Result.success();
+            if (!payload.optBoolean("ok", false)) return Result.success();
             JSONArray ipos = payload.optJSONArray("ipos");
             if (ipos == null) return Result.success();
             String today = ZonedDateTime.now(INDIA_ZONE).toLocalDate().toString();
             for (int index = 0; index < ipos.length(); index++) {
                 JSONObject ipo = ipos.optJSONObject(index);
                 if (ipo == null || !"open".equalsIgnoreCase(ipo.optString("status"))) continue;
+                String ipoId = ipo.optString("id", ipo.optString("symbol", String.valueOf(index)));
+                String symbol = ipo.optString("symbol", ipo.optString("name", "IPO"));
+                String name = ipo.optString("name", symbol + " IPO");
+                String endDate = ipo.optString("biddingEndDate", "");
+                if (today.equals(endDate)) {
+                    String closingStateKey = "last_closing_alert_date_" + ipoId;
+                    if (!today.equals(preferences.getString(closingStateKey, ""))) {
+                        double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
+                        String closingBody = Double.isFinite(issueSize) && issueSize > 0
+                            ? String.format(java.util.Locale.ENGLISH, "Issue size ₹%,.2f Cr. Bidding closes today.", issueSize)
+                            : "Bidding closes today.";
+                        showNotification(context, name + " closes today", closingBody, ("ipo-closing-" + ipoId + "-" + today).hashCode());
+                        preferences.edit().putString(closingStateKey, today).apply();
+                    }
+                    continue;
+                }
                 double gmpPercent = ipo.optDouble("gmpPercent", Double.NaN);
                 if (!Double.isFinite(gmpPercent) || gmpPercent <= 15.0) continue;
-                String ipoId = ipo.optString("id", ipo.optString("symbol", String.valueOf(index)));
                 String stateKey = "last_alert_date_" + ipoId;
                 if (today.equals(preferences.getString(stateKey, ""))) continue;
                 double gmpAmount = ipo.optDouble("gmpAmount", 0.0);
-                String symbol = ipo.optString("symbol", ipo.optString("name", "IPO"));
-                String endDate = ipo.optString("biddingEndDate", "");
                 String body = String.format(
                     java.util.Locale.ENGLISH,
                     "GMP is ₹%.2f (%.2f%% of upper issue price). Bidding closes %s.",
@@ -134,8 +147,8 @@ public class IpoGmpAlertWorker extends Worker {
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Daily IPO GMP alerts", NotificationManager.IMPORTANCE_HIGH);
-            channel.setDescription("Daily alerts for open IPOs with GMP above 15 percent");
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Daily IPO alerts", NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Closing-day IPO reminders and daily alerts for GMP above 15 percent");
             channel.enableVibration(true);
             manager.createNotificationChannel(channel);
         }

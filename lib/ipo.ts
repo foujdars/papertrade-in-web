@@ -26,7 +26,7 @@ export type IpoSummary = {
 
 export type IpoListResponse = {
   ok: boolean;
-  source?: "upstox" | "upstox+ipoalerts";
+  source?: "upstox" | "upstox+ipoalerts" | "upstox+ipogram";
   gmpFeedConfigured?: boolean;
   ipos?: IpoSummary[];
   fetchedAt?: string;
@@ -84,6 +84,31 @@ export function shouldSendDailyGmpAlert(
     && percentage > IPO_GMP_ALERT_THRESHOLD_PERCENT
     && Boolean(today)
     && lastAlertDate !== today;
+}
+
+export function shouldSendIpoClosingAlert(
+  status: IpoStatus,
+  biddingEndDate: string,
+  lastAlertDate: string | undefined,
+  today = indiaDateKey(),
+) {
+  return status === "open"
+    && Boolean(today)
+    && biddingEndDate === today
+    && lastAlertDate !== today;
+}
+
+export function sortIposByClosingDate(ipos: IpoSummary[], today = indiaDateKey()) {
+  return [...ipos].sort((left, right) => {
+    if (left.status !== right.status) return left.status === "open" ? -1 : right.status === "open" ? 1 : 0;
+    const leftDate = /^\d{4}-\d{2}-\d{2}$/.test(left.biddingEndDate) ? left.biddingEndDate : "9999-12-31";
+    const rightDate = /^\d{4}-\d{2}-\d{2}$/.test(right.biddingEndDate) ? right.biddingEndDate : "9999-12-31";
+    const leftClosingToday = leftDate === today;
+    const rightClosingToday = rightDate === today;
+    if (leftClosingToday !== rightClosingToday) return leftClosingToday ? -1 : 1;
+    if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+    return (right.gmpPercent ?? Number.NEGATIVE_INFINITY) - (left.gmpPercent ?? Number.NEGATIVE_INFINITY);
+  });
 }
 
 export function dedupeIpos(ipos: IpoSummary[]) {

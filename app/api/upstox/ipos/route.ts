@@ -1,4 +1,5 @@
 import { calculateGmpPercent, dedupeIpos, normalizeGmp, normalizeSubscription, type IpoStatus, type IpoSummary } from "@/lib/ipo";
+import { findPublicGmp, loadPublicGmpFeed, type PublicGmpEntry } from "@/lib/ipo-gmp-server";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -105,24 +106,31 @@ export async function GET(request: Request) {
       .map(normalizeIpo)
       .filter((ipo): ipo is IpoSummary => Boolean(ipo)));
     const gmpApiKey = process.env.IPOALERTS_API_KEY?.trim() ?? "";
-    const ipos = gmpApiKey
-      ? await Promise.all(normalizedIpos.map(async (ipo) => {
-        if (ipo.status !== "open") return ipo;
-        const gmp = await loadLatestGmp(ipo, gmpApiKey);
-        return {
-          ...ipo,
-          gmpAmount: gmp.amount,
-          gmpPercent: calculateGmpPercent(gmp.amount, ipo.maximumPrice),
-          gmpUpdatedAt: gmp.updatedAt,
-        };
-      }))
-      : normalizedIpos;
+    let publicGmpEntries: PublicGmpEntry[] = [];
+    try {
+      publicGmpEntries = await loadPublicGmpFeed();
+    } catch {
+      // The keyed provider can continue independently; the UI shows a truthful temporary fallback.
+    }
+    const ipos = await Promise.all(normalizedIpos.map(async (ipo) => {
+      if (ipo.status !== "open" && ipo.status !== "upcoming") return ipo;
+      const keyedGmp = gmpApiKey ? await loadLatestGmp(ipo, gmpApiKey) : null;
+      const publicGmp = findPublicGmp(ipo, publicGmpEntries);
+      const amount = keyedGmp?.amount ?? publicGmp?.amount ?? null;
+      return {
+        ...ipo,
+        gmpAmount: amount,
+        gmpPercent: calculateGmpPercent(amount, ipo.maximumPrice),
+        gmpUpdatedAt: keyedGmp?.updatedAt || (publicGmp ? new Date().toISOString() : ""),
+      };
+    }));
+    const gmpFeedConfigured = Boolean(gmpApiKey || publicGmpEntries.length);
 
     return Response.json(
       {
         ok: true,
-        source: gmpApiKey ? "upstox+ipoalerts" : "upstox",
-        gmpFeedConfigured: Boolean(gmpApiKey),
+        source: gmpApiKey ? "upstox+ipoalerts" : publicGmpEntries.length ? "upstox+ipogram" : "upstox",
+        gmpFeedConfigured,
         ipos,
         fetchedAt: new Date().toISOString(),
       },

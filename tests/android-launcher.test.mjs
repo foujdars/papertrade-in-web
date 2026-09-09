@@ -78,16 +78,20 @@ test("native notifications include the updated launcher image", async () => {
   for (const name of ["TradeAlertPlugin", "IpoGmpAlertWorker"]) {
     assert.match(await source(`android/app/src/main/java/in/papertrade/app/${name}.java`), /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(context.getResources\(\), R.mipmap.ic_launcher\)\)/);
   }
+  const ipoWorker = await source("android/app/src/main/java/in/papertrade/app/IpoGmpAlertWorker.java");
+  assert.match(ipoWorker, /last_closing_alert_date_/);
+  assert.match(ipoWorker, /closes today/);
+  assert.doesNotMatch(ipoWorker, /!payload\.optBoolean\("gmpFeedConfigured"/);
 });
 
-test("both website download links serve v1.18 with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.18-beta.apk";
+test("both website download links serve v1.19 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.19-beta.apk";
   const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
     assert.ok(content.includes(`/downloads/${name}`));
-    assert.ok(!content.includes("PaperTrade-IN-v1.17-beta.apk"));
+    assert.ok(!content.includes("PaperTrade-IN-v1.18-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1\.18"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1\.19"/);
 });

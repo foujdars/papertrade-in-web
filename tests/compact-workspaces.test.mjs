@@ -186,7 +186,8 @@ test("IPO keeps filters and research links but replaces oversized missing-GMP me
   assert.match(ipo, /<IpoAllotments board={board} directory={directory}/);
   assert.match(ipo, /<IpoResearchLink/);
   assert.match(ipo, /<IpoCompanyLogo/);
-  assert.match(ipo, /<span className="ipo-gmp-pending">{gmpFeedConfigured \? "GMP not yet reported" : "GMP feed not connected"}/);
+  assert.match(ipo, /<span className="ipo-gmp-pending">{gmpFeedConfigured \? "GMP not yet reported" : "GMP temporarily unavailable"}/);
+  assert.doesNotMatch(ipo, /GMP feed not connected/);
   assert.match(ipo, /gmp === null/);
   assert.match(ipo, /<strong>{gmp}<\/strong>/);
 });

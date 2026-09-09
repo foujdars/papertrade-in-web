@@ -10,7 +10,9 @@ import {
   IPO_GMP_ALERT_THRESHOLD_PERCENT,
   indiaDateKey,
   formatIpoGmp,
+  shouldSendIpoClosingAlert,
   shouldSendDailyGmpAlert,
+  sortIposByClosingDate,
   type IpoListResponse,
   type IpoSummary,
 } from "@/lib/ipo";
@@ -22,7 +24,7 @@ import { filterIpoBoard, type IpoBoard } from "@/lib/ipo-directory";
 
 const IPO_REFRESH_INTERVAL_MS = 60_000;
 type IpoFilter = "active" | "open" | "upcoming" | "allotments";
-type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string }>;
+type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string; lastClosingAlertDate?: string }>;
 
 function readAlertEnabled() {
   return typeof window !== "undefined" && window.localStorage.getItem(IPO_ALERT_ENABLED_STORAGE_KEY) === "true";
@@ -85,7 +87,7 @@ async function setIpoAlertEnabled(enabled: boolean) {
   return true;
 }
 
-function showIpoAlert(ipo: IpoSummary) {
+function showIpoGmpAlert(ipo: IpoSummary) {
   const today = indiaDateKey();
   const title = `${ipo.symbol || ipo.name} IPO GMP is above ${IPO_GMP_ALERT_THRESHOLD_PERCENT}%`;
   const body = `Current GMP is ${formatIpoGmp(ipo)} of the upper issue price. Bidding closes ${formatIpoDate(ipo.biddingEndDate)}.`;
@@ -98,6 +100,21 @@ function showIpoAlert(ipo: IpoSummary) {
   }
 }
 
+function showIpoClosingAlert(ipo: IpoSummary) {
+  const today = indiaDateKey();
+  const title = `${ipo.name} closes today`;
+  const gmp = formatIpoGmp(ipo);
+  const issueSize = ipo.issueSizeCrore ? `Issue size ₹${ipo.issueSizeCrore.toLocaleString("en-IN")} Cr.` : "Bidding closes today.";
+  const body = gmp ? `${issueSize} Current GMP: ${gmp}.` : issueSize;
+  addPaperTradeNotification({ id: `ipo-closing-${ipo.id}-${today}`, kind: "ipo", title, body });
+  navigator.vibrate?.([180, 90, 180]);
+  if (Capacitor.getPlatform() === "android") {
+    void getNativeTradeAlert().show({ title, body, notificationId: `ipo-closing-${ipo.id}-${today}` }).catch(() => undefined);
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-ipo-closing-${ipo.id}` });
+  }
+}
+
 function processIpoAlerts(ipos: IpoSummary[]) {
   const previous = readAlertState();
   const next = { ...previous };
@@ -105,10 +122,13 @@ function processIpoAlerts(ipos: IpoSummary[]) {
   for (const ipo of ipos.filter((item) => item.status === "open")) {
     const current = previous[ipo.id];
     const shouldAlert = shouldSendDailyGmpAlert(ipo.status, ipo.gmpPercent, current?.lastAlertDate, today);
-    if (shouldAlert) showIpoAlert(ipo);
+    const shouldClosingAlert = shouldSendIpoClosingAlert(ipo.status, ipo.biddingEndDate, current?.lastClosingAlertDate, today);
+    if (shouldClosingAlert) showIpoClosingAlert(ipo);
+    else if (shouldAlert) showIpoGmpAlert(ipo);
     next[ipo.id] = {
       gmpPercent: ipo.gmpPercent,
-      lastAlertDate: shouldAlert ? today : current?.lastAlertDate,
+      lastAlertDate: shouldAlert && !shouldClosingAlert ? today : current?.lastAlertDate,
+      lastClosingAlertDate: shouldClosingAlert ? today : current?.lastClosingAlertDate,
     };
   }
   window.localStorage.setItem(IPO_ALERT_STATE_STORAGE_KEY, JSON.stringify(next));
@@ -202,12 +222,9 @@ export function IpoWorkspace() {
   }, [refresh]);
 
   const boardIpos = useMemo(() => filterIpoBoard(ipos, board), [ipos, board]);
-  const visibleIpos = useMemo(() => boardIpos
-    .filter((ipo) => filter === "active" || ipo.status === filter)
-    .sort((left, right) => {
-      if (left.status !== right.status) return left.status === "open" ? -1 : 1;
-      return (right.gmpPercent ?? Number.NEGATIVE_INFINITY) - (left.gmpPercent ?? Number.NEGATIVE_INFINITY);
-    }), [filter, boardIpos]);
+  const visibleIpos = useMemo(() => sortIposByClosingDate(
+    boardIpos.filter((ipo) => filter === "active" || ipo.status === filter),
+  ), [filter, boardIpos]);
   const openCount = boardIpos.filter((ipo) => ipo.status === "open").length;
   const upcomingCount = boardIpos.filter((ipo) => ipo.status === "upcoming").length;
 
@@ -239,7 +256,7 @@ export function IpoWorkspace() {
         {filter !== "allotments" && <div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
             {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
-            <span>{alertsEnabled ? "Daily GMP alert on" : "Alert above 15% GMP"}</span>
+            <span>{alertsEnabled ? "Daily IPO alerts on" : "GMP + last-day alerts"}</span>
           </button>
           <button type="button" className="scanner-run-button ipo-refresh-button" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh
@@ -255,17 +272,18 @@ export function IpoWorkspace() {
         {visibleIpos.map((ipo) => {
           const thresholdReached = ipo.gmpPercent !== null && ipo.gmpPercent > IPO_GMP_ALERT_THRESHOLD_PERCENT;
           const gmp = formatIpoGmp(ipo);
+          const closingToday = ipo.status === "open" && ipo.biddingEndDate === indiaDateKey();
           return (
             <article className={`ipo-card ${ipo.status} ${thresholdReached ? "threshold-reached" : ""}`} key={ipo.id}>
               <header>
                 <IpoCompanyLogo name={ipo.name} entries={directory} />
                 <div><b>{ipo.name}</b><small>{ipo.symbol || ipo.isin} · {ipo.industry || "Industry not stated"}</small></div>
-                <span className={`ipo-status-badge ${ipo.status}`}>{ipo.status}</span>
+                <span className={`ipo-status-badge ${ipo.status} ${closingToday ? "closing-today" : ""}`}>{closingToday ? "closes today" : ipo.status}</span>
               </header>
               <div className={`ipo-subscription-block ${gmp === null ? "gmp-missing" : ""}`}>
                 <small>Grey Market Premium (GMP)</small>
                 {gmp === null
-                  ? <span className="ipo-gmp-pending">{gmpFeedConfigured ? "GMP not yet reported" : "GMP feed not connected"}</span>
+                  ? <span className="ipo-gmp-pending">{gmpFeedConfigured ? "GMP not yet reported" : "GMP temporarily unavailable"}</span>
                   : <strong>{gmp}</strong>}
                 {thresholdReached && <em><BellRing size={13} /> Above 15% GMP alert level</em>}
               </div>
