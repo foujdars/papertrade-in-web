@@ -24,6 +24,11 @@ export type PaperOrder = {
   lotSize?: number;
   underlyingKey?: string;
   underlyingSymbol?: string;
+  journalPlan?: {
+    strategy: string;
+    thesis: string;
+    confidence: number;
+  };
 };
 
 export type PaperPosition = {

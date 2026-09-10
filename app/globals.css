@@ -25,6 +25,135 @@
   --motion-ease: cubic-bezier(.22, 1, .36, 1);
 }
 
+/* Trading coach */
+.coach-backdrop { z-index: 150; padding: 18px; }
+.coach-modal { width: min(920px, 96vw); height: min(820px, 92dvh); max-height: 92dvh; display: flex; flex-direction: column; overflow: hidden; }
+.coach-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 0 20px 14px; border-bottom: 1px solid var(--line); }
+.coach-tabs button { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); color: var(--muted); text-transform: capitalize; }
+.coach-tabs button.active { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--purple), #6a55ee); box-shadow: 0 8px 22px color-mix(in srgb, var(--purple) 28%, transparent); }
+.coach-content { min-height: 0; overflow: auto; padding: 18px 20px 24px; }
+.coach-journal-list { display: grid; gap: 14px; }
+.coach-journal-card { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); }
+.coach-journal-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.coach-journal-card > header strong { font-size: 18px; }
+.coach-journal-result { display: grid; justify-items: end; gap: 5px; }
+.coach-journal-result button { display: inline-flex; align-items: center; gap: 3px; border: 0; background: transparent; color: var(--purple); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.coach-journal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.coach-journal-fields label, .coach-limit-grid label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.coach-journal-fields .wide { grid-column: 1 / -1; }
+.coach-journal-fields select, .coach-journal-fields textarea, .coach-limit-grid input { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); padding: 10px; }
+.coach-journal-fields textarea { min-height: 64px; resize: vertical; }
+.coach-journal-fields label:nth-child(2) { grid-template-columns: 1fr auto; align-items: center; }
+.coach-journal-fields label:nth-child(2) input { grid-column: 1 / -1; width: 100%; accent-color: var(--purple); }
+.coach-plan-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.coach-plan-check button { border: 1px solid var(--line); border-radius: 999px; padding: 7px 15px; background: var(--panel); color: var(--muted); }
+.coach-plan-check button.active { background: color-mix(in srgb, var(--purple) 18%, var(--panel)); border-color: var(--purple); color: var(--purple); }
+.coach-empty { min-height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--muted); }
+.coach-empty b { color: var(--ink); }
+.coach-insight-note { display: flex; gap: 10px; padding: 14px; margin-bottom: 14px; border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--purple) 8%, var(--panel)); }
+.coach-insight-note span { display: grid; gap: 3px; }
+.coach-insight-note small { color: var(--muted); }
+.coach-insight-table { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.coach-insight-table > div { display: grid; grid-template-columns: minmax(170px, 1.7fr) .55fr .7fr 1fr; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.coach-insight-table > div:last-child { border-bottom: 0; }
+.coach-insight-table > div:first-child { background: var(--soft); color: var(--muted); font-size: 12px; }
+.coach-insight-table > div > :last-child { text-align: right; }
+.coach-replay-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.coach-replay-head > strong { font-size: 20px; }
+.coach-replay-chart { position: relative; height: 330px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: repeating-linear-gradient(0deg, transparent 0 65px, color-mix(in srgb, var(--line) 48%, transparent) 66px), var(--panel); }
+.coach-replay-chart > svg { position: absolute; inset-block: 0; }
+.coach-replay-entry { position: absolute; z-index: 2; left: 0; right: 0; border-top: 1px dashed var(--purple); color: var(--purple); font-size: 11px; padding-left: 8px; }
+.coach-replay-loading { height: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); }
+.coach-replay > p { color: var(--muted); font-size: 12px; margin: 9px 0; }
+.coach-replay-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.coach-replay-controls button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; padding: 0 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); color: var(--ink); }
+.coach-replay-controls button:first-child { color: var(--green); }
+.coach-replay-controls button:nth-child(2) { color: var(--red); }
+.coach-replay-controls button:disabled { opacity: .45; }
+.coach-limit-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft); }
+.coach-limit-toggle > span { display: grid; gap: 4px; }
+.coach-limit-toggle small { color: var(--muted); }
+.coach-limit-toggle > button { position: relative; width: 58px; height: 30px; border: 0; border-radius: 999px; background: var(--line); }
+.coach-limit-toggle > button i { position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.coach-limit-toggle > button.active { background: var(--purple); }
+.coach-limit-toggle > button.active i { transform: translateX(28px); }
+.coach-limit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+.coach-payoff-legs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.coach-payoff-legs > b { width: 100%; }
+.coach-payoff-legs > span { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--soft); font-size: 12px; }
+.coach-payoff-legs i { font-style: normal; font-weight: 800; }
+.coach-metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.coach-metric-grid > div { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.coach-metric-grid span { color: var(--muted); font-size: 11px; }
+.coach-payoff svg { width: 100%; height: 300px; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--purple); }
+.coach-payoff svg line { stroke: var(--muted); stroke-width: .4; stroke-dasharray: 2 2; }
+.coach-payoff svg polyline { fill: none; stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.coach-payoff-range { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; }
+.coach-payoff-range b { color: var(--ink); }
+.coach-launch-button { width: calc(100% - 24px); margin: 12px; padding: 12px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; text-align: left; border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--purple) 8%, var(--panel)); color: var(--ink); }
+.coach-launch-button span { display: grid; gap: 2px; }
+.coach-launch-button small { color: var(--muted); }
+.ticket-risk-sizing { border: 1px solid var(--line); border-radius: 12px; background: var(--soft); overflow: hidden; }
+.ticket-section-trigger { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 0; background: transparent; color: var(--ink); }
+.ticket-section-trigger span { display: flex; align-items: center; gap: 7px; }
+.ticket-risk-sizing.open .ticket-section-trigger > svg { transform: rotate(180deg); }
+.ticket-risk-body { padding: 0 11px 12px; display: grid; gap: 10px; }
+.ticket-risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ticket-risk-grid label, .ticket-risk-grid > div { display: grid; gap: 4px; padding: 9px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 11px; }
+.ticket-risk-grid input { min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font-weight: 700; }
+.ticket-risk-grid > div { grid-template-columns: 1fr auto; align-items: center; }
+.ticket-risk-grid > div > span { grid-column: 1 / -1; }
+.ticket-risk-grid > div > b { color: var(--ink); font-size: 17px; }
+.ticket-risk-grid > div > button { border: 0; border-radius: 7px; padding: 5px 8px; background: var(--purple); color: #fff; }
+.ticket-risk-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 10px; color: var(--muted); }
+.ticket-risk-summary span { display: grid; gap: 2px; }
+.ticket-plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ticket-plan-grid label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.ticket-plan-grid select, .ticket-plan-grid textarea { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); padding: 8px; }
+.ticket-plan-grid .wide { grid-column: 1 / -1; }
+.ticket-plan-grid textarea { min-height: 54px; resize: vertical; }
+.ticket-plan-grid input[type="range"] { width: 100%; accent-color: var(--purple); }
+.ticket-payoff-preview { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--line)); border-radius: 11px; background: color-mix(in srgb, var(--purple) 7%, var(--panel)); color: var(--ink); text-align: left; }
+.ticket-payoff-preview span { display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: center; }
+.ticket-payoff-preview small { grid-column: 2; color: var(--muted); }
+.ticket-limit-block { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid color-mix(in srgb, var(--red) 45%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--red) 8%, var(--panel)); color: var(--red); }
+.ticket-limit-block span { display: grid; gap: 2px; }
+.ticket-limit-block small { color: var(--muted); }
+.ticket-limit-block button { border: 0; background: transparent; color: var(--purple); font-weight: 700; }
+.terminal-shell[data-theme="neon"] :is(.coach-modal, .coach-journal-card, .coach-insight-table, .coach-limit-toggle, .coach-payoff svg, .coach-replay-chart, .ticket-risk-sizing) { color: #eef8fb; border-color: #25365b; background-color: #09152f; }
+.terminal-shell[data-theme="neon"] :is(.coach-tabs button, .coach-replay-controls button, .coach-payoff-legs > span, .coach-metric-grid > div, .ticket-risk-grid label, .ticket-risk-grid > div) { color: #eef8fb; border-color: #25365b; background: #0d1b39; }
+.terminal-shell[data-theme="neon"] :is(.coach-journal-fields select, .coach-journal-fields textarea, .coach-limit-grid input, .ticket-plan-grid select, .ticket-plan-grid textarea) { color: #eef8fb; border-color: #25365b; background: #071127; }
+.terminal-shell[data-theme="neon"] :is(.coach-empty b, .coach-payoff-range b, .ticket-section-trigger, .ticket-risk-grid input, .ticket-risk-grid > div > b) { color: #eef8fb; }
+@media (max-width: 760px) {
+  .coach-backdrop { padding: 0; align-items: flex-end; }
+  .coach-modal { width: 100%; height: calc(100dvh - 66px); max-height: calc(100dvh - 66px); border-radius: 22px 22px 0 0; }
+  .coach-tabs { gap: 4px; padding-inline: 10px; }
+  .coach-tabs button { min-height: 46px; padding: 0; font-size: 0; }
+  .coach-tabs button svg { width: 19px; height: 19px; }
+  .coach-content { padding: 14px 12px 90px; }
+  .coach-journal-fields, .coach-limit-grid, .coach-metric-grid { grid-template-columns: 1fr; }
+  .coach-journal-fields .wide { grid-column: auto; }
+  .coach-insight-table { overflow-x: auto; }
+  .coach-insight-table > div { min-width: 560px; }
+  .coach-replay-chart { height: 290px; }
+  .coach-replay-controls button { flex: 1 1 calc(33% - 8px); padding-inline: 8px; }
+  .ticket-risk-summary { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .coach-backdrop { align-items: flex-end; padding: 0; }
+  .coach-modal { width: 100%; height: 91dvh; max-height: 91dvh; border-radius: 22px 22px 0 0; }
+  .coach-tabs { overflow-x: auto; display: flex; padding-inline: 12px; }
+  .coach-tabs button { flex: 0 0 auto; min-width: 104px; }
+  .coach-content { padding: 13px 12px 90px; }
+  .coach-journal-fields, .coach-limit-grid, .coach-metric-grid { grid-template-columns: 1fr; }
+  .coach-journal-fields .wide { grid-column: auto; }
+  .coach-replay-chart { height: 280px; }
+  .coach-replay-controls button { flex: 1 1 auto; }
+  .coach-insight-table { overflow-x: auto; }
+  .coach-insight-table > div { min-width: 610px; }
+}
+
 /* Home dashboard */
 .home-workspace { position: fixed; z-index: 86; inset: 58px 0 0; overflow: hidden; color: var(--ink); background: linear-gradient(180deg, #f4f2ff 0, #f8fbff 260px, var(--soft) 100%); }
 .home-dashboard-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 22px max(22px, calc((100vw - 1180px) / 2)) 40px; scrollbar-gutter: stable; }

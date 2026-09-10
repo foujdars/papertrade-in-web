@@ -92,14 +92,14 @@ test("native notifications include the updated launcher image", async () => {
   assert.match(protectionMonitor, /TRIGGERED_ALERTS_KEY/);
 });
 
-test("both website download links serve v1.20 with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.20-beta.apk";
+test("both website download links serve v1.21 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.21-beta.apk";
   const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
     assert.ok(content.includes(`/downloads/${name}`));
-    assert.ok(!content.includes("PaperTrade-IN-v1.19-beta.apk"));
+    assert.ok(!content.includes("PaperTrade-IN-v1.20-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1\.20"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1\.21"/);
 });

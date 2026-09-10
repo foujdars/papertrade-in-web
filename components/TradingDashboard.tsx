@@ -55,6 +55,16 @@ import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences"
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
+import { TradingCoach } from "@/components/TradingCoach";
+import {
+  buildOptionPayoff,
+  calculateRiskBasedQuantity,
+  DEFAULT_TRADING_LIMITS,
+  evaluateTradingLimits,
+  readTradingLimits,
+  type OptionPayoffLeg,
+  type TradingLimits,
+} from "@/lib/trading-coach";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
@@ -390,6 +400,11 @@ export function TradingDashboard() {
   const [targetPrice, setTargetPrice] = useState("");
   const [stopLossPrice, setStopLossPrice] = useState("");
   const [riskLevelsCustomized, setRiskLevelsCustomized] = useState(false);
+  const [riskSizingOpen, setRiskSizingOpen] = useState(false);
+  const [maxRiskInput, setMaxRiskInput] = useState("2000");
+  const [tradeStrategy, setTradeStrategy] = useState("Breakout");
+  const [tradeThesis, setTradeThesis] = useState("");
+  const [tradeConfidence, setTradeConfidence] = useState(3);
   const [orderType, setOrderType] = useState("Market");
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
   const [indicators, setIndicators] = usePersistentChartIndicators(user?.id);
@@ -434,6 +449,8 @@ export function TradingDashboard() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
   const [uiDensity, setUiDensity] = useState<UiDensity>("comfortable");
   const [motionEnabled, setMotionEnabled] = useState(true);
@@ -443,6 +460,10 @@ export function TradingDashboard() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountDeleteArmed, setAccountDeleteArmed] = useState(false);
   const [accountDeleteWorking, setAccountDeleteWorking] = useState(false);
+  useEffect(() => {
+    const restore = window.setTimeout(() => setTradingLimits(readTradingLimits()), 0);
+    return () => window.clearTimeout(restore);
+  }, []);
   const [accountDeleteError, setAccountDeleteError] = useState("");
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
@@ -1484,6 +1505,22 @@ export function TradingDashboard() {
     return orders.filter((order) => getPaperOrderTimestamp(order) >= start.getTime());
   }, [clock, orders]);
   const closedTrades = useMemo(() => buildClosedTrades(orders), [orders]);
+  const maxRiskAmount = Number(maxRiskInput);
+  const suggestedRiskQuantity = calculateRiskBasedQuantity(visibleLivePrice, chartStopLossPrice, maxRiskAmount, quantityStep);
+  const plannedRisk = Math.abs(visibleLivePrice - chartStopLossPrice) * quantity;
+  const plannedReward = Math.abs(chartTargetPrice - visibleLivePrice) * quantity;
+  const rewardRiskRatio = plannedRisk > 0 ? plannedReward / plannedRisk : 0;
+  const tradingLimitStatus = useMemo(() => evaluateTradingLimits(orders, closedTrades, tradingLimits, clock?.getTime() ?? 0), [clock, closedTrades, orders, tradingLimits]);
+  const proposedOptionLeg: OptionPayoffLeg | null = selected.assetType === "OPTION" && selected.optionType && selected.strikePrice && visibleLivePrice > 0 ? {
+    optionType: selected.optionType,
+    side,
+    strike: selected.strikePrice,
+    premium: visibleLivePrice,
+    quantity,
+  } : null;
+  const optionSpotPrice = topQuote?.lastPrice ?? spotInstrument?.price ?? selected.price;
+  const singleOptionPayoff = proposedOptionLeg ? buildOptionPayoff([proposedOptionLeg], optionSpotPrice) : null;
+  const orderReducesOpenPosition = selectedPosition.quantity > 0 && positionProduct === product && ((selectedPosition.side === "LONG" && side === "SELL") || (selectedPosition.side === "SHORT" && side === "BUY"));
   const homeStockOptions = useMemo(() => [...SEARCHABLE_INDEX_TICKERS.map((instrument) => {
     const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
     return { symbol: instrument.symbol, name: instrument.name, price: quote?.lastPrice ?? 0, changePercent: quote?.changePercent ?? 0, categories: ["INDEX"], instrumentKey: instrument.instrumentKey, assetType: "INDEX" as const };
@@ -1797,6 +1834,11 @@ export function TradingDashboard() {
 
   function placeOrder() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
+    if (tradingLimitStatus.blocked && !orderReducesOpenPosition) {
+      setToast(tradingLimitStatus.reasons[0] || "A personal trading limit is active.");
+      window.setTimeout(() => setToast(""), 4_000);
+      return;
+    }
     if (selected.assetType === "OPTION" && quantity % quantityStep !== 0) {
       setToast(`Option quantity must be a multiple of the ${quantityStep}-unit lot size.`);
       window.setTimeout(() => setToast(""), 3_500);
@@ -1855,6 +1897,7 @@ export function TradingDashboard() {
       lotSize: selected.lotSize,
       underlyingKey: selected.underlyingKey,
       underlyingSymbol: selected.underlyingSymbol,
+      journalPlan: { strategy: tradeStrategy, thesis: tradeThesis.trim(), confidence: tradeConfidence },
     };
     const nextOrders = [order, ...orders];
     const nextBalance = (side === "BUY" ? balance - executionCapital : balance + executionCapital) - executionCharges.total;
@@ -1885,6 +1928,7 @@ export function TradingDashboard() {
     setTargetPrice("");
     setStopLossPrice("");
     setRiskLevelsCustomized(false);
+    setTradeThesis("");
     setOrderSheetOpen(false);
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
     window.setTimeout(() => setToast(""), 3200);
@@ -2355,6 +2399,7 @@ export function TradingDashboard() {
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
                 <header><SlidersHorizontal size={17} /><span><b>More</b><small>Personalise your home screen</small></span></header>
+                <button className="coach-launch-button" onClick={() => { setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={18} /><span><b>Trading coach</b><small>Journal, insights, replay, limits and F&amp;O payoff</small></span><ChevronRight size={16} /></button>
                 <div className="home-card-toggles">
                   <b>Home cards</b>
                   {([['market', 'Market pulse'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
@@ -2605,8 +2650,18 @@ export function TradingDashboard() {
             <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
+          <section className={`ticket-risk-sizing ${riskSizingOpen ? "open" : ""}`}>
+            <button type="button" className="ticket-section-trigger" onClick={() => setRiskSizingOpen((value) => !value)}><span><ShieldCheck size={16} /><b>Risk sizing &amp; trade plan</b></span><ChevronDown size={16} /></button>
+            {riskSizingOpen && <div className="ticket-risk-body">
+              <div className="ticket-risk-grid"><label>Maximum loss (₹)<input type="number" min="1" step="100" value={maxRiskInput} onChange={(event) => setMaxRiskInput(event.target.value)} /></label><div><span>Suggested quantity</span><b>{suggestedRiskQuantity || "—"}</b><button type="button" disabled={!suggestedRiskQuantity} onClick={() => setQuantityInput(String(suggestedRiskQuantity))}>Apply</button></div></div>
+              <div className="ticket-risk-summary"><span>Risk <b className="negative">{formatInr(plannedRisk)}</b></span><span>Potential reward <b className="positive">{formatInr(plannedReward)}</b></span><span>Reward : risk <b>{rewardRiskRatio ? `${rewardRiskRatio.toFixed(2)} : 1` : "—"}</b></span></div>
+              <div className="ticket-plan-grid"><label>Strategy<select value={tradeStrategy} onChange={(event) => setTradeStrategy(event.target.value)}>{["Breakout", "Pullback", "Reversal", "Trend", "Support / resistance", "News", "Other"].map((strategy) => <option key={strategy}>{strategy}</option>)}</select></label><label>Confidence <span>{tradeConfidence}/5</span><input type="range" min="1" max="5" value={tradeConfidence} onChange={(event) => setTradeConfidence(Number(event.target.value))} /></label><label className="wide">Why are you entering?<textarea value={tradeThesis} onChange={(event) => setTradeThesis(event.target.value)} placeholder="Write the setup and invalidation before placing the trade" /></label></div>
+            </div>}
+          </section>
+          {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => setCoachOpen(true)}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
+          {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => setCoachOpen(true)}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} units</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -2627,7 +2682,7 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={!verifiedLivePrice || !marketOrdersAllowed || (product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : !marketOrdersAllowed ? "MARKET CLOSED" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={!verifiedLivePrice || !marketOrdersAllowed || (product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? "WAITING FOR UPSTOX" : !marketOrdersAllowed ? "MARKET CLOSED" : product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
@@ -2726,6 +2781,7 @@ export function TradingDashboard() {
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
 
+      {coachOpen && <TradingCoach selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
@@ -3004,7 +3060,7 @@ export function TradingDashboard() {
               <article>
                 <b>Android app</b>
                 <small>Install the beta APK directly from the official website.</small>
-                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.20-beta.apk" download><Download size={18} /> Download Android APK</a>
+                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.21-beta.apk" download><Download size={18} /> Download Android APK</a>
               </article>
               <article>
                 <b>iPhone / iPad app</b>
@@ -3013,7 +3069,7 @@ export function TradingDashboard() {
               </article>
             </div>
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
-            <code className="download-hash">BD9ACF123E7091CDFA9A0EC45D53F441A08D5644386592B577EBF34A337EB4C3</code>
+            <code className="download-hash">4282080129C3B881037A18BBDD136F8108D3C57E62A9A5AF3D08326A6C84414A</code>
             <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari&apos;s Add to Home Screen option.</p>
           </section>
         </div>

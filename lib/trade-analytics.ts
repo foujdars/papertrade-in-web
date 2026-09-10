@@ -12,6 +12,8 @@ export type ClosedPaperTrade = {
   charges: number;
   netPnl: number;
   closedAt: number;
+  openedAt: number;
+  direction: "LONG" | "SHORT";
   sourceOrderIds: string[];
 };
 
@@ -28,6 +30,7 @@ type OpenLeg = {
   averagePrice: number;
   entryCharges: number;
   entryOrderIds: string[];
+  openedAt: number;
 };
 
 function orderTimestamp(order: PaperOrder) {
@@ -57,7 +60,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
     const quantity = Math.max(0, order.quantity);
     if (!quantity || !Number.isFinite(order.price)) continue;
     const key = `${order.symbol}:${order.product ?? "INTRADAY"}`;
-    const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0, entryOrderIds: [] };
+    const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0, entryOrderIds: [], openedAt: orderTimestamp(order) };
     const orderCharges = getOrderCharges(order).total;
 
     if (leg.signedQuantity === 0 || Math.sign(leg.signedQuantity) === direction) {
@@ -89,6 +92,8 @@ export function buildClosedTrades(orders: PaperOrder[]) {
       charges,
       netPnl: grossPnl - charges,
       closedAt: orderTimestamp(order),
+      openedAt: leg.openedAt,
+      direction: positionDirection > 0 ? "LONG" : "SHORT",
       sourceOrderIds: [...new Set([...leg.entryOrderIds, order.id])],
     });
 
@@ -102,6 +107,7 @@ export function buildClosedTrades(orders: PaperOrder[]) {
       leg.averagePrice = order.price;
       leg.entryCharges = orderCharges * (reversingQuantity / quantity);
       leg.entryOrderIds = [order.id];
+      leg.openedAt = orderTimestamp(order);
       positions.set(key, leg);
     } else {
       leg.signedQuantity = nextQuantity;
