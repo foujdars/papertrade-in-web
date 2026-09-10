@@ -8,6 +8,7 @@ import "./compact-workspaces.css";
 import "./studio-theme.css";
 import "./stock-logos.css";
 import "./interface-cleanup.css";
+import "./trading-coach.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

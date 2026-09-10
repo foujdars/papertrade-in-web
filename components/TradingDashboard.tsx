@@ -55,7 +55,8 @@ import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences"
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
-import { TradingCoach } from "@/components/TradingCoach";
+import { RiskSizingPlan } from "@/components/RiskSizingPlan";
+import { TradingCoach, type CoachTab } from "@/components/TradingCoach";
 import {
   buildOptionPayoff,
   calculateRiskBasedQuantity,
@@ -450,6 +451,7 @@ export function TradingDashboard() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [coachTab, setCoachTab] = useState<CoachTab>("journal");
   const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
   const [uiDensity, setUiDensity] = useState<UiDensity>("comfortable");
@@ -2399,7 +2401,7 @@ export function TradingDashboard() {
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
                 <header><SlidersHorizontal size={17} /><span><b>More</b><small>Personalise your home screen</small></span></header>
-                <button className="coach-launch-button" onClick={() => { setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={18} /><span><b>Trading coach</b><small>Journal, insights, replay, limits and F&amp;O payoff</small></span><ChevronRight size={16} /></button>
+                <button className="coach-launch-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={18} /><span><b>Trading coach</b><small>Review trades &amp; practise</small></span><ChevronRight size={16} /></button>
                 <div className="home-card-toggles">
                   <b>Home cards</b>
                   {([['market', 'Market pulse'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
@@ -2650,18 +2652,11 @@ export function TradingDashboard() {
             <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
-          <section className={`ticket-risk-sizing ${riskSizingOpen ? "open" : ""}`}>
-            <button type="button" className="ticket-section-trigger" onClick={() => setRiskSizingOpen((value) => !value)}><span><ShieldCheck size={16} /><b>Risk sizing &amp; trade plan</b></span><ChevronDown size={16} /></button>
-            {riskSizingOpen && <div className="ticket-risk-body">
-              <div className="ticket-risk-grid"><label>Maximum loss (₹)<input type="number" min="1" step="100" value={maxRiskInput} onChange={(event) => setMaxRiskInput(event.target.value)} /></label><div><span>Suggested quantity</span><b>{suggestedRiskQuantity || "—"}</b><button type="button" disabled={!suggestedRiskQuantity} onClick={() => setQuantityInput(String(suggestedRiskQuantity))}>Apply</button></div></div>
-              <div className="ticket-risk-summary"><span>Risk <b className="negative">{formatInr(plannedRisk)}</b></span><span>Potential reward <b className="positive">{formatInr(plannedReward)}</b></span><span>Reward : risk <b>{rewardRiskRatio ? `${rewardRiskRatio.toFixed(2)} : 1` : "—"}</b></span></div>
-              <div className="ticket-plan-grid"><label>Strategy<select value={tradeStrategy} onChange={(event) => setTradeStrategy(event.target.value)}>{["Breakout", "Pullback", "Reversal", "Trend", "Support / resistance", "News", "Other"].map((strategy) => <option key={strategy}>{strategy}</option>)}</select></label><label>Confidence <span>{tradeConfidence}/5</span><input type="range" min="1" max="5" value={tradeConfidence} onChange={(event) => setTradeConfidence(Number(event.target.value))} /></label><label className="wide">Why are you entering?<textarea value={tradeThesis} onChange={(event) => setTradeThesis(event.target.value)} placeholder="Write the setup and invalidation before placing the trade" /></label></div>
-            </div>}
-          </section>
-          {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => setCoachOpen(true)}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
+          <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
+          {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
-          {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => setCoachOpen(true)}>Review</button></div>}
+          {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => { setCoachTab("limits"); setCoachOpen(true); }}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} units</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -2781,7 +2776,7 @@ export function TradingDashboard() {
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
 
-      {coachOpen && <TradingCoach selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onClose={() => setCoachOpen(false)} />}
+      {coachOpen && <TradingCoach initialTab={coachTab} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
