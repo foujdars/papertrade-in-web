@@ -52,7 +52,7 @@ import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
-import { getNativeTradeAlert } from "@/lib/native-alert";
+import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
 
@@ -110,13 +110,13 @@ function prepareProtectionAlerts() {
   }
 }
 
-function showProtectionAlert(order: PaperOrder) {
+function showProtectionAlert(order: PaperOrder, nativeAlreadyNotified = false) {
   if (typeof window === "undefined") return;
   const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
   addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body, symbol: order.symbol, instrumentKey: order.instrumentKey });
   navigator.vibrate?.([180, 90, 180]);
-  if (Capacitor.getPlatform() === "android") {
+  if (Capacitor.getPlatform() === "android" && !nativeAlreadyNotified) {
     void getNativeTradeAlert().show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
     new Notification(`PaperTrade IN - ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
@@ -352,6 +352,7 @@ export function TradingDashboard() {
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
   const [fnoUnderlying, setFnoUnderlying] = useState<FnoUnderlying | null>(null);
+  const [fnoUnderlyings, setFnoUnderlyings] = useState<FnoUnderlying[]>([]);
   const [fnoFutureInstrument, setFnoFutureInstrument] = useState<Instrument | null>(null);
   const [fnoTopMode, setFnoTopMode] = useState<"SPOT" | "FUTURE">("SPOT");
   const [fnoSwitchingOption, setFnoSwitchingOption] = useState(false);
@@ -395,6 +396,8 @@ export function TradingDashboard() {
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [protections, setProtections] = useState<PaperProtection[]>([]);
+  const [paperDataReady, setPaperDataReady] = useState(false);
+  const [nativeProtectionTriggers, setNativeProtectionTriggers] = useState<NativeTriggeredPriceAlert[]>([]);
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
   const [homeOpen, setHomeOpen] = useState(true);
@@ -426,6 +429,7 @@ export function TradingDashboard() {
   const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
   const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
   const [pnlHistoryFilter, setPnlHistoryFilter] = useState<PnlHistoryFilter>("all");
+  const [pnlHistoryOnly, setPnlHistoryOnly] = useState(false);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -562,6 +566,7 @@ export function TradingDashboard() {
           setCustomWatchlists(savedWatchlists.slice(0, 5).filter((list) => list?.id && list?.name && Array.isArray(list.symbols)));
         }
       } catch { /* Ignore malformed local demo data. */ }
+      setPaperDataReady(true);
     }, 0);
     return () => window.clearTimeout(restore);
   }, []);
@@ -859,6 +864,17 @@ export function TradingDashboard() {
     };
   }, [loadInstrumentUniverse]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/upstox/fno-underlyings", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[] };
+        if (response.ok && payload.ok) setFnoUnderlyings(payload.underlyings ?? []);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
@@ -904,6 +920,51 @@ export function TradingDashboard() {
     for (const item of [...stockUniverse, ...derivativeInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
   }, [derivativeInstruments, stockUniverse]);
+
+  useEffect(() => {
+    if (!paperDataReady || !isAndroidApp) return;
+    const alerts = protections.flatMap((protection) => {
+      const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
+      if (!instrument?.instrumentKey) return [];
+      return [{
+        id: protection.id,
+        symbol: protection.symbol,
+        instrumentKey: instrument.instrumentKey,
+        product: protection.product,
+        side: protection.side,
+        targetPrice: protection.targetPrice,
+        stopLossPrice: protection.stopLossPrice,
+      }];
+    });
+    void getNativeTradeAlert().setPriceAlerts({ alerts }).catch(() => undefined);
+  }, [isAndroidApp, paperDataReady, protections, tradingUniverse]);
+
+  useEffect(() => {
+    if (!paperDataReady || !isAndroidApp) return;
+    let disposed = false;
+    let listener: { remove: () => Promise<void> } | undefined;
+    const consume = async () => {
+      const result = await getNativeTradeAlert().consumeTriggeredPriceAlerts().catch(() => undefined);
+      const alerts = result?.alerts?.filter((item) => item
+        && item.id
+        && (item.trigger === "TARGET" || item.trigger === "STOP_LOSS")
+        && Number.isFinite(item.triggeredPrice)
+        && Number.isFinite(item.triggeredAt)) ?? [];
+      if (!disposed && alerts.length) {
+        setNativeProtectionTriggers((current) => [...new Map([...current, ...alerts].map((item) => [item.id, item])).values()]);
+      }
+    };
+    void consume();
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => { if (isActive) void consume(); }).then((handle) => {
+      if (disposed) void handle.remove();
+      else listener = handle;
+    });
+    return () => {
+      disposed = true;
+      if (listener) void listener.remove();
+    };
+  }, [isAndroidApp, paperDataReady]);
+
   const applyRealtimeQuote = useCallback((instrument: Instrument, price: number, timestampMs = Date.now()) => {
     if (!Number.isFinite(price) || price <= 0) return;
     const receivedAt = Date.now();
@@ -983,6 +1044,11 @@ export function TradingDashboard() {
       futureContracts: 0,
     };
   }, [fnoUnderlying, selected.assetType, spotInstrument]);
+  const selectedFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
+    if (selected.assetType === "OPTION" || selected.assetType === "FUTURE") return null;
+    if (fnoUnderlying?.instrumentKey === selected.instrumentKey || fnoUnderlying?.symbol === selected.symbol) return fnoUnderlying;
+    return fnoUnderlyings.find((item) => item.instrumentKey === selected.instrumentKey || item.symbol === selected.symbol) ?? null;
+  }, [fnoUnderlying, fnoUnderlyings, selected.assetType, selected.instrumentKey, selected.symbol]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1201,19 +1267,25 @@ export function TradingDashboard() {
   }, [orders, tradingUniverse]);
 
   useEffect(() => {
-    if (!clock || !orders.length || !protections.length || !getNseMarketStatus(clock).isOpen) return;
+    if (!clock || !orders.length || !protections.length) return;
+    const nativeTriggersById = new Map(nativeProtectionTriggers.map((item) => [item.id, item]));
+    if (!getNseMarketStatus(clock).isOpen && !nativeTriggersById.size) return;
     const afterIntradaySquareOff = getNseMarketStatus(clock).minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
     const triggeredOrders: PaperOrder[] = [];
     const clearedProtectionIds = new Set<string>();
+    const nativeTriggeredOrderIds = new Set<string>();
+    const consumedNativeTriggerIds = new Set<string>();
     let nextBalance = balance;
 
     protections.forEach((protection, index) => {
-      if (protection.product === "INTRADAY" && afterIntradaySquareOff) return;
+      const nativeTrigger = nativeTriggersById.get(protection.id);
+      if (nativeTrigger) consumedNativeTriggerIds.add(protection.id);
+      if (protection.product === "INTRADAY" && afterIntradaySquareOff && !nativeTrigger) return;
       const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[protection.symbol] : marketQuotes[protection.symbol];
       const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : protection.symbol;
-      const quoteIsFresh = Boolean(quote && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000);
-      const price = quote?.lastPrice;
+      const quoteIsFresh = Boolean(nativeTrigger || (quote && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000));
+      const price = nativeTrigger?.triggeredPrice ?? quote?.lastPrice;
       const latestFill = orders.find((order) => order.symbol === protection.symbol && (order.product ?? "INTRADAY") === protection.product);
       const position = calculatePosition(orders, protection.symbol, price ?? latestFill?.price ?? Number.NaN, protection.product);
       if (!position.quantity || position.side === "FLAT" || position.side !== protection.side) {
@@ -1221,21 +1293,23 @@ export function TradingDashboard() {
         return;
       }
       if (!quoteIsFresh || !price || !Number.isFinite(price)) return;
-      const trigger = getProtectionTrigger(protection, price);
+      const trigger = nativeTrigger?.trigger ?? getProtectionTrigger(protection, price);
       if (!trigger) return;
       const executionPrice = getProtectionExecutionPrice(protection, price, trigger);
       const closingSide = position.side === "LONG" ? "SELL" : "BUY";
       const charges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: closingSide, product: protection.product, quantity: position.quantity, price: executionPrice });
+      const triggeredAt = nativeTrigger?.triggeredAt ?? clock.getTime();
+      const triggeredDate = new Date(triggeredAt);
       const order: PaperOrder = {
-        id: `${clock.getTime() + 10_000 + index}`,
+        id: `${triggeredAt + 10_000 + index}`,
         symbol: protection.symbol,
         side: closingSide,
         quantity: position.quantity,
         price: executionPrice,
         status: "COMPLETE",
-        time: clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+        time: triggeredDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" }),
         product: protection.product,
-        createdAt: clock.getTime(),
+        createdAt: triggeredAt,
         charges,
         exitReason: trigger,
         priceSource: "UPSTOX_QUOTE",
@@ -1250,15 +1324,20 @@ export function TradingDashboard() {
         underlyingSymbol: instrument?.underlyingSymbol,
       };
       triggeredOrders.push(order);
+      if (nativeTrigger) nativeTriggeredOrderIds.add(order.id);
       clearedProtectionIds.add(protection.id);
       const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, executionPrice);
       nextBalance = closingSide === "SELL" ? nextBalance + releasedCapital - charges.total : nextBalance - releasedCapital - charges.total;
     });
 
+    if (consumedNativeTriggerIds.size) {
+      // Native trigger reconciliation must be atomic with the protective exit below.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNativeProtectionTriggers((current) => current.filter((item) => !consumedNativeTriggerIds.has(item.id)));
+    }
     if (!triggeredOrders.length && !clearedProtectionIds.size) return;
     const remainingProtections = protections.filter((item) => !clearedProtectionIds.has(item.id));
     // Protective exits are synchronized with the latest live quote.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProtections(remainingProtections);
     writePaperProtections(remainingProtections);
     if (!triggeredOrders.length) return;
@@ -1268,13 +1347,13 @@ export function TradingDashboard() {
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     const reasons = triggeredOrders.map((order) => order.exitReason === "TARGET" ? "target" : "stop loss");
-    triggeredOrders.forEach(showProtectionAlert);
+    triggeredOrders.forEach((order) => showProtectionAlert(order, nativeTriggeredOrderIds.has(order.id)));
     const alertSummary = triggeredOrders.length === 1
       ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
     window.setTimeout(() => setToast(""), 7_000);
-  }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, orders, protections, selected.symbol, tradingUniverse]);
+  }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
   const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
@@ -2214,6 +2293,7 @@ export function TradingDashboard() {
     if (section === "markets" || section === "ipo") setMarketsInitialGroup(section === "ipo" ? "IPO" : lastScannerGroupRef.current);
     setMarketsOpen(section === "markets" || section === "ipo");
     if (section === "pnl") {
+      setPnlHistoryOnly(false);
       const currentDate = indiaDateParts(clock?.getTime() ?? Date.now());
       setPnlCalendarMonth(currentDate.month - 1);
       setPnlCalendarYear(currentDate.year);
@@ -2381,10 +2461,10 @@ export function TradingDashboard() {
                 >
                   <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
                 </button>}
-                {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button
+                {selectedFnoUnderlying && <button
                   className="chart-derivatives-link"
-                  disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey}
-                  onClick={() => void openFnoUnderlying(fnoUnderlying)}
+                  disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey}
+                  onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}
                   aria-label={`Open ${selected.symbol} option charts`}
                   title="Open option charts"
                 >
@@ -2425,7 +2505,7 @@ export function TradingDashboard() {
                 <StockLogo {...selected} size={24} /><span>{selected.symbol}</span><small>NSE</small><ChevronDown size={15} />
               </button>
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
-              {selected.assetType !== "OPTION" && fnoUnderlying?.instrumentKey === selected.instrumentKey && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === fnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(fnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
+              {selectedFnoUnderlying && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
                 <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
                 <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
@@ -2617,7 +2697,13 @@ export function TradingDashboard() {
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
         onOpenPositions={() => { setHomeOpen(false); setPositionsOpen(true); }}
-        onOpenTradeHistory={() => { setSelectedPnlDateKey(null); setPnlHistoryFilter("all"); openNavigationSection("pnl"); }}
+        onOpenTradeHistory={() => {
+          setSelectedPnlDateKey(null);
+          setPnlHistoryFilter("all");
+          openNavigationSection("pnl");
+          setPnlHistoryOnly(true);
+          setPnlTradeMenuId(closedTrades[0]?.id ?? null);
+        }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
           const stock = stockUniverse.find((item) => item.symbol === symbol);
@@ -2773,8 +2859,9 @@ export function TradingDashboard() {
       )}
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
-          <section className="modal pnl-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
+          <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
+            {!pnlHistoryOnly && <>
             <div className="pnl-stat-grid">
               <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
               <button type="button" className={pnlHistoryFilter === "all" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "all" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("all"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total trades</span><b>{closedTrades.length}</b><small>View all</small></button>
@@ -2818,6 +2905,7 @@ export function TradingDashboard() {
                 </div>
               </div>
             </div>
+            </>}
             <div className="pnl-trade-list" ref={pnlTradeListRef}>
               <div className="pnl-history-toolbar">
                 <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
@@ -2916,7 +3004,7 @@ export function TradingDashboard() {
               <article>
                 <b>Android app</b>
                 <small>Install the beta APK directly from the official website.</small>
-                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.19-beta.apk" download><Download size={18} /> Download Android APK</a>
+                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.20-beta.apk" download><Download size={18} /> Download Android APK</a>
               </article>
               <article>
                 <b>iPhone / iPad app</b>
@@ -2925,7 +3013,7 @@ export function TradingDashboard() {
               </article>
             </div>
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
-            <code className="download-hash">DF521FC76A8D4EA7C53FB4C0DACFDB17AAE742CBB2C82E0F4109CC00BC76E213</code>
+            <code className="download-hash">BD9ACF123E7091CDFA9A0EC45D53F441A08D5644386592B577EBF34A337EB4C3</code>
             <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari&apos;s Add to Home Screen option.</p>
           </section>
         </div>

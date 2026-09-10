@@ -8,17 +8,17 @@ import { densities, launcherBackground, launcherPng, paddedArtwork, launcherSour
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url));
 
-test("website header uses the approved white document mark in both themes", async () => {
+test("website header uses the approved transparent document mark in both themes", async () => {
   const brand = await source("components/BrandMark.tsx");
-  assert.equal(brand.match(/papertrade-mark-light-v118\.png/g)?.length, 2);
-  assert.doesNotMatch(brand, /src="\/papertrade-mark-dark-v118\.png"/);
+  assert.match(brand, /papertrade-mark-light-v120\.png/);
+  assert.match(brand, /papertrade-mark-dark-v120\.png/);
   assert.match(brand, /brand-logo-pair/);
-  for (const path of [launcherSource, lightBrandSource, darkBrandSource, "public/papertrade-mark-light-v118.png", "public/papertrade-mark-dark-v118.png"]) {
+  for (const path of [launcherSource, lightBrandSource, darkBrandSource, "public/papertrade-mark-light-v120.png", "public/papertrade-mark-dark-v120.png"]) {
     const metadata = await sharp(await file(path)).metadata();
     assert.ok(metadata.width && metadata.height, path);
   }
-  const light = await sharp(await file("public/papertrade-mark-light-v118.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const dark = await sharp(await file("public/papertrade-mark-dark-v118.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const light = await sharp(await file("public/papertrade-mark-light-v120.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const dark = await sharp(await file("public/papertrade-mark-dark-v120.png")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   assert.ok(light.data.some((value, index) => index % 4 === 3 && value === 0), "light mark must remain transparent");
   assert.ok(dark.data.some((value, index) => index % 4 === 3 && value === 0), "dark mark must remove preview checkerboard");
 });
@@ -64,34 +64,42 @@ test("PWA icon assets and cache versions are current", async () => {
   const manifest = JSON.parse(await source("public/manifest.webmanifest"));
   assert.equal(manifest.icons.length, 4);
   for (const icon of manifest.icons) {
-    assert.match(icon.src, /v=1\.18/);
+    assert.match(icon.src, /v=1\.20/);
     const png = await file(`public${icon.src.split("?")[0]}`);
     const metadata = await sharp(png).metadata();
     assert.equal(`${metadata.width}x${metadata.height}`, icon.sizes);
   }
   const layout = await source("app/layout.tsx");
-  assert.match(layout, /favicon-32-v118\.png/);
-  assert.match(layout, /apple-touch-icon-v118\.png/);
+  assert.match(layout, /favicon-32-v120\.png/);
+  assert.match(layout, /apple-touch-icon-v120\.png/);
 });
 
 test("native notifications include the updated launcher image", async () => {
-  for (const name of ["TradeAlertPlugin", "IpoGmpAlertWorker"]) {
-    assert.match(await source(`android/app/src/main/java/in/papertrade/app/${name}.java`), /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(context.getResources\(\), R.mipmap.ic_launcher\)\)/);
+  for (const name of ["TradeAlertPlugin", "IpoGmpAlertWorker", "IpoOpeningAlertWorker", "PriceAlertMonitorService"]) {
+    const notificationSource = await source(`android/app/src/main/java/in/papertrade/app/${name}.java`);
+    assert.match(notificationSource, /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(/);
+    assert.match(notificationSource, /R\.mipmap\.ic_launcher/);
   }
   const ipoWorker = await source("android/app/src/main/java/in/papertrade/app/IpoGmpAlertWorker.java");
   assert.match(ipoWorker, /last_closing_alert_date_/);
-  assert.match(ipoWorker, /closes today/);
+  assert.match(ipoWorker, /last day to apply/);
   assert.doesNotMatch(ipoWorker, /!payload\.optBoolean\("gmpFeedConfigured"/);
+  const openingWorker = await source("android/app/src/main/java/in/papertrade/app/IpoOpeningAlertWorker.java");
+  assert.match(openingWorker, /withHour\(10\)\.withMinute\(20\)/);
+  assert.match(openingWorker, /opened today/);
+  const protectionMonitor = await source("android/app/src/main/java/in/papertrade/app/PriceAlertMonitorService.java");
+  assert.match(protectionMonitor, /scheduleWithFixedDelay\(this::monitorSafely, 0, 20, TimeUnit\.SECONDS\)/);
+  assert.match(protectionMonitor, /TRIGGERED_ALERTS_KEY/);
 });
 
-test("both website download links serve v1.19 with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.19-beta.apk";
+test("both website download links serve v1.20 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.20-beta.apk";
   const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
     assert.ok(content.includes(`/downloads/${name}`));
-    assert.ok(!content.includes("PaperTrade-IN-v1.18-beta.apk"));
+    assert.ok(!content.includes("PaperTrade-IN-v1.19-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1\.19"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1\.20"/);
 });

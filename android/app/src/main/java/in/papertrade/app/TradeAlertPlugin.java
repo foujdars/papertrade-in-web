@@ -8,7 +8,11 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -17,6 +21,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(
     name = "TradeAlert",
@@ -53,6 +60,47 @@ public class TradeAlertPlugin extends Plugin {
         if (enabled) IpoGmpAlertWorker.schedule(getContext());
         else IpoGmpAlertWorker.cancel(getContext());
         call.resolve();
+    }
+
+    @PluginMethod
+    public void setPriceAlerts(PluginCall call) {
+        JSArray requested = call.getArray("alerts", new JSArray());
+        JSONArray active = new JSONArray();
+        android.content.SharedPreferences preferences = getContext().getSharedPreferences(
+            PriceAlertMonitorService.PREFERENCES_NAME,
+            Context.MODE_PRIVATE
+        );
+        for (int index = 0; index < requested.length(); index++) {
+            JSONObject alert = requested.optJSONObject(index);
+            if (alert == null) continue;
+            String id = alert.optString("id", "");
+            String instrumentKey = alert.optString("instrumentKey", "");
+            if (id.isEmpty() || instrumentKey.isEmpty() || preferences.getBoolean(PriceAlertMonitorService.FIRED_PREFIX + id, false)) continue;
+            active.put(alert);
+        }
+        preferences.edit().putString(PriceAlertMonitorService.ACTIVE_ALERTS_KEY, active.toString()).apply();
+        Intent serviceIntent = new Intent(getContext(), PriceAlertMonitorService.class);
+        if (active.length() > 0) ContextCompat.startForegroundService(getContext(), serviceIntent);
+        else getContext().stopService(serviceIntent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void consumeTriggeredPriceAlerts(PluginCall call) {
+        android.content.SharedPreferences preferences = getContext().getSharedPreferences(
+            PriceAlertMonitorService.PREFERENCES_NAME,
+            Context.MODE_PRIVATE
+        );
+        JSONArray triggered;
+        try {
+            triggered = new JSONArray(preferences.getString(PriceAlertMonitorService.TRIGGERED_ALERTS_KEY, "[]"));
+        } catch (Exception ignored) {
+            triggered = new JSONArray();
+        }
+        preferences.edit().putString(PriceAlertMonitorService.TRIGGERED_ALERTS_KEY, "[]").apply();
+        JSObject result = new JSObject();
+        result.put("alerts", triggered);
+        call.resolve(result);
     }
 
     @PermissionCallback

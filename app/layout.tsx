@@ -47,13 +47,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon-32-v118.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-64-v118.png", sizes: "64x64", type: "image/png" },
+      { url: "/favicon-32-v120.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-64-v120.png", sizes: "64x64", type: "image/png" },
     ],
-    shortcut: "/papertrade-icon-192.png?v=1.18",
-    apple: "/apple-touch-icon-v118.png",
+    shortcut: "/papertrade-icon-192.png?v=1.20",
+    apple: "/apple-touch-icon-v120.png",
   },
-  manifest: "/manifest.webmanifest?v=1.18",
+  manifest: "/manifest.webmanifest?v=1.20",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

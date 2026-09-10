@@ -102,10 +102,10 @@ function showIpoGmpAlert(ipo: IpoSummary) {
 
 function showIpoClosingAlert(ipo: IpoSummary) {
   const today = indiaDateKey();
-  const title = `${ipo.name} closes today`;
+  const title = `${ipo.name}: last day to apply`;
   const gmp = formatIpoGmp(ipo);
-  const issueSize = ipo.issueSizeCrore ? `Issue size ₹${ipo.issueSizeCrore.toLocaleString("en-IN")} Cr.` : "Bidding closes today.";
-  const body = gmp ? `${issueSize} Current GMP: ${gmp}.` : issueSize;
+  const issueSize = ipo.issueSizeCrore ? `Issue size ₹${ipo.issueSizeCrore.toLocaleString("en-IN")} Cr. ` : "";
+  const body = `${issueSize}${gmp ? `Current GMP: ${gmp}. ` : ""}Today is the last day to apply. Do not miss the deadline.`;
   addPaperTradeNotification({ id: `ipo-closing-${ipo.id}-${today}`, kind: "ipo", title, body });
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
@@ -142,6 +142,7 @@ export function IpoAlertMonitor() {
     }
     let controller: AbortController | null = null;
     const check = async () => {
+      if (Capacitor.getPlatform() === "android") return;
       if (!enabled || document.visibilityState !== "visible" || !navigator.onLine) return;
       controller?.abort();
       controller = new AbortController();
@@ -194,7 +195,7 @@ export function IpoWorkspace() {
       setFetchedAt(result.fetchedAt);
       setGmpFeedConfigured(result.gmpFeedConfigured);
       setError("");
-      if (readAlertEnabled()) processIpoAlerts(result.ipos);
+      if (readAlertEnabled() && Capacitor.getPlatform() !== "android") processIpoAlerts(result.ipos);
     } catch (cause) {
       setError(cause instanceof DOMException && cause.name === "AbortError"
         ? "IPO refresh timed out. Pull down or tap Refresh to try again."
@@ -237,7 +238,7 @@ export function IpoWorkspace() {
     }
     setAlertsEnabledState(next);
     setError("");
-    if (next) processIpoAlerts(ipos);
+    if (next && Capacitor.getPlatform() !== "android") processIpoAlerts(ipos);
   };
 
   return (
@@ -256,7 +257,7 @@ export function IpoWorkspace() {
         {filter !== "allotments" && <div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
             {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
-            <span>{alertsEnabled ? "Daily IPO alerts on" : "GMP + last-day alerts"}</span>
+            <span>{alertsEnabled ? "Daily IPO alerts on" : "Opening + GMP + closing alerts"}</span>
           </button>
           <button type="button" className="scanner-run-button ipo-refresh-button" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh

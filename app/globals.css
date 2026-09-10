@@ -1033,6 +1033,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .trend-stock-row > span:nth-child(3) b { font-size: 12px; }
 .trend-stock-row > span:nth-child(3) small { font-size: 9px; }
 .pnl-modal { width: min(760px, 100%); }
+.pnl-modal.history-only .pnl-trade-list { margin-top: 0; }
+.pnl-modal.history-only .pnl-history-toolbar { top: -1px; padding-top: 0; }
 .pnl-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .pnl-stat-grid > :is(div, button) { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fafbfe; font: inherit; text-align: left; }
 .pnl-stat-grid > button { position: relative; padding-right: 34px; cursor: pointer; }

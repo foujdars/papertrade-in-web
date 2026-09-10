@@ -259,10 +259,21 @@ test("portfolio exposes complete history filters and a separate open-position ex
   const home = await source("components/HomeWorkspace.tsx");
   assert.match(home, /Closed trades/);
   assert.match(home, /onOpenTradeHistory/);
+  assert.match(dashboard, /setPnlHistoryOnly\(true\)/);
+  assert.match(dashboard, /setPnlTradeMenuId\(closedTrades\[0\]\?\.id \?\? null\)/);
+  assert.match(dashboard, /pnlHistoryOnly \? "history-only"/);
   assert.match(dashboard, /pnlHistoryFilter === "profit"/);
   assert.match(dashboard, /pnlHistoryFilter === "loss"/);
   assert.match(dashboard, /className="position-exit-button"/);
   assert.match(dashboard, /exitPosition\(position\.quantity, \{ symbol: position\.symbol/);
   assert.match(dashboard, /aria-expanded={menuOpen}/);
   assert.doesNotMatch(dashboard, /selectedPnlDateKey && <div className="pnl-trade-list"/);
+});
+
+test("cash charts discover F&O eligibility regardless of where a symbol was opened", async () => {
+  const dashboard = await source("components/TradingDashboard.tsx");
+  assert.match(dashboard, /fetch\("\/api\/upstox\/fno-underlyings"/);
+  assert.match(dashboard, /const selectedFnoUnderlying = useMemo/);
+  assert.match(dashboard, /item\.instrumentKey === selected\.instrumentKey \|\| item\.symbol === selected\.symbol/);
+  assert.match(dashboard, /onClick={\(\) => void openFnoUnderlying\(selectedFnoUnderlying\)}/);
 });

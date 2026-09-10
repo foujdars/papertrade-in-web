@@ -34,27 +34,23 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 
-public class IpoGmpAlertWorker extends Worker {
-    public static final String PREFERENCES_NAME = "papertrade_ipo_alerts";
-    public static final String ENABLED_KEY = "enabled";
-    private static final String UNIQUE_WORK_NAME = "papertrade_daily_ipo_gmp_alert";
+public class IpoOpeningAlertWorker extends Worker {
+    private static final String UNIQUE_WORK_NAME = "papertrade_daily_ipo_opening_alert";
     private static final String CHANNEL_ID = "papertrade_ipo_gmp_alerts_v1";
     private static final String ENDPOINT = "https://www.papertrade.site/api/upstox/ipos?status=open";
     private static final ZoneId INDIA_ZONE = ZoneId.of("Asia/Kolkata");
 
-    public IpoGmpAlertWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
+    public IpoOpeningAlertWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
         super(context, parameters);
     }
 
     public static void schedule(Context context) {
         ZonedDateTime now = ZonedDateTime.now(INDIA_ZONE);
-        ZonedDateTime nextRun = now.withHour(10).withMinute(0).withSecond(0).withNano(0);
+        ZonedDateTime nextRun = now.withHour(10).withMinute(20).withSecond(0).withNano(0);
         if (!nextRun.isAfter(now)) nextRun = nextRun.plusDays(1);
         long initialDelayMillis = Duration.between(now, nextRun).toMillis();
-        Constraints constraints = new Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build();
-        PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(IpoGmpAlertWorker.class, 24, TimeUnit.HOURS)
+        Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
+        PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(IpoOpeningAlertWorker.class, 24, TimeUnit.HOURS)
             .setInitialDelay(initialDelayMillis, TimeUnit.MILLISECONDS)
             .setConstraints(constraints)
             .build();
@@ -63,20 +59,18 @@ public class IpoGmpAlertWorker extends Worker {
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         );
-        IpoOpeningAlertWorker.schedule(context);
     }
 
     public static void cancel(Context context) {
         WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME);
-        IpoOpeningAlertWorker.cancel(context);
     }
 
     @NonNull
     @Override
     public Result doWork() {
         Context context = getApplicationContext();
-        SharedPreferences preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
-        if (!preferences.getBoolean(ENABLED_KEY, false)) return Result.success();
+        SharedPreferences preferences = context.getSharedPreferences(IpoGmpAlertWorker.PREFERENCES_NAME, Context.MODE_PRIVATE);
+        if (!preferences.getBoolean(IpoGmpAlertWorker.ENABLED_KEY, false)) return Result.success();
         try {
             JSONObject payload = fetchPayload();
             if (!payload.optBoolean("ok", false)) return Result.success();
@@ -86,40 +80,17 @@ public class IpoGmpAlertWorker extends Worker {
             for (int index = 0; index < ipos.length(); index++) {
                 JSONObject ipo = ipos.optJSONObject(index);
                 if (ipo == null || !"open".equalsIgnoreCase(ipo.optString("status"))) continue;
+                if (!today.equals(ipo.optString("biddingStartDate", ""))) continue;
                 String ipoId = ipo.optString("id", ipo.optString("symbol", String.valueOf(index)));
-                String symbol = ipo.optString("symbol", ipo.optString("name", "IPO"));
-                String name = ipo.optString("name", symbol + " IPO");
-                String endDate = ipo.optString("biddingEndDate", "");
-                if (today.equals(endDate)) {
-                    String closingStateKey = "last_closing_alert_date_" + ipoId;
-                    if (!today.equals(preferences.getString(closingStateKey, ""))) {
-                        double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
-                        double closingGmpPercent = ipo.optDouble("gmpPercent", Double.NaN);
-                        String issueText = Double.isFinite(issueSize) && issueSize > 0
-                            ? String.format(java.util.Locale.ENGLISH, "Issue size Rs %,.2f Cr. ", issueSize)
-                            : "";
-                        String gmpText = Double.isFinite(closingGmpPercent) && closingGmpPercent > 15.0
-                            ? String.format(java.util.Locale.ENGLISH, "GMP is %.2f%%. ", closingGmpPercent)
-                            : "";
-                        String closingBody = issueText + gmpText + "Today is the last day to apply. Do not miss the deadline.";
-                        showNotification(context, name + ": last day to apply", closingBody, ("ipo-closing-" + ipoId + "-" + today).hashCode());
-                        preferences.edit().putString(closingStateKey, today).apply();
-                    }
-                    continue;
-                }
-                double gmpPercent = ipo.optDouble("gmpPercent", Double.NaN);
-                if (!Double.isFinite(gmpPercent) || gmpPercent <= 15.0) continue;
-                String stateKey = "last_alert_date_" + ipoId;
+                String stateKey = "last_opening_alert_date_" + ipoId;
                 if (today.equals(preferences.getString(stateKey, ""))) continue;
-                double gmpAmount = ipo.optDouble("gmpAmount", 0.0);
-                String body = String.format(
-                    java.util.Locale.ENGLISH,
-                    "GMP is Rs %.2f (%.2f%% of upper issue price). Bidding closes %s.",
-                    gmpAmount,
-                    gmpPercent,
-                    endDate.isEmpty() ? "soon" : endDate
-                );
-                showNotification(context, "" + symbol + " IPO GMP is above 15%", body, ("ipo-gmp-" + ipoId + "-" + today).hashCode());
+                String name = ipo.optString("name", ipo.optString("symbol", "IPO") + " IPO");
+                String endDate = ipo.optString("biddingEndDate", "soon");
+                double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
+                String body = Double.isFinite(issueSize) && issueSize > 0
+                    ? String.format(java.util.Locale.ENGLISH, "Bidding is live until %s. Issue size Rs %,.2f Cr.", endDate, issueSize)
+                    : String.format(java.util.Locale.ENGLISH, "Bidding is live until %s.", endDate);
+                showNotification(context, name + " opened today", body, ("ipo-opening-" + ipoId + "-" + today).hashCode());
                 preferences.edit().putString(stateKey, today).apply();
             }
             return Result.success();
@@ -155,7 +126,7 @@ public class IpoGmpAlertWorker extends Worker {
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Daily IPO alerts", NotificationManager.IMPORTANCE_HIGH);
-            channel.setDescription("IPO opening, closing-day and daily GMP alerts");
+            channel.setDescription("IPO opening, closing-day and GMP reminders");
             channel.enableVibration(true);
             manager.createNotificationChannel(channel);
         }
