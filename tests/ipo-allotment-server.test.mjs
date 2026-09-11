@@ -17,6 +17,33 @@ async function serverWith(t, upstream) {
 
 globalThis.__allotmentTestFetch = async () => { throw new Error("Unconfigured test provider"); };
 
+test("IPO detail enrichment preserves missing prices and verifies publication rather than using dates", async (t) => {
+  let calls = 0;
+  t.mock.method(globalThis, "__allotmentTestFetch", async path => {
+    calls++;
+    const id = path.split("/").at(-1);
+    return { data: { id, name: "Example IPO", status: "closed", listing_price: null, cut_off_price: 100, daily_end_time: "17:00",
+      timeline: { allotment_date: "2020-01-01", refund_initiation_date: "2026-09-07", listing_date: "2026-09-08" },
+      registrar_info: { name: id === "kfin" ? "KFin Technologies" : "MUFG Intime" } } };
+  });
+  let source = await readFile(new URL("../lib/ipo-details-server.ts", import.meta.url), "utf8");
+  source = source.replace('import "server-only";', "")
+    .replace('import { upstoxFetch } from "./upstox-server";', "const upstoxFetch = globalThis.__allotmentTestFetch;")
+    .replace('from "./ipo-allotment"', `from ${JSON.stringify(new URL("../lib/ipo-allotment.ts", import.meta.url).href)}`)
+    .replace('import { verifyPublishedAllotment } from "./ipo-allotment-server";', "const verifyPublishedAllotment = async () => 'https://example.org/evidence.pdf';");
+  const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+  const server = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}#details`);
+  const [first, second] = await Promise.all([server.loadIpoDetails("kfin"), server.loadIpoDetails("kfin")]);
+  assert.equal(calls, 1, "concurrent visitors share a detail request");
+  assert.equal(first, second);
+  assert.equal(first.listingPrice, null);
+  assert.equal(first.dematDate, "", "refund date must not be guessed as demat date");
+  assert.equal(first.dailyEndTime, "17:00:00");
+  assert.equal(first.allotmentPublished, false, "an old date is not publication evidence");
+  assert.equal(first.registrarUrl, "https://ipostatus.kfintech.com/");
+  assert.equal((await server.loadIpoDetails("mufg")).allotmentPublished, true);
+});
+
 test("allotment server verifies a public PDF, preserves failed details and shares its cache", async (t) => {
   const today = indiaDateKey();
   const issues = ["sample", "other", "bad"].map((id) => ({ id, name: id === "sample" ? "Example IPO" : id, status: "closed", bidding_end_date: today }));

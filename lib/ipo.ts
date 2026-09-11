@@ -6,6 +6,7 @@ export const IPO_ALERT_SETTINGS_EVENT = "papertrade-ipo-alert-settings";
 export type IpoStatus = "open" | "upcoming" | "closed" | "listed";
 
 export type IpoSummary = {
+  details?: import("./ipo-lifecycle").IpoDetails;
   id: string;
   symbol: string;
   name: string;
@@ -25,6 +26,7 @@ export type IpoSummary = {
 };
 
 export type IpoListResponse = {
+  partial?: boolean;
   ok: boolean;
   source?: "upstox" | "upstox+ipoalerts" | "upstox+ipogram";
   gmpFeedConfigured?: boolean;

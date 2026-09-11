@@ -52,6 +52,10 @@ async function loadMufgCompanies() {
   } catch { return []; }
 }
 
+export async function verifyPublishedAllotment(name: string) {
+  return publishedBasis(name, await loadMufgCompanies());
+}
+
 export async function loadAllotments() {
   if (cached && cached.expires > Date.now()) return cached.value;
   if (pending) return pending;

@@ -11,6 +11,41 @@ import {
   sortIposByClosingDate,
 } from "../lib/ipo.ts";
 import { findPublicGmp, parsePublicGmpHtml } from "../lib/ipo-gmp-server.ts";
+import { ipoStage, isRecentListing, listingReturn, gmpTone } from "../lib/ipo-lifecycle.ts";
+
+test("IPO stage keeps closed issues in Open until actual listing is known", () => {
+  const base = { status: "open", biddingStartDate: "2026-09-01", biddingEndDate: "2026-09-03", details: { dailyEndTime: "17:00:00", listingDate: "2026-09-08", listingPrice: null, allotmentPublished: false } };
+  assert.equal(ipoStage(base, "2026-08-31"), "upcoming");
+  assert.equal(ipoStage(base, "2026-09-03", "16:59:59"), "open");
+  assert.equal(ipoStage(base, "2026-09-03", "17:00:00"), "waiting");
+  assert.equal(ipoStage(base, "2026-09-08"), "waiting", "tentative listing date alone is not confirmation");
+  assert.equal(ipoStage({ ...base, details: { ...base.details, allotmentPublished: true } }, "2026-09-07"), "allotted");
+  assert.equal(ipoStage({ ...base, details: { ...base.details, listingPrice: 125 } }, "2026-09-08"), "listed");
+  assert.equal(ipoStage({ ...base, status: "listed" }, "2026-09-08"), "listed");
+});
+
+test("Listed retention counts from listing, includes day 30, excludes the following date", () => {
+  assert.equal(isRecentListing("2026-08-13", "2026-09-11"), true);
+  assert.equal(isRecentListing("2026-08-12", "2026-09-11"), false);
+  assert.equal(isRecentListing("2026-09-11", "2026-09-11"), true);
+  assert.equal(isRecentListing("2026-09-12", "2026-09-11"), false);
+  assert.equal(isRecentListing(undefined, "2026-09-11"), false);
+  assert.equal(isRecentListing("invalid", "2026-09-11"), false);
+});
+
+test("GMP UI uses inclusive 15 percent boundary and missing data stays neutral", () => {
+  assert.equal(gmpTone(14.99), "low");
+  assert.equal(gmpTone(15), "high");
+  assert.equal(gmpTone(0), "low");
+  assert.equal(gmpTone(-3), "low");
+  assert.equal(gmpTone(null), "pending");
+  assert.equal(gmpTone(NaN), "pending");
+  assert.equal(listingReturn(125, 100), 25);
+  assert.equal(listingReturn(100, 100), 0);
+  assert.ok(Math.abs(listingReturn(90, 100) + 10) < .0001);
+  assert.equal(listingReturn(null, 100), null);
+  assert.equal(listingReturn(100, 0), null);
+});
 
 const ipo = (overrides = {}) => ({
   id: "example-ipo",

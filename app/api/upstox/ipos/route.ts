@@ -1,9 +1,11 @@
 import { calculateGmpPercent, dedupeIpos, normalizeGmp, normalizeSubscription, type IpoStatus, type IpoSummary } from "@/lib/ipo";
 import { findPublicGmp, loadPublicGmpFeed, type PublicGmpEntry } from "@/lib/ipo-gmp-server";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
+import { loadIpoDetails } from "@/lib/ipo-details-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type UpstoxIpo = {
   id?: string;
@@ -21,13 +23,20 @@ type UpstoxIpo = {
   total_subscription?: string | number;
 };
 
-type UpstoxIpoPayload = { status?: string; data?: UpstoxIpo[] };
+type UpstoxIpoPayload = { status?: string; data?: UpstoxIpo[]; meta_data?: { page?: { total_pages?: number } } };
 type GmpTrendPayload = {
   series?: Array<{ timestamp?: string; price?: number | null }>;
 };
 const allowedStatuses = new Set<IpoStatus>(["open", "upcoming", "closed", "listed"]);
 const GMP_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const gmpCache = new Map<string, { expiresAt: number; amount: number | null; updatedAt: string }>();
+
+async function bounded<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([operation, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("IPO provider timed out. Please refresh.")), 8_000); })]);
+  } finally { if (timer) clearTimeout(timer); }
+}
 
 async function loadLatestGmp(ipo: IpoSummary, apiKey: string) {
   const identifier = ipo.symbol || ipo.id;
@@ -98,9 +107,21 @@ export async function GET(request: Request) {
       );
     }
 
-    const payloads = await Promise.all(statuses.map((status) => {
-      const params = new URLSearchParams({ status, page_number: "1", records: "30" });
-      return upstoxFetch<UpstoxIpoPayload>(`/v2/ipos?${params}`);
+    const includeDetails = new URL(request.url).searchParams.get("details") === "1";
+    let partial = false;
+    const deadline = Date.now() + 42_000;
+    const payloads = await Promise.all(statuses.map(async (status) => {
+      const data: UpstoxIpo[] = [];
+      for (let page = 1; page <= 10; page++) {
+        if (Date.now() > deadline) { partial = true; break; }
+        const params = new URLSearchParams({ status, page_number: String(page), records: "30" });
+        const result = await bounded(upstoxFetch<UpstoxIpoPayload>(`/v2/ipos?${params}`));
+        data.push(...(result.data ?? []));
+        const pages = result.meta_data?.page?.total_pages;
+        if ((pages !== undefined && page >= pages) || (result.data?.length ?? 0) < 30) break;
+        if (page === 10) partial = true;
+      }
+      return { data };
     }));
     const normalizedIpos = dedupeIpos(payloads.flatMap((payload) => payload.data ?? [])
       .map(normalizeIpo)
@@ -113,7 +134,7 @@ export async function GET(request: Request) {
       // The keyed provider can continue independently; the UI shows a truthful temporary fallback.
     }
     const ipos = await Promise.all(normalizedIpos.map(async (ipo) => {
-      if (ipo.status !== "open" && ipo.status !== "upcoming") return ipo;
+      if (ipo.status === "listed") return ipo;
       const keyedGmp = gmpApiKey ? await loadLatestGmp(ipo, gmpApiKey) : null;
       const publicGmp = findPublicGmp(ipo, publicGmpEntries);
       const amount = keyedGmp?.amount ?? publicGmp?.amount ?? null;
@@ -125,12 +146,26 @@ export async function GET(request: Request) {
       };
     }));
     const gmpFeedConfigured = Boolean(gmpApiKey || publicGmpEntries.length);
+    if (includeDetails) {
+      // Recent records first, but don't infer listing age from the bidding end date.
+      const queue = [...ipos].sort((a, b) => b.biddingEndDate.localeCompare(a.biddingEndDate));
+      let next = 0;
+      await Promise.all(Array.from({ length: 6 }, async () => {
+        while (next < queue.length) {
+          const ipo = queue[next++];
+          if (Date.now() > deadline) { partial = true; continue; }
+          try { ipo.details = await bounded(loadIpoDetails(ipo.id)); }
+          catch { partial = true; }
+        }
+      }));
+    }
 
     return Response.json(
       {
         ok: true,
         source: gmpApiKey ? "upstox+ipoalerts" : publicGmpEntries.length ? "upstox+ipogram" : "upstox",
         gmpFeedConfigured,
+        partial,
         ipos,
         fetchedAt: new Date().toISOString(),
       },

@@ -2,13 +2,14 @@
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
 import { LongPressTradeRow } from "@/components/LongPressTradeRow";
+import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransientBack";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 
 import {
-  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
+  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
-  TrendingUp, WalletCards, X,
+  TrendingUp, Bookmark, WalletCards, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
@@ -529,6 +530,8 @@ export function TradingDashboard() {
   }, []);
 
   const returnToTradeFromBack = useCallback(() => {
+    setTradeSelection(null);
+    setPendingDeleteIds(null);
     setHomeOpen(true);
     setSidebarOpen(false);
     setPositionsOpen(false);
@@ -748,6 +751,7 @@ export function TradingDashboard() {
 
     void CapacitorApp.addListener("backButton", () => {
       if (toolkitBackRef.current) { toolkitBackRef.current(); return; }
+      if (!window.dispatchEvent(new Event(TRANSIENT_BACK_EVENT, { cancelable: true }))) return;
       if (activeNavigationSectionRef.current !== "home") {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
@@ -1659,6 +1663,9 @@ export function TradingDashboard() {
   }, [closedTrades, pnlHistoryFilter, selectedPnlDateKey]);
   const tradeSelectionScope = `${pnlOpen}:${selectedPnlDateKey ?? pnlHistoryFilter}`;
   const selectingTrades = tradeSelection?.scope === tradeSelectionScope;
+  useTransientBack(pnlOpen, () => returnToTradeFromBackRef.current());
+  useTransientBack(Boolean(selectingTrades && pnlOpen), () => setTradeSelection(null));
+  useTransientBack(Boolean(pendingDeleteIds && pnlOpen), () => setPendingDeleteIds(null));
   const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
   const pendingDeletion = useMemo(() => pendingDeleteIds ? prepareClosedTradeDeletion(orders, pendingDeleteIds) : null, [orders, pendingDeleteIds]);
   function toggleTradeSelection(id: string) {
@@ -2767,7 +2774,7 @@ export function TradingDashboard() {
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
-        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><TrendingUp size={19} /><span>Watchlist</span></button>
+        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><Bookmark size={19} /><span>Watchlist</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
@@ -2908,7 +2915,7 @@ export function TradingDashboard() {
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
           <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => setPnlOpen(false)} aria-label="Close profit and loss"><X size={20} /></button></div>
+            <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => { if (selectingTrades) setTradeSelection(null); else { setTradeSelection(null); setPnlOpen(false); } }} aria-label={selectingTrades ? "Exit trade selection" : "Close profit and loss"}><X size={20} /></button></div>
             {!pnlHistoryOnly && <>
             <div className="pnl-stat-grid">
               <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
@@ -2955,14 +2962,14 @@ export function TradingDashboard() {
             </div>
             </>}
             <div className="pnl-trade-list" ref={pnlTradeListRef}>
-              {!!visiblePnlTrades.length && <div className="pnl-selection-toolbar">
+              {!!visiblePnlTrades.length && <div className={`pnl-selection-toolbar ${selectingTrades ? "is-selecting" : ""}`}>
                 <div><b>{selectingTrades ? `${selectedTradeIds.length} selected` : "Closed trades"}</b><small>{selectingTrades ? "Choose the records to remove" : "Hold a trade to select it"}</small></div>
                 <button type="button" onClick={() => { setTradeSelection(selectingTrades ? null : { scope: tradeSelectionScope, ids: [] }); setPnlTradeMenuId(null); }}>{selectingTrades ? "Done" : "Select trades"}</button>
                 {selectingTrades && <div className="pnl-selection-actions"><button type="button" onClick={() => setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.length === visiblePnlTrades.length ? [] : visiblePnlTrades.map((trade) => trade.id) })}>{selectedTradeIds.length === visiblePnlTrades.length ? "Deselect all" : `Select all shown (${visiblePnlTrades.length})`}</button><button type="button" className="pnl-selection-delete" disabled={!selectedTradeIds.length} onClick={() => setPendingDeleteIds(selectedTradeIds)}><Trash2 size={15} /> Delete ({selectedTradeIds.length})</button></div>}
               </div>}
               <div className="pnl-history-toolbar">
                 <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
-                  {(["all", "profit", "loss"] as const).map((filter) => <button type="button" key={filter} className={!selectedPnlDateKey && pnlHistoryFilter === filter ? "active" : ""} aria-pressed={!selectedPnlDateKey && pnlHistoryFilter === filter} onClick={() => { setSelectedPnlDateKey(null); setPnlHistoryFilter(filter); }}>{filter === "all" ? `All ${closedTrades.length}` : filter === "profit" ? `Profit ${pnlVisuals.wins}` : `Loss ${pnlVisuals.losses}`}</button>)}
+                  {(["all", "profit", "loss"] as const).map((filter) => <button type="button" key={filter} className={!selectedPnlDateKey && pnlHistoryFilter === filter ? "active" : ""} aria-pressed={!selectedPnlDateKey && pnlHistoryFilter === filter} onClick={() => { setTradeSelection(null); setSelectedPnlDateKey(null); setPnlHistoryFilter(filter); }}>{filter === "all" ? `All ${closedTrades.length}` : filter === "profit" ? `Profit ${pnlVisuals.wins}` : `Loss ${pnlVisuals.losses}`}</button>)}
                 </div>
                 {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Show all dates</button></div>}
               </div>
@@ -2978,7 +2985,7 @@ export function TradingDashboard() {
                   .filter((marker) => marker.time > 0);
                 return (
                   <LongPressTradeRow onLongPress={() => { setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(trade.id) ? selectedTradeIds : [...selectedTradeIds, trade.id] }); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${formatInr(trade.netPnl)}` : undefined} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
-                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <CheckCircle2 size={21} />}</span> : <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>}
+                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>}
                     <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
                     {menuOpen && !!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>

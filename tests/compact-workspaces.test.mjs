@@ -7,6 +7,42 @@ import postcss from "postcss";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
+test("Back dismisses trade selection before its parent screen, and Done doesn't consume the next Back", async () => {
+  const require = createRequire(import.meta.url);
+  const compiled = ts.transpileModule(await source("components/useTransientBack.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
+  const listeners = new Map();
+  const history = [{ original: true }];
+  let index = 0, home = 0, deselected = 0;
+  const win = {
+    addEventListener(type, callback, options) { const entries = listeners.get(type) ?? []; entries.push({ callback, once: options?.once, capture: options === true || options?.capture }); listeners.set(type, entries); },
+    removeEventListener(type, callback) { listeners.set(type, (listeners.get(type) ?? []).filter(entry => entry.callback !== callback)); },
+    dispatchEvent(event) { let stopped = false; event.stopImmediatePropagation = () => { stopped = true; }; for (const entry of [...(listeners.get(event.type) ?? [])].sort((a, b) => Number(b.capture) - Number(a.capture))) { if (stopped) break; entry.callback(event); if (entry.once) win.removeEventListener(event.type, entry.callback); } return !event.defaultPrevented; },
+    history: { get state() { return history[index]; }, pushState(state) { history.splice(++index); history.push(state); }, back() { if (index > 0) index--; queueMicrotask(() => win.dispatchEvent(new Event("popstate"))); } },
+  };
+  const cleanups = [];
+  const fakeReact = { useRef: current => ({ current }), useEffect: fn => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup); } };
+  const exports = {};
+  new Function("require", "exports", "window", "document", compiled.outputText)(name => name === "react" ? fakeReact : name === "@capacitor/core" ? { Capacitor: { isNativePlatform: () => false } } : require(name), exports, win, { querySelector: () => null });
+  exports.useTransientBack(true, () => home++);
+  await Promise.resolve();
+  exports.useTransientBack(true, () => deselected++);
+  await Promise.resolve();
+  win.history.back(); await Promise.resolve();
+  assert.equal(deselected, 1); assert.equal(home, 0);
+  cleanups.pop()();
+  win.history.back(); await Promise.resolve();
+  assert.equal(home, 1);
+  cleanups.pop()();
+  exports.useTransientBack(true, () => home++); await Promise.resolve();
+  exports.useTransientBack(true, () => deselected++); await Promise.resolve();
+  cleanups.pop()(); // Done
+  await Promise.resolve();
+  assert.equal(home, 1, "Done must not close the parent screen");
+  win.history.back(); await Promise.resolve();
+  assert.equal(home, 2, "No lingering cleanup listener may swallow the next Back");
+  cleanups.pop()();
+});
+
 test("holding a trade selects it once, while taps, scrolling and cancelled holds stay safe", async () => {
   const require = createRequire(import.meta.url);
   const compiled = ts.transpileModule(await source("components/LongPressTradeRow.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
@@ -230,14 +266,18 @@ test("scanner controls use one compact automatic switch and refresh", async () =
 
 test("IPO keeps filters and research links but replaces oversized missing-GMP messages", async () => {
   const ipo = await source("components/IpoWorkspace.tsx");
+  const card = await source("components/IpoLifecycleCard.tsx");
   assert.doesNotMatch(ipo, /ipo-overview-banner|ipo-source-line|ipo-feed-note|Not available/);
-  assert.match(ipo, /<IpoAllotments board={board} directory={directory}/);
-  assert.match(ipo, /<IpoResearchLink/);
-  assert.match(ipo, /<IpoCompanyLogo/);
-  assert.match(ipo, /<span className="ipo-gmp-pending">{gmpFeedConfigured \? "GMP not yet reported" : "GMP temporarily unavailable"}/);
+  assert.match(ipo, /setFilter\("listed"\)/);
+  assert.match(ipo, /isRecentListing/);
+  assert.match(card, /<IpoResearchLink/);
+  assert.match(card, /<IpoCompanyLogo/);
+  assert.match(card, /ipo.gmpPercent === null \? "Not reported"/);
   assert.doesNotMatch(ipo, /GMP feed not connected/);
-  assert.match(ipo, /gmp === null/);
-  assert.match(ipo, /<strong>{gmp}<\/strong>/);
+  assert.match(card, /gmpTone\(ipo.gmpPercent\)/);
+  assert.match(card, /ipo.gmpPercent.toFixed\(2\)/);
+  assert.match(card, /href={ipo.details.registrarUrl}/);
+  assert.match(card, /Category-wise valid applications/);
 });
 
 test("compact styling uses theme colours and preserves readable, scrollable controls", async () => {

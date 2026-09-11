@@ -1,7 +1,7 @@
 "use client";
 
-import { Bell, BellRing, Building2, CalendarDays, Clock3, RefreshCw, Rocket, Store } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Bell, BellRing, Building2, Clock3, RefreshCw, Rocket, Store } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
   IPO_ALERT_ENABLED_STORAGE_KEY,
@@ -18,12 +18,14 @@ import {
 } from "@/lib/ipo";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
-import { IpoAllotments } from "@/components/IpoAllotments";
-import { IpoCompanyLogo, IpoResearchLink, useIpoDirectory } from "@/components/IpoCompany";
+import { IpoLifecycleCard, IpoDetailView } from "./IpoLifecycleCard";
+import { ipoStage, isRecentListing } from "@/lib/ipo-lifecycle";
+import { readAllotmentAlertEnabled, setAllotmentAlertEnabled } from "@/lib/ipo-allotment-alerts";
+import { useIpoDirectory } from "@/components/IpoCompany";
 import { filterIpoBoard, type IpoBoard } from "@/lib/ipo-directory";
 
 const IPO_REFRESH_INTERVAL_MS = 60_000;
-type IpoFilter = "active" | "open" | "upcoming" | "allotments";
+type IpoFilter = "active" | "open" | "upcoming" | "listed";
 type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string; lastClosingAlertDate?: string }>;
 
 function readAlertEnabled() {
@@ -39,11 +41,12 @@ function readAlertState(): AlertState {
   }
 }
 
-async function loadIpos(status = "open,upcoming", signal?: AbortSignal) {
-  const response = await fetch(`/api/upstox/ipos?status=${encodeURIComponent(status)}`, { cache: "no-store", signal });
+async function loadIpos(status = "open,upcoming", signal?: AbortSignal, details = false) {
+  const response = await fetch(`/api/upstox/ipos?status=${encodeURIComponent(status)}${details ? "&details=1" : ""}`, { cache: "no-store", signal });
   const payload = await response.json() as IpoListResponse;
   if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "IPO information is unavailable.");
   return {
+    partial: payload.partial ?? false,
     ipos: payload.ipos ?? [],
     fetchedAt: payload.fetchedAt ?? new Date().toISOString(),
     gmpFeedConfigured: payload.gmpFeedConfigured ?? false,
@@ -55,12 +58,6 @@ function formatIpoDate(value: string) {
   const date = new Date(`${value}T00:00:00+05:30`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }).format(date);
-}
-
-function formatPriceBand(ipo: IpoSummary) {
-  if (!ipo.minimumPrice && !ipo.maximumPrice) return "To be announced";
-  if (ipo.minimumPrice === ipo.maximumPrice) return `₹${ipo.maximumPrice.toLocaleString("en-IN")}`;
-  return `₹${ipo.minimumPrice.toLocaleString("en-IN")} – ₹${ipo.maximumPrice.toLocaleString("en-IN")}`;
 }
 
 function formatRefreshTime(value: string) {
@@ -175,34 +172,41 @@ export function IpoAlertMonitor() {
 }
 
 export function IpoWorkspace() {
+  const requestRef = useRef<AbortController | null>(null);
+  const [allotmentAlerts, setAllotmentAlerts] = useState(readAllotmentAlertEnabled);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const [board, setBoard] = useState<IpoBoard>("regular");
   const directory = useIpoDirectory();
   const [filter, setFilter] = useState<IpoFilter>("open");
   const [ipos, setIpos] = useState<IpoSummary[]>([]);
   const [fetchedAt, setFetchedAt] = useState("");
-  const [gmpFeedConfigured, setGmpFeedConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [alertsEnabled, setAlertsEnabledState] = useState(readAlertEnabled);
 
   const refresh = useCallback(async (silent = false) => {
+    requestRef.current?.abort();
     if (!silent) setLoading(true);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    requestRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 55_000);
     try {
-      const result = await loadIpos("open,upcoming", controller.signal);
+      const result = await loadIpos("open,upcoming,closed,listed", controller.signal, true);
+      if (controller.signal.aborted) return;
       setIpos(result.ipos);
       setFetchedAt(result.fetchedAt);
-      setGmpFeedConfigured(result.gmpFeedConfigured);
-      setError("");
+      setNow(new Date());
+      setError(result.partial ? "Some IPO details could not be loaded. Refresh to complete the list; unverified listing dates are not included in Listed." : "");
       if (readAlertEnabled() && Capacitor.getPlatform() !== "android") processIpoAlerts(result.ipos);
     } catch (cause) {
+      if (requestRef.current !== controller) return;
       setError(cause instanceof DOMException && cause.name === "AbortError"
         ? "IPO refresh timed out. Pull down or tap Refresh to try again."
         : cause instanceof Error ? cause.message : "IPO information is unavailable.");
     } finally {
       window.clearTimeout(timeout);
-      setLoading(false);
+      if (requestRef.current === controller) setLoading(false);
     }
   }, []);
 
@@ -215,6 +219,8 @@ export function IpoWorkspace() {
     window.addEventListener("online", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
+      requestRef.current?.abort();
+      requestRef.current = null;
       window.clearTimeout(initialRefresh);
       window.clearInterval(interval);
       window.removeEventListener("online", refreshWhenVisible);
@@ -222,12 +228,17 @@ export function IpoWorkspace() {
     };
   }, [refresh]);
 
+  const today = indiaDateKey(now);
+  const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false });
   const boardIpos = useMemo(() => filterIpoBoard(ipos, board), [ipos, board]);
-  const visibleIpos = useMemo(() => sortIposByClosingDate(
-    boardIpos.filter((ipo) => filter === "active" || ipo.status === filter),
-  ), [filter, boardIpos]);
-  const openCount = boardIpos.filter((ipo) => ipo.status === "open").length;
-  const upcomingCount = boardIpos.filter((ipo) => ipo.status === "upcoming").length;
+  const stageOf = (ipo: IpoSummary) => ipoStage(ipo, today, time);
+  const active = boardIpos.filter(ipo => stageOf(ipo) !== "listed");
+  const openCount = active.filter(ipo => stageOf(ipo) !== "upcoming").length;
+  const upcomingCount = active.filter(ipo => stageOf(ipo) === "upcoming").length;
+  const listed = boardIpos.filter(ipo => stageOf(ipo) === "listed" && isRecentListing(ipo.details?.listingDate, today))
+    .sort((a, b) => (b.details?.listingDate ?? "").localeCompare(a.details?.listingDate ?? ""));
+  const visibleIpos = filter === "listed" ? listed : sortIposByClosingDate(active.filter(ipo => filter === "active" || (filter === "upcoming" ? stageOf(ipo) === "upcoming" : stageOf(ipo) !== "upcoming")));
+  const selectedIpo = ipos.find(ipo => ipo.id === selectedId);
 
   const toggleAlerts = async () => {
     const next = !alertsEnabled;
@@ -241,6 +252,8 @@ export function IpoWorkspace() {
     if (next && Capacitor.getPlatform() !== "android") processIpoAlerts(ipos);
   };
 
+  if (selectedIpo) return <IpoDetailView ipo={selectedIpo} stage={stageOf(selectedIpo)} directory={directory} onClose={() => setSelectedId(null)} />;
+
   return (
     <div className="ipo-workspace">
       <div className="ipo-board-tabs" role="group" aria-label="IPO market segment">
@@ -249,12 +262,12 @@ export function IpoWorkspace() {
       </div>
       <div className="ipo-toolbar">
         <div className="ipo-filter-tabs" role="group" aria-label="IPO status">
-          <button type="button" className={filter === "active" ? "active" : ""} aria-pressed={filter === "active"} onClick={() => setFilter("active")}>All active <small>{boardIpos.length}</small></button>
+          <button type="button" className={filter === "active" ? "active" : ""} aria-pressed={filter === "active"} onClick={() => setFilter("active")}>All active <small>{active.length}</small></button>
           <button type="button" className={filter === "open" ? "active" : ""} aria-pressed={filter === "open"} onClick={() => setFilter("open")}>Open <small>{openCount}</small></button>
           <button type="button" className={filter === "upcoming" ? "active" : ""} aria-pressed={filter === "upcoming"} onClick={() => setFilter("upcoming")}>Upcoming <small>{upcomingCount}</small></button>
-          <button type="button" className={filter === "allotments" ? "active" : ""} aria-pressed={filter === "allotments"} onClick={() => setFilter("allotments")}>Allotments</button>
+          <button type="button" className={filter === "listed" ? "active" : ""} aria-pressed={filter === "listed"} onClick={() => setFilter("listed")}>Listed <small>{listed.length}</small></button>
         </div>
-        {filter !== "allotments" && <div className="ipo-toolbar-actions">
+        {<div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
             {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
             <span>{alertsEnabled ? "Daily IPO alerts on" : "Opening + GMP + closing alerts"}</span>
@@ -265,43 +278,22 @@ export function IpoWorkspace() {
         </div>}
       </div>
 
-      {filter === "allotments" ? <IpoAllotments board={board} directory={directory} /> : <>
+      <>
+      <button type="button" className="ipo-allotment-switch" aria-pressed={allotmentAlerts} onClick={async () => {
+        const next = !allotmentAlerts;
+        if (await setAllotmentAlertEnabled(next)) setAllotmentAlerts(next);
+        else setError("Enable notification permission to receive allotment alerts.");
+      }}><Bell size={14} />{allotmentAlerts ? "Allotment alerts on" : "Enable allotment alerts"}</button>
+      {filter === "listed" && <p className="ipo-listed-caption">Listing-day price and return · retained for 30 days from listing.</p>}
       {fetchedAt && <p className="ipo-updated-caption"><Clock3 size={12} aria-hidden="true" />Updated {formatRefreshTime(fetchedAt)} IST</p>}
       {error && <div className="scanner-inline-error ipo-error"><Bell size={16} /><span>{error}</span></div>}
 
       <div className="ipo-card-list">
-        {visibleIpos.map((ipo) => {
-          const thresholdReached = ipo.gmpPercent !== null && ipo.gmpPercent > IPO_GMP_ALERT_THRESHOLD_PERCENT;
-          const gmp = formatIpoGmp(ipo);
-          const closingToday = ipo.status === "open" && ipo.biddingEndDate === indiaDateKey();
-          return (
-            <article className={`ipo-card ${ipo.status} ${thresholdReached ? "threshold-reached" : ""}`} key={ipo.id}>
-              <header>
-                <IpoCompanyLogo name={ipo.name} entries={directory} />
-                <div><b>{ipo.name}</b><small>{ipo.symbol || ipo.isin} · {ipo.industry || "Industry not stated"}</small></div>
-                <span className={`ipo-status-badge ${ipo.status} ${closingToday ? "closing-today" : ""}`}>{closingToday ? "closes today" : ipo.status}</span>
-              </header>
-              <div className={`ipo-subscription-block ${gmp === null ? "gmp-missing" : ""}`}>
-                <small>Grey Market Premium (GMP)</small>
-                {gmp === null
-                  ? <span className="ipo-gmp-pending">{gmpFeedConfigured ? "GMP not yet reported" : "GMP temporarily unavailable"}</span>
-                  : <strong>{gmp}</strong>}
-                {thresholdReached && <em><BellRing size={13} /> Above 15% GMP alert level</em>}
-              </div>
-              <div className="ipo-facts">
-                <span><small>Price band</small><b>{formatPriceBand(ipo)}</b></span>
-                <span><small>Issue size</small><b>{ipo.issueSizeCrore ? `₹${ipo.issueSizeCrore.toLocaleString("en-IN")} Cr` : "To be announced"}</b></span>
-                <span><small>Issue type</small><b>{ipo.issueType === "sme" ? "SME" : "Mainboard"}</b></span>
-              </div>
-              <footer><CalendarDays size={14} /><span>{formatIpoDate(ipo.biddingStartDate)} – {formatIpoDate(ipo.biddingEndDate)}</span></footer>
-              <IpoResearchLink name={ipo.name} entries={directory} />
-            </article>
-          );
-        })}
+        {visibleIpos.map(ipo => <IpoLifecycleCard key={ipo.id} ipo={ipo} stage={stageOf(ipo)} directory={directory} onOpen={() => setSelectedId(ipo.id)} />)}
         {loading && !visibleIpos.length && Array.from({ length: 5 }, (_, index) => <div className="ipo-card ipo-card-skeleton" key={`ipo-skeleton-${index}`} aria-hidden="true"><span /><span /><span /><span /></div>)}
         {!loading && !error && !visibleIpos.length && <div className="positions-empty"><Rocket size={30} /><b>No {filter === "active" ? "active" : filter} {board === "regular" ? "Mainboard" : "SME"} IPOs</b><span>Try the other market segment or Upcoming. New issues appear automatically.</span></div>}
       </div>
-      </>}
+      </>
       <p className="ipo-disclaimer">GMP is unofficial, speculative and can change without notice. Verify information independently. PaperTrade IN provides educational information and does not recommend applying to an IPO.</p>
     </div>
   );

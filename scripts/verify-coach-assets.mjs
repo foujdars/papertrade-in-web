@@ -11,6 +11,9 @@ async function cssFiles(directory) {
 }
 const files = await cssFiles(".next/static");
 const css = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
+for (const selector of [".ipo-lifecycle-card", ".ipo-gmp-panel", ".ipo-date-pair", ".ipo-timeline", ".ipo-chance-list", ".ipo-detail-view", ".pnl-selection-toolbar.is-selecting"]) {
+  assert.ok(css.includes(selector), `Production stylesheet is missing ${selector}`);
+}
 for (const selector of [".coach-modal", ".coach-tabs", ".coach-header", ".coach-content", ".coach-trade-heading", ".coach-insight-cards", ".coach-candle-canvas", ".coach-limit-grid", ".coach-payoff", ".coach-launch-button", ".ticket-risk-sizing", ".ticket-risk-grid", ".plan-picker", ".plan-confidence"]) {
   assert.ok(css.includes(selector), `Production stylesheet is missing ${selector}`);
 }
