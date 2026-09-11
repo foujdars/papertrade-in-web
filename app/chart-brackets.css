@@ -1,0 +1,29 @@
+/* Entry is immutable; only the explicitly chosen TP / SL levels are draggable. */
+.terminal-shell .chart-bracket-tool .risk-entry-line { pointer-events: none; }
+.terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip) {
+  position: absolute; top: 50%; left: 12px; transform: translateY(-50%);
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% - 20px);
+  min-height: 36px; padding: 6px 10px; border: 1px solid currentColor;
+  border-radius: 7px; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums;
+  background: var(--studio-panel, var(--surface, #fff)); color: var(--purple);
+  box-shadow: 0 2px 7px #0001; white-space: nowrap;
+}
+.terminal-shell .chart-bracket-tool .bracket-entry-chip { pointer-events: auto; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-entry-chip small { font-size: 11px; padding-left: 6px; border-left: 1px solid var(--line); }
+.terminal-shell .chart-bracket-tool .bracket-level-chip { cursor: ns-resize; touch-action: none; color: inherit; }
+.terminal-shell .chart-bracket-tool .risk-target-line { color: var(--green); border-color: var(--green); box-shadow: none; }
+.terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--red); border-color: var(--red); box-shadow: none; }
+.terminal-shell .chart-bracket-tool .bracket-unset { border-color: transparent; }
+.terminal-shell .chart-bracket-tool .bracket-unset::before { display: none; }
+.terminal-shell .chart-bracket-tool .bracket-unset .bracket-level-chip { border-style: dashed; }
+.terminal-shell .chart-bracket-tool .bracket-help { position: absolute; bottom: 36px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.terminal-shell .chart-bracket-tool .bracket-help span { padding: 6px; border-radius: 6px; background: var(--studio-panel, var(--surface)); }
+.terminal-shell .chart-bracket-tool .bracket-help button { pointer-events: auto; min-height: 36px; padding: 6px 10px; border: 1px solid var(--red); border-radius: 8px; background: var(--studio-panel, var(--surface)); color: var(--red); font: inherit; cursor: pointer; }
+.terminal-shell .chart-bracket-tool :is(button, [role="slider"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.terminal-shell .pnl-trade-row { -webkit-touch-callout: none; user-select: none; }
+.terminal-shell .pnl-trade-row :is(input, textarea) { user-select: text; }
+.terminal-shell .toast { max-width: min(440px, calc(100vw - 32px)); line-height: 1.5; font-size: 14px; }
+@media (max-width: 400px) {
+  .terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip) { left: 5px; gap: 5px; padding: 6px; }
+  .terminal-shell .chart-bracket-tool .bracket-level-chip strong { font-size: 11px; }
+}

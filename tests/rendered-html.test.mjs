@@ -165,10 +165,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /quote\?\.netChange/);
   assert.match(dashboard, /assetType: "INDEX"/);
   assert.match(dashboard, /DEFAULT_RISK_AMOUNT = 2_000/);
-  assert.match(dashboard, /DEFAULT_REWARD_AMOUNT = 3_000/);
-  assert.match(dashboard, /defaultProtectionPrices\(nextPosition\.averagePrice, intendedDirection, nextPosition\.quantity\)/);
+  assert.doesNotMatch(dashboard, /defaultProtectionPrices|automaticProtection|DEFAULT_REWARD_AMOUNT/);
+  assert.match(dashboard, /const \{ target, stopLoss \} = requestedProtection/);
   assert.match(dashboard, /selectedPnlDateKey/);
-  assert.match(chart, /risk-tool-exit/);
+  assert.match(chart, /onClick={onOrderToolExit}>Close trade/);
   assert.match(dashboard, /chart-status-live-pnl/);
   assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
   assert.match(dashboard, /Daily P&amp;L heat map/);
@@ -316,7 +316,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(styles, /chart-trade-footer \{ flex: 0 0 59px; display: grid; grid-template-rows: 36px 15px; gap: 2px; padding: 3px 10px; \}/);
   assert.match(dashboard, /quantityInput/);
   assert.match(dashboard, /activeRiskToolEnabled/);
-  assert.match(dashboard, /setRiskToolEnabled\(true\)/);
+  assert.match(dashboard, /activeRiskToolEnabled = selectedPosition.quantity > 0/);
   assert.match(dashboard, /setQuantityInput\(event\.target\.value\.replace/);
   assert.doesNotMatch(dashboard, /name="accessToken"/);
   assert.match(quoteRoute, /Cache-Control.*no-store/);

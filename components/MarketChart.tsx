@@ -447,7 +447,7 @@ export function MarketChart({
   indicators,
   chartAction,
   chartTheme = "light",
-  orderTool,
+  orderTool: suppliedOrderTool,
   tradeMarkers = [],
   focusTradeMarkers = false,
   preservePageScroll = false,
@@ -542,7 +542,16 @@ export function MarketChart({
   const storageKeyRef = useRef(drawingStorageKey(instrument));
   const gridVisibleRef = useRef(true);
   const crosshairVisibleRef = useRef(true);
+  const [expandedEntry, setExpandedEntry] = useState("");
+  const [draftRisk, setDraftRisk] = useState<{ key: string; level: "target" | "stopLoss"; price: number } | null>(null);
+  const entryKey = `${instrument.instrumentKey}:${suppliedOrderTool?.enabled}:${suppliedOrderTool?.side}:${suppliedOrderTool?.entryPrice}`;
+  const orderTool = suppliedOrderTool && draftRisk?.key === entryKey
+    ? { ...suppliedOrderTool, [draftRisk.level === "target" ? "targetPrice" : "stopLossPrice"]: draftRisk.price }
+    : suppliedOrderTool;
+  const branchesOpen = expandedEntry === entryKey;
   const orderToolRef = useRef(orderTool);
+  const riskPointerStartRef = useRef(0);
+  const riskGestureKeyRef = useRef("");
   const tradeMarkersRef = useRef(tradeMarkers);
   const focusTradeMarkersRef = useRef(focusTradeMarkers);
   const tradeMarkerKeyRef = useRef("");
@@ -592,16 +601,16 @@ export function MarketChart({
       return;
     }
     const entry = series.priceToCoordinate(tool.entryPrice);
-    const target = series.priceToCoordinate(tool.targetPrice);
-    const stopLoss = series.priceToCoordinate(tool.stopLossPrice);
-    if (entry === null || target === null || stopLoss === null) {
+    const target = tool.targetPrice > 0 ? series.priceToCoordinate(tool.targetPrice) : null;
+    const stopLoss = tool.stopLossPrice > 0 ? series.priceToCoordinate(tool.stopLossPrice) : null;
+    if (entry === null) {
       setRiskCoordinates(null);
       return;
     }
     const chartHeight = chartHost.current?.clientHeight ?? 0;
     const legendSafeTop = 58;
     const axisSafeBottom = Math.max(legendSafeTop, chartHeight - 28);
-    const visibleCoordinate = (coordinate: number) => coordinate >= legendSafeTop && coordinate <= axisSafeBottom
+    const visibleCoordinate = (coordinate: number | null) => coordinate !== null && coordinate >= legendSafeTop && coordinate <= axisSafeBottom
       ? coordinate
       : null;
     const nextCoordinates = {
@@ -703,7 +712,11 @@ export function MarketChart({
   }
 
   function beginRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
     riskDragRef.current = level;
+    riskGestureKeyRef.current = entryKey;
+    riskDragPriceRef.current = 0;
+    riskPointerStartRef.current = event.clientY;
     const priceScale = chartApi.current?.priceScale("right");
     riskDragPriceRangeRef.current = priceScale?.getVisibleRange() ?? null;
     priceScale?.setAutoScale(false);
@@ -717,10 +730,11 @@ export function MarketChart({
 
   function moveRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
     if (riskDragRef.current !== level) return;
+    if (Math.abs(event.clientY - riskPointerStartRef.current) < 4 && !riskDragPriceRef.current) return;
     const price = riskPriceFromPointer(event, level);
     if (price === null) return;
     riskDragPriceRef.current = price;
-    onOrderToolChange?.(level, price, false);
+    setDraftRisk({ key: entryKey, level, price });
     const frozenRange = riskDragPriceRangeRef.current;
     if (frozenRange) {
       const priceScale = chartApi.current?.priceScale("right");
@@ -734,10 +748,11 @@ export function MarketChart({
 
   function endRiskDrag(level: "target" | "stopLoss", event: ReactPointerEvent<HTMLDivElement>) {
     if (riskDragRef.current !== level) return;
-    const price = riskPriceFromPointer(event, level) ?? riskDragPriceRef.current;
+    const price = riskDragPriceRef.current;
     riskDragRef.current = null;
     chartApi.current?.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
-    if (price > 0) onOrderToolChange?.(level, price, true);
+    setDraftRisk(null);
+    if (event.type !== "pointercancel" && price > 0 && riskGestureKeyRef.current === entryKey) onOrderToolChange?.(level, price, true);
     const frozenRange = riskDragPriceRangeRef.current;
     if (frozenRange) {
       const priceScale = chartApi.current?.priceScale("right");
@@ -747,6 +762,7 @@ export function MarketChart({
     // Freeze the scale only for the gesture. The user regains normal chart
     // scaling as soon as the handle is released.
     riskDragPriceRangeRef.current = null;
+    chartApi.current?.priceScale("right").setAutoScale(true);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     event.nativeEvent.stopImmediatePropagation?.();
     event.preventDefault();
@@ -1939,42 +1955,43 @@ export function MarketChart({
           </div>
         ))}
         {orderTool?.enabled && riskCoordinates && (
-          <div className={`chart-risk-tool ${orderTool.side.toLowerCase()}`} aria-label={`${orderTool.side === "BUY" ? "Long" : "Short"} target and stop-loss tool`}>
-            {onOrderToolClose && <button className="risk-tool-close" onClick={onOrderToolClose} aria-label="Hide order tool">×</button>}
+          <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
-              <em title={`Entry price ${orderTool.entryPrice}`}>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
+              <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
+                <span>{orderTool.quantity}</span><b>ENTRY</b><span>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span><small>{branchesOpen ? "−" : "+ TP / SL"}</small>
+              </button>
             </div>}
-            {riskCoordinates.target !== null && <div
-              className="risk-line risk-target-line"
-              style={{ top: riskCoordinates.target }}
-              onPointerDown={(event) => beginRiskDrag("target", event)}
-              onPointerMove={(event) => moveRiskDrag("target", event)}
-              onPointerUp={(event) => endRiskDrag("target", event)}
-              onPointerCancel={(event) => endRiskDrag("target", event)}
-            >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
-              <em title={`Target price ${orderTool.targetPrice}`}>₹{orderTool.targetPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
-              <b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
-            </div>}
-            {riskCoordinates.stopLoss !== null && <div
-              className="risk-line risk-stop-line"
-              style={{ top: riskCoordinates.stopLoss }}
-              onPointerDown={(event) => beginRiskDrag("stopLoss", event)}
-              onPointerMove={(event) => moveRiskDrag("stopLoss", event)}
-              onPointerUp={(event) => endRiskDrag("stopLoss", event)}
-              onPointerCancel={(event) => endRiskDrag("stopLoss", event)}
-            >
-              <span title={`Quantity ${orderTool.quantity}`}>{orderTool.quantity}</span>
-              <em title={`Stop-loss price ${orderTool.stopLossPrice}`}>₹{orderTool.stopLossPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</em>
-              <b>{formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
-            </div>}
-            <div className={`risk-reward-summary ${onOrderToolExit ? "has-exit" : ""}`}>
-              <span>{orderTool.side === "BUY" ? "LONG" : "SHORT"} · Qty {orderTool.quantity}</span>
-              <b>Risk {formatRiskPnl(orderToolPnl(orderTool, orderTool.stopLossPrice))}</b>
-              <b>Reward {formatRiskPnl(orderToolPnl(orderTool, orderTool.targetPrice))}</b>
-              {onOrderToolExit && <button type="button" className="risk-tool-exit" onClick={onOrderToolExit}>Close trade</button>}
-            </div>
+            {(["target", "stopLoss"] as const).map((level) => {
+              const price = level === "target" ? orderTool.targetPrice : orderTool.stopLossPrice;
+              const coordinate = draftRisk?.key === entryKey && draftRisk.level === level
+                ? candleSeries.current?.priceToCoordinate(price) ?? riskCoordinates[level]
+                : riskCoordinates[level];
+              const unset = !(price > 0);
+              if (unset && !branchesOpen) return null;
+              const direction = (orderTool.side === "BUY" ? -1 : 1) * (level === "target" ? 1 : -1);
+              const top = coordinate ?? (unset && riskCoordinates.entry !== null ? Math.max(64, Math.min((chartHost.current?.clientHeight ?? 400) - 52, riskCoordinates.entry + direction * 48)) : null);
+              if (top === null) return null;
+              return <div key={level} className={`risk-line ${level === "target" ? "risk-target-line" : "risk-stop-line"} ${unset ? "bracket-unset" : ""}`} style={{ top }}
+                onPointerDown={(event) => beginRiskDrag(level, event)}
+                onPointerMove={(event) => moveRiskDrag(level, event)}
+                onPointerUp={(event) => endRiskDrag(level, event)}
+                onPointerCancel={(event) => endRiskDrag(level, event)}>
+                <div className="bracket-level-chip" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : price.toFixed(2)}
+                  onKeyDown={(event) => {
+                    if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+                    event.preventDefault();
+                    const tool = suppliedOrderTool;
+                    if (!tool) return;
+                    const step = Math.max(.05, Math.round(tool.entryPrice * .001 * 100) / 100);
+                    const next = Math.round(((price || tool.entryPrice) + (event.key === "ArrowUp" ? step : -step)) * 100) / 100;
+                    if (next > 0) onOrderToolChange?.(level, next, true);
+                  }}>
+                  <b>{level === "target" ? "TP" : "SL"}</b>
+                  {unset ? <span>Drag to set</span> : <><span>₹{price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span><strong>{formatRiskPnl(orderToolPnl(orderTool, price))}</strong></>}
+                </div>
+              </div>;
+            })}
+            {branchesOpen && <div className="bracket-help"><span>Drag TP / SL to place protection</span>{onOrderToolExit && <button type="button" onClick={onOrderToolExit}>Close trade</button>}</div>}
           </div>
         )}
         {typeof orderTool?.livePnl === "number" && Number.isFinite(orderTool.livePnl) && <div className={`chart-live-pnl ${orderTool.livePnl >= 0 ? "positive" : "negative"}`}>

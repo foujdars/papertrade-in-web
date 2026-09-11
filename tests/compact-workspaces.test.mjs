@@ -7,6 +7,54 @@ import postcss from "postcss";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
+test("holding a trade selects it once, while taps, scrolling and cancelled holds stay safe", async () => {
+  const require = createRequire(import.meta.url);
+  const compiled = ts.transpileModule(await source("components/LongPressTradeRow.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
+  let pending = null, selected = 0, clicked = 0;
+  const effects = [];
+  const fakeReact = { useRef: (current) => ({ current }), useEffect: (fn) => { effects.push(fn()); } };
+  const exports = {};
+  new Function("require", "exports", "setTimeout", "clearTimeout", "navigator", compiled.outputText)((name) => name === "react" ? fakeReact : require(name), exports, (fn, delay) => { assert.equal(delay, 500); pending = fn; return 1; }, () => { pending = null; }, {});
+  const row = exports.LongPressTradeRow({ onLongPress: () => selected++, onClick: () => clicked++ });
+  const event = { button: 0, isPrimary: true, clientX: 10, clientY: 10, target: { closest: () => null }, preventDefault() {}, stopPropagation() {} };
+  row.props.onPointerDown(event);
+  pending();
+  row.props.onPointerUp(event);
+  row.props.onClick(event);
+  assert.equal(selected, 1);
+  assert.equal(clicked, 0, "Release must not open chart or deselect");
+  row.props.onPointerDown(event);
+  row.props.onPointerUp(event);
+  assert.equal(pending, null);
+  row.props.onClick(event);
+  assert.equal(clicked, 1);
+  row.props.onPointerDown(event);
+  row.props.onPointerMove({ ...event, clientY: 30 });
+  assert.equal(pending, null, "Scrolling cancels selection");
+  row.props.onPointerDown(event);
+  row.props.onPointerCancel(event);
+  assert.equal(pending, null);
+  row.props.onPointerDown({ ...event, target: { closest: () => ({}) } });
+  assert.equal(pending, null, "Child controls must not select the parent");
+  effects.forEach((cleanup) => cleanup?.());
+});
+
+test("chart brackets start with entry only and commit protection only after a completed drag", async () => {
+  const [chart, dashboard, layout, css] = await Promise.all([source("components/MarketChart.tsx"), source("components/TradingDashboard.tsx"), source("app/layout.tsx"), source("app/chart-brackets.css")]);
+  assert.doesNotMatch(dashboard, /defaultProtectionPrices|automaticProtection/);
+  assert.match(dashboard, /activeRiskToolEnabled = selectedPosition.quantity > 0/);
+  assert.match(dashboard, /targetPrice: selectedProtection\?\.targetPrice \?\? 0/);
+  assert.match(chart, /if \(unset && !branchesOpen\) return null/);
+  assert.match(chart, /setExpandedEntry\(branchesOpen \? "" : entryKey\)/);
+  assert.match(chart, /setDraftRisk\(\{ key: entryKey, level, price \}\)/);
+  assert.match(chart, /event.type !== "pointercancel" && price > 0/);
+  assert.doesNotMatch(chart, /onOrderToolChange\?\.\(level, price, false\)/);
+  assert.match(dashboard, /if \(!committed \|\| selectedPosition.quantity <= 0/);
+  assert.match(dashboard, /paper order placed/);
+  assert.match(layout, /chart-brackets.css/);
+  assert.match(css, /\.bracket-level-chip/);
+});
+
 // Render the real component functions with deterministic hooks. This exercises
 // their actual event handlers and state transitions without a browser or feed.
 async function componentHarness(path, name, initialStates = []) {

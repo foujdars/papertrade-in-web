@@ -1,6 +1,7 @@
 "use client";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
+import { LongPressTradeRow } from "@/components/LongPressTradeRow";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 
 import {
@@ -110,7 +111,6 @@ const SEARCHABLE_INDEX_TICKERS = [
 const PNL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
 const PNL_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const DEFAULT_RISK_AMOUNT = 2_000;
-const DEFAULT_REWARD_AMOUNT = 3_000;
 const INDIA_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 function prepareProtectionAlerts() {
   if (typeof window === "undefined") return;
@@ -155,16 +155,6 @@ function compactCalendarPnl(value: number) {
   return `${value >= 0 ? "+" : "−"}₹${amount}`;
 }
 
-function defaultProtectionPrices(entryPrice: number, direction: "LONG" | "SHORT", quantity: number) {
-  const safeQuantity = Math.max(1, quantity);
-  const riskDistance = DEFAULT_RISK_AMOUNT / safeQuantity;
-  const rewardDistance = DEFAULT_REWARD_AMOUNT / safeQuantity;
-  const directionMultiplier = direction === "LONG" ? 1 : -1;
-  return {
-    target: Math.max(.05, entryPrice + directionMultiplier * rewardDistance),
-    stopLoss: Math.max(.05, entryPrice - directionMultiplier * riskDistance),
-  };
-}
 
 type CustomWatchlist = {
   id: string;
@@ -394,7 +384,6 @@ export function TradingDashboard() {
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
-  const [riskToolEnabled, setRiskToolEnabled] = useState(false);
   const [theme, setTheme] = useState<"light" | "neon">("light");
   const isAndroidApp = useSyncExternalStore(subscribeToNativePlatform, getAndroidPlatformSnapshot, getServerAndroidPlatformSnapshot);
   const [quantityInput, setQuantityInput] = useState("1");
@@ -402,7 +391,6 @@ export function TradingDashboard() {
   const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1;
   const [targetPrice, setTargetPrice] = useState("");
   const [stopLossPrice, setStopLossPrice] = useState("");
-  const [riskLevelsCustomized, setRiskLevelsCustomized] = useState(false);
   const [riskSizingOpen, setRiskSizingOpen] = useState(false);
   const [maxRiskInput, setMaxRiskInput] = useState("2000");
   const [tradeStrategy, setTradeStrategy] = useState("Breakout");
@@ -1432,29 +1420,24 @@ export function TradingDashboard() {
     : side;
   const riskEntryPrice = selectedPosition.quantity > 0 ? selectedPosition.averagePrice : visibleLivePrice;
   const riskDisplayQuantity = selectedPosition.quantity > 0 ? selectedPosition.quantity : quantity;
-  const defaultProtection = defaultProtectionPrices(riskEntryPrice, riskToolSide === "BUY" ? "LONG" : "SHORT", riskDisplayQuantity);
   const requestedTargetPrice = Number(targetPrice);
   const requestedStopLossPrice = Number(stopLossPrice);
   const chartTargetPrice = Number.isFinite(requestedTargetPrice) && requestedTargetPrice > 0
     ? requestedTargetPrice
-    : defaultProtection.target;
+    : 0;
   const chartStopLossPrice = Number.isFinite(requestedStopLossPrice) && requestedStopLossPrice > 0
     ? requestedStopLossPrice
-    : defaultProtection.stopLoss;
-  const activeRiskToolEnabled = riskToolEnabled || Boolean(selectedProtection && selectedPosition.quantity > 0);
+    : 0;
+  const activeRiskToolEnabled = selectedPosition.quantity > 0;
 
   useEffect(() => {
     const restoreProtection = window.setTimeout(() => {
       if (selectedProtection) {
         setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
         setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
-        setRiskLevelsCustomized(true);
-        setRiskToolEnabled(true);
       } else {
         setTargetPrice("");
         setStopLossPrice("");
-        setRiskToolEnabled(false);
-        setRiskLevelsCustomized(false);
       }
     }, 0);
     return () => window.clearTimeout(restoreProtection);
@@ -1517,9 +1500,9 @@ export function TradingDashboard() {
   }, [clock, orders]);
   const closedTrades = useMemo(() => buildClosedTrades(orders), [orders]);
   const maxRiskAmount = Number(maxRiskInput);
-  const suggestedRiskQuantity = calculateRiskBasedQuantity(visibleLivePrice, chartStopLossPrice, maxRiskAmount, quantityStep);
-  const plannedRisk = Math.abs(visibleLivePrice - chartStopLossPrice) * quantity;
-  const plannedReward = Math.abs(chartTargetPrice - visibleLivePrice) * quantity;
+  const suggestedRiskQuantity = chartStopLossPrice > 0 ? calculateRiskBasedQuantity(visibleLivePrice, chartStopLossPrice, maxRiskAmount, quantityStep) : 0;
+  const plannedRisk = chartStopLossPrice > 0 ? Math.abs(visibleLivePrice - chartStopLossPrice) * quantity : Number.NaN;
+  const plannedReward = chartTargetPrice > 0 ? Math.abs(chartTargetPrice - visibleLivePrice) * quantity : Number.NaN;
   const rewardRiskRatio = plannedRisk > 0 ? plannedReward / plannedRisk : 0;
   const tradingLimitStatus = useMemo(() => evaluateTradingLimits(orders, closedTrades, tradingLimits, clock?.getTime() ?? 0), [clock, closedTrades, orders, tradingLimits]);
   const proposedOptionLeg: OptionPayoffLeg | null = selected.assetType === "OPTION" && selected.optionType && selected.strikePrice && visibleLivePrice > 0 ? {
@@ -1709,31 +1692,31 @@ export function TradingDashboard() {
 
   function activateRiskTool(nextSide: "BUY" | "SELL") {
     setSide(nextSide);
-    const positionMatches = selectedPosition.quantity > 0 && selectedPosition.side === (nextSide === "BUY" ? "LONG" : "SHORT");
-    const entry = positionMatches ? selectedPosition.averagePrice : visibleLivePrice;
-    if (!entry) {
-      setRiskToolEnabled(false);
-      return;
-    }
-    setRiskToolEnabled(true);
-    const projectedQuantity = Math.max(1, positionMatches ? selectedPosition.quantity + quantity : quantity);
-    const projectedEntry = positionMatches
-      ? ((selectedPosition.averagePrice * selectedPosition.quantity) + (entry * quantity)) / projectedQuantity
-      : entry;
-    const defaults = defaultProtectionPrices(projectedEntry, nextSide === "BUY" ? "LONG" : "SHORT", projectedQuantity);
-    setTargetPrice(defaults.target.toFixed(4));
-    setStopLossPrice(defaults.stopLoss.toFixed(4));
-    setRiskLevelsCustomized(false);
+    const positionMatches = selectedPosition.quantity > 0 && positionProduct === product && selectedPosition.side === (nextSide === "BUY" ? "LONG" : "SHORT");
+    // Opening a ticket never creates a target or stop loss.
+    setTargetPrice(positionMatches ? selectedProtection?.targetPrice?.toFixed(2) ?? "" : "");
+    setStopLossPrice(positionMatches ? selectedProtection?.stopLossPrice?.toFixed(2) ?? "" : "");
   }
 
   function updateChartRiskLevel(level: "target" | "stopLoss", value: number, committed: boolean) {
-    setRiskLevelsCustomized(true);
+    if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
+    if (!verifiedLivePrice || !Number.isFinite(value) || value <= 0) {
+      setToast("Live price unavailable. Protection was not placed.");
+      window.setTimeout(() => setToast(""), 3500);
+      return;
+    }
+    const direction = selectedPosition.side === "LONG" ? 1 : -1;
+    const validSide = (value - verifiedLivePrice) * direction * (level === "target" ? 1 : -1) > 0;
+    if (!validSide) {
+      setToast("That level is already crossed by the live price. Choose a new level.");
+      window.setTimeout(() => setToast(""), 3500);
+      return;
+    }
     const formatted = value.toFixed(2);
     if (level === "target") setTargetPrice(formatted);
     else setStopLossPrice(formatted);
-    if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
-    const nextTarget = level === "target" ? value : Number(targetPrice) || selectedProtection?.targetPrice;
-    const nextStop = level === "stopLoss" ? value : Number(stopLossPrice) || selectedProtection?.stopLossPrice;
+    const nextTarget = level === "target" ? value : selectedProtection?.targetPrice;
+    const nextStop = level === "stopLoss" ? value : selectedProtection?.stopLossPrice;
     saveProtection({
       id: selectedProtection?.id ?? `${new Date().getTime()}-chart-risk`,
       symbol: selected.symbol,
@@ -1743,8 +1726,8 @@ export function TradingDashboard() {
       stopLossPrice: nextStop,
       createdAt: selectedProtection?.createdAt ?? new Date().getTime(),
     }, selected.symbol, positionProduct);
-    setToast(`${level === "target" ? "Target" : "Stop loss"} moved to ${formatInr(value)}`);
-    window.setTimeout(() => setToast(""), 2_200);
+    setToast(`${level === "target" ? "Take profit" : "Stop loss"} paper order placed · ${selected.symbol} · ${selectedPosition.quantity} units at ${formatInr(value)}`);
+    window.setTimeout(() => setToast(""), 4_000);
   }
 
   function toggleTheme() {
@@ -1924,11 +1907,7 @@ export function TradingDashboard() {
     const nextBalance = (side === "BUY" ? balance - executionCapital : balance + executionCapital) - executionCharges.total;
     const nextPosition = calculatePosition(nextOrders, selected.symbol, executionPrice, product);
     const requestedProtection = protectionValues();
-    const automaticProtection = nextPosition.quantity > 0
-      ? defaultProtectionPrices(nextPosition.averagePrice, intendedDirection, nextPosition.quantity)
-      : requestedProtection;
-    const target = riskLevelsCustomized ? requestedProtection.target : automaticProtection.target;
-    const stopLoss = riskLevelsCustomized ? requestedProtection.stopLoss : automaticProtection.stopLoss;
+    const { target, stopLoss } = requestedProtection;
     if ((target !== undefined || stopLoss !== undefined) && nextPosition.quantity > 0 && nextPosition.side === intendedDirection) {
       saveProtection({
         id: `${new Date().getTime()}-risk`,
@@ -1948,7 +1927,6 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setTargetPrice("");
     setStopLossPrice("");
-    setRiskLevelsCustomized(false);
     setTradeThesis("");
     setOrderSheetOpen(false);
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
@@ -2046,7 +2024,6 @@ export function TradingDashboard() {
     }
     setShowTradeSymbols(false);
     setTradeSymbolSearch("");
-    setRiskToolEnabled(false);
     setTargetPrice("");
     setStopLossPrice("");
     setSidebarOpen(false);
@@ -2305,7 +2282,6 @@ export function TradingDashboard() {
     setProduct("DELIVERY");
     setSide("SELL");
     setQuantityInput(String(heldQuantity));
-    setRiskToolEnabled(false);
     setTargetPrice("");
     setStopLossPrice("");
     setOrderSheetOpen(true);
@@ -2628,9 +2604,8 @@ export function TradingDashboard() {
                 chartTheme={theme}
                 tradeMarkers={selectedTradeMarkers}
                 onChartTap={() => setChartTradeFooterOpen((value) => !value)}
-                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
+                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
-                onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
                 onDrawingComplete={() => setActiveTool("cursor")}
@@ -2669,8 +2644,8 @@ export function TradingDashboard() {
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
-            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setTargetPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
-            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onFocus={() => setRiskToolEnabled(true)} onChange={(event) => { setStopLossPrice(event.target.value); setRiskToolEnabled(true); setRiskLevelsCustomized(true); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
+            <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onChange={(event) => { setTargetPrice(event.target.value); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
+            <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onChange={(event) => { setStopLossPrice(event.target.value); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
@@ -2735,9 +2710,8 @@ export function TradingDashboard() {
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
-          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: chartTargetPrice, stopLossPrice: chartStopLossPrice, quantity: riskDisplayQuantity }}
+          orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
           onOrderToolChange={updateChartRiskLevel}
-          onOrderToolClose={selectedProtection ? undefined : () => setRiskToolEnabled(false)}
           onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
           tradeMarkers={selectedTradeMarkers}
           onFeedStatus={handleFeedStatus}
@@ -2982,7 +2956,7 @@ export function TradingDashboard() {
             </>}
             <div className="pnl-trade-list" ref={pnlTradeListRef}>
               {!!visiblePnlTrades.length && <div className="pnl-selection-toolbar">
-                <div><b>{selectingTrades ? `${selectedTradeIds.length} selected` : "Closed trades"}</b><small>{selectingTrades ? "Choose the records to remove" : "Review and manage your history"}</small></div>
+                <div><b>{selectingTrades ? `${selectedTradeIds.length} selected` : "Closed trades"}</b><small>{selectingTrades ? "Choose the records to remove" : "Hold a trade to select it"}</small></div>
                 <button type="button" onClick={() => { setTradeSelection(selectingTrades ? null : { scope: tradeSelectionScope, ids: [] }); setPnlTradeMenuId(null); }}>{selectingTrades ? "Done" : "Select trades"}</button>
                 {selectingTrades && <div className="pnl-selection-actions"><button type="button" onClick={() => setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.length === visiblePnlTrades.length ? [] : visiblePnlTrades.map((trade) => trade.id) })}>{selectedTradeIds.length === visiblePnlTrades.length ? "Deselect all" : `Select all shown (${visiblePnlTrades.length})`}</button><button type="button" className="pnl-selection-delete" disabled={!selectedTradeIds.length} onClick={() => setPendingDeleteIds(selectedTradeIds)}><Trash2 size={15} /> Delete ({selectedTradeIds.length})</button></div>}
               </div>}
@@ -3003,7 +2977,7 @@ export function TradingDashboard() {
                   .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
                   .filter((marker) => marker.time > 0);
                 return (
-                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${formatInr(trade.netPnl)}` : undefined} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
+                  <LongPressTradeRow onLongPress={() => { setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(trade.id) ? selectedTradeIds : [...selectedTradeIds, trade.id] }); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${formatInr(trade.netPnl)}` : undefined} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
                     {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <CheckCircle2 size={21} />}</span> : <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>}
                     <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
@@ -3049,7 +3023,7 @@ export function TradingDashboard() {
                       </div>
                     )}
                     {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button></div>}
-                  </div>
+                  </LongPressTradeRow>
                 );
               })}
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
@@ -3152,7 +3126,7 @@ export function TradingDashboard() {
           </section>
         </div>
       )}
-      {toast && <div className="toast"><Target size={18} /> {toast}</div>}
+      {toast && <div className="toast" role="status" aria-live="polite"><Target size={18} /> {toast}</div>}
     </main>
     </StockLogoProvider>
   );
