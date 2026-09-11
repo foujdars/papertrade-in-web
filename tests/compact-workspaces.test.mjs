@@ -266,8 +266,21 @@ test("portfolio exposes complete history filters and a separate open-position ex
   assert.match(dashboard, /pnlHistoryFilter === "loss"/);
   assert.match(dashboard, /className="position-exit-button"/);
   assert.match(dashboard, /exitPosition\(position\.quantity, \{ symbol: position\.symbol/);
-  assert.match(dashboard, /aria-expanded={menuOpen}/);
+  assert.match(dashboard, /aria-expanded={selectingTrades \? undefined : menuOpen}/);
+  assert.match(dashboard, /role={selectingTrades \? "checkbox" : "button"}/);
   assert.doesNotMatch(dashboard, /selectedPnlDateKey && <div className="pnl-trade-list"/);
+});
+
+test("portfolio controls ship styled confirmation, aligned identities and a quantity margin estimate", async () => {
+  const [layout, css, dialog, dashboard] = await Promise.all([source("app/layout.tsx"), source("app/portfolio-controls.css"), source("components/TradeDeleteDialog.tsx"), source("components/TradingDashboard.tsx")]);
+  assert.match(layout, /import "\.\/portfolio-controls\.css"/);
+  assert.match(css, /\.position-chart-link > \.stock-identity\s*\{[^}]*flex-direction: row/s);
+  assert.match(css, /\.trade-delete-dialog::backdrop/);
+  assert.match(dialog, /showModal\(\)/);
+  assert.match(dialog, /cancelRef\.current\?\.focus\(\)/);
+  assert.match(dialog, /disabled={Boolean\(error\) \|\| !count}/);
+  assert.match(dashboard, /verifiedLivePrice \? formatInr\(estimatedFundsRequired\) : "—"/);
+  assert.match(dashboard, /pendingDeleteIds \? \(\) => setPendingDeleteIds\(null\)/);
 });
 
 test("cash charts discover F&O eligibility regardless of where a symbol was opened", async () => {

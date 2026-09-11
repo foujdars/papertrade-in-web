@@ -15,6 +15,9 @@ for (const selector of [".coach-modal", ".coach-tabs", ".coach-header", ".coach-
   assert.ok(css.includes(selector), `Production stylesheet is missing ${selector}`);
 }
 console.log("Production toolkit CSS verified.");
+for (const selector of [".trade-delete-dialog", ".pnl-selection-toolbar", ".quantity-margin", ".positions-modal .position-chart-link"] ) {
+  assert.ok(css.includes(selector), `Production stylesheet is missing ${selector}`);
+}
 for (const selector of [".bar-replay", ".bar-replay-dialog", ".bar-replay-chart", ".bar-replay-playback", ".bar-replay-orders", ".chart-replay-link", ".header-coach-button"]) {
   assert.ok(css.includes(selector), `Production stylesheet is missing ${selector}`);
 }

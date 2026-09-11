@@ -183,7 +183,13 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /quoteIsFresh/);
   assert.match(dashboard, /chart-trade-footer/);
   assert.match(dashboard, /orderSheetOpen/);
-  assert.match(dashboard, /deleteClosedTrade/);
+  assert.match(dashboard, /confirmClosedTradeDeletion/);
+  assert.match(dashboard, /prepareClosedTradeDeletion\(orders, pendingDeleteIds\)/);
+  assert.match(dashboard, /<TradeDeleteDialog/);
+  assert.match(dashboard, /Select all shown/);
+  assert.match(dashboard, /setPendingDeleteIds\(selectedTradeIds\)/);
+  assert.match(dashboard, /className="quantity-margin"/);
+  assert.doesNotMatch(dashboard, /window\.confirm\(/);
   assert.match(dashboard, /Delete trade/);
   assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
   assert.match(dashboard, /FnoChartWorkspace/);

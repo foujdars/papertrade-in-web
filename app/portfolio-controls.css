@@ -1,0 +1,72 @@
+/* Explicit role-based rules override the legacy nth-child position layout. */
+.terminal-shell .positions-modal .position-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+}
+.terminal-shell .positions-modal .position-chart-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 16px;
+  gap: 10px 8px;
+  padding: 0;
+}
+.terminal-shell .positions-modal .position-chart-link > .stock-identity {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.terminal-shell .positions-modal .stock-identity > .stock-logo { flex: 0 0 32px; margin: 0; }
+.terminal-shell .positions-modal .stock-identity > span:not(.stock-logo) { display: flex; flex-direction: column; min-width: 0; gap: 4px; text-align: left; }
+.terminal-shell .positions-modal .stock-identity b { font-size: 13px; line-height: 1.3; }
+.terminal-shell .positions-modal .stock-identity small { font-size: 10px; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
+.terminal-shell .positions-modal .position-live-result { text-align: right; align-items: flex-end; gap: 3px; }
+.terminal-shell .positions-modal .position-live-result b { font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.terminal-shell .positions-modal .position-chart-link > :is(.buy-tag, .sell-tag) { justify-self: start; font-size: 9px; }
+.terminal-shell .positions-modal .position-exit-button { min-width: 50px; min-height: 44px; padding: 10px; font-size: 13px; }
+
+.terminal-shell .quantity-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; }
+.terminal-shell .quantity-heading .quantity-margin { display: inline-flex; align-items: baseline; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; padding: 6px 9px; border: 1px solid var(--studio-border, var(--line)); border-radius: 8px; background: var(--purple-soft); }
+.terminal-shell .quantity-margin small { font-size: 10px; color: var(--muted); }
+.terminal-shell .quantity-margin b { font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.terminal-shell .pnl-selection-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid var(--studio-border, var(--line)); border-radius: 14px; background: var(--studio-panel, var(--surface)); }
+.terminal-shell .pnl-selection-toolbar > div:first-child { display: grid; gap: 4px; }
+.terminal-shell .pnl-selection-toolbar b { font-size: 14px; }
+.terminal-shell .pnl-selection-toolbar small { font-size: 11px; color: var(--muted); }
+.terminal-shell .pnl-selection-toolbar button { min-height: 40px; padding: 9px 12px; border: 1px solid var(--studio-border, var(--line)); border-radius: 10px; background: var(--purple-soft); color: var(--purple); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.terminal-shell .pnl-selection-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; width: 100%; padding-top: 10px; border-top: 1px solid var(--line); }
+.terminal-shell .pnl-selection-actions .pnl-selection-delete { display: inline-flex; align-items: center; gap: 6px; color: var(--red); background: color-mix(in srgb, var(--red) 9%, var(--surface)); border-color: color-mix(in srgb, var(--red) 30%, var(--line)); }
+.terminal-shell .pnl-selection-toolbar button:disabled { opacity: .45; cursor: not-allowed; }
+.terminal-shell .pnl-trade-row.batch-selected { border-color: var(--purple); box-shadow: inset 3px 0 var(--purple); }
+.terminal-shell .pnl-trade-row > .trade-selection-check { display: grid; place-items: center; width: 25px; height: 25px; border: 1.5px solid var(--muted); border-radius: 7px; color: var(--purple); background: var(--studio-panel, var(--surface)); }
+.terminal-shell .pnl-trade-row > .trade-selection-check.checked { border-color: var(--purple); background: var(--purple-soft); }
+
+.terminal-shell .trade-delete-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 24px; overflow-y: auto; border: 1px solid var(--studio-border, var(--line)); border-radius: 22px; color: var(--ink); background: var(--studio-panel, var(--surface, #fff)); box-shadow: 0 24px 80px #0005; font: inherit; text-align: left; }
+.trade-delete-dialog::backdrop { background: #080d2480; backdrop-filter: blur(5px); }
+.terminal-shell .trade-delete-dialog header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.terminal-shell .trade-delete-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.terminal-shell .trade-delete-dialog button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 13px; font-weight: 650; color: var(--ink); background: var(--studio-raised, var(--soft)); cursor: pointer; }
+.terminal-shell .trade-delete-dialog .trade-delete-close { width: 38px; min-height: 38px; padding: 6px; }
+.terminal-shell .trade-delete-eyebrow { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; }
+.terminal-shell .trade-delete-dialog h2 { margin: 8px 0 10px; color: var(--ink); font-size: 24px; line-height: 1.2; }
+.terminal-shell .trade-delete-dialog p { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.terminal-shell .trade-delete-preview { display: grid; gap: 0; max-height: 160px; overflow-y: auto; margin: 18px 0; padding: 0 12px; list-style: none; border: 1px solid var(--line); border-radius: 12px; background: var(--studio-raised, var(--soft)); }
+.terminal-shell .trade-delete-preview li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 5px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.terminal-shell .trade-delete-preview li:last-child { border-bottom: 0; }
+.terminal-shell .trade-delete-preview b { font-size: 12px; overflow-wrap: anywhere; }
+.terminal-shell .trade-delete-preview span { font-size: 11px; color: var(--muted); }
+.terminal-shell .trade-delete-dialog .trade-delete-note { font-size: 12px; }
+.terminal-shell .trade-delete-dialog .trade-delete-error { padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); }
+.terminal-shell .trade-delete-dialog footer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
+.terminal-shell .trade-delete-dialog .trade-delete-confirm { color: #fff; background: #c62e50; border-color: #c62e50; }
+.terminal-shell .trade-delete-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+.terminal-shell :is(.trade-delete-dialog button, .pnl-selection-toolbar button, .pnl-trade-row[role="checkbox"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+@media (max-width: 380px) {
+  .terminal-shell .positions-modal .position-row { padding: 10px; gap: 8px; }
+  .terminal-shell .positions-modal .position-live-result b { font-size: 12px; }
+  .terminal-shell .trade-delete-dialog { padding: 18px; }
+}

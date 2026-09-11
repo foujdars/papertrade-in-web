@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionExecutionPrice, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
 import { buildClosedTrades, filterClosedTradesByOutcome } from "../lib/trade-analytics.ts";
+import { prepareClosedTradeDeletion } from "../lib/closed-trade-deletion.ts";
 import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
 
 function order(id, side, quantity, price) {
@@ -15,6 +16,44 @@ function order(id, side, quantity, price) {
     time: "10:00",
   };
 }
+
+test("batch deletion removes only selected round trips and recalculates cash once", () => {
+  const fills = [order(1, "BUY", 10, 100), order(2, "SELL", 10, 110), order(3, "SELL", 5, 120), order(4, "BUY", 5, 115), order(5, "BUY", 3, 90)];
+  const snapshot = structuredClone(fills);
+  const result = prepareClosedTradeDeletion(fills, ["2", "4", "2"]);
+  assert.equal(result.error, "");
+  assert.equal(result.trades.length, 2);
+  assert.deepEqual(result.orders.map((fill) => fill.id), ["5"]);
+  assert.equal(result.balanceAdjustment, deletePaperTradeOrders(fills, ["1", "2", "3", "4"]).balanceAdjustment);
+  assert.deepEqual(fills, snapshot, "Preview must not mutate the account");
+});
+
+test("partial exits require selecting every trade sharing the entry fill", () => {
+  const fills = [order(1, "BUY", 10, 100), order(2, "SELL", 4, 110), order(3, "SELL", 6, 105)];
+  assert.match(prepareClosedTradeDeletion(fills, ["2"]).error, /share entry or exit fills/);
+  const result = prepareClosedTradeDeletion(fills, ["2", "3"]);
+  assert.equal(result.error, "");
+  assert.equal(result.removedOrders.length, 3);
+  assert.equal(result.orders.length, 0);
+});
+
+test("deletion blocks a partial exit that is still linked to an open position", () => {
+  const fills = [order(1, "BUY", 10, 100), order(2, "SELL", 4, 110)];
+  assert.match(prepareClosedTradeDeletion(fills, ["2"]).error, /open position/);
+});
+
+test("reversing fills cannot remove an unselected trade", () => {
+  const fills = [order(1, "BUY", 10, 100), order(2, "SELL", 15, 110), order(3, "BUY", 5, 105)];
+  assert.match(prepareClosedTradeDeletion(fills, ["2"]).error, /share entry or exit fills/);
+  assert.equal(prepareClosedTradeDeletion(fills, ["2", "3"]).error, "");
+});
+
+test("empty and stale selections are rejected; unrelated symbols remain intact", () => {
+  const fills = [order(1, "BUY", 10, 100), order(2, "SELL", 10, 110), { ...order(3, "BUY", 4, 200), symbol: "OTHER" }];
+  assert.match(prepareClosedTradeDeletion(fills, []).error, /changed/);
+  assert.match(prepareClosedTradeDeletion(fills, ["2", "missing"]).error, /changed/);
+  assert.equal(prepareClosedTradeDeletion(fills, ["2"]).orders[0].symbol, "OTHER");
+});
 
 test("completed-trade history filters all, profitable and losing trades", () => {
   const trades = [

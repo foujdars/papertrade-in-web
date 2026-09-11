@@ -1,5 +1,7 @@
 "use client";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
+import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
+import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 
 import {
   Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
@@ -31,7 +33,6 @@ import { deriveNetChange, formatInr, formatSignedMarketMove, instruments, mergeI
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
   calculatePosition,
-  deletePaperTradeOrders,
   getDeliveryHoldingQuantity,
   getProtectionExecutionPrice,
   getProtectionTrigger,
@@ -45,7 +46,7 @@ import {
   type PaperOrder,
   type PaperProtection,
 } from "@/lib/paper-trading";
-import { buildClosedTrades, filterClosedTradesByOutcome, getOrderCharges, type ClosedPaperTrade, type ClosedTradeOutcome } from "@/lib/trade-analytics";
+import { buildClosedTrades, filterClosedTradesByOutcome, getOrderCharges, type ClosedTradeOutcome } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
@@ -442,6 +443,8 @@ export function TradingDashboard() {
   const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
+  const [tradeSelection, setTradeSelection] = useState<{ scope: string; ids: string[] } | null>(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
   const [pnlCalendarMonth, setPnlCalendarMonth] = useState(() => indiaDateParts(Date.now()).month - 1);
   const [pnlCalendarYear, setPnlCalendarYear] = useState(() => indiaDateParts(Date.now()).year);
   const [selectedPnlDateKey, setSelectedPnlDateKey] = useState<string | null>(null);
@@ -455,7 +458,7 @@ export function TradingDashboard() {
   const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
   const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
   const toolkitBackRef = useRef<(() => void) | null>(null);
-  useEffect(() => { toolkitBackRef.current = replayInstrument ? () => { setReplayInstrument(null); setReplayReviewTimeframe(null); } : coachOpen ? () => setCoachOpen(false) : null; }, [replayInstrument, coachOpen]);
+  useEffect(() => { toolkitBackRef.current = pendingDeleteIds ? () => setPendingDeleteIds(null) : replayInstrument ? () => { setReplayInstrument(null); setReplayReviewTimeframe(null); } : coachOpen ? () => setCoachOpen(false) : null; }, [pendingDeleteIds, replayInstrument, coachOpen]);
   const [coachTab, setCoachTab] = useState<CoachTab>("journal");
   const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
@@ -1671,6 +1674,13 @@ export function TradingDashboard() {
     }
     return filterClosedTradesByOutcome(closedTrades, pnlHistoryFilter);
   }, [closedTrades, pnlHistoryFilter, selectedPnlDateKey]);
+  const tradeSelectionScope = `${pnlOpen}:${selectedPnlDateKey ?? pnlHistoryFilter}`;
+  const selectingTrades = tradeSelection?.scope === tradeSelectionScope;
+  const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
+  const pendingDeletion = useMemo(() => pendingDeleteIds ? prepareClosedTradeDeletion(orders, pendingDeleteIds) : null, [orders, pendingDeleteIds]);
+  function toggleTradeSelection(id: string) {
+    setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(id) ? selectedTradeIds.filter((selectedId) => selectedId !== id) : [...selectedTradeIds, id] });
+  }
   const paperOrdersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
   const orderMarkerRoles = useMemo(() => {
     const roles = new Map<string, "ENTRY" | "EXIT">();
@@ -1771,22 +1781,25 @@ export function TradingDashboard() {
     window.setTimeout(() => setToast(""), 3_000);
   }
 
-  function deleteClosedTrade(trade: ClosedPaperTrade) {
-    const deletion = deletePaperTradeOrders(orders, trade.sourceOrderIds);
-    if (!deletion.removedOrders.length) return;
-    const confirmed = window.confirm(
-      `Delete ${trade.symbol} trade from this device? Its entry/exit fills, P&L, charges and calendar heat map will be recalculated.`,
-    );
-    if (!confirmed) return;
+  function confirmClosedTradeDeletion() {
+    if (!pendingDeleteIds) return;
+    const deletion = prepareClosedTradeDeletion(orders, pendingDeleteIds);
+    if (deletion.error || !deletion.removedOrders.length) return;
     const nextBalance = balance + deletion.balanceAdjustment;
     setOrders(deletion.orders);
     setBalance(nextBalance);
     writePaperOrders(deletion.orders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
-    const remainingPosition = calculatePosition(deletion.orders, trade.symbol, Number.NaN, trade.product);
-    if (!remainingPosition.quantity) saveProtection(null, trade.symbol, trade.product);
+    const nextProtections = protections.filter((protection) => {
+      const affected = deletion.trades.some((trade) => trade.symbol === protection.symbol && trade.product === protection.product);
+      return !affected || calculatePosition(deletion.orders, protection.symbol, Number.NaN, protection.product).quantity !== 0;
+    });
+    setProtections(nextProtections);
+    writePaperProtections(nextProtections);
+    setPendingDeleteIds(null);
+    setTradeSelection(null);
     setPnlTradeMenuId(null);
-    setToast(`${trade.symbol} trade deleted and account totals recalculated`);
+    setToast(`${deletion.trades.length} trade${deletion.trades.length === 1 ? "" : "s"} deleted and account totals recalculated`);
     window.setTimeout(() => setToast(""), 3_500);
   }
 
@@ -2652,7 +2665,7 @@ export function TradingDashboard() {
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
           <div className="input-grid">
-            <label>{selected.assetType === "OPTION" ? "Quantity (lot multiples)" : "Quantity"}<div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{selected.assetType === "OPTION" && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot</small>}</label>
+            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{selected.assetType === "OPTION" && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot</small>}</label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
@@ -2968,6 +2981,11 @@ export function TradingDashboard() {
             </div>
             </>}
             <div className="pnl-trade-list" ref={pnlTradeListRef}>
+              {!!visiblePnlTrades.length && <div className="pnl-selection-toolbar">
+                <div><b>{selectingTrades ? `${selectedTradeIds.length} selected` : "Closed trades"}</b><small>{selectingTrades ? "Choose the records to remove" : "Review and manage your history"}</small></div>
+                <button type="button" onClick={() => { setTradeSelection(selectingTrades ? null : { scope: tradeSelectionScope, ids: [] }); setPnlTradeMenuId(null); }}>{selectingTrades ? "Done" : "Select trades"}</button>
+                {selectingTrades && <div className="pnl-selection-actions"><button type="button" onClick={() => setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.length === visiblePnlTrades.length ? [] : visiblePnlTrades.map((trade) => trade.id) })}>{selectedTradeIds.length === visiblePnlTrades.length ? "Deselect all" : `Select all shown (${visiblePnlTrades.length})`}</button><button type="button" className="pnl-selection-delete" disabled={!selectedTradeIds.length} onClick={() => setPendingDeleteIds(selectedTradeIds)}><Trash2 size={15} /> Delete ({selectedTradeIds.length})</button></div>}
+              </div>}
               <div className="pnl-history-toolbar">
                 <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
                   {(["all", "profit", "loss"] as const).map((filter) => <button type="button" key={filter} className={!selectedPnlDateKey && pnlHistoryFilter === filter ? "active" : ""} aria-pressed={!selectedPnlDateKey && pnlHistoryFilter === filter} onClick={() => { setSelectedPnlDateKey(null); setPnlHistoryFilter(filter); }}>{filter === "all" ? `All ${closedTrades.length}` : filter === "profit" ? `Profit ${pnlVisuals.wins}` : `Loss ${pnlVisuals.losses}`}</button>)}
@@ -2975,7 +2993,7 @@ export function TradingDashboard() {
                 {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => setSelectedPnlDateKey(null)}>Show all dates</button></div>}
               </div>
               {visiblePnlTrades.map((trade) => {
-                const menuOpen = pnlTradeMenuId === trade.id;
+                const menuOpen = !selectingTrades && pnlTradeMenuId === trade.id;
                 const sourceOrders = trade.sourceOrderIds
                   .map((orderId) => paperOrdersById.get(orderId))
                   .filter((order): order is PaperOrder => Boolean(order))
@@ -2985,8 +3003,8 @@ export function TradingDashboard() {
                   .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
                   .filter((marker) => marker.time > 0);
                 return (
-                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""}`} role="button" tabIndex={0} aria-expanded={menuOpen} onClick={() => setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
-                    <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>
+                  <div key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${formatInr(trade.netPnl)}` : undefined} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
+                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <CheckCircle2 size={21} />}</span> : <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>}
                     <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
                     <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
                     {menuOpen && !!sourceOrders.length && <div className="pnl-order-positions" onClick={(event) => event.stopPropagation()}>
@@ -3030,12 +3048,13 @@ export function TradingDashboard() {
                         </div>
                       </div>
                     )}
-                    {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); deleteClosedTrade(trade); }}><Trash2 size={14} /> Delete trade</button></div>}
+                    {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button></div>}
                   </div>
                 );
               })}
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
             </div>
+            {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} onCancel={() => setPendingDeleteIds(null)} onConfirm={confirmClosedTradeDeletion} />}
             {showPnlReviewTimeframeMenu && <ChartTimeframeMenu current={pnlReviewTimeframe} onSelect={(period) => { setPnlReviewTimeframe(period); setShowPnlReviewTimeframeMenu(false); }} onClose={() => setShowPnlReviewTimeframeMenu(false)} />}
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>
