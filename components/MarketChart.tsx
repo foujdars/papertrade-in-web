@@ -451,6 +451,10 @@ export function MarketChart({
   tradeMarkers = [],
   focusTradeMarkers = false,
   preservePageScroll = false,
+  replayCandles,
+  replaySelecting = false,
+  replayStartTime = null,
+  onReplaySelect,
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
@@ -478,6 +482,10 @@ export function MarketChart({
   tradeMarkers?: ChartTradeMarker[];
   focusTradeMarkers?: boolean;
   preservePageScroll?: boolean;
+  replayCandles?: Candle[];
+  replaySelecting?: boolean;
+  replayStartTime?: number | null;
+  onReplaySelect?: (time: number) => void;
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -487,6 +495,10 @@ export function MarketChart({
   onPrice?: (value: number) => void;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
+  const isReplay = replayCandles !== undefined;
+  const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect });
+  const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
+  useEffect(() => { replayRef.current = { selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect }; scheduleOverlayRefresh(); }, [replaySelecting, replayStartTime, onReplaySelect]);
   const chartHost = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -516,7 +528,7 @@ export function MarketChart({
   const magnetRef = useRef(magnet);
   const lockedRef = useRef(lockedDrawings);
   const hiddenRef = useRef(hiddenDrawings);
-  const [initialData] = useState<Candle[]>([]);
+  const [initialData] = useState<Candle[]>(() => replayCandles ?? []);
   const dataRef = useRef<Candle[]>(initialData);
   const storedDrawingsRef = useRef<SerializedDrawing[]>([]);
   const historyRef = useRef<SerializedDrawing[][]>([]);
@@ -653,6 +665,9 @@ export function MarketChart({
   function scheduleOverlayRefresh() {
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
+      const start = replayRef.current.start;
+      const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
+      setReplayMarkerX(x);
       refreshRiskCoordinates();
       refreshTradeMarkerCoordinates();
       window.requestAnimationFrame(() => {
@@ -956,7 +971,7 @@ export function MarketChart({
     if (!manager || restoringRef.current) return;
     const snapshot = manager.exportDrawings();
     storedDrawingsRef.current = snapshot;
-    window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
+    if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     if (pushHistory) {
       const previous = historyRef.current.at(-1);
       if (JSON.stringify(previous) !== JSON.stringify(snapshot)) {
@@ -983,7 +998,7 @@ export function MarketChart({
     restoringRef.current = false;
     if (persist) {
       storedDrawingsRef.current = snapshot;
-      window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
+      if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     }
   }
 
@@ -1238,6 +1253,7 @@ export function MarketChart({
     let resizeChart: (() => void) | null = null;
     let refreshOverlays: (() => void) | null = null;
     let crosshairMove: ((event: MouseEventParams<Time>) => void) | null = null;
+    let replayClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
@@ -1335,15 +1351,21 @@ export function MarketChart({
           ? previous : { scope: legendScope, time });
       };
       chart.subscribeCrosshairMove(crosshairMove);
+      replayClick = (event) => {
+        if (!replayRef.current.selecting || event.time === undefined) return;
+        const time = timeToTimestamp(event.time) - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0);
+        replayRef.current.onSelect?.(time);
+      };
+      if (isReplay) chart.subscribeClick(replayClick);
 
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
       drawingManager.current = manager;
       drawingRegistry.current = drawing.getToolRegistry();
       storageKeyRef.current = drawingStorageKey(instrument);
-      const stored = readStoredDrawings(storageKeyRef.current, legacyDrawingStorageKey(instrument, timeframe));
+      const stored = isReplay ? [] : readStoredDrawings(storageKeyRef.current, legacyDrawingStorageKey(instrument, timeframe));
       storedDrawingsRef.current = stored;
-      window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
+      if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
       restoreDrawings(projectDrawingsToCandles(stored, dataRef.current, timeframe), false);
       historyRef.current = [stored];
       redoRef.current = [];
@@ -1501,6 +1523,10 @@ export function MarketChart({
       };
 
       const onKeyDown = (event: KeyboardEvent) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+        // A replay or coach overlay must never edit drawings on the live chart behind it.
+        if (!isReplay && document.querySelector(".bar-replay")) return;
         if (event.key === "Escape") {
           if (draftRef.current) cancelDraft();
           else drawingManager.current?.deselectAll();
@@ -1580,6 +1606,7 @@ export function MarketChart({
       }
       if (refreshOverlays) chartApi.current?.timeScale().unsubscribeVisibleLogicalRangeChange(refreshOverlays);
       if (crosshairMove) chartApi.current?.unsubscribeCrosshairMove(crosshairMove);
+      if (replayClick) chartApi.current?.unsubscribeClick(replayClick);
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup?.();
       cancelDraft();
       editRef.current = null;
@@ -1639,6 +1666,18 @@ export function MarketChart({
   }, [redoSignal]);
 
   useEffect(() => {
+    if (replayCandles === undefined) return;
+    dataRef.current = replayCandles;
+    candleSeries.current?.setData(replayCandles.map((candle) => toCandleData(candle, timeframe)));
+    setLatestCandle(replayCandles.at(-1));
+    syncIndicatorData(replayCandles);
+    // No quote callbacks, live subscriptions or portfolio execution in replay.
+    if (!replaySelecting) { applyVisibleRange(); chartApi.current?.timeScale().scrollToRealTime(); }
+    scheduleOverlayRefresh();
+  }, [replayCandles, replaySelecting, timeframe]);
+
+  useEffect(() => {
+    if (isReplay) return;
     const controller = new AbortController();
     let retryTimer = 0;
     onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
@@ -1694,10 +1733,10 @@ export function MarketChart({
       controller.abort();
       window.clearTimeout(retryTimer);
     };
-  }, [instrument.instrumentKey, timeframe]);
+  }, [instrument.instrumentKey, timeframe, isReplay]);
 
   useEffect(() => {
-    if (!LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     const controller = new AbortController();
     let stopped = false;
     let reconnectTimer = 0;
@@ -1800,10 +1839,10 @@ export function MarketChart({
       window.clearTimeout(liveIndicatorTimerRef.current);
       liveIndicatorTimerRef.current = 0;
     };
-  }, [instrument.instrumentKey, timeframe]);
+  }, [instrument.instrumentKey, timeframe, isReplay]);
 
   useEffect(() => {
-    if ((feedMode !== "live" && feedMode !== "stale") || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
+    if (isReplay || (feedMode !== "live" && feedMode !== "stale") || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
     let controller: AbortController | null = null;
     async function refreshIntradayCandles() {
       controller?.abort();
@@ -1840,12 +1879,13 @@ export function MarketChart({
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [feedMode, instrument.instrumentKey, timeframe]);
+  }, [feedMode, instrument.instrumentKey, timeframe, isReplay]);
 
   return (
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {isReplay && replayMarkerX !== null && <div className="replay-start-marker" style={{ left: replayMarkerX }}><span>Start</span></div>}
         <div className="chart-symbol-legend lightweight-symbol-legend">
           <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
           {legend && (

@@ -1,7 +1,7 @@
 "use client";
 import { StockLogo } from "@/components/StockLogo";
 
-import { Activity, ChevronDown, ChevronsUpDown, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
+import { Activity, ChevronDown, ChevronsUpDown, History, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
@@ -52,6 +52,7 @@ export function FnoChartWorkspace({
   onOrderToolExit,
   tradeMarkers = [],
   chartTheme,
+  onReplay,
 }: {
   topInstrument: Instrument;
   topMode: "SPOT" | "FUTURE";
@@ -84,6 +85,7 @@ export function FnoChartWorkspace({
   onOrderToolExit?: () => void;
   tradeMarkers?: ChartTradeMarker[];
   chartTheme: "light" | "neon";
+  onReplay: (instrument: Instrument) => void;
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
@@ -141,6 +143,7 @@ export function FnoChartWorkspace({
               <span>{topPrice > 0 ? topPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={topChange >= 0 ? "positive" : "negative"}>{signedPercent(topChange)}</i></span>
             </div>
             <button className="fno-symbol-list-link" onClick={(event) => { event.stopPropagation(); onOpenSymbols(); }} aria-label="Open indices and F&O symbols"><ListFilter size={15} /></button>
+            <button type="button" className="chart-replay-link" onClick={() => onReplay(topInstrument)} aria-label={`Bar replay for ${topInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
             <button className="fno-option-chain-link" onClick={(event) => { event.stopPropagation(); onOptionChain(); }}>Option Chain</button>
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
           </header>
@@ -177,6 +180,7 @@ export function FnoChartWorkspace({
               </button>
               <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChange >= 0 ? "positive" : "negative"}>{signedPercent(optionChange)}</i></span>
             </div>
+            <button type="button" className="chart-replay-link" onClick={() => onReplay(option)} aria-label={`Bar replay for ${option.symbol}`} title="Bar replay"><History size={17} /></button>
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
           </header>
           <div className="fno-clean-chart">

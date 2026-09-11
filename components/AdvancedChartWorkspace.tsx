@@ -1,5 +1,6 @@
 "use client";
 import { StockLogo } from "@/components/StockLogo";
+import { BarReplayDialog } from "@/components/BarReplay";
 
 import {
   Activity,
@@ -12,6 +13,7 @@ import {
   EyeOff,
   FlipHorizontal2,
   Fullscreen,
+  History,
   Layers3,
   ListFilter,
   Lock,
@@ -118,6 +120,7 @@ export function AdvancedChartWorkspace({
   const [exitQuantity, setExitQuantity] = useState(1);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
+  const [replayOpen, setReplayOpen] = useState(false);
   const symbolPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,6 +149,7 @@ export function AdvancedChartWorkspace({
     let listener: { remove: () => Promise<void> } | undefined;
     let disposed = false;
     const returnToTrade = () => {
+      if (replayOpen) { setReplayOpen(false); return; }
       const params = new URLSearchParams(window.location.search);
       const symbol = params.get("symbol") ?? instrument.symbol ?? initialSymbol;
       const period = params.get("timeframe") ?? timeframe ?? initialTimeframe;
@@ -159,7 +163,7 @@ export function AdvancedChartWorkspace({
       disposed = true;
       if (listener) void listener.remove();
     };
-  }, [initialSymbol, initialTimeframe, instrument.symbol, timeframe]);
+  }, [initialSymbol, initialTimeframe, instrument.symbol, timeframe, replayOpen]);
 
   useEffect(() => {
     const restore = window.setTimeout(() => setOrders(readPaperOrders()), 0);
@@ -325,6 +329,7 @@ export function AdvancedChartWorkspace({
 
   return (
     <main className="advanced-terminal">
+      {replayOpen && <BarReplayDialog instrument={instrument} timeframe={timeframe} theme="light" onClose={() => setReplayOpen(false)} />}
       <header className="advanced-topbar">
         <Link href={`/?symbol=${instrument.symbol}&timeframe=${timeframe}`} onClick={(event) => { event.preventDefault(); window.history.back(); }} className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
         <div className="advanced-brand"><span><BrandMark size={31} /></span><b>PaperTrade</b> IN</div>
@@ -351,6 +356,7 @@ export function AdvancedChartWorkspace({
       </header>
 
       <nav className="advanced-commandbar" aria-label="Chart controls">
+        <button type="button" onClick={() => setReplayOpen(true)} aria-label={`Bar replay for ${instrument.symbol}`}><History size={18} /> Replay</button>
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
         <button className={`advanced-indicator-button ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={18} /> Functions <em>{activeIndicatorCount}</em></button>

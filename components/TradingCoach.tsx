@@ -1,10 +1,11 @@
 "use client";
 
-import { Activity, BarChart3, BookOpenText, ChevronRight, Pause, Play, RotateCcw, ShieldCheck, Target, X } from "lucide-react";
+import { BarChart3, BookOpenText, ChevronRight, Play, ShieldCheck, Target, X } from "lucide-react";
+import { BarReplay } from "@/components/BarReplay";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceControl, StrategyPicker } from "@/components/TradePlanControls";
 import { StockLogo } from "@/components/StockLogo";
-import { formatInr, type Candle, type Instrument } from "@/lib/market";
+import { formatInr, type Instrument } from "@/lib/market";
 import type { PaperOrder } from "@/lib/paper-trading";
 import type { ClosedPaperTrade } from "@/lib/trade-analytics";
 import { buildOptionPayoff, readTradeJournal, writeTradeJournal, writeTradingLimits, type OptionPayoffLeg, type TradeJournalEntry, type TradingLimits } from "@/lib/trading-coach";
@@ -59,69 +60,8 @@ function PayoffChart({ legs, spot }: { legs: OptionPayoffLeg[]; spot: number }) 
   </div>;
 }
 
-function ReplayPanel({ instrument }: { instrument: Instrument }) {
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [cursor, setCursor] = useState(35);
-  const [playing, setPlaying] = useState(false);
-  const [position, setPosition] = useState<{ side: "LONG" | "SHORT"; price: number } | null>(null);
-  const [realized, setRealized] = useState(0);
-  const [message, setMessage] = useState("Loading a past market sequence…");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const reset = window.setTimeout(() => { setCandles([]); setCursor(35); setPlaying(false); setPosition(null); setRealized(0); setMessage("Loading a past market sequence…"); }, 0);
-    const params = new URLSearchParams({ instrumentKey: instrument.instrumentKey, timeframe: "5m", scope: "combined" });
-    void fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal }).then(async (response) => {
-      const payload = await response.json() as { candles?: Candle[]; error?: { message?: string } };
-      if (!response.ok || !payload.candles?.length) throw new Error("Historical candles are unavailable. Please try again shortly.");
-      const past = [...payload.candles].sort((a, b) => a.time - b.time).slice(0, -1);
-      if (!past.length) throw new Error("No completed candles available for replay.");
-      setCandles(past); setCursor(Math.min(35, Math.max(0, past.length - 1))); setMessage("Future candles are hidden. Advance when you are ready.");
-    }).catch((error) => { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Replay data unavailable"); });
-    return () => { controller.abort(); window.clearTimeout(reset); };
-  }, [instrument.instrumentKey]);
-
-  useEffect(() => {
-    if (!playing || !candles.length || cursor >= candles.length - 1) return;
-    const timer = window.setInterval(() => setCursor((value) => Math.min(candles.length - 1, value + 1)), 700);
-    return () => window.clearInterval(timer);
-  }, [candles.length, cursor, playing]);
-
-  const visible = candles.slice(Math.max(0, cursor - 49), cursor + 1);
-  const current = candles[cursor];
-  const low = visible.length ? Math.min(...visible.map((candle) => candle.low)) : 0;
-  const high = visible.length ? Math.max(...visible.map((candle) => candle.high)) : 1;
-  const range = Math.max(.01, high - low);
-  const floating = position && current ? (current.close - position.price) * (position.side === "LONG" ? 1 : -1) : 0;
-  function trade(nextSide: "LONG" | "SHORT") {
-    if (!current) return;
-    if (!position) { setPosition({ side: nextSide, price: current.close }); return; }
-    if (position.side === nextSide) return;
-    setRealized((value) => value + (current.close - position.price) * (position.side === "LONG" ? 1 : -1)); setPosition(null);
-  }
-
-  return <div className="coach-replay">
-    <div className="coach-replay-head"><span className="stock-identity"><StockLogo {...instrument} size={30} /><span><b>{instrument.symbol}</b><small>5-minute historical replay</small></span></span><strong className={realized + floating >= 0 ? "positive" : "negative"}>{realized + floating >= 0 ? "+" : ""}{formatInr(realized + floating)}</strong></div>
-    <div className="coach-replay-chart">
-      {visible.length > 0 ? <svg className="coach-candle-canvas" viewBox="0 0 600 330" role="img" aria-label={`${instrument.symbol} historical candles, future candles hidden`}>
-        {[0, 1, 2, 3, 4].map((tick) => <g key={tick}><line x1="14" x2="530" y1={24 + tick * 64} y2={24 + tick * 64} className="coach-chart-grid" /><text x="542" y={28 + tick * 64} className="coach-chart-axis">{(high - range * tick / 4).toFixed(2)}</text></g>)}
-        {visible.map((candle, index) => {
-          const x = 22 + index * 498 / Math.max(1, visible.length - 1);
-          const y = (price: number) => 24 + (high - price) / range * 256;
-          const colour = candle.close >= candle.open ? "var(--green)" : "var(--red)";
-          return <g key={String(candle.time)}><line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} stroke={colour} strokeWidth="1.4" /><rect x={x - 3.4} width="6.8" y={y(Math.max(candle.open, candle.close))} height={Math.max(1.4, Math.abs(y(candle.open) - y(candle.close)))} fill={colour} rx=".6" /></g>;
-        })}
-        {position && position.price >= low && position.price <= high && <line x1="14" x2="530" y1={24 + (high - position.price) / range * 256} y2={24 + (high - position.price) / range * 256} className="coach-chart-position" />}
-        <text x="14" y="316" className="coach-chart-axis">{new Date(visible[0].time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</text>
-        <text x="525" y="316" textAnchor="end" className="coach-chart-axis">{current && new Date(current.time * 1000).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })}</text>
-      </svg> : <div className="coach-replay-loading"><Activity size={24} /><span>{message}</span></div>}
-    </div>
-    <div className="coach-replay-position"><span>{position ? `${position.side} · Entry ${formatInr(position.price)}` : "No practice position"}</span><span>{current ? `Candle ${cursor + 1} / ${candles.length}` : "—"}</span></div>
-    <p>{current ? "Practice with one unit. Use the opposite side to close." : message}</p><div className="coach-replay-controls"><button onClick={() => trade("LONG")} disabled={!current || position?.side === "LONG"}>Buy</button><button onClick={() => trade("SHORT")} disabled={!current || position?.side === "SHORT"}>Sell</button><button onClick={() => setPlaying((value) => !value)} disabled={!current || cursor >= candles.length - 1}>{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? "Pause" : "Play"}</button><button onClick={() => setCursor((value) => Math.min(candles.length - 1, value + 1))} disabled={!current || cursor >= candles.length - 1}>Next <ChevronRight size={15} /></button><button onClick={() => { setCursor(Math.min(35, Math.max(0, candles.length - 1))); setPosition(null); setRealized(0); setPlaying(false); }}><RotateCcw size={15} /> Reset</button></div>
-  </div>;
-}
-
-export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onClose, initialTab = "journal" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; initialTab?: CoachTab; }) {
+export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onClose, initialTab = "journal", timeframe = "5m", theme = "light" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; initialTab?: CoachTab; timeframe?: string; theme?: "light" | "neon"; }) {
   const [tab, setTab] = useState<CoachTab>(initialTab);
   const [journal, setJournal] = useState<Record<string, TradeJournalEntry>>({});
   const dialogRef = useRef<HTMLElement>(null);
@@ -173,7 +113,7 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
           {item === "journal" ? <BookOpenText size={18} /> : item === "insights" ? <BarChart3 size={18} /> : item === "limits" ? <ShieldCheck size={18} /> : item === "payoff" ? <Target size={18} /> : <Play size={18} />}<span>{item}</span>
         </button>)}
       </div>
-      <div className="coach-content" id="coach-panel" role="tabpanel" aria-labelledby={`coach-tab-${tab}`}>
+      <div className={`coach-content ${tab === "replay" ? "coach-content-replay" : ""}`} id="coach-panel" role="tabpanel" aria-labelledby={`coach-tab-${tab}`}>
         {tab === "journal" && <div className="coach-journal-list">
           <div className="coach-section-heading"><h3>Trade journal</h3><span>{trades.length} completed</span></div>
           {trades.map((trade) => {
@@ -207,7 +147,7 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
           {chargeReversalCount > 0 && <p className="coach-footnote">{chargeReversalCount} gross winner{chargeReversalCount === 1 ? "" : "s"} became a loss after charges.</p>}
           {!insights.length && <div className="coach-empty"><BarChart3 size={30} /><b>No results yet</b><span>Complete trades to compare your performance.</span></div>}
         </div>}
-        {tab === "replay" && <ReplayPanel instrument={selected} />}
+        {tab === "replay" && <BarReplay key={selected.instrumentKey} instrument={selected} initialTimeframe={timeframe} theme={theme} />}
         {tab === "limits" && <div className="coach-limits" onChange={() => setLimitsSaved(false)}>
           <div className="coach-section-heading"><h3>Your trading rules</h3></div>
           <div className="coach-limit-toggle"><span><b>Enable limits</b><small>Pause new entries when a rule is reached.</small></span><button type="button" role="switch" aria-label="Personal trading limits" aria-checked={draftLimits.enabled} className={draftLimits.enabled ? "active" : ""} onClick={() => { setLimitsSaved(false); setDraftLimits((value) => ({ ...value, enabled: !value.enabled })); }}><span>{draftLimits.enabled ? "ON" : "OFF"}</span><i /></button></div>

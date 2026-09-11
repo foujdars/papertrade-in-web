@@ -2,7 +2,7 @@
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 
 import {
-  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home,
+  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingUp, WalletCards, X,
@@ -56,6 +56,7 @@ import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/nativ
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
 import { RiskSizingPlan } from "@/components/RiskSizingPlan";
+import { BarReplayDialog } from "@/components/BarReplay";
 import { TradingCoach, type CoachTab } from "@/components/TradingCoach";
 import {
   buildOptionPayoff,
@@ -451,6 +452,10 @@ export function TradingDashboard() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
+  const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
+  const toolkitBackRef = useRef<(() => void) | null>(null);
+  useEffect(() => { toolkitBackRef.current = replayInstrument ? () => { setReplayInstrument(null); setReplayReviewTimeframe(null); } : coachOpen ? () => setCoachOpen(false) : null; }, [replayInstrument, coachOpen]);
   const [coachTab, setCoachTab] = useState<CoachTab>("journal");
   const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
@@ -751,6 +756,7 @@ export function TradingDashboard() {
     let disposed = false;
 
     void CapacitorApp.addListener("backButton", () => {
+      if (toolkitBackRef.current) { toolkitBackRef.current(); return; }
       if (activeNavigationSectionRef.current !== "home") {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
@@ -2395,13 +2401,13 @@ export function TradingDashboard() {
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
           <NotificationCenter />
+          <button type="button" className="icon-button header-coach-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }} aria-label="Open trading coach" title="Trading coach"><Target size={19} /></button>
           <div className="more-menu-wrap">
             <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
                 <header><SlidersHorizontal size={17} /><span><b>More</b><small>Personalise your home screen</small></span></header>
-                <button className="coach-launch-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={18} /><span><b>Trading coach</b><small>Review trades &amp; practise</small></span><ChevronRight size={16} /></button>
                 <div className="home-card-toggles">
                   <b>Home cards</b>
                   {([['market', 'Market pulse'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
@@ -2517,6 +2523,7 @@ export function TradingDashboard() {
                 >
                   <Link2 size={19} />
                 </button>}
+                <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><History size={18} /></button>
                 {showTradeSymbols && (
                   <div className="trade-symbol-menu">
                     <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
@@ -2553,6 +2560,7 @@ export function TradingDashboard() {
               </button>
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
               {selectedFnoUnderlying && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
+              <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><History size={17} /></button>
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
                 <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
                 <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
@@ -2689,6 +2697,7 @@ export function TradingDashboard() {
 
       {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
+          onReplay={setReplayInstrument}
           topInstrument={fnoTopInstrument}
           topMode={fnoTopMode}
           canToggleFuture={Boolean(fnoFutureInstrument)}
@@ -2776,7 +2785,8 @@ export function TradingDashboard() {
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
       </nav>
 
-      {coachOpen && <TradingCoach initialTab={coachTab} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onClose={() => setCoachOpen(false)} />}
+      {replayInstrument && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={() => { setReplayInstrument(null); setReplayReviewTimeframe(null); }} />}
+      {coachOpen && <TradingCoach initialTab={coachTab} timeframe={timeframe} theme={theme} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
@@ -2995,6 +3005,7 @@ export function TradingDashboard() {
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
+                          <button type="button" className="chart-replay-link" onClick={() => { setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
                           <button type="button" className="pnl-review-timeframe-trigger" onClick={() => setShowPnlReviewTimeframeMenu(true)}>
                             <small>Timeframe</small><b>{pnlReviewTimeframe}</b><ChevronDown size={13} />
                           </button>
