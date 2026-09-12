@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -1912,6 +1913,7 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replayMarkerX !== null && <>
           {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
           <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX }} aria-label="Drag to a starting candle; Enter to select" onPointerDown={event => {

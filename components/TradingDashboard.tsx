@@ -1,4 +1,7 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
+import { TradeExecutionSummary } from "./TradeExecutionSummary";
+import { TradeReviewDialog } from "./TradeReviewDialog";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
 import { LongPressTradeRow } from "@/components/LongPressTradeRow";
@@ -374,7 +377,6 @@ export function TradingDashboard() {
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false);
-  const [showPnlReviewTimeframeMenu, setShowPnlReviewTimeframeMenu] = useState(false);
   const [showWatchlistSelector, setShowWatchlistSelector] = useState(false);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [drawingsLocked, setDrawingsLocked] = useState(false);
@@ -756,8 +758,7 @@ export function TradingDashboard() {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
         returnToTradeFromBackRef.current();
-        setToast("Returned to Home");
-        exitBackToastTimerRef.current = window.setTimeout(() => setToast(""), 1_800);
+        setToast("");
         return;
       }
 
@@ -2454,7 +2455,7 @@ export function TradingDashboard() {
                 <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
                   <StockLogo {...item} />
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
-                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? formatSignedMarketMove(netChange, change) : "Quote loading"}</small></span>
+                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? formatSignedMarketMove(netChange, change) : <CandleLoader compact label="Loading quote" />}</small></span>
                   {activeCustomList?.symbols.includes(item.symbol) ? (
                     <button className="watchlist-star remove" onClick={(event) => { event.stopPropagation(); removeStockFromCustomWatchlist(activeCustomList.id, item.symbol); }} aria-label={`Remove ${item.symbol} from ${activeCustomList.name}`}><X size={15} /></button>
                   ) : (
@@ -2463,7 +2464,7 @@ export function TradingDashboard() {
                 </div>
               );
             })}
-            {watchlistLoading && <div className="watchlist-skeleton-list" aria-label="Loading NSE stocks">{Array.from({ length: 8 }, (_, index) => <div className="watchlist-skeleton-row" key={`watchlist-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
+            {watchlistLoading && <CandleLoader label="Loading NSE stocks" />}
             {!watchlistLoading && !filtered.length && <div className="empty-list">No matching NSE stocks.</div>}
             {visibleInstruments.length < filtered.length && <button className="load-more-stocks" onClick={() => setWatchlistLimit((value) => value + 60)}>Load 60 more <small>{visibleInstruments.length} of {filtered.length}</small></button>}
           </div>
@@ -2985,23 +2986,15 @@ export function TradingDashboard() {
                 return (
                   <LongPressTradeRow onLongPress={() => { setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(trade.id) ? selectedTradeIds : [...selectedTradeIds, trade.id] }); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${formatInr(trade.netPnl)}` : undefined} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
                     {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={trade.netPnl >= 0 ? "win" : "loss"}>{trade.netPnl >= 0 ? "WIN" : "LOSS"}</span>}
-                    <span className="stock-identity"><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.quantity} units · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></span>
-                    <span><b className={trade.netPnl >= 0 ? "positive" : "negative"}>{trade.netPnl >= 0 ? "+" : ""}{formatInr(trade.netPnl)}</b><small>Charges {formatInr(trade.charges)}</small></span>
-                    {menuOpen && !!sourceOrders.length && <div className="pnl-inline-fills" onClick={event => event.stopPropagation()}>
-                      {sourceOrders.map((order, index) => <button type="button" key={order.id} onClick={() => openPaperOrderChart(order)} aria-label={`View ${order.symbol} ${order.side} execution`}>
-                        <strong className={order.side === "BUY" ? "positive" : "negative"}>{index === sourceOrders.length - 1 ? "Exit" : "Entry"} · {order.side}</strong>
-                        <span>{order.quantity} @ {formatInr(order.price)}</span><span>{order.time}</span>
-                        <small>Fees {formatInr(getOrderCharges(order).total)} · {paperOrderStatusLabel(order)}</small>
-                      </button>)}
-                    </div>}
-                    {menuOpen && reviewInstrument && reviewMarkers.length > 0 && (
+                    <button type="button" className="stock-identity pnl-stock-chart-link" aria-label={selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) toggleTradeSelection(trade.id); else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></button>
+                    <TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get(trade.id)} status={paperOrdersById.get(trade.id) ? paperOrderStatusLabel(paperOrdersById.get(trade.id)!) : "Complete"} />
+                    {menuOpen && <TradeReviewDialog symbol={trade.symbol} theme={theme} onClose={() => setPnlTradeMenuId(null)}>
+                    {reviewInstrument && reviewMarkers.length > 0 ? (
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
-                          <button type="button" className="chart-replay-link" onClick={() => { setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
-                          <button type="button" className="pnl-review-timeframe-trigger" onClick={() => setShowPnlReviewTimeframeMenu(true)}>
-                            <small>Timeframe</small><b>{pnlReviewTimeframe}</b><ChevronDown size={13} />
-                          </button>
+                          <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
+                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => setPnlReviewTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
                         </div>
                         <div className="pnl-trade-review-body">
                           <MarketChart
@@ -3022,15 +3015,15 @@ export function TradingDashboard() {
                           />
                         </div>
                       </div>
-                    )}
-                    {menuOpen && <div className="pnl-trade-actions"><small>Delete only if this record was caused by incorrect data.</small><button type="button" onClick={(event) => { event.stopPropagation(); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button></div>}
+                    ) : <div className="positions-empty">Historical entry and exit candles are unavailable for this record.</div>}
+                    <div className="pnl-trade-actions"><small>Remove only an incorrect record.</small><button type="button" onClick={(event) => { event.stopPropagation(); setPnlTradeMenuId(null); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button></div>
+                    </TradeReviewDialog>}
                   </LongPressTradeRow>
                 );
               })}
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
             </div>
             {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} onCancel={() => setPendingDeleteIds(null)} onConfirm={confirmClosedTradeDeletion} />}
-            {showPnlReviewTimeframeMenu && <ChartTimeframeMenu current={pnlReviewTimeframe} onSelect={(period) => { setPnlReviewTimeframe(period); setShowPnlReviewTimeframeMenu(false); }} onClose={() => setShowPnlReviewTimeframeMenu(false)} />}
             <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>
         </div>
@@ -3111,7 +3104,7 @@ export function TradingDashboard() {
               <span>{user.user_metadata?.avatar_url ? <Image unoptimized width={43} height={43} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={25} />}</span>
               <div><b>{(user.user_metadata?.full_name as string | undefined) ?? "Paper trader"}</b><small>{user.email}</small></div>
             </div>
-            <div className={`account-sync sync-${syncStatus}`}>{syncStatus === "synced" ? <CheckCircle2 size={17} /> : <Cloud size={17} />}<span><b>{syncStatus === "synced" ? "Portfolio synced" : syncStatus === "saving" ? "Saving portfolio…" : syncStatus === "error" ? "Cloud setup required" : "Loading portfolio…"}</b><small>Virtual balance, orders, watchlists and preferences</small></span></div>
+            <div className={`account-sync sync-${syncStatus}`}>{syncStatus === "synced" ? <CheckCircle2 size={17} /> : syncStatus === "saving" || syncStatus === "loading" ? <CandleLoader compact label="Syncing portfolio" /> : <Cloud size={17} />}<span><b>{syncStatus === "synced" ? "Portfolio synced" : syncStatus === "saving" ? "Saving portfolio…" : syncStatus === "error" ? "Cloud setup required" : "Loading portfolio…"}</b><small>Virtual balance, orders, watchlists and preferences</small></span></div>
             <button className="signout-button" onClick={() => void signOut()}><LogOut size={17} /> Sign out</button>
             <div className="account-legal-links"><Link href="/privacy" target="_blank">Privacy</Link><Link href="/terms" target="_blank">Terms</Link><Link href="/delete-account" target="_blank">Delete account</Link></div>
             {!accountDeleteArmed ? (

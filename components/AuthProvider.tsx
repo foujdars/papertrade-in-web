@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
@@ -283,7 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <span className="eyebrow">Secure paper trading</span>
             <h1>Welcome to PaperTrade IN</h1>
             <p>Sign in to keep your virtual balance, watchlists, orders and P&amp;L securely connected to your account.</p>
-            <button type="button" className="google-signin" disabled={signingIn} onClick={() => void signInWithGoogle()}><LogIn size={19} /><span>{signingIn ? "Opening Google…" : "Continue with Google"}</span></button>
+            <button type="button" className="google-signin" disabled={signingIn} onClick={() => void signInWithGoogle()}>{signingIn ? <CandleLoader compact label="Opening secure sign-in" /> : <LogIn size={19} />}<span>{signingIn ? "Opening Google…" : "Continue with Google"}</span></button>
             {authError && <div className="auth-error">{authError}</div>}
             <div className="auth-points"><span><ShieldCheck size={15} /> Paper trading only</span><span><Cloud size={15} /> Cloud-synced portfolio</span></div>
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>

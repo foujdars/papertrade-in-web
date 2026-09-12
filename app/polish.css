@@ -1,0 +1,70 @@
+.welcome-candle-screen { padding: max(30px, env(safe-area-inset-top)) 24px max(40px, env(safe-area-inset-bottom)); justify-content: center; gap: 0; }
+.welcome-candle-content { width: min(100%, 430px); display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; text-align: center; }
+.welcome-candle-brand { justify-content: center; gap: 11px; margin-bottom: clamp(36px, 8vh, 70px); }
+.welcome-candle-brand b { font-size: clamp(24px, 6.2vw, 32px); letter-spacing: -1.2px; }
+.welcome-candle-greeting p { font-size: 20px; line-height: 1.4; color: #76718e; margin-bottom: 8px; }
+.welcome-candle-greeting h1 { font-weight: 750; font-size: clamp(30px, 8vw, 42px); line-height: 1.2; letter-spacing: -1.4px; max-width: 100%; }
+.welcome-wave { display: inline-block; margin-left: 10px; font-size: .78em; vertical-align: 4%; }
+.welcome-candle-greeting small { display: block; margin-top: 16px; font-size: 13px; line-height: 1.7; color: #76718e; }
+.welcome-candle-divider { width: 42px; height: 3px; border-radius: 3px; background: #e0d1f8; margin: clamp(22px, 4vh, 34px) 0; }
+.welcome-candle-motto { font-size: clamp(24px, 6.8vw, 33px); line-height: 1.3; letter-spacing: -1px; font-weight: 700; }
+.welcome-candle-content > .candle-loading { margin-top: clamp(30px, 6vh, 52px); }
+.welcome-candle-footnote { margin: 25px 0 0; color: #817995; font-size: 11px; letter-spacing: .2px; }
+.welcome-candle-screen::after { bottom: -130px; height: 210px; transform: none; box-shadow: 0 -22px 0 #f0e8fd; }
+.candle-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 160px; width: 100%; padding: 28px 12px; color: var(--muted, #76718e); }
+.candle-loading .welcome-candle-loader { flex: none; }
+.candle-loading-label { font-size: 12px; line-height: 1.5; text-align: center; }
+.candle-loading.is-artwork { min-height: 64px; padding: 0; }
+.candle-loading.is-compact { display: inline-flex; width: 42px; min-height: 26px; height: 26px; padding: 0; vertical-align: middle; overflow: visible; flex: 0 0 42px; }
+.candle-loading.is-compact .welcome-candle-loader { transform: scale(.32); transform-origin: center; }
+.chart-candle-loading { position: absolute; inset: 50px 0 30px; z-index: 6; display: grid; place-items: center; background: var(--surface, white); pointer-events: none; }
+.scanner-pull-stage { position: relative; --pull-distance: 0px; }
+.terminal-shell .scanner-pull-stage > .market-discovery-list { transform: translate3d(0, var(--pull-distance), 0); transition: transform 260ms cubic-bezier(.2,.8,.2,1); }
+.terminal-shell .scanner-pull-stage[data-dragging="true"] > .market-discovery-list { transition: none; will-change: transform; }
+.scanner-pull-feedback { position: absolute; left: 0; right: 0; top: 0; height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--purple); font-size: 11px; opacity: 0; transform: translateY(-8px); transition: opacity 140ms, transform 200ms; pointer-events: none; }
+.scanner-pull-stage[data-pull="pulling"] .scanner-pull-feedback, .scanner-pull-stage[data-pull="ready"] .scanner-pull-feedback, .scanner-pull-stage[data-pull="refreshing"] .scanner-pull-feedback { opacity: 1; transform: translateY(0); }
+.scanner-pull-feedback .pull-ready, .scanner-pull-feedback .pull-refreshing { display: none; }
+.scanner-pull-stage[data-pull="ready"] .pull-ready, .scanner-pull-stage[data-pull="refreshing"] .pull-refreshing { display: inline-flex; align-items: center; gap: 8px; }
+.scanner-pull-stage[data-pull="ready"] .pull-hint, .scanner-pull-stage[data-pull="refreshing"] .pull-hint { display: none; }
+.terminal-shell .compact-market-panel .market-results-head > span { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px; width: 100%; }
+.market-pull-hint { text-align: center; font-size: 9px; font-weight: 400; color: var(--muted); }
+.terminal-shell .market-results-head small { font-size: 8px; white-space: nowrap; }
+.terminal-shell .market-results-head > span > b { font-size: 10px; white-space: nowrap; }
+.ipo-chance-source { display: block; padding: 10px 15px; color: var(--purple); font-size: 11px; }
+.terminal-shell .pnl-trade-row { grid-template-columns: 38px minmax(150px, 1.2fr) minmax(230px, 1.6fr) minmax(100px, .7fr) minmax(105px, .7fr); gap: 12px; border-radius: 14px; padding: 14px; }
+.terminal-shell .pnl-stock-chart-link { display: flex; align-items: center; flex-direction: row; gap: 9px; min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.terminal-shell .pnl-stock-chart-link > span:last-child { min-width: 0; display: grid; gap: 4px; }
+.terminal-shell .pnl-stock-chart-link b { font-size: 13px; overflow-wrap: anywhere; }
+.terminal-shell .pnl-stock-chart-link small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.pnl-execution-pair { display: flex; align-items: center; justify-content: space-around; gap: 8px; border-left: 1px solid var(--line); padding-left: 12px; }
+.pnl-execution-pair > span { min-width: 0; display: grid; gap: 4px; text-align: center; }
+.pnl-execution-pair b, .pnl-execution-pair strong { font-size: 12px; font-weight: 650; }
+.terminal-shell .pnl-execution-pair small { font-size: 10px; color: var(--muted); }
+.pnl-execution-pair > i { color: var(--muted); font-style: normal; }
+.pnl-card-fees, .pnl-card-result { display: grid; gap: 4px; text-align: center; border-left: 1px solid var(--line); padding-left: 10px; }
+.pnl-card-fees b { font-size: 13px; }
+.terminal-shell .pnl-card-fees small, .terminal-shell .pnl-card-result small { font-size: 10px; color: var(--muted); }
+.pnl-card-result > b { font-size: 18px; white-space: nowrap; }
+.trade-review-dialog { width: min(900px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 36px); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface, white); color: var(--ink); overflow: auto; box-shadow: 0 24px 80px #17102755; }
+.trade-review-dialog::backdrop { background: #14102980; backdrop-filter: blur(4px); }
+.trade-review-content { padding: 16px; }
+.trade-review-content > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }
+.trade-review-content > header > span { display: grid; gap: 4px; }
+.trade-review-content > header b { font-size: 18px; }
+.trade-review-content > header small { font-size: 12px; color: var(--muted); }
+.trade-review-content > header button { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); color: var(--ink); }
+.terminal-shell .trade-review-dialog .pnl-trade-review-body { height: min(60dvh, 560px); min-height: 300px; }
+.pnl-review-period { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); }
+.pnl-review-period select { background: var(--soft); color: var(--ink); border: 1px solid var(--line); padding: 8px; border-radius: 8px; }
+@media (max-width: 760px) {
+  .terminal-shell .pnl-trade-row { grid-template-columns: 33px minmax(0, 1fr) auto; gap: 10px 8px; padding: 11px; }
+  .pnl-card-result { grid-column: 3; grid-row: 1; border: 0; padding: 0; text-align: right; }
+  .pnl-execution-pair { grid-row: 2; grid-column: 1 / 3; border: 0; padding: 8px 0 0; border-top: 1px solid var(--line); }
+  .pnl-card-fees { grid-row: 2; grid-column: 3; padding: 8px 0 0 8px; }
+  .pnl-execution-pair strong { font-size: 11px; }
+  .terminal-shell .pnl-execution-pair small, .terminal-shell .pnl-card-fees small { font-size: 9px; }
+  .pnl-card-result > b { font-size: 17px; }
+}
+.ipo-chance-list small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
+@media (max-height: 550px) { .welcome-candle-screen { justify-content: flex-start; } .welcome-candle-brand { margin-bottom: 22px; } }
+@media (prefers-reduced-motion: reduce) { .scanner-pull-stage > .market-discovery-list, .scanner-pull-feedback { transition: none !important; } }

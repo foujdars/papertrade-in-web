@@ -8,6 +8,24 @@ const page = "https://www.chittorgarh.com/ipo/deepa-jewellers-ipo/2827/";
 const logo = "https://www.chittorgarh.net/images/ipo/deepa-jewellers-ipo-logo.png";
 const catalogue = `<a href="${page}"><b>Deepa Jewellers</b> IPO</a><a href="${page}">Deepa Jewellers IPO</a><a href="/ipo/ipo_dashboard.asp">Dashboard</a>`;
 
+test("allotment estimates require exact issuer and application-based category demand", async () => {
+  const input = await readFile(new URL("../lib/ipo-chances.ts", import.meta.url), "utf8");
+  const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const exports = {};
+  new Function("require", "exports", compiled)(() => ({ issuerKey }), exports);
+  const header = '<section data-testid="ipo-summary-card" data-ipo-name="Pranav Constructions IPO">';
+  const table = '<table class="subscription-apps-extras-table"><tr><th>Total No. of Applications</th><th>bHNI</th><th>sHNI</th><th>Retail</th></tr><tr><td>100000</td><td>49.05x</td><td>163.74x</td><td>40.08x</td></tr></table>';
+  assert.deepEqual(exports.parseIpoChances(header + table, "Pranav Constructions"), { bnii: 49.05, snii: 163.74, retail: 40.08 });
+  assert.equal(exports.parseIpoChances(header + table, "Other Company"), null);
+  assert.equal(exports.parseIpoChances(header + table.replace("subscription-apps-extras-table", "share-subscription"), "Pranav Constructions"), null);
+  assert.equal(exports.parseIpoChances(header + table + table, "Pranav Constructions"), null);
+  const partial = exports.parseIpoChances(header + table.replace("49.05x", "Not available"), "Pranav Constructions");
+  assert.equal(partial.bnii, null); assert.equal(partial.retail, 40.08);
+  assert.equal(exports.chanceLabel(40.08), "Approx. 1 in 40");
+  assert.equal(exports.chanceLabel(.22), "Below 1× demand");
+  assert.equal(exports.chanceLabel(null), "Not published yet");
+});
+
 test("directory deduplicates real issue pages and ignores navigation/foreign URLs", () => {
   assert.deepEqual(parseIpoDirectory(catalogue + '<a href="https://evil.test/ipo/example/1/">Other</a>'), [{ name: "Deepa Jewellers IPO", url: page }]);
 });

@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import { Bell, BellRing, CalendarDays, ExternalLink, FileCheck2, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -132,7 +133,7 @@ export function IpoAllotments({ board, directory }: { board: IpoBoard; directory
         <small className="allotment-link-note">{ipo.registrar === "bse" ? "BSE fallback: only issues available on BSE can be checked here." : "Opens the registrar’s website in a new tab."}</small>
         <IpoResearchLink name={ipo.name} entries={directory} />
       </article>)}
-      {loading && !visibleItems.length && Array.from({ length: 4 }, (_, i) => <div className="ipo-card ipo-card-skeleton" key={i} aria-hidden="true"><span /><span /><span /><span /></div>)}
+      {loading && !visibleItems.length && <CandleLoader label="Loading allotments" />}
       {!loading && !error && !visibleItems.length && <div className="positions-empty"><FileCheck2 size={28} /><b>No recent {board === "regular" ? "Mainboard" : "SME"} allotments to track</b><span>Recently closed IPOs will appear here automatically once their board is confirmed.</span></div>}
     </div>
   </section>;

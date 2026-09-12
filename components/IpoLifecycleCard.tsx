@@ -6,6 +6,7 @@ import type { IpoDirectoryEntry } from "@/lib/ipo-directory";
 import { compactIpoName, gmpTone, listingReturn, stageLabels, type IpoStage } from "@/lib/ipo-lifecycle";
 import { IpoCompanyLogo, IpoResearchLink } from "./IpoCompany";
 import { useTransientBack } from "./useTransientBack";
+import { IpoChances } from "./IpoChances";
 
 export function ipoDate(value?: string, weekday = false) {
   if (!value) return "To be announced";
@@ -46,7 +47,7 @@ export function IpoDetailView({ ipo, stage, directory, onClose }: Props & { onCl
     <div className="ipo-detail-heading"><button onClick={onClose} className="ipo-back"><ArrowLeft size={18} /> All IPOs</button><h2 ref={heading} tabIndex={-1}>{compactIpoName(ipo.name)}</h2></div>
     <div className="ipo-detail-summary"><IpoCompanyLogo name={ipo.name} entries={directory} /><span><small>{ipo.symbol} · {ipo.issueType === "sme" ? "SME" : "Mainboard"}</small><b>{stageLabels[stage]}</b></span>{stage === "allotted" && ipo.details?.registrarUrl && <a href={ipo.details.registrarUrl} target="_blank" rel="noopener noreferrer">Check status <ArrowUpRight size={16} /></a>}</div>
     <section className="ipo-detail-section"><h3><CalendarDays size={21} /> Tentative timeline</h3><ol className="ipo-timeline">{timeline.map(([label, date]) => <li key={label} className={(stage === "open" && label === "Close date") || (stage === "waiting" && label === "Allotment date") || (stage === "allotted" && label === "Listing date") ? "current" : ""}><span>{label}</span><b>{ipoDate(date, true)}</b></li>)}</ol><p>Dates are tentative until confirmed. An expected allotment date is not proof that results are out.</p></section>
-    <section className="ipo-detail-section"><h3><ChartNoAxesColumnIncreasing size={21} /> Estimated allotment chances</h3><div className="ipo-chance-list">{["bNII · Above ₹10 lakh", "sNII · ₹2–10 lakh", "Retail"].map(label => <div key={label}><b>{label}</b><span>Data unavailable</span></div>)}</div><p>Category-wise valid applications and available allotments are not provided by the current feed. Total subscription alone cannot reliably determine “1 out of N” chances. Category eligibility depends on the issue.</p></section>
+    <IpoChances key={ipo.id} name={ipo.name} upcoming={stage === "upcoming"} />
     <section className="ipo-detail-section ipo-registrar"><h3><ShieldCheck size={21} /> Check with the registrar</h3><b>{ipo.details?.registrarName || "Registrar details awaiting confirmation"}</b>{ipo.details?.registrarUrl && <a href={ipo.details.registrarUrl} target="_blank" rel="noopener noreferrer">{stage === "allotted" ? "Allotment out — check status" : "Visit official status page"}<ArrowUpRight size={17} /></a>}{ipo.details?.allotmentEvidenceUrl && <a href={ipo.details.allotmentEvidenceUrl} target="_blank" rel="noopener noreferrer">{ipo.details.allotmentEvidenceLabel}<ArrowUpRight size={14} /></a>}<p>Enter your PAN only on the official website. PaperTrade never asks for or stores it. If publication cannot be verified, check with the registrar directly.</p></section>
   </section>;
 }

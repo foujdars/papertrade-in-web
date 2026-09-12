@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, Pause, Play, RotateCcw, SkipForward, X, SlidersHorizontal } from "lucide-react";
@@ -96,7 +97,7 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
     </div>
     <div className="bar-replay-chart">
       {!!visible.length && <MarketChart key={`${instrument.instrumentKey}-${timeframe}`} instrument={instrument} timeframe={timeframe} activeTool={tool} magnet hiddenDrawings={selecting} indicators={indicators} chartAction={action} chartTheme={theme} visibleBars={60} replayCandles={visible} replaySelecting={selecting} replayStartTime={hasStarted ? null : selecting ? current?.time ?? null : startTime} replayPrompt={showStart && !hasStarted} onReplayPreview={previewAt} onReplaySelect={startAt} onReplayPlay={playFromHere} tradeMarkers={selecting ? [] : account.fills} clearSignal={clearSignal} onDrawingComplete={() => setTool("cursor")} onFeedStatus={ignoreFeed} />}
-      {!visible.length && <div className="bar-replay-empty" role="status"><RotateCcw size={25} /><p>{message}</p>{!loading && <button type="button" onClick={() => { reload(timeframe); setRetry((value) => value + 1); }}>Retry</button>}</div>}
+      {!visible.length && <div className="bar-replay-empty" role="status">{loading ? <CandleLoader label={message} /> : <p>{message}</p>}{!loading && <button type="button" onClick={() => { reload(timeframe); setRetry((value) => value + 1); }}>Retry</button>}</div>}
       {timeMenu && <ChartTimeframeMenu current={timeframe} onSelect={reload} onClose={() => setTimeMenu(false)} />}
       {functionsOpen && <ChartFunctionMenu indicators={indicators} onToggleIndicator={(name) => setIndicators((value) => ({ ...value, [name]: !value[name] }))} onAction={(type) => setAction((value) => ({ type, token: (value?.token ?? 0) + 1 }))} onClose={() => setFunctionsOpen(false)} />}
     </div>

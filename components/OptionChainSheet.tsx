@@ -1,7 +1,8 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
-import { Activity, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { optionToInstrument, underlyingToInstrument, type FnoUnderlying, type OptionChainRow, type OptionContractSide } from "@/lib/fno";
 import { loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
@@ -121,7 +122,7 @@ export function OptionChainSheet({
               </div>
             );
           })}
-          {loading && !rows.length && <div className="positions-empty"><Activity size={28} /><b>Loading live option chain</b><span>Fetching Calls and Puts from Upstox.</span></div>}
+          {loading && !rows.length && <CandleLoader label="Loading live option chain" />}
           {!loading && error && <div className="positions-empty"><b>Option chain unavailable</b><span>{error}</span></div>}
           {!loading && !error && !rows.length && <div className="positions-empty"><b>No active contracts</b><span>Select another expiry.</span></div>}
         </div>

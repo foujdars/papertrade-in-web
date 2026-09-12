@@ -2,6 +2,8 @@
 
 import { Activity, ArrowRight, Clock3, RefreshCw, ScanSearch } from "lucide-react";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
+import { CandleLoader } from "./CandleLoader";
+import { usePullToRefresh } from "./usePullToRefresh";
 import { StockLogo } from "@/components/StockLogo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
@@ -22,8 +24,6 @@ const STORAGE_KEY = "papertrade-market-scanner-results-v4";
 const SCAN_MODE_STORAGE_KEY = "papertrade-market-scanner-mode-v1";
 const SCANNER_SELECTION_STORAGE_KEY = "papertrade-market-scanner-selection-v1";
 const AUTO_SCAN_INTERVAL_MS = 60_000;
-const PULL_REFRESH_THRESHOLD = 58;
-const MAX_PULL_DISTANCE = 86;
 const tradingScannerOptions: ScannerOption[] = [
   { id: "VOLUME", label: "Volume Shocker", description: "Unusual participation versus the 20-day average", cadence: "Live" },
   { id: "OPEN_HIGH", label: "Open = High", description: "Stocks holding the session high from the opening print", cadence: "1D" },
@@ -138,9 +138,7 @@ export function MarketsWorkspace({
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
   const marketListRef = useRef<HTMLElement | null>(null);
-  const pullStartYRef = useRef<number | null>(null);
-  const pullDistanceRef = useRef(0);
-  const [pullDistance, setPullDistance] = useState(0);
+  const pullStageRef = useRef<HTMLDivElement | null>(null);
 
   const scannerOptions = scannerGroup === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const selectedOption = allScannerOptions.find((option) => option.id === activeScanner) ?? allScannerOptions[0];
@@ -243,33 +241,10 @@ export function MarketsWorkspace({
 
   useEffect(() => () => scanAbortRef.current?.abort(), []);
 
-  const resetPullRefresh = useCallback(() => {
-    pullStartYRef.current = null;
-    pullDistanceRef.current = 0;
-    setPullDistance(0);
-  }, []);
-
-  const handlePullStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
-    if (loadingScanner || (marketListRef.current?.scrollTop ?? 0) > 0) return;
-    pullStartYRef.current = event.touches[0]?.clientY ?? null;
-  }, [loadingScanner]);
-
-  const handlePullMove = useCallback((event: React.TouchEvent<HTMLElement>) => {
-    if (pullStartYRef.current === null || (marketListRef.current?.scrollTop ?? 0) > 0) return;
-    const rawDistance = (event.touches[0]?.clientY ?? pullStartYRef.current) - pullStartYRef.current;
-    const distance = Math.min(MAX_PULL_DISTANCE, Math.max(0, rawDistance * 0.52));
-    pullDistanceRef.current = distance;
-    setPullDistance(distance);
-  }, []);
-
-  const handlePullEnd = useCallback(() => {
-    const shouldRefresh = pullDistanceRef.current >= PULL_REFRESH_THRESHOLD;
-    resetPullRefresh();
-    if (shouldRefresh) void runSelectedScan(undefined, true);
-  }, [resetPullRefresh, runSelectedScan]);
+  usePullToRefresh(marketListRef, pullStageRef, Boolean(loadingScanner), () => runSelectedScan(undefined, true));
 
   return (
-    <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners" onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} onTouchCancel={resetPullRefresh}>
+    <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
 
       <MarketSectionTabs active={scannerGroup} onChange={(section) => {
         if (section === "WATCHLIST") onOpenWatchlist();
@@ -281,18 +256,12 @@ export function MarketsWorkspace({
       </div>
 
       <div className="market-results-head">
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><span className="market-pull-hint">Pull down to refresh</span><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
+      <div className="scanner-pull-stage" ref={pullStageRef} data-pull="idle">
+        <div className="scanner-pull-feedback" aria-live="off"><span className="pull-hint">Pull down to refresh</span><span className="pull-ready"><RefreshCw size={15} />Release to refresh</span><span className="pull-refreshing"><CandleLoader compact label="Refreshing scanner" />Refreshing</span></div>
       <div className="market-discovery-list">
-        <div
-          className={`scanner-pull-indicator ${pullDistance > 0 ? "visible" : ""} ${pullDistance >= PULL_REFRESH_THRESHOLD ? "ready" : ""}`}
-          style={{ height: pullDistance > 0 ? `${pullDistance}px` : undefined }}
-          aria-hidden={pullDistance <= 0}
-        >
-          <RefreshCw size={17} />
-          <span>{pullDistance >= PULL_REFRESH_THRESHOLD ? "Release to refresh" : "Pull to refresh"}</span>
-        </div>
         {activeRows.map((row) => {
           const item = stockUniverse.find((instrument) => instrument.symbol === row.symbol);
           if (!item) return null;
@@ -312,9 +281,10 @@ export function MarketsWorkspace({
             </button>
           );
         })}
-        {loadingScanner === activeScanner && !activeRows.length && <div className="scanner-skeleton-list" aria-label={`Scanning ${selectedOption.label}`}>{Array.from({ length: 7 }, (_, index) => <div className="scanner-skeleton-row" key={`scanner-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
+        {loadingScanner === activeScanner && !activeRows.length && <CandleLoader label={`Scanning ${selectedOption.label}`} />}
         {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Automatically loading {selectedOption.label}. Pull down to refresh.</span></div>}
         {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>{activeSnapshot.error ? "No saved matches" : "No stocks pass this scan"}</b><span>{activeSnapshot.error ? "Refresh to check for current setups." : `The completed Upstox candles returned no current ${selectedOption.label} setup.`}</span></div>}
+      </div>
       </div>
     </section>
   );

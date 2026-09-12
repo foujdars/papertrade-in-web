@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
 import {
@@ -160,7 +161,7 @@ export function HomeWorkspace({
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>
         <section className="home-stock-preview" role="dialog" aria-modal="true" aria-label={`${preview.symbol} stock preview`} onClick={(event) => event.stopPropagation()}>
           <header><StockLogo symbol={preview.symbol} /><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
-          <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{preview.price > 0 ? formatInr(preview.price) : "Quote loading"}</strong></span><b className={preview.changePercent >= 0 ? "positive" : "negative"}>{preview.changePercent >= 0 ? "+" : ""}{preview.changePercent.toFixed(2)}%</b></div>
+          <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{preview.price > 0 ? formatInr(preview.price) : <CandleLoader compact label="Loading quote" />}</strong></span><b className={preview.changePercent >= 0 ? "positive" : "negative"}>{preview.changePercent >= 0 ? "+" : ""}{preview.changePercent.toFixed(2)}%</b></div>
           <div className="home-stock-preview-tags">{preview.categories.length ? preview.categories.map((category) => <span key={category}>{category}</span>) : <span>ALL NSE</span>}</div>
           <p>Preview the stock first, then open its remembered chart setup when you are ready.</p>
           <div className="home-stock-preview-actions"><button onClick={onOpenWatchlist}><Layers3 size={16} /> Watchlists</button><button onClick={() => onOpenStock(preview.symbol)}><CandlestickChart size={16} /> Open chart <ArrowRight size={15} /></button></div>

@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "@/components/CandleLoader";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,5 +30,5 @@ export default function AuthCallbackPage() {
     });
   }, [router]);
 
-  return <main className="auth-screen auth-loading-screen"><b>{message}</b></main>;
+  return <main className="auth-screen auth-loading-screen">{message.startsWith("Completing secure") ? <CandleLoader label={message} /> : <b>{message}</b>}</main>;
 }

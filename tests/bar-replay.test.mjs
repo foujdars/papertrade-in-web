@@ -23,6 +23,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
   const chart = () => null;
   const mocks = {
     react,
+    "./CandleLoader": { CandleLoader: () => null },
     "@/components/MarketChart": { MarketChart: chart, DEFAULT_CHART_INDICATORS: {} },
     "@/components/ChartFunctionMenu": {}, "@/components/CompactSelectors": {}, "@/components/StockLogo": {},
     "@/lib/market": { formatInr: String },

@@ -23,7 +23,7 @@ export function LongPressTradeRow({ onLongPress, onClick, onKeyDown, children, .
     onPointerDown={(event) => {
       cancelHold();
       suppressClick.current = false;
-      if (event.button !== 0 || !event.isPrimary || (event.target as HTMLElement).closest("button, input, select, textarea, a, .pnl-trade-review-chart")) return;
+      if (event.button !== 0 || !event.isPrimary || (event.target as HTMLElement).closest("button, input, select, textarea, a, .pnl-trade-review-chart, .trade-review-dialog")) return;
       origin.current = { x: event.clientX, y: event.clientY };
       timer.current = setTimeout(() => {
         timer.current = null;

@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import { Bell, Building2, Clock3, Rocket, Store } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -244,7 +245,7 @@ export function IpoWorkspace() {
 
       <div className="ipo-card-list">
         {visibleIpos.map(ipo => <IpoLifecycleCard key={ipo.id} ipo={ipo} stage={stageOf(ipo)} directory={directory} onOpen={() => setSelectedId(ipo.id)} />)}
-        {loading && !visibleIpos.length && Array.from({ length: 5 }, (_, index) => <div className="ipo-card ipo-card-skeleton" key={`ipo-skeleton-${index}`} aria-hidden="true"><span /><span /><span /><span /></div>)}
+        {loading && !visibleIpos.length && <CandleLoader label="Loading IPOs" />}
         {!loading && !error && !visibleIpos.length && <div className="positions-empty"><Rocket size={30} /><b>No {filter === "active" ? "active" : filter} {board === "regular" ? "Mainboard" : "SME"} IPOs</b><span>Try the other market segment or Upcoming. New issues appear automatically.</span></div>}
       </div>
       </>

@@ -96,8 +96,8 @@ test("ships project assets and removes the starter preview", async () => {
   await access(new URL(`../public${apkPath}`, import.meta.url));
   const welcome = await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8");
   assert.match(welcome, /Preparing your paper trading workspace/);
-  assert.match(welcome, /Practise/);
-  assert.match(welcome, /a man perfect/);
+  assert.match(welcome, /A little practice/);
+  assert.match(welcome, /A more confident you/);
   assert.match(authProvider, /WELCOME_MINIMUM_MS = 5_000/);
   assert.match(supabaseClient, /flowType: "pkce"/);
   assert.match(authMigration, /enable row level security/);
@@ -105,7 +105,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
-  assert.match(dashboard, /pnl-inline-fills/);
+  assert.match(dashboard, /TradeExecutionSummary/);
   assert.doesNotMatch(dashboard, /Order book positions/);
   assert.match(dashboard, /trade\.sourceOrderIds/);
   assert.match(dashboard, /<BrandMark size=\{34\}/);

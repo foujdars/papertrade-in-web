@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 
 import type { Session } from "@supabase/supabase-js";
 import { LogIn, ShieldCheck, Trash2 } from "lucide-react";
@@ -54,7 +55,7 @@ export function DeleteAccountClient() {
   }
 
   if (deleted) return <div className={styles.success}><b>Your PaperTrade IN account has been deleted.</b><br />Your profile and synchronized paper-trading data were permanently removed. You may now close this page.</div>;
-  if (loading) return <div className={styles.actionCard}><b>Checking your secure session…</b></div>;
+  if (loading) return <div className={styles.actionCard}><CandleLoader label="Checking your secure session" /></div>;
 
   if (!session) {
     return (

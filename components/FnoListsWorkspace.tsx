@@ -1,4 +1,5 @@
 "use client";
+import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, Cable, Search, Star, X } from "lucide-react";
@@ -78,12 +79,12 @@ export function FnoListsWorkspace({
             }} aria-label={`Open ${item.symbol} chart`}>
               {item.underlyingType === "EQUITY" && <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} />}
               <span className="fno-symbol-identity"><b>{item.symbol}</b><small>{item.name} · NSE</small></span>
-              <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{quote ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : "Loading"}</small></span>
+              <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{quote ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : <CandleLoader compact label="Loading quote" />}</small></span>
               <button type="button" className={`watchlist-star ${starred ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); onStar(item); }} aria-label={`${starred ? "Manage" : "Add"} ${item.symbol} custom watchlists`}><Star size={16} fill={starred ? "currentColor" : "none"} /></button>
             </div>
           );
         })}
-        {loading && !underlyings.length && <div className="positions-empty"><Activity size={30} /><b>Loading active derivative symbols</b><span>Reading the current NSE contracts from Upstox.</span></div>}
+        {loading && !underlyings.length && <div className="positions-empty"><CandleLoader label="Loading active derivative symbols" /></div>}
         {!loading && error && <div className="positions-empty"><Cable size={30} /><b>F&amp;O list unavailable</b><span>{error}</span></div>}
         {!loading && !error && !filtered.length && <div className="positions-empty"><Activity size={30} /><b>No matching symbols</b><span>Try another symbol name.</span></div>}
       </div>

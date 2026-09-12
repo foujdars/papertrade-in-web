@@ -7,6 +7,56 @@ import postcss from "postcss";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
+test("execution summary allocates partial-exit fees and preserves short-trade sides", async () => {
+  const { buildClosedTrades, getOrderCharges } = await import("../lib/trade-analytics.ts");
+  const require = createRequire(import.meta.url), exports = {};
+  const code = ts.transpileModule(await source("components/TradeExecutionSummary.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  new Function("require", "exports", code)(id => id === "@/lib/trade-analytics" ? { getOrderCharges } : id === "@/lib/market" ? { formatInr: n => "₹" + n.toFixed(2) } : require(id), exports);
+  const entry = { id: "entry", symbol: "TEST", side: "SELL", product: "INTRADAY", quantity: 80, price: 25, createdAt: Date.parse("2026-09-11T04:29:43Z"), charges: { total: 2 } };
+  const exit = { ...entry, id: "exit", side: "BUY", quantity: 160, price: 24, createdAt: Date.parse("2026-09-11T04:30:02Z"), charges: { total: 6 } };
+  const [trade] = buildClosedTrades([entry, exit]);
+  const view = exports.TradeExecutionSummary({ trade, exitOrder: exit });
+  const rendered = viewText(view);
+  assert.match(rendered, /SELL80 @ ₹25.00/);
+  assert.match(rendered, /BUY80 @ ₹24.00/);
+  assert.match(rendered, /09:59:43/);
+  assert.match(rendered, /10:00:02/);
+  assert.match(rendered, /Fees₹5.00\(₹2.00 \+ ₹3.00\)/);
+  assert.match(rendered, /\+₹75.00Complete/);
+  assert.doesNotMatch(rendered, /160 @/);
+});
+
+test("pull refresh uses a passive-safe smooth layer, ignores sideways scroll and only refreshes once", async () => {
+  const effects = [], events = new Map(), style = {}, layer = { style: { setProperty: (key, value) => style[key] = value }, dataset: {} };
+  const host = { scrollTop: 0, addEventListener: (type, fn, options) => events.set(type, { fn, options }), removeEventListener: type => events.delete(type) };
+  const exports = {};
+  let raf, calls = 0, complete;
+  const code = ts.transpileModule(await source("components/usePullToRefresh.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", "requestAnimationFrame", "cancelAnimationFrame", code)(() => ({ useEffect: fn => effects.push(fn), useRef: current => ({ current }) }), exports, fn => { raf = fn; return 1; }, () => { raf = null; });
+  exports.usePullToRefresh({ current: host }, { current: layer }, false, () => { calls++; return new Promise(resolve => { complete = resolve; }); });
+  const cleanups = effects.map(fn => fn());
+  const fire = (type, x = 0, y = 0) => events.get(type).fn({ touches: [{ clientX: x, clientY: y }], target: { closest: () => null }, cancelable: true, preventDefault() {} });
+  const paint = () => { const next = raf; raf = null; next?.(); };
+  assert.equal(events.get("touchmove").options.passive, false);
+  fire("touchstart"); fire("touchmove", 120, 20); fire("touchend"); paint();
+  assert.equal(calls, 0);
+  fire("touchstart"); fire("touchmove", 0, 70); paint(); fire("touchend"); paint();
+  assert.equal(calls, 0, "Short pulls spring back without a request");
+  assert.equal(style["--pull-distance"], "0.00px");
+  fire("touchstart"); fire("touchmove", 0, 200); paint();
+  assert.equal(layer.dataset.pull, "ready");
+  assert.ok(parseFloat(style["--pull-distance"]) < 86);
+  fire("touchend"); paint();
+  assert.equal(layer.dataset.pull, "refreshing"); assert.equal(calls, 1);
+  fire("touchstart"); fire("touchmove", 0, 300); fire("touchend");
+  assert.equal(calls, 1, "A second gesture cannot overlap a refresh");
+  complete(); await new Promise(setImmediate); paint();
+  assert.equal(layer.dataset.pull, "idle");
+  host.scrollTop = 30; fire("touchstart"); fire("touchmove", 0, 200); fire("touchend");
+  assert.equal(calls, 1, "Normal list scrolling is not intercepted");
+  cleanups.forEach(fn => fn?.()); assert.equal(events.size, 0);
+});
+
 test("Back dismisses trade selection before its parent screen, and Done doesn't consume the next Back", async () => {
   const require = createRequire(import.meta.url);
   const compiled = ts.transpileModule(await source("components/useTransientBack.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
@@ -81,7 +131,7 @@ test("holding a trade selects it once, while taps, scrolling and cancelled holds
 test("welcome artwork uses each user's own name with a safe generic fallback", async () => {
   const compiled = ts.transpileModule(await source("components/WelcomeScreen.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {}, require = createRequire(import.meta.url);
-  new Function("require", "exports", compiled)(id => id === "./BrandMark" ? { BrandMark: () => null } : require(id), exports);
+  new Function("require", "exports", compiled)(id => id === "./BrandMark" ? { BrandMark: () => null } : id === "./CandleLoader" ? { CandleLoader: () => null } : require(id), exports);
   assert.match(viewText(exports.WelcomeScreen({ name: "  Asha Sharma " })), /Welcome back,Asha/);
   assert.doesNotMatch(viewText(exports.WelcomeScreen({ name: "Asha Sharma" })), /Rajkumar|Sharma/);
   for (const name of [undefined, "", "   ", 123]) assert.match(viewText(exports.WelcomeScreen({ name })), /Welcome toPaperTrade IN/);
@@ -94,8 +144,11 @@ test("compact trade cards retain execution facts and only show the selection too
   const dashboard = await source("components/TradingDashboard.tsx");
   assert.doesNotMatch(dashboard, /pnl-dismiss-row|Order book positions|Hold a trade to select it/);
   assert.match(dashboard, /visiblePnlTrades.length && selectingTrades && <div/);
-  const fills = dashboard.slice(dashboard.indexOf('className="pnl-inline-fills"'), dashboard.indexOf('{menuOpen && reviewInstrument'));
-  for (const detail of ["order.quantity", "order.price", "order.time", "getOrderCharges(order).total", "paperOrderStatusLabel(order)", "openPaperOrderChart(order)"]) assert.ok(fills.includes(detail), detail);
+  assert.match(dashboard, /<TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get\(trade.id\)}/);
+  assert.match(dashboard, /<TradeReviewDialog/);
+  assert.match(dashboard, /className="stock-identity pnl-stock-chart-link"/);
+  const summary = await source("components/TradeExecutionSummary.tsx");
+  for (const detail of ["trade.quantity", "trade.entryPrice", "trade.exitPrice", "trade.openedAt", "trade.closedAt", "trade.charges", "trade.netPnl"]) assert.ok(summary.includes(detail), detail);
 });
 
 test("chart brackets start with entry only and commit protection only after a completed drag", async () => {
@@ -137,6 +190,8 @@ async function componentHarness(path, name, initialStates = []) {
   };
   const mocks = {
     react,
+    "./CandleLoader": { CandleLoader: () => null },
+    "./usePullToRefresh": { usePullToRefresh() {} },
     "@/components/StockLogo": { StockLogo: () => null },
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
     "@/lib/market": { formatInr: String, deriveNetChange: () => 0, formatSignedMarketMove: String },
@@ -294,7 +349,8 @@ test("scanner removes redundant controls while keeping automatic and pull refres
   assert.match(markets, /window.setInterval\(scanWhenReady, AUTO_SCAN_INTERVAL_MS\)/);
   assert.doesNotMatch(markets, /showStrategyInfo|activeStrategyDescription|scanner-strategy-details|scanner-inline-error/);
   assert.match(markets, /runSelectedScan\(undefined, true\)/);
-  assert.match(markets, /onTouchEnd={handlePullEnd}/);
+  assert.match(markets, /usePullToRefresh\(marketListRef, pullStageRef/);
+  assert.match(markets, /Pull down to refresh/);
 });
 
 test("IPO keeps filters and research links but replaces oversized missing-GMP messages", async () => {
@@ -310,7 +366,7 @@ test("IPO keeps filters and research links but replaces oversized missing-GMP me
   assert.match(card, /gmpTone\(ipo.gmpPercent\)/);
   assert.match(card, /ipo.gmpPercent.toFixed\(2\)/);
   assert.match(card, /href={ipo.details.registrarUrl}/);
-  assert.match(card, /Category-wise valid applications/);
+  assert.match(card, /<IpoChances/);
 });
 
 test("compact styling uses theme colours and preserves readable, scrollable controls", async () => {
