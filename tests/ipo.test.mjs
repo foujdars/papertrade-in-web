@@ -11,7 +11,38 @@ import {
   sortIposByClosingDate,
 } from "../lib/ipo.ts";
 import { findPublicGmp, parsePublicGmpHtml } from "../lib/ipo-gmp-server.ts";
-import { ipoStage, isRecentListing, listingReturn, gmpTone } from "../lib/ipo-lifecycle.ts";
+import { ipoStage, isRecentListing, listingReturn, gmpTone, compactIpoName, sortIposByLifecycle } from "../lib/ipo-lifecycle.ts";
+import { parseKfinIssuers, reportedAllotmentOut, ipoPublicationSlug } from "../lib/ipo-publication.ts";
+
+test("compact names remove only the redundant IPO suffix", () => {
+  assert.equal(compactIpoName("Pranav Constructions IPO"), "Pranav Constructions");
+  assert.equal(compactIpoName("IPOWER Limited"), "IPOWER Limited");
+});
+
+test("active issues sort release first, waiting second, then nearest closing date", () => {
+  const result = sortIposByLifecycle([
+    ipo({ id: "later", biddingEndDate: "2026-09-16" }),
+    ipo({ id: "waiting", status: "closed", details: { allotmentDate: "2026-09-12" } }),
+    ipo({ id: "closing", biddingEndDate: "2026-09-12" }),
+    ipo({ id: "released-later", status: "closed", details: { allotmentPublished: true, allotmentDate: "2026-09-11" } }),
+    ipo({ id: "released-first", status: "closed", details: { allotmentPublished: true, allotmentDate: "2026-09-10" } }),
+  ], "2026-09-12");
+  assert.deepEqual(result.map(item => item.id), ["released-first", "released-later", "waiting", "closing", "later"]);
+});
+
+test("KFin catalogue is parsed as data and release reports must match the primary issuer", () => {
+  const name = "Pranav Constructions IPO";
+  const script = `const rows=JSON.parse('[{"clientId":"123","name":"PRANAV CONSTRUCTIONS LIMITED"}]');`;
+  assert.deepEqual(parseKfinIssuers(script), ["PRANAV CONSTRUCTIONS LIMITED"]);
+  assert.deepEqual(parseKfinIssuers("JSON.parse('broken')"), []);
+  assert.equal(ipoPublicationSlug(name), "pranav-constructions-ipo");
+  const record = (issuer, status) => `<section data-ipo-name="${issuer}" data-ipo-status="${status}" data-testid="ipo-summary-card">`;
+  assert.equal(reportedAllotmentOut(record("Pranav Constructions", "Allotment Out"), name), true);
+  assert.equal(reportedAllotmentOut(record("Pranav Constructions", "Awaiting Allotment"), name), false);
+  assert.equal(reportedAllotmentOut(record("Different Company", "Allotment Out"), name), false);
+  assert.equal(reportedAllotmentOut("<p>Pranav Constructions Allotment Out</p>", name), false);
+  assert.equal(reportedAllotmentOut(script, name), false, "registrar dropdown presence alone is not proof");
+});
 
 test("IPO stage keeps closed issues in Open until actual listing is known", () => {
   const base = { status: "open", biddingStartDate: "2026-09-01", biddingEndDate: "2026-09-03", details: { dailyEndTime: "17:00:00", listingDate: "2026-09-08", listingPrice: null, allotmentPublished: false } };

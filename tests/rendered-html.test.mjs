@@ -128,7 +128,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /mini-order-symbol/);
   assert.match(dashboard, /order-symbol-link/);
   assert.doesNotMatch(dashboard, /Auto 3:20/);
-  assert.match(marketsWorkspace, /<h2>Watchlist<\/h2>/);
+  assert.doesNotMatch(marketsWorkspace, /<h2>Watchlist<\/h2>/);
+  assert.match(marketsWorkspace, /<MarketSectionTabs/);
   const nimbleScanner = await readFile(new URL("../lib/nimble-scanner.ts", import.meta.url), "utf8");
   assert.match(marketsWorkspace, /NIMBLE_STRATEGIES/);
   assert.match(nimbleScanner, /EMA 21 Retest/);
@@ -230,7 +231,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /quantityStep/);
   assert.doesNotMatch(marketsWorkspace, /fno-symbol-row|Indices|F&amp;O/);
   assert.match(fnoListsWorkspace, /fno-symbol-row/);
-  assert.match(fnoListsWorkspace, /Indices &amp; F&amp;O/);
+  assert.doesNotMatch(fnoListsWorkspace, /Indices &amp; F&amp;O/);
+  assert.match(fnoListsWorkspace, /aria-label="Indices and F&O lists"/);
   assert.match(fnoListsWorkspace, /quote\.changePercent/);
   assert.match(fnoListsWorkspace, /watchlist-star/);
   assert.match(fnoListsWorkspace, /onQuoteKeysChange/);

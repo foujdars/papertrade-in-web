@@ -57,10 +57,11 @@ export function FnoListsWorkspace({
 
   return (
     <section className="market-discovery-panel fno-lists-panel" aria-label="Indices and F&O lists">
-      <div className="market-discovery-head"><div><span className="eyebrow">DERIVATIVES WORKSPACE</span><h2>Indices &amp; F&amp;O</h2></div><button className="icon-button" onClick={onClose} aria-label="Close F&O symbols"><X size={20} /></button></div>
+
       <nav className="trend-tabs" aria-label="F&O market lists">
         <button className={tab === "indices" ? "active" : ""} onClick={() => { setTab("indices"); setSearch(""); }}>Indices</button>
         <button className={tab === "fno" ? "active" : ""} onClick={() => { setTab("fno"); setSearch(""); }}>F&amp;O stocks</button>
+        <button className="fno-list-close" onClick={onClose} aria-label="Close F&O symbols"><X size={18} /></button>
       </nav>
       <label className="market-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "indices" ? "Search indices" : "Search F&O stocks"} /></label>
       <div className="market-discovery-list">

@@ -4,6 +4,7 @@ export type IpoDetails = {
   listingDate: string; allotmentDate: string; refundDate: string; dematDate: string;
   listingPrice: number | null; issuePrice: number | null; dailyEndTime: string;
   registrarName: string; registrarUrl: string; allotmentPublished: boolean;
+  allotmentEvidenceUrl?: string; allotmentEvidenceLabel?: string;
 };
 export type IpoStage = "upcoming" | "open" | "waiting" | "allotted" | "listed";
 export const stageLabels: Record<IpoStage, string> = {
@@ -28,3 +29,15 @@ export function listingReturn(price: number | null | undefined, issuePrice: numb
     ? (price / issuePrice - 1) * 100 : null;
 }
 export function gmpTone(percent: number | null) { return percent === null || !Number.isFinite(percent) ? "pending" : percent >= 15 ? "high" : "low"; }
+
+export function compactIpoName(name: string) { return name.replace(/\s+IPO\s*$/i, "").trim(); }
+export function sortIposByLifecycle(ipos: IpoSummary[], today: string, time = "00:00:00") {
+  const rank: Record<IpoStage, number> = { allotted: 0, waiting: 1, open: 2, upcoming: 3, listed: 4 };
+  return [...ipos].sort((a, b) => {
+    const first = ipoStage(a, today, time), second = ipoStage(b, today, time);
+    if (first !== second) return rank[first] - rank[second];
+    const date = (ipo: IpoSummary, stage: IpoStage) => stage === "allotted" || stage === "waiting" ? ipo.details?.allotmentDate : stage === "upcoming" ? ipo.biddingStartDate : stage === "listed" ? ipo.details?.listingDate : ipo.biddingEndDate;
+    const left = date(a, first) || "9999-12-31", right = date(b, second) || "9999-12-31";
+    return left.localeCompare(right) || a.name.localeCompare(b.name);
+  });
+}

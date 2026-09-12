@@ -2,6 +2,7 @@ import "server-only";
 import { classifyAllotment, identifyRegistrar, normalizeIssuerName, parseMufgCompanies, validIpoDate, type IpoAllotment } from "./ipo-allotment";
 import { indiaDateKey } from "./ipo";
 import { upstoxFetch } from "./upstox-server";
+import { kfinPublicationReport } from "./ipo-kfin-server";
 
 type Issue = { id?: string; name?: string; symbol?: string; status?: string; bidding_end_date?: string; issue_type?: string };
 type Details = Issue & { timeline?: { allotment_date?: string; listing_date?: string }; registrar_info?: { name?: string; registrar?: string } };
@@ -52,7 +53,9 @@ async function loadMufgCompanies() {
   } catch { return []; }
 }
 
-export async function verifyPublishedAllotment(name: string) {
+export async function verifyPublishedAllotment(name: string, registrar = "mufg") {
+  if (registrar === "kfin") return kfinPublicationReport(name);
+  if (registrar !== "mufg") return undefined;
   return publishedBasis(name, await loadMufgCompanies());
 }
 
@@ -90,7 +93,7 @@ export async function loadAllotments() {
           const registrarName = data.registrar_info?.name || data.registrar_info?.registrar || "Registrar not announced";
           const registrar = identifyRegistrar(`${registrarName} ${data.registrar_info?.registrar ?? ""}`);
           const allotmentDate = validIpoDate(data.timeline?.allotment_date);
-          const evidenceUrl = registrar === "mufg" ? await publishedBasis(base.name, companies) : undefined;
+          const evidenceUrl = registrar === "mufg" ? await publishedBasis(base.name, companies) : registrar === "kfin" && data.status === "closed" ? await kfinPublicationReport(base.name) : undefined;
           allotments.push({ ...base, registrarName, registrar, allotmentDate, listingDate: validIpoDate(data.timeline?.listing_date),
             issueType: data.issue_type === "sme" ? "sme" : data.issue_type === "regular" ? "regular" : base.issueType,
             state: classifyAllotment(data.status ?? issue.status!, allotmentDate, today, Boolean(evidenceUrl)), evidenceUrl });

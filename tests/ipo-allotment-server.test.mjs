@@ -8,6 +8,7 @@ async function serverWith(t, upstream) {
   t.mock.method(globalThis, "__allotmentTestFetch", upstream);
   let source = await readFile(new URL("../lib/ipo-allotment-server.ts", import.meta.url), "utf8");
   source = source.replace('import "server-only";', "")
+    .replace('import { kfinPublicationReport } from "./ipo-kfin-server";', "const kfinPublicationReport = async () => undefined;")
     .replace('from "./ipo-allotment"', `from ${JSON.stringify(new URL("../lib/ipo-allotment.ts", import.meta.url).href)}`)
     .replace('from "./ipo"', `from ${JSON.stringify(new URL("../lib/ipo.ts", import.meta.url).href)}`)
     .replace('import { upstoxFetch } from "./upstox-server";', "const upstoxFetch = globalThis.__allotmentTestFetch;");
@@ -16,6 +17,34 @@ async function serverWith(t, upstream) {
 }
 
 globalThis.__allotmentTestFetch = async () => { throw new Error("Unconfigured test provider"); };
+
+test("KFin release checks require an exact catalogue match and an explicit release report", async (t) => {
+  let source = await readFile(new URL("../lib/ipo-kfin-server.ts", import.meta.url), "utf8");
+  source = source.replace('import "server-only";', "")
+    .replace('from "./ipo-publication"', `from ${JSON.stringify(new URL("../lib/ipo-publication.ts", import.meta.url).href)}`);
+  const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+  const server = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}#kfin`);
+  const reportUrl = "https://www.ipoji.com/ipo-allotment-status/pranav-constructions-ipo";
+  let released = false, catalogueCalls = 0;
+  t.mock.method(globalThis, "fetch", async (input, options) => {
+    const url = String(input);
+    assert.equal(options.redirect, "error");
+    if (url === "https://ipostatus.kfintech.com/") {
+      catalogueCalls++;
+      return new Response('<script src="./static/js/main.a123.js"></script>');
+    }
+    if (url === "https://ipostatus.kfintech.com/static/js/main.a123.js") return new Response(`JSON.parse('[{"clientId":"123","name":"PRANAV CONSTRUCTIONS LIMITED"}]')`);
+    assert.equal(url, reportUrl, "no investor lookup or arbitrary URLs are requested");
+    return new Response(`<section data-testid="ipo-summary-card" data-ipo-name="Pranav Constructions" data-ipo-status="${released ? "Allotment Out" : "Awaiting Allotment"}">`);
+  });
+  assert.equal(await server.kfinPublicationReport("Pranav Constructions IPO"), undefined);
+  released = true;
+  assert.equal(await server.kfinPublicationReport("Pranav Constructions IPO"), reportUrl);
+  assert.equal(await server.kfinPublicationReport("Different Company IPO"), undefined);
+  assert.equal(catalogueCalls, 1, "registrar catalogue is shared and cached");
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("offline"); });
+  assert.equal(await server.kfinPublicationReport("Pranav Constructions IPO"), undefined, "unavailable reports never become published");
+});
 
 test("IPO detail enrichment preserves missing prices and verifies publication rather than using dates", async (t) => {
   let calls = 0;
@@ -30,7 +59,7 @@ test("IPO detail enrichment preserves missing prices and verifies publication ra
   source = source.replace('import "server-only";', "")
     .replace('import { upstoxFetch } from "./upstox-server";', "const upstoxFetch = globalThis.__allotmentTestFetch;")
     .replace('from "./ipo-allotment"', `from ${JSON.stringify(new URL("../lib/ipo-allotment.ts", import.meta.url).href)}`)
-    .replace('import { verifyPublishedAllotment } from "./ipo-allotment-server";', "const verifyPublishedAllotment = async () => 'https://example.org/evidence.pdf';");
+    .replace('import { verifyPublishedAllotment } from "./ipo-allotment-server";', "const verifyPublishedAllotment = async (_name, registrar) => registrar === 'mufg' ? 'https://example.org/evidence.pdf' : undefined;");
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
   const server = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}#details`);
   const [first, second] = await Promise.all([server.loadIpoDetails("kfin"), server.loadIpoDetails("kfin")]);

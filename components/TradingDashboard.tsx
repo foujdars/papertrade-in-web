@@ -6,7 +6,7 @@ import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransien
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 
 import {
-  Activity, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
+  Activity, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingUp, Bookmark, WalletCards, X,
@@ -2428,7 +2428,7 @@ export function TradingDashboard() {
       {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           {sidebarOpen && <div className="watchlist-market-header">
-            <div className="market-discovery-head"><h2>Watchlist</h2><small>SAVED STOCKS</small></div>
+
             <MarketSectionTabs active="WATCHLIST" onChange={(section) => {
               if (section === "WATCHLIST") return;
               openNavigationSection("markets");
@@ -2776,7 +2776,7 @@ export function TradingDashboard() {
         <button className={activeNavigationSection === "fno" ? "active" : ""} onClick={() => openNavigationSection("fno")}><CandlestickChart size={19} /><span>F&amp;O</span></button>
         <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><Bookmark size={19} /><span>Watchlist</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
-        <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><Activity size={19} /><span>Portfolio</span></button>
+        <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><ChartNoAxesCombined size={19} /><span>P&amp;L</span></button>
       </nav>
 
       {replayInstrument && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={() => { setReplayInstrument(null); setReplayReviewTimeframe(null); }} />}
@@ -2859,7 +2859,7 @@ export function TradingDashboard() {
       )}
       {marketsOpen && marketsInitialGroup === "IPO" && (
         <section className="market-discovery-panel ipo-discovery-panel" aria-label="IPO opportunities">
-          <div className="market-discovery-head"><div><span className="eyebrow">PRIMARY MARKET</span><h2>IPOs</h2></div><button className="icon-button" onClick={() => setMarketsOpen(false)} aria-label="Close IPOs"><X size={20} /></button></div>
+
           <IpoWorkspace />
         </section>
       )}
@@ -2915,7 +2915,7 @@ export function TradingDashboard() {
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
           <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Complete trade record</span><h2>Profit &amp; loss</h2></div><button className="icon-button" onClick={() => { if (selectingTrades) setTradeSelection(null); else { setTradeSelection(null); setPnlOpen(false); } }} aria-label={selectingTrades ? "Exit trade selection" : "Close profit and loss"}><X size={20} /></button></div>
+            <div className="pnl-dismiss-row"><button className="icon-button" onClick={() => { if (selectingTrades) setTradeSelection(null); else { setTradeSelection(null); setPnlOpen(false); } }} aria-label={selectingTrades ? "Exit trade selection" : "Close profit and loss"}><X size={20} /></button></div>
             {!pnlHistoryOnly && <>
             <div className="pnl-stat-grid">
               <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>

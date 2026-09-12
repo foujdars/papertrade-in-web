@@ -140,7 +140,7 @@ export function MarketsWorkspace({
   const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
-  const marketListRef = useRef<HTMLDivElement | null>(null);
+  const marketListRef = useRef<HTMLElement | null>(null);
   const pullStartYRef = useRef<number | null>(null);
   const pullDistanceRef = useRef(0);
   const [pullDistance, setPullDistance] = useState(0);
@@ -252,12 +252,12 @@ export function MarketsWorkspace({
     setPullDistance(0);
   }, []);
 
-  const handlePullStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+  const handlePullStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
     if (loadingScanner || (marketListRef.current?.scrollTop ?? 0) > 0) return;
     pullStartYRef.current = event.touches[0]?.clientY ?? null;
   }, [loadingScanner]);
 
-  const handlePullMove = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+  const handlePullMove = useCallback((event: React.TouchEvent<HTMLElement>) => {
     if (pullStartYRef.current === null || (marketListRef.current?.scrollTop ?? 0) > 0) return;
     const rawDistance = (event.touches[0]?.clientY ?? pullStartYRef.current) - pullStartYRef.current;
     const distance = Math.min(MAX_PULL_DISTANCE, Math.max(0, rawDistance * 0.52));
@@ -272,8 +272,8 @@ export function MarketsWorkspace({
   }, [resetPullRefresh, runSelectedScan]);
 
   return (
-    <section className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
-      <div className="market-discovery-head"><h2>Watchlist</h2></div>
+    <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners" onTouchStart={handlePullStart} onTouchMove={handlePullMove} onTouchEnd={handlePullEnd} onTouchCancel={resetPullRefresh}>
+
       <MarketSectionTabs active={scannerGroup} onChange={(section) => {
         if (section === "WATCHLIST") onOpenWatchlist();
         else setScannerGroup(section);
@@ -296,14 +296,7 @@ export function MarketsWorkspace({
         <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Tap Scan now to retry" : "Run this strategy to build your shortlist"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
-      <div
-        ref={marketListRef}
-        className="market-discovery-list"
-        onTouchStart={handlePullStart}
-        onTouchMove={handlePullMove}
-        onTouchEnd={handlePullEnd}
-        onTouchCancel={resetPullRefresh}
-      >
+      <div className="market-discovery-list">
         <div
           className={`scanner-pull-indicator ${pullDistance > 0 ? "visible" : ""} ${pullDistance >= PULL_REFRESH_THRESHOLD ? "ready" : ""}`}
           style={{ height: pullDistance > 0 ? `${pullDistance}px` : undefined }}

@@ -19,13 +19,16 @@ export async function loadIpoDetails(id: string): Promise<IpoDetails> {
     if (!data || data.id !== id) throw new Error("IPO details could not be verified");
     const registrarName = data.registrar_info?.name || data.registrar_info?.registrar || "Registrar not announced";
     const registrar = identifyRegistrar(`${registrarName} ${data.registrar_info?.registrar ?? ""}`);
+    const evidenceUrl = data.status === "closed" ? await verifyPublishedAllotment(data.name ?? "", registrar) : undefined;
     const result: IpoDetails = {
       listingDate: validIpoDate(data.timeline?.listing_date), allotmentDate: validIpoDate(data.timeline?.allotment_date),
       refundDate: validIpoDate(data.timeline?.refund_initiation_date), dematDate: validIpoDate(data.timeline?.demat_transfer_date),
       listingPrice: positive(data.listing_price), issuePrice: positive(data.cut_off_price),
       dailyEndTime: /^\d{2}:\d{2}(:\d{2})?$/.test(data.daily_end_time ?? "") ? data.daily_end_time!.padEnd(8, ":00") : "",
       registrarName, registrarUrl: registrar === "bse" ? "" : allotmentLink(registrar) ?? "",
-      allotmentPublished: data.status === "closed" && registrar === "mufg" ? Boolean(await verifyPublishedAllotment(data.name ?? "")) : false,
+      allotmentPublished: Boolean(evidenceUrl),
+      allotmentEvidenceUrl: evidenceUrl,
+      allotmentEvidenceLabel: evidenceUrl ? registrar === "kfin" ? "Release reported by IPO Ji · issuer matched on KFin" : "Registrar publication" : undefined,
     };
     if (cache.size >= 1000) cache.delete(cache.keys().next().value!);
     cache.set(id, { expires: Date.now() + 300_000, data: result });

@@ -12,14 +12,13 @@ import {
   formatIpoGmp,
   shouldSendIpoClosingAlert,
   shouldSendDailyGmpAlert,
-  sortIposByClosingDate,
   type IpoListResponse,
   type IpoSummary,
 } from "@/lib/ipo";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoLifecycleCard, IpoDetailView } from "./IpoLifecycleCard";
-import { ipoStage, isRecentListing } from "@/lib/ipo-lifecycle";
+import { ipoStage, isRecentListing, sortIposByLifecycle } from "@/lib/ipo-lifecycle";
 import { readAllotmentAlertEnabled, setAllotmentAlertEnabled } from "@/lib/ipo-allotment-alerts";
 import { useIpoDirectory } from "@/components/IpoCompany";
 import { filterIpoBoard, type IpoBoard } from "@/lib/ipo-directory";
@@ -237,7 +236,7 @@ export function IpoWorkspace() {
   const upcomingCount = active.filter(ipo => stageOf(ipo) === "upcoming").length;
   const listed = boardIpos.filter(ipo => stageOf(ipo) === "listed" && isRecentListing(ipo.details?.listingDate, today))
     .sort((a, b) => (b.details?.listingDate ?? "").localeCompare(a.details?.listingDate ?? ""));
-  const visibleIpos = filter === "listed" ? listed : sortIposByClosingDate(active.filter(ipo => filter === "active" || (filter === "upcoming" ? stageOf(ipo) === "upcoming" : stageOf(ipo) !== "upcoming")));
+  const visibleIpos = filter === "listed" ? listed : sortIposByLifecycle(active.filter(ipo => filter === "active" || (filter === "upcoming" ? stageOf(ipo) === "upcoming" : stageOf(ipo) !== "upcoming")), today, time);
   const selectedIpo = ipos.find(ipo => ipo.id === selectedId);
 
   const toggleAlerts = async () => {
@@ -270,8 +269,13 @@ export function IpoWorkspace() {
         {<div className="ipo-toolbar-actions">
           <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
             {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
-            <span>{alertsEnabled ? "Daily IPO alerts on" : "Opening + GMP + closing alerts"}</span>
+            <span>{alertsEnabled ? "Daily alerts on" : "Daily alerts"}</span>
           </button>
+          <button type="button" className="ipo-allotment-switch" aria-pressed={allotmentAlerts} onClick={async () => {
+            const next = !allotmentAlerts;
+            if (await setAllotmentAlertEnabled(next)) setAllotmentAlerts(next);
+            else setError("Enable notification permission to receive allotment alerts.");
+          }}><Bell size={14} />{allotmentAlerts ? "Allotment on" : "Allotment alerts"}</button>
           <button type="button" className="scanner-run-button ipo-refresh-button" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh
           </button>
@@ -279,11 +283,7 @@ export function IpoWorkspace() {
       </div>
 
       <>
-      <button type="button" className="ipo-allotment-switch" aria-pressed={allotmentAlerts} onClick={async () => {
-        const next = !allotmentAlerts;
-        if (await setAllotmentAlertEnabled(next)) setAllotmentAlerts(next);
-        else setError("Enable notification permission to receive allotment alerts.");
-      }}><Bell size={14} />{allotmentAlerts ? "Allotment alerts on" : "Enable allotment alerts"}</button>
+
       {filter === "listed" && <p className="ipo-listed-caption">Listing-day price and return · retained for 30 days from listing.</p>}
       {fetchedAt && <p className="ipo-updated-caption"><Clock3 size={12} aria-hidden="true" />Updated {formatRefreshTime(fetchedAt)} IST</p>}
       {error && <div className="scanner-inline-error ipo-error"><Bell size={16} /><span>{error}</span></div>}
@@ -294,7 +294,7 @@ export function IpoWorkspace() {
         {!loading && !error && !visibleIpos.length && <div className="positions-empty"><Rocket size={30} /><b>No {filter === "active" ? "active" : filter} {board === "regular" ? "Mainboard" : "SME"} IPOs</b><span>Try the other market segment or Upcoming. New issues appear automatically.</span></div>}
       </div>
       </>
-      <p className="ipo-disclaimer">GMP is unofficial, speculative and can change without notice. Verify information independently. PaperTrade IN provides educational information and does not recommend applying to an IPO.</p>
+
     </div>
   );
 }
