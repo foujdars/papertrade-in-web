@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type HTMLAttributes } from "react";
 
-export function LongPressTradeRow({ onLongPress, onClick, children, ...props }: HTMLAttributes<HTMLDivElement> & { onLongPress: () => void }) {
+export function LongPressTradeRow({ onLongPress, onClick, onKeyDown, children, ...props }: HTMLAttributes<HTMLDivElement> & { onLongPress: () => void }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef({ x: 0, y: 0 });
   const suppressClick = useRef(false);
@@ -14,6 +14,12 @@ export function LongPressTradeRow({ onLongPress, onClick, children, ...props }: 
   }
   useEffect(() => () => { if (timer.current !== null) clearTimeout(timer.current); }, []);
   return <div {...props}
+    aria-keyshortcuts="Shift+Space"
+    onKeyDown={event => {
+      if (event.target === event.currentTarget && event.shiftKey && event.key === " ") {
+        event.preventDefault(); event.stopPropagation(); action.current();
+      } else onKeyDown?.(event);
+    }}
     onPointerDown={(event) => {
       cancelHold();
       suppressClick.current = false;

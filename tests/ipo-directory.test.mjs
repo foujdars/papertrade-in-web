@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
-import { filterIpoBoard, issuerKey, matchIpoDirectory, parseIpoDirectory, parseIssuerLogo, safeIpoLogo, safeIpoPage } from "../lib/ipo-directory.ts";
+import { filterIpoBoard, issuerKey, matchIpoDirectory, parseIpoDirectory, parseIssuerLogo, parseSupplementalIpoLogo, safeIpoLogo, safeIpoPage } from "../lib/ipo-directory.ts";
 
 const page = "https://www.chittorgarh.com/ipo/deepa-jewellers-ipo/2827/";
 const logo = "https://www.chittorgarh.net/images/ipo/deepa-jewellers-ipo-logo.png";
@@ -23,6 +23,41 @@ test("only the issuer's actual logo is used, never a broker or decorative image"
   const html = `<img src="${logo}" alt="Broker logo"><img alt="Deepa Jewellers IPO Logo" src="${logo}">`;
   assert.equal(parseIssuerLogo(html, "Deepa Jewellers IPO"), logo);
   assert.equal(parseIssuerLogo(html, "Rays of Belief IPO"), undefined);
+});
+
+test("supplemental logos require the exact main issuer and an approved image destination", () => {
+  const image = "https://media.ipoji.com/ipo/images/pranav-construction-ipo-logo.png";
+  const html = `<section data-testid="ipo-summary-card" data-ipo-name="Pranav Constructions"><img alt="Pranav Constructions IPO logo" src="${image}"></section>`;
+  assert.equal(parseSupplementalIpoLogo(html, "Pranav Constructions Limited IPO"), image);
+  assert.equal(parseSupplementalIpoLogo(html, "Prasol Chemicals"), undefined);
+  assert.equal(parseSupplementalIpoLogo(html.replace("ipo-summary-card", "related-issues"), "Pranav Constructions"), undefined);
+  assert.equal(parseSupplementalIpoLogo(html.replace("media.ipoji.com", "media.ipoji.com.evil.test"), "Pranav Constructions"), undefined);
+  assert.equal(safeIpoLogo(image + "?redirect=https://evil.test"), undefined);
+  assert.equal(safeIpoLogo(image.replace(".png", ".svg")), undefined);
+  assert.equal(issuerKey("Asset Reconstruction Co. (India)"), issuerKey("Asset Reconstruction Company (India) Limited IPO"));
+});
+
+test("supplemental logo requests share cached results and never follow arbitrary destinations", async t => {
+  const input = (await readFile(new URL("../lib/ipo-logos-server.ts", import.meta.url), "utf8"))
+    .replace('import "server-only";', "")
+    .replace('from "./ipo-directory"', `from ${JSON.stringify(new URL("../lib/ipo-directory.ts", import.meta.url).href)}`)
+    .replace('from "./ipo-publication"', `from ${JSON.stringify(new URL("../lib/ipo-publication.ts", import.meta.url).href)}`);
+  const compiled = ts.transpileModule(input, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+  const { loadSupplementalIpoLogo } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const logo = "https://media.ipoji.com/ipo/images/pranav-construction-ipo-logo.png";
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls++;
+    assert.equal(url, "https://www.ipoji.com/ipo/pranav-constructions-ipo");
+    assert.equal(options.redirect, "error");
+    assert.equal(options.headers, undefined);
+    return new Response(`<section data-testid="ipo-summary-card" data-ipo-name="Pranav Constructions"><img alt="Pranav Constructions IPO logo" src="${logo}"></section>`, { headers: { "content-type": "text/html" } });
+  });
+  assert.equal(await loadSupplementalIpoLogo("https://evil.test"), undefined);
+  assert.equal(calls, 0);
+  assert.deepEqual(await Promise.all([loadSupplementalIpoLogo("Pranav Constructions"), loadSupplementalIpoLogo("Pranav Constructions")]), [logo, logo]);
+  assert.equal(await loadSupplementalIpoLogo("Pranav Constructions"), logo);
+  assert.equal(calls, 1);
 });
 
 test("external page and logo URLs reject unsafe destinations", () => {

@@ -14,6 +14,7 @@ import "./portfolio-controls.css";
 import "./chart-brackets.css";
 import "./ipo-lifecycle.css";
 import "./list-density.css";
+import "./refinements.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

@@ -99,10 +99,7 @@ function formatScanTime(value: string) {
   return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value));
 }
 
-function readScanMode(): "manual" | "auto" {
-  if (typeof window === "undefined") return "auto";
-  return window.localStorage.getItem(SCAN_MODE_STORAGE_KEY) === "manual" ? "manual" : "auto";
-}
+
 
 function readSavedScanner(group: ScannerGroup): ScannerId {
   if (typeof window === "undefined") return group === "INVESTMENT" ? "ema-30-50-100" : "VOLUME";
@@ -137,7 +134,7 @@ export function MarketsWorkspace({
   const [activeScanner, setActiveScanner] = useState<ScannerId>(() => readSavedScanner(group));
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
-  const [scanMode, setScanMode] = useState<"manual" | "auto">(readScanMode);
+  const scanMode = "auto";
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
   const marketListRef = useRef<HTMLElement | null>(null);
@@ -283,17 +280,8 @@ export function MarketsWorkspace({
         {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><b>{option.label}</b><small>{option.cadence}</small></button>)}
       </div>
 
-      <div className="scanner-run-row">
-        <div className="scanner-run-actions">
-          <button type="button" className={`scanner-auto-switch ${scanMode === "auto" ? "active" : ""}`} role="switch" aria-checked={scanMode === "auto"} aria-label="Automatic one-minute scanning" onClick={() => setScanMode((current) => current === "auto" ? "manual" : "auto")}><span>{scanMode === "auto" ? "ON" : "OFF"}</span><i aria-hidden="true" /></button>
-          <button className="scanner-run-button" aria-label={activeSnapshot?.scannedAt ? "Refresh scan" : "Scan now"} onClick={() => void runSelectedScan(undefined, true)} disabled={Boolean(loadingScanner)}>
-            {loadingScanner === activeScanner ? <RefreshCw size={16} className="spin" /> : <ScanSearch size={16} />}
-            {activeSnapshot?.scannedAt ? "Refresh" : "Scan now"}
-          </button>
-        </div>
-      </div>
       <div className="market-results-head">
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Tap Scan now to retry" : "Run this strategy to build your shortlist"}</small></span>
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
       <div className="market-discovery-list">
@@ -325,7 +313,7 @@ export function MarketsWorkspace({
           );
         })}
         {loadingScanner === activeScanner && !activeRows.length && <div className="scanner-skeleton-list" aria-label={`Scanning ${selectedOption.label}`}>{Array.from({ length: 7 }, (_, index) => <div className="scanner-skeleton-row" key={`scanner-skeleton-${index}`}><span /><span><i /><i /></span><span><i /><i /></span></div>)}</div>}
-        {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Press Scan to load {selectedOption.label}. Nothing is fetched merely by changing tabs.</span></div>}
+        {!loadingScanner && !activeSnapshot?.scannedAt && <div className="positions-empty"><ScanSearch size={30} /><b>Ready to scan</b><span>Automatically loading {selectedOption.label}. Pull down to refresh.</span></div>}
         {!loadingScanner && activeSnapshot?.scannedAt && !activeRows.length && <div className="positions-empty"><Activity size={30} /><b>{activeSnapshot.error ? "No saved matches" : "No stocks pass this scan"}</b><span>{activeSnapshot.error ? "Refresh to check for current setups." : `The completed Upstox candles returned no current ${selectedOption.label} setup.`}</span></div>}
       </div>
     </section>

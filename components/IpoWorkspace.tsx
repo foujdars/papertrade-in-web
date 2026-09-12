@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BellRing, Building2, Clock3, RefreshCw, Rocket, Store } from "lucide-react";
+import { Bell, Building2, Clock3, Rocket, Store } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -19,7 +19,6 @@ import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoLifecycleCard, IpoDetailView } from "./IpoLifecycleCard";
 import { ipoStage, isRecentListing, sortIposByLifecycle } from "@/lib/ipo-lifecycle";
-import { readAllotmentAlertEnabled, setAllotmentAlertEnabled } from "@/lib/ipo-allotment-alerts";
 import { useIpoDirectory } from "@/components/IpoCompany";
 import { filterIpoBoard, type IpoBoard } from "@/lib/ipo-directory";
 
@@ -28,7 +27,7 @@ type IpoFilter = "active" | "open" | "upcoming" | "listed";
 type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string; lastClosingAlertDate?: string }>;
 
 function readAlertEnabled() {
-  return typeof window !== "undefined" && window.localStorage.getItem(IPO_ALERT_ENABLED_STORAGE_KEY) === "true";
+  return typeof window !== "undefined" && window.localStorage.getItem(IPO_ALERT_ENABLED_STORAGE_KEY) !== "false";
 }
 
 function readAlertState(): AlertState {
@@ -64,24 +63,6 @@ function formatRefreshTime(value: string) {
   return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Kolkata" }).format(new Date(value));
 }
 
-async function setIpoAlertEnabled(enabled: boolean) {
-  if (typeof window === "undefined") return false;
-  if (enabled) {
-    if (Capacitor.getPlatform() === "android") {
-      const permission = await getNativeTradeAlert().requestPermission().catch(() => undefined);
-      if (permission && permission.granted === false) return false;
-    } else if ("Notification" in window) {
-      const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-      if (permission !== "granted") return false;
-    }
-  }
-  window.localStorage.setItem(IPO_ALERT_ENABLED_STORAGE_KEY, String(enabled));
-  if (Capacitor.getPlatform() === "android") {
-    await getNativeTradeAlert().setIpoAlerts({ enabled }).catch(() => undefined);
-  }
-  window.dispatchEvent(new CustomEvent(IPO_ALERT_SETTINGS_EVENT, { detail: { enabled } }));
-  return true;
-}
 
 function showIpoGmpAlert(ipo: IpoSummary) {
   const today = indiaDateKey();
@@ -172,17 +153,15 @@ export function IpoAlertMonitor() {
 
 export function IpoWorkspace() {
   const requestRef = useRef<AbortController | null>(null);
-  const [allotmentAlerts, setAllotmentAlerts] = useState(readAllotmentAlertEnabled);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [board, setBoard] = useState<IpoBoard>("regular");
-  const directory = useIpoDirectory();
   const [filter, setFilter] = useState<IpoFilter>("open");
   const [ipos, setIpos] = useState<IpoSummary[]>([]);
+  const directory = useIpoDirectory(ipos.map(ipo => ipo.name));
   const [fetchedAt, setFetchedAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [alertsEnabled, setAlertsEnabledState] = useState(readAlertEnabled);
 
   const refresh = useCallback(async (silent = false) => {
     requestRef.current?.abort();
@@ -196,12 +175,12 @@ export function IpoWorkspace() {
       setIpos(result.ipos);
       setFetchedAt(result.fetchedAt);
       setNow(new Date());
-      setError(result.partial ? "Some IPO details could not be loaded. Refresh to complete the list; unverified listing dates are not included in Listed." : "");
+      setError(result.partial ? "Some IPO details could not be loaded. We will retry automatically; unverified listing dates are not included in Listed." : "");
       if (readAlertEnabled() && Capacitor.getPlatform() !== "android") processIpoAlerts(result.ipos);
     } catch (cause) {
       if (requestRef.current !== controller) return;
       setError(cause instanceof DOMException && cause.name === "AbortError"
-        ? "IPO refresh timed out. Pull down or tap Refresh to try again."
+        ? "IPO refresh timed out. Retrying automatically when online."
         : cause instanceof Error ? cause.message : "IPO information is unavailable.");
     } finally {
       window.clearTimeout(timeout);
@@ -239,17 +218,6 @@ export function IpoWorkspace() {
   const visibleIpos = filter === "listed" ? listed : sortIposByLifecycle(active.filter(ipo => filter === "active" || (filter === "upcoming" ? stageOf(ipo) === "upcoming" : stageOf(ipo) !== "upcoming")), today, time);
   const selectedIpo = ipos.find(ipo => ipo.id === selectedId);
 
-  const toggleAlerts = async () => {
-    const next = !alertsEnabled;
-    const changed = await setIpoAlertEnabled(next);
-    if (!changed) {
-      setError("Notification permission is blocked. Enable notifications for PaperTrade IN in your phone or browser settings.");
-      return;
-    }
-    setAlertsEnabledState(next);
-    setError("");
-    if (next && Capacitor.getPlatform() !== "android") processIpoAlerts(ipos);
-  };
 
   if (selectedIpo) return <IpoDetailView ipo={selectedIpo} stage={stageOf(selectedIpo)} directory={directory} onClose={() => setSelectedId(null)} />;
 
@@ -266,20 +234,6 @@ export function IpoWorkspace() {
           <button type="button" className={filter === "upcoming" ? "active" : ""} aria-pressed={filter === "upcoming"} onClick={() => setFilter("upcoming")}>Upcoming <small>{upcomingCount}</small></button>
           <button type="button" className={filter === "listed" ? "active" : ""} aria-pressed={filter === "listed"} onClick={() => setFilter("listed")}>Listed <small>{listed.length}</small></button>
         </div>
-        {<div className="ipo-toolbar-actions">
-          <button type="button" className={`ipo-alert-toggle ${alertsEnabled ? "active" : ""}`} onClick={() => void toggleAlerts()} aria-pressed={alertsEnabled}>
-            {alertsEnabled ? <BellRing size={16} /> : <Bell size={16} />}
-            <span>{alertsEnabled ? "Daily alerts on" : "Daily alerts"}</span>
-          </button>
-          <button type="button" className="ipo-allotment-switch" aria-pressed={allotmentAlerts} onClick={async () => {
-            const next = !allotmentAlerts;
-            if (await setAllotmentAlertEnabled(next)) setAllotmentAlerts(next);
-            else setError("Enable notification permission to receive allotment alerts.");
-          }}><Bell size={14} />{allotmentAlerts ? "Allotment on" : "Allotment alerts"}</button>
-          <button type="button" className="scanner-run-button ipo-refresh-button" onClick={() => void refresh()} disabled={loading}>
-            <RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh
-          </button>
-        </div>}
       </div>
 
       <>

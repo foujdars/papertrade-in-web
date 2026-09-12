@@ -75,7 +75,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /Browser\.open/);
   assert.match(authProvider, /trading_states/);
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
-  assert.match(authProvider, /Welcome back/);
+  assert.match(authProvider, /<WelcomeScreen name={session\?\.user.user_metadata\?\.full_name/);
+  assert.match(await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8"), /Welcome back/);
   assert.match(authProvider, /Your information stays private/);
   assert.match(authProvider, /encrypted connections/);
   assert.match(authProvider, /do not sell or share your personal information for advertising/);
@@ -93,9 +94,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(webManifest, /"display": "standalone"/);
   assert.match(webManifest, /"short_name": "PaperTrade"/);
   await access(new URL(`../public${apkPath}`, import.meta.url));
-  assert.match(authProvider, /Getting your trading desk ready/);
-  assert.match(authProvider, /Don’t waste your hard-earned money/);
-  assert.match(authProvider, /Practice\. Feel the thrill\. Learn\. Improve\. Then Trade\./);
+  const welcome = await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8");
+  assert.match(welcome, /Preparing your paper trading workspace/);
+  assert.match(welcome, /Practise/);
+  assert.match(welcome, /a man perfect/);
   assert.match(authProvider, /WELCOME_MINIMUM_MS = 5_000/);
   assert.match(supabaseClient, /flowType: "pkce"/);
   assert.match(authMigration, /enable row level security/);
@@ -103,7 +105,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(androidManifest, /android:scheme="in\.papertrade\.app"/);
   assert.match(setupGuide, /12 testers/);
   assert.match(dashboard, /calculatePosition/);
-  assert.match(dashboard, /Order book positions/);
+  assert.match(dashboard, /pnl-inline-fills/);
+  assert.doesNotMatch(dashboard, /Order book positions/);
   assert.match(dashboard, /trade\.sourceOrderIds/);
   assert.match(dashboard, /<BrandMark size=\{34\}/);
   assert.match(authProvider, /<BrandMark size=\{58\}/);
@@ -134,7 +137,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(marketsWorkspace, /NIMBLE_STRATEGIES/);
   assert.match(nimbleScanner, /EMA 21 Retest/);
   assert.match(nimbleScanner, /Weekly Fakeout MTF/);
-  assert.match(marketsWorkspace, /Refresh scan/);
+  assert.match(marketsWorkspace, /Scanning automatically/);
   assert.doesNotMatch(marketsWorkspace, /selectedOption\.description/);
   assert.doesNotMatch(dashboard, /Top 15 stocks where/);
   assert.doesNotMatch(dashboard, /Top Gainers/);

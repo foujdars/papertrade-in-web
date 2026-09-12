@@ -18,6 +18,8 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
   const [cursor, setCursor] = useState(0);
   const [selecting, setSelecting] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [showStart, setShowStart] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [account, setAccount] = useState(emptyReplayAccount);
   const lotSize = Math.max(1, instrument.lotSize || 1);
@@ -62,12 +64,22 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
   const units = Number(quantity);
   const validQuantity = Number.isSafeInteger(units) && units > 0 && units % lotSize === 0;
   const ended = !selecting && cursor >= candles.length - 1;
-  function resetSelection() { setSelecting(true); setPlaying(false); setCursor((value) => Math.min(value, Math.max(0, candles.length - 2))); setAccount(emptyReplayAccount()); setStartTime(null); setTool("cursor"); setClearSignal((value) => value + 1); }
+  function resetSelection() { setHasStarted(false); setShowStart(false); setSelecting(true); setPlaying(false); setCursor((value) => Math.min(value, Math.max(0, candles.length - 2))); setAccount(emptyReplayAccount()); setStartTime(null); setTool("cursor"); setClearSignal((value) => value + 1); }
   function reload(nextTimeframe: string) { resetSelection(); setCandles([]); setCursor(0); setLoading(true); setMessage("Loading historical candles…"); setTimeframe(nextTimeframe); setTimeMenu(false); }
   function startAt(time: number) {
     const index = candles.findIndex((candle) => candle.time === time);
     if (index < 0 || index >= candles.length - 1) return;
-    setCursor(index); setStartTime(time); setSelecting(false); setPlaying(false); setAccount(emptyReplayAccount()); setClearSignal((value) => value + 1);
+    setHasStarted(false); setShowStart(true); setCursor(index); setStartTime(time); setSelecting(false); setPlaying(false); setAccount(emptyReplayAccount()); setClearSignal((value) => value + 1);
+  }
+  function previewAt(time: number) {
+    const index = candles.findIndex(candle => candle.time === time);
+    if (!selecting || index < 0 || index >= candles.length - 1) return;
+    setCursor(index); setShowStart(true);
+  }
+  function playFromHere() {
+    if (!current || cursor >= candles.length - 1) return;
+    if (selecting) startAt(current.time);
+    setHasStarted(true); setShowStart(false); setPlaying(true);
   }
   function trade(side: "BUY" | "SELL" | "CLOSE") {
     if (selecting || !current || (!account.position && !validQuantity)) return;
@@ -83,14 +95,14 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
       <button type="button" onClick={() => setAction((value) => ({ type: "fit", token: (value?.token ?? 0) + 1 }))}>Fit</button>
     </div>
     <div className="bar-replay-chart">
-      {!!visible.length && <MarketChart key={`${instrument.instrumentKey}-${timeframe}`} instrument={instrument} timeframe={timeframe} activeTool={tool} magnet hiddenDrawings={selecting} indicators={indicators} chartAction={action} chartTheme={theme} visibleBars={60} replayCandles={visible} replaySelecting={selecting} replayStartTime={selecting ? current?.time ?? null : startTime} onReplaySelect={startAt} tradeMarkers={selecting ? [] : account.fills} clearSignal={clearSignal} onDrawingComplete={() => setTool("cursor")} onFeedStatus={ignoreFeed} />}
+      {!!visible.length && <MarketChart key={`${instrument.instrumentKey}-${timeframe}`} instrument={instrument} timeframe={timeframe} activeTool={tool} magnet hiddenDrawings={selecting} indicators={indicators} chartAction={action} chartTheme={theme} visibleBars={60} replayCandles={visible} replaySelecting={selecting} replayStartTime={hasStarted ? null : selecting ? current?.time ?? null : startTime} replayPrompt={showStart && !hasStarted} onReplayPreview={previewAt} onReplaySelect={startAt} onReplayPlay={playFromHere} tradeMarkers={selecting ? [] : account.fills} clearSignal={clearSignal} onDrawingComplete={() => setTool("cursor")} onFeedStatus={ignoreFeed} />}
       {!visible.length && <div className="bar-replay-empty" role="status"><RotateCcw size={25} /><p>{message}</p>{!loading && <button type="button" onClick={() => { reload(timeframe); setRetry((value) => value + 1); }}>Retry</button>}</div>}
       {timeMenu && <ChartTimeframeMenu current={timeframe} onSelect={reload} onClose={() => setTimeMenu(false)} />}
       {functionsOpen && <ChartFunctionMenu indicators={indicators} onToggleIndicator={(name) => setIndicators((value) => ({ ...value, [name]: !value[name] }))} onAction={(type) => setAction((value) => ({ type, token: (value?.token ?? 0) + 1 }))} onClose={() => setFunctionsOpen(false)} />}
     </div>
-    {selecting ? <div className="bar-replay-start"><span><Crosshair size={16} />Tap a candle to start, or choose a bar below.</span><div><input type="range" aria-label="Replay starting candle" min={0} max={Math.max(0, candles.length - 2)} value={cursor} disabled={!candles.length} onChange={(event) => setCursor(Number(event.target.value))} /><button type="button" disabled={!current} onClick={() => current && startAt(current.time)}>Start here</button></div><small>{current ? `${dateLabel(current.time)} IST · Available history only` : ""}</small></div> : <>
+    {!selecting && <>
       <div className="bar-replay-progress"><span>{current ? `${dateLabel(current.time)} IST` : ""}</span><span>{ended ? "Replay complete" : `${cursor + 1} / ${candles.length}`}</span></div>
-      <div className="bar-replay-playback"><button type="button" onClick={resetSelection} aria-label="Choose a new replay start"><Crosshair size={18} /></button><button type="button" onClick={() => setPlaying(!playing)} disabled={ended} aria-label={playing ? "Pause replay" : "Play replay"}>{playing ? <Pause size={18} /> : <Play size={18} />}</button><button type="button" disabled={ended} onClick={() => { setPlaying(false); setCursor((value) => Math.min(value + 1, candles.length - 1)); }} aria-label="Next candle"><SkipForward size={18} /></button><button type="button" onClick={() => setSpeed((value) => value === 4 ? .5 : value * 2)} aria-label={`Replay speed ${speed}x`}>{speed}×</button><button type="button" onClick={() => startTime && startAt(startTime)} aria-label="Restart replay"><RotateCcw size={18} /></button></div>
+      <div className="bar-replay-playback"><button type="button" onClick={resetSelection} aria-label="Choose a new replay start"><Crosshair size={18} /></button><button type="button" onClick={() => playing ? setPlaying(false) : playFromHere()} disabled={ended} aria-label={playing ? "Pause replay" : "Play replay"}>{playing ? <Pause size={18} /> : <Play size={18} />}</button><button type="button" disabled={ended} onClick={() => { setPlaying(false); setCursor((value) => Math.min(value + 1, candles.length - 1)); }} aria-label="Next candle"><SkipForward size={18} /></button><button type="button" onClick={() => setSpeed((value) => value === 4 ? .5 : value * 2)} aria-label={`Replay speed ${speed}x`}>{speed}×</button><button type="button" onClick={() => startTime && startAt(startTime)} aria-label="Restart replay"><RotateCcw size={18} /></button></div>
       <div className="bar-replay-practice"><div><span>{account.position ? `${account.position.side === "BUY" ? "Long" : "Short"} ${account.position.quantity} @ ${formatInr(account.position.price)}` : "No practice position"}</span><strong className={pnl >= 0 ? "positive" : "negative"}>{pnl >= 0 ? "+" : ""}{formatInr(pnl)}</strong></div><div className="bar-replay-orders"><button type="button" className="replay-sell" onClick={() => trade("SELL")} disabled={account.position?.side === "SELL" || (!account.position && !validQuantity)}>Sell</button><label>Qty<input type="number" inputMode="numeric" min={lotSize} step={lotSize} value={quantity} disabled={!!account.position} onChange={(event) => setQuantity(event.target.value)} /></label><button type="button" className="replay-buy" onClick={() => trade("BUY")} disabled={account.position?.side === "BUY" || (!account.position && !validQuantity)}>Buy</button><button type="button" onClick={() => trade("CLOSE")} disabled={!account.position}>Close</button></div>{!validQuantity && <small role="alert">Enter a positive quantity in multiples of {lotSize}.</small>}<small>Replay P&amp;L excludes charges. Your portfolio is unchanged.</small></div>
     </>}
   </section>;

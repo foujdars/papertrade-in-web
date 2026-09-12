@@ -73,6 +73,29 @@ test("holding a trade selects it once, while taps, scrolling and cancelled holds
   row.props.onPointerDown({ ...event, target: { closest: () => ({}) } });
   assert.equal(pending, null, "Child controls must not select the parent");
   effects.forEach((cleanup) => cleanup?.());
+  const target = {};
+  row.props.onKeyDown({ target, currentTarget: target, shiftKey: true, key: " ", preventDefault() {}, stopPropagation() {} });
+  assert.equal(selected, 2, "Keyboard users can select without the removed header button");
+});
+
+test("welcome artwork uses each user's own name with a safe generic fallback", async () => {
+  const compiled = ts.transpileModule(await source("components/WelcomeScreen.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const exports = {}, require = createRequire(import.meta.url);
+  new Function("require", "exports", compiled)(id => id === "./BrandMark" ? { BrandMark: () => null } : require(id), exports);
+  assert.match(viewText(exports.WelcomeScreen({ name: "  Asha Sharma " })), /Welcome back,Asha/);
+  assert.doesNotMatch(viewText(exports.WelcomeScreen({ name: "Asha Sharma" })), /Rajkumar|Sharma/);
+  for (const name of [undefined, "", "   ", 123]) assert.match(viewText(exports.WelcomeScreen({ name })), /Welcome toPaperTrade IN/);
+  const css = await source("app/refinements.css");
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(css, /welcome-candle-pulse/);
+});
+
+test("compact trade cards retain execution facts and only show the selection toolbar when selecting", async () => {
+  const dashboard = await source("components/TradingDashboard.tsx");
+  assert.doesNotMatch(dashboard, /pnl-dismiss-row|Order book positions|Hold a trade to select it/);
+  assert.match(dashboard, /visiblePnlTrades.length && selectingTrades && <div/);
+  const fills = dashboard.slice(dashboard.indexOf('className="pnl-inline-fills"'), dashboard.indexOf('{menuOpen && reviewInstrument'));
+  for (const detail of ["order.quantity", "order.price", "order.time", "getOrderCharges(order).total", "paperOrderStatusLabel(order)", "openPaperOrderChart(order)"]) assert.ok(fills.includes(detail), detail);
 });
 
 test("chart brackets start with entry only and commit protection only after a completed drag", async () => {
@@ -181,27 +204,37 @@ test("index row keyboard navigation does not swallow the watchlist-star action",
   assert.ok(elements(row).some((node) => node.props?.className === "fno-symbol-identity"));
 });
 
-test("scanner OFF never fetches automatically; empty success clears old matches; failure keeps their original date", async (t) => {
+test("scanner runs automatically; empty success clears old matches; failure keeps their original date", async (t) => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  let automaticRefresh;
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { visibilityState: "visible", addEventListener() {}, removeEventListener() {} } });
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { onLine: true } });
   const storage = new Map([["papertrade-market-scanner-mode-v1", "manual"]]);
   Object.defineProperty(globalThis, "window", { configurable: true, value: {
     localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, setInterval: callback => { automaticRefresh = callback; return 1; }, clearInterval() {}, addEventListener() {}, removeEventListener() {},
   } });
   t.after(() => { if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else delete globalThis.window; });
+  t.after(() => {
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument); else delete globalThis.document;
+    if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator); else delete globalThis.navigator;
+  });
   let payload = { ok: true, rows: [], fetchedAt: "2026-09-07T10:00:00.000Z" };
   const fetchMock = t.mock.method(globalThis, "fetch", async () => ({ ok: payload.ok, json: async () => payload }));
   const props = { group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
   const harness = await componentHarness("components/MarketsWorkspace.tsx", "MarketsWorkspace");
   const render = () => harness.render(props);
   const refresh = async () => {
-    elements(render()).find((node) => node.props?.className === "scanner-run-button").props.onClick();
+    automaticRefresh();
     await new Promise(setImmediate);
   };
   const initial = render();
-  assert.equal(elements(initial).find((node) => node.props?.role === "switch").props["aria-checked"], false);
+  assert.equal(elements(initial).find((node) => node.props?.role === "switch"), undefined);
   const cleanups = harness.runEffects();
-  assert.equal(fetchMock.mock.callCount(), 0, "OFF must not run an initial scan, even with no saved matches");
+  await new Promise(setImmediate);
+  assert.equal(fetchMock.mock.callCount(), 1, "The scanner starts automatically without a switch");
 
   const previous = { rows: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", lastPrice: 100, changePercent: 1 }], scannedAt: "2026-09-07T09:00:00.000Z" };
   harness.states[1] = { VOLUME: previous };
@@ -253,12 +286,12 @@ test("Watchlist stays in Markets navigation and retains saved-list controls", as
   assert.match(markets, /if \(section === "WATCHLIST"\) onOpenWatchlist\(\)/);
 });
 
-test("scanner controls use one compact automatic switch and refresh", async () => {
+test("scanner removes redundant controls while keeping automatic and pull refresh", async () => {
   const markets = await source("components/MarketsWorkspace.tsx");
   assert.doesNotMatch(markets, /market-command-hero|scanner-active-story|ACTIVE STRATEGY|Close markets/);
-  assert.match(markets, /className={`scanner-auto-switch/);
-  assert.match(markets, /role="switch" aria-checked={scanMode === "auto"}/);
-  assert.match(markets, /scanMode === "auto" \? "ON" : "OFF"/);
+  assert.doesNotMatch(markets, /scanner-auto-switch|scanner-run-button|scanner-run-row/);
+  assert.match(markets, /const scanMode = "auto"/);
+  assert.match(markets, /window.setInterval\(scanWhenReady, AUTO_SCAN_INTERVAL_MS\)/);
   assert.doesNotMatch(markets, /showStrategyInfo|activeStrategyDescription|scanner-strategy-details|scanner-inline-error/);
   assert.match(markets, /runSelectedScan\(undefined, true\)/);
   assert.match(markets, /onTouchEnd={handlePullEnd}/);

@@ -4,10 +4,11 @@ import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import type { Session, User } from "@supabase/supabase-js";
-import { CandlestickChart, Cloud, Download, LogIn, ShieldCheck, Smartphone, Sparkles, TrendingUp } from "lucide-react";
+import { Cloud, Download, LogIn, ShieldCheck, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-client";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { BrandMark } from "@/components/BrandMark";
 import { deletePaperTradeAccount } from "@/lib/account-deletion-client";
 
@@ -274,23 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={contextValue}>
       {configured && (!welcomeMinimumElapsed || authLoading || (session && !cloudReady)) ? (
-        <main className="auth-screen auth-loading-screen">
-          <section className="auth-welcome-stage">
-            <div className="welcome-market-visual" aria-hidden="true">
-              <span /><span /><span /><span /><span /><span /><i><TrendingUp size={22} /></i>
-            </div>
-            <span className="auth-logo"><BrandMark size={58} /></span>
-            <span className="auth-welcome-eyebrow"><Sparkles size={14} /> Welcome back</span>
-            <b>Getting your trading desk ready</b>
-            <small>Restoring your charts, watchlists and paper portfolio securely.</small>
-            <p className="welcome-practice-message">
-              <span>Don’t waste your hard-earned money.</span>
-              <span>Practice. Feel the thrill. Learn. Improve. Then Trade.</span>
-            </p>
-            <div className="welcome-loading-pills"><span><CandlestickChart size={14} /> Live charts</span><span><ShieldCheck size={14} /> Paper trades only</span></div>
-            <div className="welcome-progress" aria-label="Loading"><i /></div>
-          </section>
-        </main>
+        <WelcomeScreen name={session?.user.user_metadata?.full_name || session?.user.user_metadata?.name} />
       ) : configured && !session ? (
         <main className="auth-screen">
           <section className="auth-card">

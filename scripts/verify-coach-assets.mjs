@@ -11,7 +11,7 @@ async function cssFiles(directory) {
 }
 const files = await cssFiles(".next/static");
 const css = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
-for (const selector of [".pnl-dismiss-row", ".fno-list-close", ".ipo-toolbar-actions"]) {
+for (const selector of [".welcome-candle-screen", ".welcome-candle-loader", ".pnl-inline-fills", ".ipo-gmp-amount", ".replay-future-shade", ".replay-drag-marker", ".replay-start-popover"]) {
   assert.ok(css.includes(selector), `Production stylesheet is missing compact layout ${selector}`);
 }
 for (const selector of [".ipo-lifecycle-card", ".ipo-gmp-panel", ".ipo-date-pair", ".ipo-timeline", ".ipo-chance-list", ".ipo-detail-view", ".pnl-selection-toolbar.is-selecting"]) {

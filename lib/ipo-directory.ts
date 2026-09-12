@@ -10,7 +10,9 @@ function decodeText(value: string) {
 export function issuerKey(value: string) {
   const key = decodeText(value).toLowerCase().replace(/\b(?:limited|ltd|ipo)\b/g, "").replace(/[^a-z0-9]/g, "");
   // The two sources use these verified names for the same issuer. No fuzzy matching.
-  return key === "flyhimaritimetravels" ? "flyhimaritime" : key;
+  if (key === "flyhimaritimetravels") return "flyhimaritime";
+  if (key === "assetreconstructioncoindia") return "assetreconstructioncompanyindia";
+  return key;
 }
 
 export function safeIpoPage(value: string): string | undefined {
@@ -25,8 +27,9 @@ export function safeIpoPage(value: string): string | undefined {
 export function safeIpoLogo(value: string): string | undefined {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.hostname !== "www.chittorgarh.net" || url.port || url.username || url.password
-      || !/^\/images\/ipo\/[a-z0-9_.-]+\.(?:png|jpg|jpeg|webp|gif)$/i.test(url.pathname) || url.search || url.hash) return;
+    const approvedPath = (url.hostname === "www.chittorgarh.net" && /^\/images\/ipo\/[a-z0-9_.-]+\.(?:png|jpg|jpeg|webp|gif)$/i.test(url.pathname))
+      || (url.hostname === "media.ipoji.com" && /^\/ipo\/images\/[a-z0-9_.-]+\.(?:png|jpg|jpeg|webp|gif)$/i.test(url.pathname));
+    if (url.protocol !== "https:" || !approvedPath || url.port || url.username || url.password || url.search || url.hash) return;
     return url.href;
   } catch { return; }
 }
@@ -55,6 +58,13 @@ export function matchIpoDirectory(name: string, entries: IpoDirectoryEntry[]) {
   const matches = entries.filter((entry) => issuerKey(entry.name) === issuerKey(name) && safeIpoPage(entry.url));
   // Ambiguous matches must not send the user to an unrelated issue.
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+export function parseSupplementalIpoLogo(html: string, name: string): string | undefined {
+  const card = html.match(/<section\b[^>]*\bdata-testid=["']ipo-summary-card["'][^>]*>([\s\S]*?)<\/section>/i);
+  const issuer = card?.[0].match(/\bdata-ipo-name=["']([^"']+)["']/i)?.[1];
+  if (!card || !issuer || issuerKey(issuer) !== issuerKey(name)) return;
+  return parseIssuerLogo(card[1], name);
 }
 
 export function filterIpoBoard<T extends { issueType?: string }>(items: T[], board: IpoBoard): T[] {

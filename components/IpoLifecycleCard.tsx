@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, ArrowUpRight, CalendarDays, ChartNoAxesColumnIncreasing, ChevronRight, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, IndianRupee, CalendarDays, ChartNoAxesColumnIncreasing, ChevronRight, ShieldCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IpoSummary } from "@/lib/ipo";
 import type { IpoDirectoryEntry } from "@/lib/ipo-directory";
@@ -25,9 +25,9 @@ export function IpoLifecycleCard({ ipo, stage, directory, onOpen }: Props) {
     </header>
     <button type="button" className="ipo-card-body" onClick={onOpen} disabled={!onOpen} aria-label={`View ${ipo.name} timeline and details`}>
       {stage === "listed" ? <div className={`ipo-gmp-panel ${returns === null ? "pending" : returns >= 0 ? "high" : "low"}`}><span>Listing price<small>{ipoDate(ipo.details?.listingDate)}</small></span><strong>{rupees(ipo.details?.listingPrice)}<small>{returns === null ? "Return awaiting issue price" : `${returns > 0 ? "+" : ""}${returns.toFixed(2)}% on issue price`}</small></strong></div>
-        : <div className={`ipo-gmp-panel ${tone}`}><span>GMP<small>{ipo.gmpAmount !== null ? `${rupees(ipo.gmpAmount)} per share · unofficial` : "Unofficial market estimate"}</small></span><strong>{ipo.gmpPercent === null ? "Not reported" : `${ipo.gmpPercent.toFixed(2)}%`}</strong></div>}
-      <div className="ipo-card-facts"><span><small>Price band</small><b>{ipo.maximumPrice ? `${rupees(ipo.minimumPrice)} – ${rupees(ipo.maximumPrice)}` : "To be announced"}</b></span><span><small>Issue size</small><b>{ipo.issueSizeCrore ? `${rupees(ipo.issueSizeCrore)} Cr` : "To be announced"}</b></span><span><small>{stage === "listed" ? "Subscription" : "Issue type"}</small><b>{stage === "listed" ? ipo.totalSubscription > 0 ? `${ipo.totalSubscription.toFixed(2)}×` : "Not reported" : ipo.issueType === "sme" ? "SME" : "Mainboard"}</b></span></div>
-      {stage !== "listed" && <div className="ipo-date-pair"><span><small>Opens</small><b>{ipoDate(ipo.biddingStartDate)}</b></span><span><small>Closes</small><b>{ipoDate(ipo.biddingEndDate)}</b></span></div>}
+        : <div className={`ipo-gmp-panel ${tone}`}><span>GMP (unofficial)<small>{ipo.gmpAmount !== null ? <><b className="ipo-gmp-amount">{rupees(ipo.gmpAmount)}</b> per share</> : "Not reported"}</small></span><strong>{ipo.gmpPercent === null ? "Not reported" : `${ipo.gmpPercent.toFixed(2)}%`}</strong></div>}
+      <div className="ipo-card-facts"><span><small><IndianRupee size={13} />Price band</small><b>{ipo.maximumPrice ? `${rupees(ipo.minimumPrice)} – ${rupees(ipo.maximumPrice)}` : "To be announced"}</b></span><span><small><ChartNoAxesColumnIncreasing size={13} />Issue size</small><b>{ipo.issueSizeCrore ? `${rupees(ipo.issueSizeCrore)} Cr` : "To be announced"}</b></span><span><small><BriefcaseBusiness size={13} />{stage === "listed" ? "Subscription" : "Issue type"}</small><b>{stage === "listed" ? ipo.totalSubscription > 0 ? `${ipo.totalSubscription.toFixed(2)}×` : "Not reported" : ipo.issueType === "sme" ? "SME" : "Mainboard"}</b></span></div>
+      {stage !== "listed" && <div className="ipo-date-pair"><span><small><CalendarDays size={13} />Opens</small><b>{ipoDate(ipo.biddingStartDate)}</b></span><span><small><CalendarDays size={13} />Closes</small><b>{ipoDate(ipo.biddingEndDate)}</b></span></div>}
       {onOpen && <span className="ipo-detail-hint">Timeline & allotment details <ChevronRight size={15} /></span>}
     </button>
     <IpoResearchLink name={ipo.name} entries={directory} />

@@ -2,10 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { CHITTORGARH_DIRECTORY_URL, matchIpoDirectory, safeIpoLogo, type IpoDirectoryEntry } from "@/lib/ipo-directory";
+import { CHITTORGARH_DIRECTORY_URL, issuerKey, matchIpoDirectory, safeIpoLogo, type IpoDirectoryEntry } from "@/lib/ipo-directory";
 
-export function useIpoDirectory() {
+export function useIpoDirectory(names: string[] = []) {
   const [entries, setEntries] = useState<IpoDirectoryEntry[]>([]);
+  const [logos, setLogos] = useState<IpoDirectoryEntry[]>([]);
+  const nameKey = JSON.stringify([...new Set(names)].sort());
+  useEffect(() => {
+    const issuers = JSON.parse(nameKey) as string[];
+    const controller = new AbortController();
+    let next = 0;
+    void Promise.all(Array.from({ length: 4 }, async () => {
+      while (next < issuers.length && !controller.signal.aborted) {
+        const name = issuers[next++];
+        try {
+          const response = await fetch(`/api/ipo-logos?name=${encodeURIComponent(name)}`, { signal: controller.signal });
+          if (!response.ok) continue;
+          const result = await response.json() as { name?: string; logoUrl?: string };
+          if (!controller.signal.aborted && result.name === name && result.logoUrl && safeIpoLogo(result.logoUrl)) {
+            setLogos(previous => [...previous.filter(entry => entry.name !== name), { name, url: "", logoUrl: result.logoUrl }]);
+          }
+        } catch { /* Initials remain available if the public artwork is offline. */ }
+      }
+    }));
+    return () => controller.abort();
+  }, [nameKey]);
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 35_000);
@@ -16,17 +37,17 @@ export function useIpoDirectory() {
     }).catch(() => undefined).finally(() => window.clearTimeout(timer));
     return () => { controller.abort(); window.clearTimeout(timer); };
   }, []);
-  return entries;
+  return [...entries, ...logos];
 }
 
 export function IpoCompanyLogo({ name, entries }: { name: string; entries: IpoDirectoryEntry[] }) {
-  const entry = matchIpoDirectory(name, entries);
-  const source = entry?.logoUrl ? safeIpoLogo(entry.logoUrl) : undefined;
-  const [failedSource, setFailedSource] = useState("");
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const source = entries.filter(entry => issuerKey(entry.name) === issuerKey(name))
+    .map(entry => entry.logoUrl ? safeIpoLogo(entry.logoUrl) : undefined).find(url => url && !failedSources.includes(url));
   const initials = name.replace(/\b(?:ipo|limited|ltd)\b/gi, "").trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
-  return <span className="ipo-company-mark" title={source && source !== failedSource ? name : `${name} · Company logo unavailable`}>
-    {source && source !== failedSource
-      ? <img src={source} alt={`${name} logo`} width={48} height={48} loading="lazy" decoding="async" referrerPolicy="no-referrer" crossOrigin="anonymous" onError={() => setFailedSource(source)} />
+  return <span className="ipo-company-mark" title={source ? name : `${name} · Company logo unavailable`}>
+    {source
+      ? <img src={source} alt={`${name} logo`} width={48} height={48} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailedSources(previous => [...previous, source])} />
       : <span aria-label={`${name} initials`}>{initials}</span>}
   </span>;
 }

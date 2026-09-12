@@ -455,6 +455,9 @@ export function MarketChart({
   replaySelecting = false,
   replayStartTime = null,
   onReplaySelect,
+  onReplayPreview,
+  onReplayPlay,
+  replayPrompt = false,
   onOrderSide,
   onOrderToolChange,
   onOrderToolClose,
@@ -486,6 +489,9 @@ export function MarketChart({
   replaySelecting?: boolean;
   replayStartTime?: number | null;
   onReplaySelect?: (time: number) => void;
+  onReplayPreview?: (time: number) => void;
+  onReplayPlay?: () => void;
+  replayPrompt?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -496,9 +502,9 @@ export function MarketChart({
   onFeedStatus: (status: FeedStatus) => void;
 }) {
   const isReplay = replayCandles !== undefined;
-  const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect });
+  const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect, onPreview: onReplayPreview });
+  const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
-  useEffect(() => { replayRef.current = { selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect }; scheduleOverlayRefresh(); }, [replaySelecting, replayStartTime, onReplaySelect]);
   const chartHost = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -685,6 +691,11 @@ export function MarketChart({
       });
     });
   }
+
+  useEffect(() => {
+    replayRef.current = { selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect, onPreview: onReplayPreview };
+    scheduleOverlayRefresh();
+  }, [replaySelecting, replayStartTime, onReplaySelect, onReplayPreview]);
 
   function orderToolPnl(tool: ChartOrderTool, price: number) {
     const direction = tool.side === "BUY" ? 1 : -1;
@@ -1370,7 +1381,7 @@ export function MarketChart({
       replayClick = (event) => {
         if (!replayRef.current.selecting || event.time === undefined) return;
         const time = timeToTimestamp(event.time) - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0);
-        replayRef.current.onSelect?.(time);
+        replayRef.current.onPreview?.(time);
       };
       if (isReplay) chart.subscribeClick(replayClick);
 
@@ -1901,7 +1912,48 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
-        {isReplay && replayMarkerX !== null && <div className="replay-start-marker" style={{ left: replayMarkerX }}><span>Start</span></div>}
+        {isReplay && replayMarkerX !== null && <>
+          {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
+          <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX }} aria-label="Drag to a starting candle; Enter to select" onPointerDown={event => {
+            if (!replaySelecting) return;
+            event.stopPropagation(); event.preventDefault();
+            replayDrag.current = { id: event.pointerId, x: event.clientX, moved: false, original: replayStartTime };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }} onPointerMove={event => {
+            const drag = replayDrag.current;
+            if (!drag || drag.id !== event.pointerId) return;
+            event.stopPropagation();
+            if (Math.abs(event.clientX - drag.x) > 4) drag.moved = true;
+            if (!drag.moved) return;
+            const rect = chartHost.current?.getBoundingClientRect();
+            const logical = rect ? chartApi.current?.timeScale().coordinateToLogical(event.clientX - rect.left) : null;
+            if (logical == null) return;
+            const index = Math.max(0, Math.min(dataRef.current.length - 2, Math.round(logical)));
+            const candle = dataRef.current[index];
+            if (candle) onReplayPreview?.(candle.time);
+          }} onPointerUp={event => {
+            const drag = replayDrag.current; replayDrag.current = null;
+            if (!drag) return;
+            event.stopPropagation();
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            if (!drag.moved && replayStartTime !== null) onReplaySelect?.(replayStartTime);
+          }} onPointerCancel={event => {
+            const original = replayDrag.current?.original; replayDrag.current = null;
+            if (original != null) onReplayPreview?.(original);
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+          }} onClick={event => event.stopPropagation()} onKeyDown={event => {
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (replayStartTime !== null) onReplaySelect?.(replayStartTime); }
+            if (replaySelecting && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+              event.preventDefault(); const index = dataRef.current.findIndex(candle => candle.time === replayStartTime);
+              const candle = dataRef.current[Math.max(0, Math.min(dataRef.current.length - 2, index + (event.key === "ArrowLeft" ? -1 : 1)))];
+              if (candle) onReplayPreview?.(candle.time);
+            }
+          }}><span>↔</span></button>
+          {replayPrompt && <div className="replay-start-popover" style={{ left: `clamp(90px, ${replayMarkerX}px, calc(100% - 90px))` }}>
+            <small>{replayStartTime !== null ? new Date(replayStartTime * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} IST</small>
+            <button type="button" onClick={onReplayPlay}>▶ Replay from here</button>
+          </div>}
+        </>}
         <div className="chart-symbol-legend lightweight-symbol-legend">
           <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
           {legend && (

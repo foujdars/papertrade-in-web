@@ -1,0 +1,43 @@
+.welcome-candle-screen { position: fixed; inset: 0; z-index: 2000; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(30px, 7vh, 75px); padding: 35px 20px 95px; background: radial-gradient(ellipse at 0 0, #eee5ff 0, transparent 32%), radial-gradient(ellipse at 100% 90%, #eee5ff 0, transparent 40%), #fcfaff; color: #0b0e43; text-align: center; }
+.welcome-candle-screen::after { content: ""; position: fixed; pointer-events: none; bottom: -110px; left: -20%; width: 140%; height: 200px; border-radius: 50%; background: #e9dcfc; transform: rotate(-8deg); box-shadow: 0 -25px 0 #f0e8fd; }
+.welcome-candle-brand { display: flex; align-items: center; gap: 12px; }
+.welcome-candle-brand b { font-size: clamp(23px, 6vw, 42px); letter-spacing: -1.4px; }
+.welcome-candle-screen em { font-style: normal; color: #7114ed; }
+.welcome-candle-greeting p { margin: 0 0 8px; color: #81809f; font-size: clamp(19px, 5vw, 28px); font-weight: 650; }
+.welcome-candle-greeting h1 { max-width: 90vw; overflow-wrap: anywhere; margin: 0; font-size: clamp(30px, 8vw, 48px); letter-spacing: -1px; }
+.welcome-candle-motto { margin: 0; font-size: clamp(28px, 8vw, 48px); font-weight: 800; line-height: 1.15; letter-spacing: -1.4px; }
+.welcome-candle-loader { display: flex; gap: 26px; align-items: center; min-height: 64px; }
+.welcome-candle-loader i { position: relative; display: block; width: 16px; height: 28px; border-radius: 4px; color: #00bf85; background: currentColor; animation: welcome-candle-pulse 1.6s ease-in-out infinite; }
+.welcome-candle-loader i::before { content: ""; position: absolute; height: 44px; width: 2px; left: 7px; top: -8px; background: currentColor; }
+.welcome-candle-loader i::after { content: ""; position: absolute; width: 24px; height: 4px; border-radius: 50%; bottom: -13px; left: -4px; background: #e3d5fa; }
+.welcome-candle-loader i:nth-child(2) { color: #f75c7a; animation-delay: .4s; }
+.welcome-candle-loader i:nth-child(3) { animation-delay: .8s; }
+.welcome-candle-loader i:nth-child(4) { animation-delay: 1.2s; }
+@keyframes welcome-candle-pulse { 0%, 70%, 100% { opacity: .22; transform: scaleY(.8); } 20%, 40% { opacity: 1; transform: scaleY(1.35); } }
+@media (prefers-reduced-motion: reduce) { .welcome-candle-loader i { animation: none; opacity: .8; } }
+.terminal-shell .pnl-inline-fills { grid-column: 1 / -1; display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 7px; }
+.terminal-shell .pnl-inline-fills button { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; padding: 3px 0; min-height: 30px; border: 0; background: none; text-align: left; color: var(--ink); font: inherit; font-size: 11px; }
+.terminal-shell .pnl-inline-fills small { font-size: 10px; color: var(--muted); }
+.terminal-shell .pnl-inline-fills strong { font-size: 11px; }
+.terminal-shell .ipo-lifecycle-card { border-radius: 20px; padding: 13px; }
+.terminal-shell .ipo-lifecycle-card .ipo-company-mark { border-radius: 50%; }
+.terminal-shell .ipo-gmp-panel { background: var(--soft); border: 1px solid var(--line); border-bottom: 0; border-radius: 13px 13px 0 0; padding: 11px; }
+.terminal-shell .ipo-gmp-panel > span { color: var(--muted); }
+.terminal-shell .ipo-gmp-amount { display: inline; font-size: 23px; font-weight: 800; color: var(--purple); }
+.terminal-shell .ipo-gmp-panel strong { border: 0; font-size: 29px; }
+.terminal-shell .ipo-card-facts { background: var(--soft); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 13px 13px; padding: 10px; margin-bottom: 8px; }
+.terminal-shell .ipo-card-facts small { display: flex; align-items: center; gap: 4px; }
+.terminal-shell .ipo-card-facts svg { color: var(--purple); flex-shrink: 0; }
+.terminal-shell .ipo-date-pair { background: none; border: 0; padding: 0; gap: 7px; }
+.terminal-shell .ipo-date-pair > span { background: var(--soft); border: 0; border-radius: 12px; padding: 7px; }
+.terminal-shell .ipo-date-pair small { display: flex; align-items: center; gap: 4px; }
+.terminal-shell .ipo-gmp-panel strong { padding-left: 0; }
+.terminal-shell .ipo-lifecycle-card .ipo-research-link { justify-content: center; gap: 8px; color: white; background: var(--studio-accent, #7437dc); border: 0; border-radius: 10px; min-height: 34px; }
+.replay-future-shade { position: absolute; top: 0; bottom: 28px; right: 0; background: color-mix(in srgb, var(--surface, white) 78%, transparent); pointer-events: none; z-index: 3; }
+.replay-start-marker.replay-drag-marker { width: 28px; margin-left: -14px; border: 0; background: transparent; padding: 0; pointer-events: auto; touch-action: none; cursor: ew-resize; z-index: 5; }
+.replay-drag-marker::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: #8560dc; }
+.replay-drag-marker span { left: 0; bottom: 10px; }
+.replay-drag-marker:focus-visible { outline: 2px solid #8560dc; }
+.replay-start-popover { position: absolute; top: 65px; transform: translateX(-50%); z-index: 8; display: grid; gap: 5px; width: 170px; padding: 9px; background: var(--surface, white); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px #27113d24; }
+.replay-start-popover small { font-size: 10px; }
+.replay-start-popover button { min-height: 36px; border: 0; border-radius: 8px; background: #7437dc; color: white; }

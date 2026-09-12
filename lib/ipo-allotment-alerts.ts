@@ -4,7 +4,12 @@ import { getNativeTradeAlert } from "./native-alert";
 import { addPaperTradeNotification } from "./notification-center";
 
 export function readAllotmentAlertEnabled() {
-  try { return typeof window !== "undefined" && Number(localStorage.getItem(ALLOTMENT_ALERT_ENABLED_KEY)) > 0; } catch { return false; }
+  try {
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem(ALLOTMENT_ALERT_ENABLED_KEY);
+    if (stored === null) localStorage.setItem(ALLOTMENT_ALERT_ENABLED_KEY, String(Date.now()));
+    return stored === null || Number(stored) > 0;
+  } catch { return false; }
 }
 
 export async function setAllotmentAlertEnabled(enabled: boolean) {
@@ -63,7 +68,7 @@ export async function processAllotmentAlerts(ipos: IpoAllotment[]) {
       const id = allotmentAlertKey(ipo);
       const title = ipo.state === "published" ? `${ipo.name}: allotment published` : `${ipo.name}: listed — check allotment`;
       const body = ipo.state === "published"
-        ? "The registrar has published the basis of allotment. Open the official result website, select this IPO and enter your PAN there."
+        ? "Allotment results are reported available. Open the official registrar website to check your result. Enter your PAN only there."
         : "Listing is confirmed by Upstox. Check your allotment on the official result website; select the IPO and enter your PAN there.";
       addPaperTradeNotification({ id, kind: "ipo", title, body, allotmentRegistrar: ipo.registrar });
       seen[id] = Date.now();
