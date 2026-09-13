@@ -1,8 +1,10 @@
 import { registerPlugin } from "@capacitor/core";
 
 type NativeAlertPlugin = {
+  configurePush: (options: { preferences: import("./notification-policy").NotificationPreferences; requestPermission: boolean }) => Promise<{ token?: string; error?: string }>;
+  consumeNotifications: () => Promise<{ notifications?: Array<{ id:string;title:string;body:string;url:string;createdAt:number;kind:"ipo"|"allotment"|"portfolio"|"practice" }> }>;
   requestPermission: () => Promise<{ granted?: boolean } | void>;
-  show: (options: { title: string; body: string; notificationId?: string }) => Promise<void>;
+  show: (options: { title: string; body: string; notificationId?: string; kind?: string; url?: string; silent?: boolean }) => Promise<void>;
   setIpoAlerts: (options: { enabled: boolean }) => Promise<void>;
   setPriceAlerts: (options: { alerts: NativePriceAlert[] }) => Promise<void>;
   consumeTriggeredPriceAlerts: () => Promise<{ alerts?: NativeTriggeredPriceAlert[] }>;

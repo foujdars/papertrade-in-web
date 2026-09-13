@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { removeUserPushDevices } from "@/lib/push-admin";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
   const { data, error: userError } = await admin.auth.getUser(accessToken);
   if (userError || !data.user) return unauthorized();
 
+  try { await removeUserPushDevices(data.user.id); }
+  catch { return NextResponse.json({ error: "Could not remove notification registrations. Please retry account deletion." }, { status: 503 }); }
   const { error: deletionError } = await admin.auth.admin.deleteUser(data.user.id);
   if (deletionError) {
     return NextResponse.json({ error: "Account deletion could not be completed. Please contact support." }, { status: 500 });

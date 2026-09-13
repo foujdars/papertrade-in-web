@@ -75,11 +75,18 @@ test("PWA icon assets and cache versions are current", async () => {
 });
 
 test("native notifications include the updated launcher image", async () => {
-  for (const name of ["TradeAlertPlugin", "IpoGmpAlertWorker", "IpoOpeningAlertWorker", "PriceAlertMonitorService"]) {
+  for (const name of ["IpoGmpAlertWorker", "IpoOpeningAlertWorker"]) {
     const notificationSource = await source(`android/app/src/main/java/in/papertrade/app/${name}.java`);
     assert.match(notificationSource, /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(/);
     assert.match(notificationSource, /R\.mipmap\.ic_launcher/);
   }
+  const delivery = await source("android/app/src/main/java/in/papertrade/app/NotificationDelivery.java");
+  assert.match(delivery, /setSmallIcon\(R.drawable.ic_stat_papertrade\)/);
+  assert.match(delivery, /setLargeIcon\(logo\(context\)\)/);
+  assert.match(delivery, /R.mipmap.ic_launcher/);
+  assert.match(delivery, /drawable.draw\(new Canvas\(bitmap\)\)/);
+  assert.match(await source("android/app/src/main/java/in/papertrade/app/TradeAlertPlugin.java"), /NotificationDelivery.show/);
+  assert.match(await source("android/app/src/main/java/in/papertrade/app/PriceAlertMonitorService.java"), /NotificationDelivery.logo/);
   const ipoWorker = await source("android/app/src/main/java/in/papertrade/app/IpoGmpAlertWorker.java");
   assert.match(ipoWorker, /last_closing_alert_date_/);
   assert.match(ipoWorker, /last day to apply/);

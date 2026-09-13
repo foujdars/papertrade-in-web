@@ -12,6 +12,7 @@ export type PaperTradeNotification = {
   symbol?: string;
   instrumentKey?: string;
   allotmentRegistrar?: AllotmentRegistrar;
+  url?: string;
 };
 
 export const NOTIFICATION_CENTER_EVENT = "papertrade:notification-center-change";
@@ -40,6 +41,7 @@ export function addPaperTradeNotification(input: Omit<PaperTradeNotification, "i
   const id = input.id ?? `${input.kind}-${createdAt}-${Math.random().toString(36).slice(2, 7)}`;
   const current = readPaperTradeNotifications().filter((item) => item.id !== id);
   savePaperTradeNotifications([{ id, kind: input.kind, title: input.title, body: input.body, createdAt, read: false,
+    ...(input.url && (/^\/\?screen=(ipo|pnl)$/.test(input.url) || /^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(input.url)) ? { url: input.url } : {}),
     ...(input.kind === "trade" && input.symbol ? { symbol: input.symbol, instrumentKey: input.instrumentKey } : {}),
     ...(input.kind === "ipo" && allotmentLink(input.allotmentRegistrar) ? { allotmentRegistrar: input.allotmentRegistrar } : {}),
   }, ...current]);

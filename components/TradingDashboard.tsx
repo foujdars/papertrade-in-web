@@ -26,7 +26,9 @@ import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
-import { IpoAlertMonitor, IpoWorkspace } from "@/components/IpoWorkspace";
+import { IpoWorkspace } from "@/components/IpoWorkspace";
+import { PushNotificationBridge } from "./PushNotificationBridge";
+import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
@@ -60,7 +62,6 @@ import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
-import { IpoAllotmentMonitor } from "@/components/IpoAllotments";
 import { RiskSizingPlan } from "@/components/RiskSizingPlan";
 import { BarReplayDialog } from "@/components/BarReplay";
 import { TradingCoach, type CoachTab } from "@/components/TradingCoach";
@@ -132,11 +133,13 @@ function showProtectionAlert(order: PaperOrder, nativeAlreadyNotified = false) {
   const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
   addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body, symbol: order.symbol, instrumentKey: order.instrumentKey });
-  navigator.vibrate?.([180, 90, 180]);
+  const preferences = readNotificationPreferences();
+  if (!preferences.trades || preferences.pausedUntil > Date.now() || nativeAlreadyNotified || document.visibilityState === "visible") return;
   if (Capacitor.getPlatform() === "android" && !nativeAlreadyNotified) {
-    void getNativeTradeAlert().show({ title: `PaperTrade IN - ${reason}`, body }).catch(() => undefined);
+    void getNativeTradeAlert().show({ title: `${order.symbol}: paper ${reason.toLowerCase()}`, body, kind: "trade", notificationId: `trade-${order.id}`, url: "/?screen=pnl" }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(`PaperTrade IN - ${reason}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-${order.id}` });
+    const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+    new Notification(`PaperTrade IN - ${reason}`, { body: preferences.hideAmounts ? "Your paper-trade protection event is ready to review." : body, icon: "/papertrade-icon-192.png?v=1.22", tag: `papertrade-${order.id}`, silent: hour >= 21 || hour < 8 });
   }
 }
 
@@ -713,6 +716,8 @@ export function TradingDashboard() {
         setFnoFutureInstrument(savedFuture ? futureToInstrument(savedFuture, savedChart.fnoUnderlying) : null);
       }
       if (savedChart.fnoTopMode) setFnoTopMode(savedChart.fnoTopMode);
+      const requestedScreen = params.get("screen");
+      if (requestedScreen === "ipo" || requestedScreen === "pnl") openNavigationSection(requestedScreen);
       const savedInstrumentSymbol = typeof savedChart.instrument?.symbol === "string" ? savedChart.instrument.symbol.toUpperCase() : "";
       if (requestedSymbol && savedInstrumentSymbol !== requestedSymbol) {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
@@ -1553,22 +1558,7 @@ export function TradingDashboard() {
   const intradayOpenPnl = openPositions.filter((position) => position.product === "INTRADAY").reduce((sum, position) => sum + position.unrealizedPnl, 0);
   const currentDayPortfolioPnl = todayClosedPnl + intradayOpenPnl + holdingsSummary.dayPnl;
 
-  useEffect(() => {
-    if (!clock || getNseMarketStatus(clock).minutesFromMidnight < 17 * 60) return;
-    const dateKey = indiaDateKey(clock);
-    const reminderKey = `papertrade-portfolio-summary:${user?.id ?? "guest"}:${dateKey}`;
-    if (localStorage.getItem(reminderKey) === "sent") return;
-    const direction = currentDayPortfolioPnl >= 0 ? "profit" : "loss";
-    const title = `Today’s portfolio ${direction}`;
-    const body = `${currentDayPortfolioPnl >= 0 ? "+" : ""}${formatInr(currentDayPortfolioPnl)} including completed trades, open intraday positions and holdings’ day move.`;
-    addPaperTradeNotification({ id: `portfolio-${dateKey}-${user?.id ?? "guest"}`, kind: "portfolio", title, body });
-    localStorage.setItem(reminderKey, "sent");
-    if (Capacitor.getPlatform() === "android") {
-      void getNativeTradeAlert().show({ title: `PaperTrade IN - ${title}`, body }).catch(() => undefined);
-    } else if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(`PaperTrade IN - ${title}`, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-portfolio-${dateKey}` });
-    }
-  }, [clock, currentDayPortfolioPnl, user?.id]);
+  // Scheduled portfolio reviews are delivered by the server, never on app resume.
   const pnlStats = useMemo(() => {
     const totalProfit = closedTrades.filter((trade) => trade.netPnl > 0).reduce((sum, trade) => sum + trade.netPnl, 0);
     const totalLoss = Math.abs(closedTrades.filter((trade) => trade.netPnl < 0).reduce((sum, trade) => sum + trade.netPnl, 0));
@@ -2382,8 +2372,7 @@ export function TradingDashboard() {
   return (
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
-      <IpoAlertMonitor />
-      <IpoAllotmentMonitor />
+      <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2989,6 +2978,7 @@ export function TradingDashboard() {
                     <button type="button" className="stock-identity pnl-stock-chart-link" aria-label={selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) toggleTradeSelection(trade.id); else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} size={32} /><span><b>{trade.symbol}</b><small>{trade.product} · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small></span></button>
                     <TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get(trade.id)} status={paperOrdersById.get(trade.id) ? paperOrderStatusLabel(paperOrdersById.get(trade.id)!) : "Complete"} />
                     {menuOpen && <TradeReviewDialog symbol={trade.symbol} theme={theme} onClose={() => setPnlTradeMenuId(null)}>
+                    <div className="pnl-review-executions"><span>Entry: {trade.openedAt ? new Date(trade.openedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Exit: {trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Fees: {formatInr(trade.charges)} · included in net P&amp;L</span></div>
                     {reviewInstrument && reviewMarkers.length > 0 ? (
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">

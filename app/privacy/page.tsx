@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
         <article className={styles.card}>
           <span className={styles.eyebrow}>Your privacy</span>
           <h1>Privacy Policy</h1>
-          <p className={styles.updated}>Effective 2 September 2026</p>
+          <p className={styles.updated}>Effective 13 September 2026</p>
           <p className={styles.summary}>PaperTrade IN is a paper-trading simulator. We do not sell personal information, display behavioural advertising, see your Google password, or place real exchange orders.</p>
 
           <section className={styles.section}>
@@ -25,14 +25,14 @@ export default function PrivacyPolicyPage() {
               <li><b>Google account information:</b> your account identifier, email address, display name, and profile image when you choose Google sign-in.</li>
               <li><b>Paper-trading information:</b> virtual balance, simulated orders and positions, holdings, watchlists, chart preferences, protections, and P&amp;L records that you save or generate.</li>
               <li><b>Technical information:</b> ordinary security and diagnostic information processed by our hosting and authentication providers, such as request timestamps, IP address, browser or device type, and error information.</li>
-              <li><b>Optional notifications:</b> if you permit notifications, the Android app can show local alerts when a simulated target or stop-loss is reached.</li>
-              <li><b>IPO allotment alerts:</b> when enabled, the website checks public IPO information while it is open. The alert preference and records used to avoid duplicate alerts are saved on your device, along with the notification centre history.</li>
+              <li><b>Optional notifications:</b> if you enable background delivery, we register a device messaging token with your account identifier, notification choices, last active time and daily completed-paper-trade count. Firebase Cloud Messaging delivers permitted updates; Firestore stores these registrations. No PAN, holdings, trade prices or P&amp;L amounts are included in this registration.</li>
+              <li><b>IPO and trade alerts:</b> server checks support scheduled IPO reminders and verified allotment updates without keeping the app open. Android can also monitor configured paper-trade price levels while its background service runs. Delivery depends on connectivity and operating-system restrictions. Notification history, preferences and duplicate-prevention records are stored on your device.</li>
             </ul>
           </section>
 
           <section className={styles.section}>
             <h2>2. How information is used</h2>
-            <p>We use this information only to authenticate you, synchronize your paper portfolio across your devices, provide charts and simulated trading features, maintain service security, diagnose failures, and respond to support or privacy requests.</p>
+            <p>We use this information to authenticate you, synchronize your paper portfolio across your devices, provide charts and simulated trading features, deliver notifications you enable, maintain service security, diagnose failures, and respond to support or privacy requests.</p>
           </section>
 
           <section className={styles.section}>
@@ -54,6 +54,7 @@ export default function PrivacyPolicyPage() {
 
           <section className={styles.section}>
             <h2>6. Retention and deletion</h2>
+            <p>Signing out disconnects notifications on the current device; account deletion removes notification registrations for all your devices. The notification scheduler removes registrations inactive for more than 90 days. You can independently turn off IPO updates, allotment alerts or your own trade alerts, or pause notifications for a week. Optional review and practice reminders are off by default.</p>
             <p>Your account profile and synchronized trading state are retained while your account is active. You may permanently delete them from the profile menu or through the <Link href="/delete-account">account deletion page</Link>. Deletion removes your Supabase authentication account and associated profile and cloud trading data. Hosting providers may retain limited security logs for their normal operational or legal periods.</p>
           </section>
 

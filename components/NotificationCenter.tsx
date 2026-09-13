@@ -1,4 +1,5 @@
 "use client";
+import { NotificationSettings } from "./NotificationSettings";
 import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, Bell, BellRing, BriefcaseBusiness, CheckCheck, ExternalLink, Rocket, ShieldCheck, Trash2, X } from "lucide-react";
@@ -73,9 +74,11 @@ export function NotificationCenter() {
             {items.length > 0 && <button onClick={() => { clearPaperTradeNotifications(); setItems([]); }}><Trash2 size={14} /> Clear</button>}
           </div>
           <div className="notification-center-list">
+            <NotificationSettings />
             {items.map((item) => <article key={item.id} className={`notification-item kind-${item.kind}`}>
               {item.kind === "trade" && item.symbol ? <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} size={32} /> : <span className="notification-item-icon"><NotificationIcon item={item} /></span>}
-              <div><b>{item.title}</b>{item.kind !== "ipo" && <p>{item.body}</p>}<small>{formatNotificationTime(item.createdAt)} IST</small>
+              <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small>
+                {item.url && <a className="allotment-result-link notification-result-link" href={item.url}>View update <ExternalLink size={14}/></a>}
                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
               </div>
             </article>)}

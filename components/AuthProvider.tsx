@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { disconnectPush } from "@/lib/push-client";
 
 import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
@@ -243,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [signingIn]);
 
   const signOut = useCallback(async () => {
+    await disconnectPush();
     const client = getSupabaseBrowserClient();
     if (client && session?.user.id) {
       await client.from("trading_states").upsert({ user_id: session.user.id, state: readCloudTradingState() });
@@ -255,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [configured, session]);
 
   const deleteAccount = useCallback(async () => {
+    await disconnectPush();
     if (!session?.access_token) throw new Error("Your secure session has expired. Please sign in again.");
     await deletePaperTradeAccount(session.access_token);
     lastUploadedState.current = "";

@@ -207,8 +207,8 @@ public class PriceAlertMonitorService extends Service {
 
     private Notification buildMonitorNotification() {
         return new NotificationCompat.Builder(this, MONITOR_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher))
+            .setSmallIcon(R.drawable.ic_stat_papertrade)
+            .setLargeIcon(NotificationDelivery.logo(this))
             .setContentTitle("PaperTrade protection is active")
             .setContentText("Targets and stop losses are being monitored in the background.")
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -219,25 +219,13 @@ public class PriceAlertMonitorService extends Service {
     }
 
     private void showTriggeredNotification(JSONObject alert, String trigger, double price) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager == null) return;
-        String symbol = alert.optString("symbol", "Stock");
-        String reason = "TARGET".equals(trigger) ? "Target reached" : "Stop-loss reached";
-        String body = String.format(Locale.ENGLISH, "%s reached the protected level at Rs %,.2f. Open the app to review the completed exit.", symbol, price);
-        Notification notification = new NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher))
-            .setContentTitle("PaperTrade IN - " + reason)
-            .setContentText(body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setDefaults(Notification.DEFAULT_ALL)
-            .setContentIntent(launchIntent(alert.optString("id", symbol).hashCode()))
-            .setAutoCancel(true)
-            .build();
-        manager.notify(alert.optString("id", symbol).hashCode() & 0x7fffffff, notification);
+        try {
+            JSONObject notice=new JSONObject();
+            String symbol=alert.optString("symbol","Stock");
+            notice.put("id","price-"+alert.optString("id",symbol));notice.put("kind","trade");
+            notice.put("title",symbol+(": ")+("TARGET".equals(trigger)?"paper target reached":"paper stop-loss reached"));
+            notice.put("body",String.format(Locale.ENGLISH,"Protected price reached at Rs %,.2f. Open the app to confirm the paper exit and review the trade.",price));
+            notice.put("url","/?screen=pnl");NotificationDelivery.show(this,notice);
+        }catch(Exception ignored){}
     }
 }

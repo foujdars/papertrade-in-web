@@ -19,9 +19,15 @@ test("execution summary allocates partial-exit fees and preserves short-trade si
   const rendered = viewText(view);
   assert.match(rendered, /SELL80 @ ₹25.00/);
   assert.match(rendered, /BUY80 @ ₹24.00/);
-  assert.match(rendered, /09:59:43/);
-  assert.match(rendered, /10:00:02/);
-  assert.match(rendered, /Fees₹5.00\(₹2.00 \+ ₹3.00\)/);
+  assert.match(rendered, /09:59/);
+  assert.match(rendered, /10:00/);
+  assert.doesNotMatch(rendered, /09:59:43|10:00:02|Fees/);
+  const [pair, result] = view.props.children;
+  assert.match(pair.props.children[0].props.title, /09:59:43/);
+  assert.match(pair.props.children[1].props.title, /10:00:02/);
+  assert.match(result.props.title, /fees ₹5.00 \(₹2.00 \+ ₹3.00\)/);
+  assert.equal(pair.props.children.length, 2, "Entry and exit share the compact strip without a slash or fees column");
+  assert.equal(view.props.children.length, 2, "Only the execution strip and net result occupy the card grid");
   assert.match(rendered, /\+₹75.00Complete/);
   assert.doesNotMatch(rendered, /160 @/);
 });
@@ -147,6 +153,7 @@ test("compact trade cards retain execution facts and only show the selection too
   assert.match(dashboard, /<TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get\(trade.id\)}/);
   assert.match(dashboard, /<TradeReviewDialog/);
   assert.match(dashboard, /className="stock-identity pnl-stock-chart-link"/);
+  assert.match(dashboard, /className="pnl-review-executions"/);
   const summary = await source("components/TradeExecutionSummary.tsx");
   for (const detail of ["trade.quantity", "trade.entryPrice", "trade.exitPrice", "trade.openedAt", "trade.closedAt", "trade.charges", "trade.netPnl"]) assert.ok(summary.includes(detail), detail);
 });

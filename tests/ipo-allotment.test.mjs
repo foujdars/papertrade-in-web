@@ -49,8 +49,9 @@ test("registrar company matching only accepts numeric IDs and exact normalized n
 
 test("notification worker cannot cache pages, collect PANs, or open arbitrary external links", async () => {
   const sw = await readFile(new URL("../public/notifications-sw.js", import.meta.url), "utf8");
-  assert.doesNotMatch(sw, /addEventListener\(["'](?:fetch|push)["']/);
-  assert.match(sw, /allowed\.includes\(registrar\)/);
+  assert.doesNotMatch(sw, /addEventListener\(["']fetch["']/);
+  assert.match(sw, /addEventListener\("push"/);
+  assert.match(sw, /safePath/);
   assert.match(sw, /self\.location\.origin/);
   const panel = await readFile(new URL("../components/IpoAllotments.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(panel, /<input/);

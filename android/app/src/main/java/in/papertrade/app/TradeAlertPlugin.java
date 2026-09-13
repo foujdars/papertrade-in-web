@@ -44,7 +44,7 @@ public class TradeAlertPlugin extends Plugin {
     @PluginMethod
     public void show(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && getPermissionState("notifications") != PermissionState.GRANTED) {
-            requestPermissionForAlias("notifications", call, "showPermissionCallback");
+            call.resolve();
             return;
         }
         showNotification(call);
@@ -57,8 +57,7 @@ public class TradeAlertPlugin extends Plugin {
             .edit()
             .putBoolean(IpoGmpAlertWorker.ENABLED_KEY, enabled)
             .apply();
-        if (enabled) IpoGmpAlertWorker.schedule(getContext());
-        else IpoGmpAlertWorker.cancel(getContext());
+        IpoGmpAlertWorker.cancel(getContext());
         call.resolve();
     }
 
@@ -116,50 +115,41 @@ public class TradeAlertPlugin extends Plugin {
         else call.resolve();
     }
 
+    @PluginMethod
+    public void configurePush(PluginCall call) {
+        JSObject preferences=call.getObject("preferences",new JSObject());
+        getContext().getSharedPreferences(NotificationDelivery.PREFS,0).edit().putString("preferences",preferences.toString()).apply();
+        IpoGmpAlertWorker.cancel(getContext());
+        if(Boolean.TRUE.equals(call.getBoolean("requestPermission",false)) && Build.VERSION.SDK_INT>=33 && getPermissionState("notifications")!=PermissionState.GRANTED) {
+            requestPermissionForAlias("notifications",call,"pushPermissionCallback");return;
+        }
+        finishPushSetup(call);
+    }
+    @PermissionCallback private void pushPermissionCallback(PluginCall call) { finishPushSetup(call); }
+    private void finishPushSetup(PluginCall call) {
+        if(com.google.firebase.FirebaseApp.getApps(getContext()).isEmpty()){
+            JSObject result=new JSObject();result.put("error","Firebase app configuration is pending. Install the updated app after setup.");call.resolve(result);return;
+        }
+        if(Build.VERSION.SDK_INT>=33&&getPermissionState("notifications")!=PermissionState.GRANTED){call.reject("Allow notifications in phone settings.");return;}
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token->{JSObject result=new JSObject();result.put("token",token);call.resolve(result);}).addOnFailureListener(error->call.reject("Push registration failed. Please retry."));
+    }
+    @PluginMethod public void consumeNotifications(PluginCall call) {
+        android.content.SharedPreferences state=getContext().getSharedPreferences(NotificationDelivery.PREFS,0);
+        JSObject result=new JSObject();
+        synchronized(NotificationDelivery.class) {
+            try{result.put("notifications",new JSONArray(state.getString("inbox","[]")));state.edit().putString("inbox","[]").apply();}catch(Exception ignored){}
+        }
+        call.resolve(result);
+    }
     private void showNotification(PluginCall call) {
-        Context context = getContext();
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager == null) {
-            call.resolve();
-            return;
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "PaperTrade alerts", NotificationManager.IMPORTANCE_HIGH);
-            channel.setDescription("Paper trade protection, portfolio, market and IPO alerts");
-            channel.enableVibration(true);
-            channel.setVibrationPattern(new long[] { 0, 250, 120, 250 });
-            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            channel.setShowBadge(true);
-            manager.createNotificationChannel(channel);
-        }
-        String title = call.getString("title", "PaperTrade IN");
-        String body = call.getString("body", "A paper trade protection level was reached.");
-        Intent launchIntent = new Intent(context, MainActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent contentIntent = PendingIntent.getActivity(
-            context,
-            (int) (System.currentTimeMillis() & 0x7fffffff),
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher))
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(Notification.DEFAULT_ALL)
-            .setVibrate(new long[] { 0, 250, 120, 250 })
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setContentIntent(contentIntent)
-            .setAutoCancel(true);
-        String requestedId = call.getString("notificationId");
-        int notificationId = requestedId == null
-            ? (int) (System.currentTimeMillis() & 0x7fffffff)
-            : requestedId.hashCode() & 0x7fffffff;
-        manager.notify(notificationId, notification.build());
+        JSONObject notice=new JSONObject();
+        try{
+            notice.put("id",call.getString("notificationId","event-"+System.currentTimeMillis()));
+            notice.put("title",call.getString("title","PaperTrade IN"));notice.put("body",call.getString("body",""));
+            notice.put("kind",call.getString("kind","trade"));notice.put("url",call.getString("url","/?screen=pnl"));
+            notice.put("silent",Boolean.TRUE.equals(call.getBoolean("silent",false)));
+            NotificationDelivery.show(getContext(),notice);
+        }catch(Exception ignored){}
         call.resolve();
     }
 }
