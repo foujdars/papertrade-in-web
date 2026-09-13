@@ -1,6 +1,13 @@
 import "server-only";
 import type { PushNotice } from "./notification-policy";
-export function pushConfigured() { return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON && (process.env.NOTIFICATION_CRON_SECRET?.length ?? 0) >= 32); }
+export function firebaseProjectId() {
+  try {
+    const credential = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}") as Record<string, unknown>;
+    return typeof credential.project_id === "string" && typeof credential.client_email === "string" && typeof credential.private_key === "string"
+      ? credential.project_id : "";
+  } catch { return ""; }
+}
+export function pushConfigured() { return Boolean(firebaseProjectId() && (process.env.NOTIFICATION_CRON_SECRET?.length ?? 0) >= 32); }
 export async function pushServices() {
   // Node-only credentials/SDK are needed only by configured push endpoints,
   // never while rendering the home page or an unconfigured local preview.

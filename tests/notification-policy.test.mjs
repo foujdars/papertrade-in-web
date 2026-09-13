@@ -118,3 +118,12 @@ test("visible app receives inbox events without an extra OS alert, and unsafe li
   worker.setVisible(false);await worker.push(push({id:"two",url:"https://evil.example"}));
   assert.equal(worker.shown[0].data.url,"/");
 });
+
+test("browser push configuration rejects placeholders and requires Firebase-shaped public IDs", async () => {
+  const route=await readFile(new URL("../app/api/notifications/config/route.ts",import.meta.url),"utf8");
+  assert.match(route,/\^AIza/);
+  assert.match(route,/messagingSenderId.*\\d\{6,20\}/s);
+  assert.match(route,/appId.*web:/s);
+  assert.match(route,/projectId === firebaseProjectId\(\)/);
+  assert.match(route,/!authDomain\.includes\("YOUR_"\)/);
+});
