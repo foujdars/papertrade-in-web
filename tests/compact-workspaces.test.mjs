@@ -153,9 +153,15 @@ test("compact trade cards retain execution facts and only show the selection too
   assert.match(dashboard, /<TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get\(trade.id\)}/);
   assert.match(dashboard, /<TradeReviewDialog/);
   assert.match(dashboard, /className="stock-identity pnl-stock-chart-link"/);
+  assert.match(dashboard, /Open \$\{trade\.symbol\} price chart/);
+  assert.match(dashboard, /Open \$\{trade\.symbol\} entry and exit trade chart/);
   assert.match(dashboard, /className="pnl-review-executions"/);
   const summary = await source("components/TradeExecutionSummary.tsx");
   for (const detail of ["trade.quantity", "trade.entryPrice", "trade.exitPrice", "trade.openedAt", "trade.closedAt", "trade.charges", "trade.netPnl"]) assert.ok(summary.includes(detail), detail);
+  const polish = await source("app/polish.css");
+  assert.match(polish, /pnl-execution-pair::before[^}]+ENTRY & EXIT CHART/);
+  assert.match(polish, /pnl-history-tabs button\.active[^}]+var\(--purple-soft\)/);
+  assert.match(polish, /fno-list-tabs button\.active[^}]+var\(--studio-accent/);
 });
 
 test("chart brackets start with entry only and commit protection only after a completed drag", async () => {
