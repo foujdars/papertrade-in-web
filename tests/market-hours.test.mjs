@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getNseMarketStatus, nseDate, nseSquareOffMinute } from "../lib/market-hours.ts";
-import { stackTradeMarkers } from "../lib/trade-marker-layout.ts";
+import { stackTradeMarkers, positionPnl, compactPnl } from "../lib/trade-marker-layout.ts";
 
 test("enables intraday orders only during the weekday NSE session", () => {
   assert.equal(getNseMarketStatus(new Date("2026-08-03T03:44:00Z")).isOpen, false);
@@ -33,13 +33,33 @@ test("dated evening and weekend sessions override regular hours; stale status ca
 });
 
 test("two round trips on one candle retain four separate markers at the same horizontal position", () => {
-  for (const anchor of [60, 300, 610]) {
+  for (const anchor of [60, 300, 580]) {
     const markers = Array.from({ length: 4 }, (_, i) => ({ id: String(i), time: i, candleTime: 100, x: 200, y: anchor, direction: i % 2 ? "up" : "down" }));
     const result = stackTradeMarkers(markers, 650).sort((a, b) => a.y - b.y);
     assert.equal(result.length, 4);
     assert.ok(result.every(m => m.x === 200 && m.y >= 0 && m.y <= 610));
-    for (let i = 1; i < result.length; i++) assert.ok(result[i].y - result[i - 1].y >= 38);
+    for (let i = 1; i < result.length; i++) assert.ok(result[i].y - result[i - 1].y >= 24);
+    assert.ok(result.filter(m => m.direction === "down").every(m => m.y + 22 < anchor));
+    assert.ok(result.filter(m => m.direction === "up").every(m => m.y > anchor));
   }
+});
+
+test("offscreen arrows are hidden rather than clamped into the price scale or across a candle", () => {
+  const marker = { id: "sell", time: 1, candleTime: 1, x: 200, y: 150, direction: "down" };
+  assert.equal(stackTradeMarkers([marker], 600, 300).length, 1);
+  for (const x of [-10, 0, 295, 320]) assert.equal(stackTradeMarkers([{ ...marker, x }], 600, 300).length, 0);
+  assert.equal(stackTradeMarkers([{ ...marker, y: 10 }], 600, 300).length, 0);
+  assert.equal(stackTradeMarkers([{ ...marker, y: 590, direction: "up" }], 600, 300).length, 0);
+  const many = Array.from({ length: 20 }, (_, i) => ({ ...marker, id: String(i), time: i }));
+  assert.ok(stackTradeMarkers(many, 600, 300).every(m => m.y >= 0 && m.y + 22 < 150));
+});
+
+test("fixed entry boxes display current-price P&L for long and short positions", () => {
+  assert.equal(compactPnl(positionPnl("BUY", 10, 100, 105)), "+50");
+  assert.equal(compactPnl(positionPnl("BUY", 10, 100, 95)), "-50");
+  assert.equal(compactPnl(positionPnl("SELL", 10, 100, 95)), "+50");
+  assert.equal(compactPnl(positionPnl("SELL", 10, 100, 105)), "-50");
+  assert.equal(compactPnl(positionPnl("BUY", 10, 100, 100)), "0");
 });
 
 test("disables intraday orders on weekends", () => {

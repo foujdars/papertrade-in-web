@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="mipmap" name="ic_papertrade_current">@mipmap/ic_launcher</item>
+    <item type="mipmap" name="ic_papertrade_current_round">@mipmap/ic_launcher_round</item>
+    <item type="drawable" name="ic_stat_papertrade_current">@drawable/ic_stat_papertrade</item>
+</resources>

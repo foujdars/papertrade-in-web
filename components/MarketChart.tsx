@@ -1,6 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
-import { stackTradeMarkers } from "@/lib/trade-marker-layout";
+import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -645,10 +645,7 @@ export function MarketChart({
       setTradeMarkerCoordinates([]);
       return;
     }
-    const chartHeight = host.clientHeight;
-    const chartWidth = host.clientWidth;
-    const topPadding = 18;
-    const bottomPadding = Math.max(topPadding, chartHeight - 26);
+    const { height: chartHeight, width: chartWidth } = chart.paneSize(0);
     const positions = markers.flatMap((marker) => {
       const markerTime = marker.time > 1_000_000_000_000 ? Math.floor(marker.time / 1_000) : Math.floor(marker.time);
       let nearest = candles[0];
@@ -660,12 +657,12 @@ export function MarketChart({
       // Keep execution arrows attached to the candle extremum as the chart moves.
       const anchorPrice = marker.side === "BUY" ? nearest.low : nearest.high;
       const yBase = series.priceToCoordinate(anchorPrice);
-      if (x === null || yBase === null || x < -18 || x > chartWidth + 18) return [];
+      if (x === null || yBase === null || x < 0 || x > chartWidth) return [];
       const y = yBase;
-      if (y < topPadding || y > bottomPadding) return [];
+      if (y < 0 || y > chartHeight) return [];
       return [{ ...marker, candleTime: Number(nearest.time), x, y, direction: marker.side === "BUY" ? "up" as const : "down" as const }];
     });
-    const next = stackTradeMarkers(positions, chartHeight);
+    const next = stackTradeMarkers(positions, chartHeight, chartWidth);
     setTradeMarkerCoordinates((current) => {
       if (current.length !== next.length) return next;
       const same = current.every((item, index) => {
@@ -697,8 +694,7 @@ export function MarketChart({
   }, [replaySelecting, replayStartTime, onReplaySelect, onReplayPreview]);
 
   function orderToolPnl(tool: ChartOrderTool, price: number) {
-    const direction = tool.side === "BUY" ? 1 : -1;
-    return (price - tool.entryPrice) * direction * tool.quantity;
+    return positionPnl(tool.side, tool.quantity, tool.entryPrice, price);
   }
 
   function formatRiskPnl(value: number) {
@@ -2002,15 +1998,16 @@ export function MarketChart({
             style={{ left: marker.x, top: marker.y }}
             aria-label={`${marker.role === "ENTRY" ? "Entry" : "Exit"} ${marker.side}`}
           >
-            <span>{marker.direction === "up" ? "↑" : "↓"}</span>
-            <em>{marker.role === "ENTRY" ? "Entry" : "Exit"}</em>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={marker.direction === "up" ? "M12 21V3M5 10L12 3L19 10" : "M12 3V21M5 14L12 21L19 14"} />
+            </svg>
           </div>
         ))}
         {orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
-                <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>0</span>
+                <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{compactPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</span>
               </button>
             </div>}
             {(["target", "stopLoss"] as const).map((level) => {
@@ -2038,7 +2035,7 @@ export function MarketChart({
                     const next = Math.round(((price || tool.entryPrice) + (event.key === "ArrowUp" ? step : -step)) * 100) / 100;
                     if (next > 0) onOrderToolChange?.(level, next, true);
                   }}>
-                  <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : `${orderToolPnl(orderTool, price) > 0 ? "+" : ""}${orderToolPnl(orderTool, price).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}</span>
+                  <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : compactPnl(orderToolPnl(orderTool, price))}</span>
                 </div>
               </div>;
             })}

@@ -168,7 +168,7 @@ public class IpoGmpAlertWorker extends Worker {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_papertrade)
+            .setSmallIcon(R.drawable.ic_stat_papertrade_current)
             .setLargeIcon(NotificationDelivery.logo(context))
             .setContentTitle(title)
             .setContentText(body)

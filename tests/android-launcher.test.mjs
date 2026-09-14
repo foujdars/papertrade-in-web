@@ -26,8 +26,9 @@ test("website header uses the approved transparent document mark in both themes"
 test("adaptive square and round icons use the requested white launcher artwork", async () => {
   const root = "android/app/src/main/res/";
   const manifest = await source("android/app/src/main/AndroidManifest.xml");
-  assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
-  assert.match(manifest, /android:roundIcon="@mipmap\/ic_launcher_round"/);
+  assert.match(manifest, /android:icon="@mipmap\/ic_papertrade_current"/);
+  assert.match(manifest, /android:roundIcon="@mipmap\/ic_papertrade_current_round"/);
+  assert.match(await source(`${root}values/current_brand.xml`), /name="ic_papertrade_current">@mipmap\/ic_launcher/);
   for (const name of ["ic_launcher", "ic_launcher_round"]) {
     const xml = await source(`${root}mipmap-anydpi-v26/${name}.xml`);
     assert.match(xml, /foreground android:drawable="@drawable\/ic_launcher_foreground"/);
@@ -78,12 +79,16 @@ test("native notifications include the updated launcher image", async () => {
   for (const name of ["IpoGmpAlertWorker", "IpoOpeningAlertWorker"]) {
     const notificationSource = await source(`android/app/src/main/java/in/papertrade/app/${name}.java`);
     assert.match(notificationSource, /setLargeIcon\(NotificationDelivery.logo\(context\)\)/);
-    assert.match(notificationSource, /setSmallIcon\(R.drawable.ic_stat_papertrade\)/);
+    assert.match(notificationSource, /setSmallIcon\(R.drawable.ic_stat_papertrade_current\)/);
   }
   const delivery = await source("android/app/src/main/java/in/papertrade/app/NotificationDelivery.java");
-  assert.match(delivery, /setSmallIcon\(R.drawable.ic_stat_papertrade\)/);
+  assert.match(delivery, /setSmallIcon\(R.drawable.ic_stat_papertrade_current\)/);
   assert.match(delivery, /setLargeIcon\(logo\(context\)\)/);
-  assert.match(delivery, /R.mipmap.ic_launcher/);
+  assert.match(delivery, /R.mipmap.ic_papertrade_current/);
+  assert.match(delivery, /getActiveNotifications/);
+  assert.match(delivery, /new NotificationCompat.Builder\(context, active.getNotification\(\)\)/);
+  assert.match(delivery, /setOnlyAlertOnce\(true\).setSilent\(true\)/);
+  assert.match(await source("android/app/src/main/java/in/papertrade/app/BrandUpdateReceiver.java"), /ACTION_MY_PACKAGE_REPLACED/);
   assert.match(delivery, /drawable.draw\(new Canvas\(bitmap\)\)/);
   assert.match(await source("android/app/src/main/java/in/papertrade/app/TradeAlertPlugin.java"), /NotificationDelivery.show/);
   assert.match(await source("android/app/src/main/java/in/papertrade/app/PriceAlertMonitorService.java"), /NotificationDelivery.logo/);
@@ -99,8 +104,8 @@ test("native notifications include the updated launcher image", async () => {
   assert.match(protectionMonitor, /TRIGGERED_ALERTS_KEY/);
 });
 
-test("both website download links serve v1.22 with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.22-beta.apk";
+test("both website download links serve v1.23 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.23-beta.apk";
   const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
@@ -108,5 +113,5 @@ test("both website download links serve v1.22 with its real checksum", async () 
     assert.ok(!content.includes("PaperTrade-IN-v1.20-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1\.22"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1\.23"/);
 });

@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         }
         registerPlugin(TradeAlertPlugin.class);
         super.onCreate(savedInstanceState);
+        NotificationDelivery.refreshBranding(this);
         // Retire the imprecise device-polling schedules after the app update.
         IpoGmpAlertWorker.cancel(this);
     }

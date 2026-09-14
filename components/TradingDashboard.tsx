@@ -3067,7 +3067,7 @@ export function TradingDashboard() {
               <article>
                 <b>Android app</b>
                 <small>Install the beta APK directly from the official website.</small>
-                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.22-beta.apk" download><Download size={18} /> Download Android APK</a>
+                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.23-beta.apk" download><Download size={18} /> Download Android APK</a>
               </article>
               <article>
                 <b>iPhone / iPad app</b>
@@ -3076,7 +3076,7 @@ export function TradingDashboard() {
               </article>
             </div>
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
-            <code className="download-hash">CB244AA7CC288B2396F7BB59D7677F15043B6522BA77F99478481FDCFCF089D6</code>
+            <code className="download-hash">AFA1D398275C8444934B3CB6AEF85E81556C63B4E0A291C1FEE9A193E5B68967</code>
             <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari&apos;s Add to Home Screen option.</p>
           </section>
         </div>

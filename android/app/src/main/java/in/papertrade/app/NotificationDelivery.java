@@ -18,13 +18,29 @@ public final class NotificationDelivery {
     try{return new JSONObject(context.getSharedPreferences(PREFS,0).getString("preferences","{}"));}catch(Exception e){return new JSONObject();}
   }
   public static Bitmap logo(Context context) {
-    Drawable drawable=ContextCompat.getDrawable(context,R.mipmap.ic_launcher);
+    Drawable drawable=ContextCompat.getDrawable(context,R.mipmap.ic_papertrade_current);
     Bitmap bitmap=Bitmap.createBitmap(128,128,Bitmap.Config.ARGB_8888);
     if(drawable!=null){drawable.setBounds(0,0,128,128);drawable.draw(new Canvas(bitmap));}
     return bitmap;
   }
   public static String safePath(String path) {
     return path!=null && (path.matches("/\\?screen=(ipo|pnl)")||path.matches("/ipo-allotment/(mufg|kfin|bigshare|bse)"))?path:"/";
+  }
+  public static void refreshBranding(Context context) {
+    if (Build.VERSION.SDK_INT < 24) return;
+    SharedPreferences state = context.getSharedPreferences(PREFS, 0);
+    if (state.getInt("notification_brand_revision", 0) >= 123) return;
+    NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+    if (manager == null) return;
+    try {
+      for (android.service.notification.StatusBarNotification active : manager.getActiveNotifications()) {
+        Notification refreshed = new NotificationCompat.Builder(context, active.getNotification())
+            .setSmallIcon(R.drawable.ic_stat_papertrade_current).setLargeIcon(logo(context))
+            .setOnlyAlertOnce(true).setSilent(true).build();
+        manager.notify(active.getTag(), active.getId(), refreshed);
+      }
+      state.edit().putInt("notification_brand_revision", 123).apply();
+    } catch (Exception ignored) { /* Retry at next launch; never remove the user's notifications. */ }
   }
   public static synchronized void show(Context context, JSONObject notice) {
     try{
@@ -53,7 +69,7 @@ public final class NotificationDelivery {
       PendingIntent pending=PendingIntent.getActivity(context,id.hashCode()&0x7fffffff,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
       String body=notice.optString("body");
       if("trade".equals(kind)&&prefs.optBoolean("hideAmounts",true))body="A paper-trade protection event occurred. Open PaperTrade IN to review it.";
-      NotificationCompat.Builder builder=new NotificationCompat.Builder(context,channelId).setSmallIcon(R.drawable.ic_stat_papertrade).setLargeIcon(logo(context)).setContentTitle(notice.optString("title","PaperTrade IN")).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(silent).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_STATUS).setGroup("papertrade-"+kind);
+      NotificationCompat.Builder builder=new NotificationCompat.Builder(context,channelId).setSmallIcon(R.drawable.ic_stat_papertrade_current).setLargeIcon(logo(context)).setContentTitle(notice.optString("title","PaperTrade IN")).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(silent).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_STATUS).setGroup("papertrade-"+kind);
       manager.notify(id.hashCode()&0x7fffffff,builder.build());
     }catch(Exception ignored){/* Never interrupt trading if notification delivery fails. */}
   }

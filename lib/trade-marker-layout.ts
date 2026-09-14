@@ -1,15 +1,25 @@
 type MarkerPosition = { id: string; time: number; candleTime: number; x: number; y: number; direction: "up" | "down" };
 
-/** Stack each execution at the candle's x coordinate, including entry/exit pairs. */
-export function stackTradeMarkers<T extends MarkerPosition>(markers: T[], height: number): T[] {
-  const groups = new Map<number, T[]>();
-  for (const marker of markers) groups.set(marker.candleTime, [...(groups.get(marker.candleTime) ?? []), marker]);
+/** Keep sell arrows above the high and buy arrows below the low, never across the candle. */
+export function stackTradeMarkers<T extends MarkerPosition>(markers: T[], height: number, width = Infinity): T[] {
+  const groups = new Map<string, T[]>();
+  for (const marker of markers) {
+    const key = `${marker.candleTime}:${marker.direction}`;
+    groups.set(key, [...(groups.get(key) ?? []), marker]);
+  }
   return [...groups.values()].flatMap(group => {
-    const placed = group.map(marker => ({ ...marker, y: marker.direction === "down" ? marker.y - 38 : marker.y + 3 }))
-      .sort((a, b) => a.y - b.y || a.time - b.time || a.id.localeCompare(b.id));
-    for (let i = 0; i < placed.length; i++) placed[i].y = Math.max(52, placed[i].y, i ? placed[i - 1].y + 38 : 52);
-    const overflow = Math.max(0, (placed.at(-1)?.y ?? 0) - (height - 40));
-    if (overflow) for (const marker of placed) marker.y -= overflow;
-    return placed;
+    return [...group].sort((a, b) => a.time - b.time || a.id.localeCompare(b.id))
+      .map((marker, index) => ({ ...marker, y: marker.direction === "down" ? marker.y - 26 - index * 24 : marker.y + 4 + index * 24 }))
+      // Clip instead of moving an offscreen execution onto another price or onto an axis.
+      .filter(marker => marker.x >= 11 && marker.x <= width - 11 && marker.y >= 0 && marker.y + 22 <= height);
   });
+}
+
+export function positionPnl(side: "BUY" | "SELL", quantity: number, entry: number, current: number) {
+  return (current - entry) * (side === "BUY" ? 1 : -1) * quantity;
+}
+
+export function compactPnl(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded > 0 ? "+" : ""}${rounded.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
