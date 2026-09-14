@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { stackTradeMarkers } from "@/lib/trade-marker-layout";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -648,16 +649,12 @@ export function MarketChart({
     const chartWidth = host.clientWidth;
     const topPadding = 18;
     const bottomPadding = Math.max(topPadding, chartHeight - 26);
-    const next = markers.flatMap((marker) => {
+    const positions = markers.flatMap((marker) => {
       const markerTime = marker.time > 1_000_000_000_000 ? Math.floor(marker.time / 1_000) : Math.floor(marker.time);
       let nearest = candles[0];
-      let nearestDistance = Math.abs(Number(nearest.time) - markerTime);
       for (const candle of candles) {
-        const distance = Math.abs(Number(candle.time) - markerTime);
-        if (distance < nearestDistance) {
-          nearest = candle;
-          nearestDistance = distance;
-        }
+        if (Number(candle.time) > markerTime) break;
+        nearest = candle;
       }
       const x = chart.timeScale().timeToCoordinate(chartTimeFromEpoch(Number(nearest.time), timeframe));
       // Keep execution arrows attached to the candle extremum as the chart moves.
@@ -666,8 +663,9 @@ export function MarketChart({
       if (x === null || yBase === null || x < -18 || x > chartWidth + 18) return [];
       const y = yBase;
       if (y < topPadding || y > bottomPadding) return [];
-      return [{ ...marker, x, y, direction: marker.side === "BUY" ? "up" as const : "down" as const }];
+      return [{ ...marker, candleTime: Number(nearest.time), x, y, direction: marker.side === "BUY" ? "up" as const : "down" as const }];
     });
+    const next = stackTradeMarkers(positions, chartHeight);
     setTradeMarkerCoordinates((current) => {
       if (current.length !== next.length) return next;
       const same = current.every((item, index) => {
@@ -2000,7 +1998,7 @@ export function MarketChart({
         {tradeMarkerCoordinates.map((marker) => (
           <div
             key={marker.id}
-            className={`chart-trade-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()} ${marker.direction}`}
+            className={`chart-trade-marker stacked-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()} ${marker.direction}`}
             style={{ left: marker.x, top: marker.y }}
             aria-label={`${marker.role === "ENTRY" ? "Entry" : "Exit"} ${marker.side}`}
           >
@@ -2012,7 +2010,7 @@ export function MarketChart({
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
-                <span>{orderTool.quantity}</span><b>ENTRY</b><span>₹{orderTool.entryPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span><small>{branchesOpen ? "−" : "+ TP / SL"}</small>
+                <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>0</span>
               </button>
             </div>}
             {(["target", "stopLoss"] as const).map((level) => {
@@ -2040,8 +2038,7 @@ export function MarketChart({
                     const next = Math.round(((price || tool.entryPrice) + (event.key === "ArrowUp" ? step : -step)) * 100) / 100;
                     if (next > 0) onOrderToolChange?.(level, next, true);
                   }}>
-                  <b>{level === "target" ? "TP" : "SL"}</b>
-                  {unset ? <span>Drag to set</span> : <><span>₹{price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span><strong>{formatRiskPnl(orderToolPnl(orderTool, price))}</strong></>}
+                  <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : `${orderToolPnl(orderTool, price) > 0 ? "+" : ""}${orderToolPnl(orderTool, price).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}</span>
                 </div>
               </div>;
             })}

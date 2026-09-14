@@ -45,6 +45,7 @@ export function FnoChartWorkspace({
   onToggleOptionType,
   onQuantityChange,
   onOpenOrder,
+  ordersEnabled = true,
   onFeedStatus,
   orderTool,
   onOrderToolChange,
@@ -78,6 +79,7 @@ export function FnoChartWorkspace({
   onToggleOptionType: () => void;
   onQuantityChange: (quantity: number) => void;
   onOpenOrder: (side: "BUY" | "SELL", mode: "Market" | "Limit") => void;
+  ordersEnabled?: boolean;
   onFeedStatus: (status: FeedStatus) => void;
   orderTool?: ChartOrderTool;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
@@ -216,9 +218,9 @@ export function FnoChartWorkspace({
         <div className="fno-trade-dock">
           <div className="fno-order-modes"><button className={orderMode === "Market" ? "active" : ""} onClick={() => setOrderMode("Market")}>1-Tap Market</button><button className={orderMode === "Limit" ? "active" : ""} onClick={() => setOrderMode("Limit")}>Limit/Trigger on Chart</button></div>
           <div className="fno-trade-actions">
-            <button className="sell" onClick={() => onOpenOrder("SELL", orderMode)}>Sell at <b>{orderMode === "Market" ? "Mkt" : optionPrice.toFixed(2)}</b><small>Margin {formatInr(margin)}</small></button>
+            <button disabled={!ordersEnabled} className="sell" onClick={() => onOpenOrder("SELL", orderMode)}>Sell at <b>{orderMode === "Market" ? "Mkt" : optionPrice.toFixed(2)}</b><small>Margin {formatInr(margin)}</small></button>
             <div className="fno-lot-stepper"><button onClick={() => onQuantityChange(Math.max(lotSize, quantity - lotSize))}><Minus size={16} /></button><span><b>{quantity}</b><small>{lots} lot{lots === 1 ? "" : "s"}</small></span><button onClick={() => onQuantityChange(quantity + lotSize)}><Plus size={16} /></button></div>
-            <button className="buy" onClick={() => onOpenOrder("BUY", orderMode)}>Buy at <b>{orderMode === "Market" ? "Mkt" : optionPrice.toFixed(2)}</b><small>Margin {formatInr(margin)}</small></button>
+            <button disabled={!ordersEnabled} className="buy" onClick={() => onOpenOrder("BUY", orderMode)}>Buy at <b>{orderMode === "Market" ? "Mkt" : optionPrice.toFixed(2)}</b><small>Margin {formatInr(margin)}</small></button>
           </div>
         </div>
       )}

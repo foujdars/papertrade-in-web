@@ -16,6 +16,8 @@ const responseCache = new Map<string, CachedResponse>();
 const inFlightRequests = new Map<string, Promise<unknown>>();
 
 function cachePolicy(path: string) {
+  if (path.includes("/market/status/")) return { freshMs: 5_000, staleMs: 0 };
+  if (path.includes("/market/timings/")) return { freshMs: 60_000, staleMs: 0 };
   // Quotes are never served stale because they can execute a paper order or protective exit.
   if (path.includes("market-quote/quotes")) return { freshMs: 5_000, staleMs: 5_000 };
   if (path.includes("/v2/ipos")) return { freshMs: 30_000, staleMs: 5 * 60_000 };
@@ -95,6 +97,7 @@ export async function upstoxFetch<T>(path: string): Promise<T> {
 
   const request = (async () => {
     const response = await fetch(`https://api.upstox.com${path}`, {
+      signal: AbortSignal.timeout(12_000),
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${token}`,

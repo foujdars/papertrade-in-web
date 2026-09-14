@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { useNseSession } from "./useNseSession";
 import { TradeExecutionSummary } from "./TradeExecutionSummary";
 import { TradeReviewDialog } from "./TradeReviewDialog";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
@@ -38,7 +39,7 @@ import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { deriveNetChange, formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
-import { getNseMarketStatus } from "@/lib/market-hours";
+import { getNseMarketStatus, nseSquareOffMinute, type NseSession } from "@/lib/market-hours";
 import {
   calculatePosition,
   getDeliveryHoldingQuantity,
@@ -253,7 +254,7 @@ function orderTradeMarker(order: PaperOrder, role: "ENTRY" | "EXIT"): ChartTrade
 function paperOrderStatusLabel(order: PaperOrder) {
   if (order.exitReason === "TARGET") return "Target hit";
   if (order.exitReason === "STOP_LOSS") return "SL hit";
-  if (order.autoSquareOff || order.exitReason === "AUTO_SQUARE_OFF") return "Auto 3:00";
+  if (order.autoSquareOff || order.exitReason === "AUTO_SQUARE_OFF") return "Auto exit";
   return "Complete";
 }
 
@@ -269,8 +270,8 @@ function indiaDateKey(value: Date | number) {
   return `${record.year}-${record.month}-${record.day}`;
 }
 
-function squareOffTimestamp(sessionDate: string) {
-  return Date.parse(`${sessionDate}T15:00:00+05:30`);
+function squareOffTimestamp(sessionDate: string, minute = UPSTOX_AUTO_SQUARE_OFF_MINUTES) {
+  return Date.parse(`${sessionDate}T00:00:00+05:30`) + minute * 60_000;
 }
 
 function squareOffTimeLabel(timestamp: number) {
@@ -282,12 +283,12 @@ function squareOffTimeLabel(timestamp: number) {
   });
 }
 
-async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string) {
+async function fetchSquareOffPrice(instrumentKey: string, sessionDate: string, minute = UPSTOX_AUTO_SQUARE_OFF_MINUTES) {
   const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(instrumentKey)}&timeframe=1m&scope=combined`, { cache: "no-store" });
   const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
   if (!response.ok || !payload.ok || !payload.candles?.length) return undefined;
-  const sessionStart = Date.parse(`${sessionDate}T09:15:00+05:30`) / 1_000;
-  const squareOffEnd = Date.parse(`${sessionDate}T15:00:59+05:30`) / 1_000;
+  const sessionStart = Date.parse(`${sessionDate}T00:00:00+05:30`) / 1_000;
+  const squareOffEnd = squareOffTimestamp(sessionDate, minute) / 1_000 + 59;
   const candle = payload.candles
     .filter((item) => Number(item.time) >= sessionStart && Number(item.time) <= squareOffEnd)
     .sort((a, b) => Number(a.time) - Number(b.time))
@@ -356,6 +357,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 }
 
 export function TradingDashboard() {
+  const exchangeSession = useNseSession();
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
@@ -1182,8 +1184,9 @@ export function TradingDashboard() {
 
   useEffect(() => {
     if (!clock || !orders.length || autoSquareOffInFlightRef.current || Date.now() < autoSquareOffRetryAtRef.current) return;
-    const marketClock = getNseMarketStatus(clock);
-    const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
+    const marketClock = getNseMarketStatus(clock, exchangeSession);
+    const cutoffMinute = nseSquareOffMinute(clock, exchangeSession);
+    const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= cutoffMinute;
     const currentIndiaDate = indiaDateKey(clock);
     const symbols = [...new Set(orders.map((order) => order.symbol))];
     const pending = symbols.flatMap((symbol) => {
@@ -1198,14 +1201,20 @@ export function TradingDashboard() {
       const instrument = tradingUniverse.find((item) => item.symbol === symbol);
       if (!instrument) return [];
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
-      return [{ symbol, position, instrument, quote, sessionDate: carriedOver ? orderIndiaDate : currentIndiaDate }];
+      return [{ symbol, position, instrument, quote, sessionDate: carriedOver ? orderIndiaDate : currentIndiaDate, cutoffMinute: carriedOver ? UPSTOX_AUTO_SQUARE_OFF_MINUTES : cutoffMinute }];
     });
     if (!pending.length) return;
     autoSquareOffInFlightRef.current = true;
-    void Promise.all(pending.map(async (item) => ({
-      ...item,
-      resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate).catch(() => undefined),
-    }))).then((resolved) => {
+    void Promise.all(pending.map(async (item) => {
+      let cutoffMinute = item.cutoffMinute;
+      if (item.sessionDate !== currentIndiaDate) {
+        const historical = await fetch(`/api/market/session?date=${item.sessionDate}`, { cache: "no-store" })
+          .then(response => response.json()).catch(() => null) as { session?: NseSession } | null;
+        if (!historical?.session?.sessions.length) return { ...item, resolvedPrice: undefined };
+        cutoffMinute = nseSquareOffMinute(new Date(`${item.sessionDate}T00:00:00+05:30`), historical.session);
+      }
+      return { ...item, cutoffMinute, resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate, cutoffMinute).catch(() => undefined) };
+    })).then((resolved) => {
       const automaticOrders: PaperOrder[] = [];
       let nextBalance = balance;
       resolved.forEach((item, index) => {
@@ -1213,7 +1222,7 @@ export function TradingDashboard() {
         if (!squareOffPrice || !Number.isFinite(squareOffPrice) || squareOffPrice <= 0) return;
         const closingSide = item.position.side === "LONG" ? "SELL" : "BUY";
         const charges = calculateInstrumentCharges(item.instrument, { side: closingSide, product: "INTRADAY", quantity: item.position.quantity, price: squareOffPrice });
-        const exitTimestamp = squareOffTimestamp(item.sessionDate);
+        const exitTimestamp = squareOffTimestamp(item.sessionDate, item.cutoffMinute);
         automaticOrders.push({
           id: `${exitTimestamp + index}`,
           symbol: item.symbol,
@@ -1226,7 +1235,7 @@ export function TradingDashboard() {
           createdAt: exitTimestamp,
           charges,
           autoSquareOff: true,
-          squareOffPolicy: UPSTOX_AUTO_SQUARE_OFF_POLICY,
+          squareOffPolicy: "NSE_SESSION_30_MIN_V1",
           exitReason: "AUTO_SQUARE_OFF",
           priceSource: item.resolvedPrice ? "UPSTOX_CANDLE" : "UPSTOX_QUOTE",
         });
@@ -1248,17 +1257,17 @@ export function TradingDashboard() {
         writePaperProtections(remaining);
         return remaining;
       });
-      setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off at 3:00 PM`);
+      setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off for the exchange session`);
       window.setTimeout(() => setToast(""), 4_000);
     }).finally(() => {
       autoSquareOffInFlightRef.current = false;
     });
-  }, [balance, clock, marketQuotes, orders, tradingUniverse]);
+  }, [balance, clock, exchangeSession, marketQuotes, orders, tradingUniverse]);
 
   useEffect(() => {
     if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
     const candidates = orders
-      .filter((order) => order.autoSquareOff && order.exitReason === "AUTO_SQUARE_OFF" && order.squareOffPolicy !== UPSTOX_AUTO_SQUARE_OFF_POLICY)
+      .filter((order) => order.autoSquareOff && order.exitReason === "AUTO_SQUARE_OFF" && order.squareOffPolicy !== UPSTOX_AUTO_SQUARE_OFF_POLICY && order.squareOffPolicy !== "NSE_SESSION_30_MIN_V1")
       .map((order) => ({ order, instrument: tradingUniverse.find((item) => item.symbol === order.symbol) }))
       .filter((item): item is { order: PaperOrder; instrument: Instrument } => Boolean(item.instrument));
     if (!candidates.length) return;
@@ -1311,8 +1320,8 @@ export function TradingDashboard() {
   useEffect(() => {
     if (!clock || !orders.length || !protections.length) return;
     const nativeTriggersById = new Map(nativeProtectionTriggers.map((item) => [item.id, item]));
-    if (!getNseMarketStatus(clock).isOpen && !nativeTriggersById.size) return;
-    const afterIntradaySquareOff = getNseMarketStatus(clock).minutesFromMidnight >= UPSTOX_AUTO_SQUARE_OFF_MINUTES;
+    if (!getNseMarketStatus(clock, exchangeSession).isOpen && !nativeTriggersById.size) return;
+    const afterIntradaySquareOff = getNseMarketStatus(clock, exchangeSession).minutesFromMidnight >= nseSquareOffMinute(clock, exchangeSession);
     const triggeredOrders: PaperOrder[] = [];
     const clearedProtectionIds = new Set<string>();
     const nativeTriggeredOrderIds = new Set<string>();
@@ -1395,7 +1404,7 @@ export function TradingDashboard() {
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
     window.setTimeout(() => setToast(""), 7_000);
-  }, [balance, clock, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
+  }, [balance, clock, exchangeSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
   const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
@@ -1504,15 +1513,15 @@ export function TradingDashboard() {
   const holdingsDayReturnPercent = holdingsDayBase > 0 ? holdingsSummary.dayPnl / holdingsDayBase * 100 : 0;
   const holdingsTotalReturnPercent = holdingsSummary.invested > 0 ? holdingsSummary.pnl / holdingsSummary.invested * 100 : 0;
   const marketStatus = useMemo(
-    () => clock ? getNseMarketStatus(clock) : { isOpen: false, message: "Checking NSE market hours…" },
-    [clock],
+    () => clock ? getNseMarketStatus(clock, exchangeSession) : { isOpen: false, message: "Checking NSE session…" },
+    [clock, exchangeSession],
   );
   const intradayOrdersAllowed = Boolean(
-    clock && marketStatus.isOpen && getNseMarketStatus(clock).minutesFromMidnight < UPSTOX_AUTO_SQUARE_OFF_MINUTES,
+    clock && marketStatus.isOpen && getNseMarketStatus(clock, exchangeSession).minutesFromMidnight < nseSquareOffMinute(clock, exchangeSession),
   );
   const marketOrdersAllowed = Boolean(clock && marketStatus.isOpen);
   const intradayStatusMessage = marketStatus.isOpen && !intradayOrdersAllowed
-    ? "Upstox intraday auto square-off starts at 3:00 PM IST"
+    ? "Intraday entry is closed for this session’s auto square-off window"
     : marketStatus.message;
   const todayOrders = useMemo(() => {
     if (!clock) return [];
@@ -1847,6 +1856,8 @@ export function TradingDashboard() {
   }
 
   function placeOrder() {
+    const currentSession = getNseMarketStatus(new Date(), exchangeSession);
+    if (!currentSession.isOpen) { setToast(currentSession.message); return; }
     if (!Number.isFinite(quantity) || quantity < 1) return;
     if (tradingLimitStatus.blocked && !orderReducesOpenPosition) {
       setToast(tradingLimitStatus.reasons[0] || "A personal trading limit is active.");
@@ -2157,6 +2168,7 @@ export function TradingDashboard() {
   }
 
   function openOrderSheet(nextSide: "BUY" | "SELL") {
+    if (!getNseMarketStatus(new Date(), exchangeSession).isOpen) { setToast(marketStatus.message); return; }
     activateRiskTool(nextSide);
     setOrderSheetOpen(true);
   }
@@ -2494,7 +2506,7 @@ export function TradingDashboard() {
           <div className="instrument-header">
             <div className="trade-identity-cluster">
               <div className="trade-context-line">
-                <span className={`trade-feed-chip ${selectedQuoteIsFresh ? "live" : "waiting"}`}><i />{selectedQuoteIsFresh ? "LIVE" : "SYNCING"}</span>
+                <span className={`trade-feed-chip ${selectedQuoteIsFresh && marketOrdersAllowed ? "live" : "waiting"}`} title={marketStatus.message}><i />{!marketOrdersAllowed ? "CLOSED" : selectedQuoteIsFresh ? "LIVE" : "SYNCING"}</span>
                 <span>Paper practice</span>
               </div>
               <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
@@ -2546,7 +2558,7 @@ export function TradingDashboard() {
               <span className={selectedPosition.quantity > 0 ? "complete" : "active"}><i>2</i><b>Place</b></span>
               <span className={selectedPosition.quantity > 0 ? "active" : ""}><i>3</i><b>Review</b></span>
             </div>
-            <div className="header-order-buttons"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
+            <div className="header-order-buttons"><button disabled={!marketOrdersAllowed} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button disabled={!marketOrdersAllowed} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
 
           <div className="chart-controls">
@@ -2567,7 +2579,7 @@ export function TradingDashboard() {
             <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
               <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
             </button>
-            <div className="chart-control-orders"><button className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
+            <div className="chart-control-orders"><button disabled={!marketOrdersAllowed} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button disabled={!marketOrdersAllowed} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
           </section>
 
@@ -2629,9 +2641,10 @@ export function TradingDashboard() {
           </div>
           <div className={`chart-trade-footer ${chartTradeFooterOpen ? "" : "trade-footer-hidden"}`} aria-hidden={!chartTradeFooterOpen}>
             <div className="chart-trade-buttons">
-              <button className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
-              <button className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
+              <button disabled={!marketOrdersAllowed} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
+              <button disabled={!marketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
             </div>
+            {!marketOrdersAllowed && <small className="market-closed-note" role="status">{marketStatus.message}</small>}
             <button className="chart-positions-trigger" onClick={() => setPositionsOpen(true)}>
               <span>{selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
               <b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b>
@@ -2657,7 +2670,7 @@ export function TradingDashboard() {
           </div>
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
           {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
-          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed · auto square-off 15:00 IST"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
+          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => { setCoachTab("limits"); setCoachOpen(true); }}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
@@ -2717,6 +2730,7 @@ export function TradingDashboard() {
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
           onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
+          ordersEnabled={marketOrdersAllowed}
           orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
           onOrderToolChange={updateChartRiskLevel}
           onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
