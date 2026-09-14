@@ -30,7 +30,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const NATIVE_AUTH_CALLBACK = "in.papertrade.app://auth/callback";
 const PRODUCTION_WEB_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://papertrade.site").replace(/\/+$/, "");
 const WELCOME_MINIMUM_MS = 5_000;
-const SEBI_DISCLAIMER_VERSION = "2026-09";
 const CLOUD_STORAGE_KEYS = [
   "papertrade-orders",
   "papertrade-protections",
@@ -70,10 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const configured = isSupabaseConfigured();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(configured);
-  const [welcomeMinimumElapsed, setWelcomeMinimumElapsed] = useState(!configured);
+  const [welcomeMinimumElapsed, setWelcomeMinimumElapsed] = useState(false);
   const [cloudReady, setCloudReady] = useState(!configured);
-  const [disclaimerReady, setDisclaimerReady] = useState(!configured);
-  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(configured ? "loading" : "disabled");
   const [authError, setAuthError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
@@ -88,24 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!configured) return;
     const timer = window.setTimeout(() => setWelcomeMinimumElapsed(true), WELCOME_MINIMUM_MS);
     return () => window.clearTimeout(timer);
-  }, [configured]);
-
-  useEffect(() => {
-    const userId = session?.user.id;
-    const timer = window.setTimeout(() => {
-      if (!userId) {
-        setDisclaimerAccepted(false);
-        setDisclaimerReady(true);
-        return;
-      }
-      setDisclaimerAccepted(window.localStorage.getItem(`papertrade-sebi-disclaimer-${SEBI_DISCLAIMER_VERSION}:${userId}`) === "accepted");
-      setDisclaimerReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [session?.user.id]);
+  }, []);
 
   const finishNativeSignIn = useCallback(async (url: string) => {
     if (!url.startsWith(NATIVE_AUTH_CALLBACK)) return;
@@ -143,8 +125,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!nextSession) setCloudReady(true);
       else if (userChanged) {
         setCloudReady(false);
-        setDisclaimerReady(false);
-        setDisclaimerAccepted(false);
       }
     });
 
@@ -287,13 +267,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus(configured ? "loading" : "disabled");
   }, [configured, session]);
 
-  const acceptDisclaimer = useCallback(() => {
-    const userId = session?.user.id;
-    if (!userId) return;
-    window.localStorage.setItem(`papertrade-sebi-disclaimer-${SEBI_DISCLAIMER_VERSION}:${userId}`, "accepted");
-    setDisclaimerAccepted(true);
-  }, [session?.user.id]);
-
   const contextValue = useMemo<AuthContextValue>(() => ({
     configured,
     session,
@@ -306,11 +279,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {configured && (!welcomeMinimumElapsed || authLoading || (session && (!cloudReady || !disclaimerReady || !disclaimerAccepted))) ? (
-        <WelcomeScreen name={session?.user.user_metadata?.full_name || session?.user.user_metadata?.name}
-          showDisclaimer={Boolean(session && cloudReady && disclaimerReady && !disclaimerAccepted)}
-          onAcceptDisclaimer={acceptDisclaimer}
-        />
+      {!welcomeMinimumElapsed || (configured && (authLoading || (session && !cloudReady))) ? (
+        <WelcomeScreen name={session?.user.user_metadata?.full_name || session?.user.user_metadata?.name} />
       ) : configured && !session ? (
         <main className="auth-screen">
           <section className="auth-card">
@@ -324,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="auth-privacy-note"><ShieldCheck size={18} /><span><b>Your information stays private</b><small>Google and Supabase handle sign-in through encrypted connections. We never see your Google password, and we do not sell or share your personal information for advertising.</small></span></div>
             <div className="auth-legal-links"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/delete-account">Delete account</Link></div>
             {!nativePlatform && <div className="auth-download-options">
-              <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.21-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · v1.21</small></span></a>
+              <a className="auth-download-link" href="/downloads/PaperTrade-IN-v1.22-beta.apk" download><Download size={17} /><span><b>Download Android beta</b><small>Official APK from papertrade.site · v1.22</small></span></a>
               <Link className="auth-download-link" href="/"><Smartphone size={17} /><span><b>Install on iPhone</b><small>Open in Safari, Share, then Add to Home Screen</small></span></Link>
             </div>}
             <small className="auth-disclaimer">No real exchange orders are placed.</small>

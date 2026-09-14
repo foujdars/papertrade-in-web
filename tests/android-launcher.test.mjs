@@ -77,8 +77,8 @@ test("PWA icon assets and cache versions are current", async () => {
 test("native notifications include the updated launcher image", async () => {
   for (const name of ["IpoGmpAlertWorker", "IpoOpeningAlertWorker"]) {
     const notificationSource = await source(`android/app/src/main/java/in/papertrade/app/${name}.java`);
-    assert.match(notificationSource, /setLargeIcon\(android.graphics.BitmapFactory.decodeResource\(/);
-    assert.match(notificationSource, /R\.mipmap\.ic_launcher/);
+    assert.match(notificationSource, /setLargeIcon\(NotificationDelivery.logo\(context\)\)/);
+    assert.match(notificationSource, /setSmallIcon\(R.drawable.ic_stat_papertrade\)/);
   }
   const delivery = await source("android/app/src/main/java/in/papertrade/app/NotificationDelivery.java");
   assert.match(delivery, /setSmallIcon\(R.drawable.ic_stat_papertrade\)/);
@@ -99,8 +99,8 @@ test("native notifications include the updated launcher image", async () => {
   assert.match(protectionMonitor, /TRIGGERED_ALERTS_KEY/);
 });
 
-test("both website download links serve v1.21 with its real checksum", async () => {
-  const name = "PaperTrade-IN-v1.21-beta.apk";
+test("both website download links serve v1.22 with its real checksum", async () => {
+  const name = "PaperTrade-IN-v1.22-beta.apk";
   const checksum = createHash("sha256").update(await file(`public/downloads/${name}`)).digest("hex").toUpperCase();
   for (const path of ["components/TradingDashboard.tsx", "components/AuthProvider.tsx"]) {
     const content = await source(path);
@@ -108,5 +108,5 @@ test("both website download links serve v1.21 with its real checksum", async () 
     assert.ok(!content.includes("PaperTrade-IN-v1.20-beta.apk"));
   }
   assert.ok((await source("components/TradingDashboard.tsx")).includes(checksum));
-  assert.match(await source("android/app/build.gradle"), /versionName "1\.21"/);
+  assert.match(await source("android/app/build.gradle"), /versionName "1\.22"/);
 });

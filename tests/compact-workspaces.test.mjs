@@ -138,13 +138,13 @@ test("welcome artwork uses each user's own name with a safe generic fallback", a
   const compiled = ts.transpileModule(await source("components/WelcomeScreen.tsx"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {}, require = createRequire(import.meta.url);
   new Function("require", "exports", compiled)(id => id === "./BrandMark" ? { BrandMark: () => null } : id === "./CandleLoader" ? { CandleLoader: () => null } : require(id), exports);
-  assert.match(viewText(exports.WelcomeScreen({ name: "  Asha Sharma " })), /Welcome back,Asha/);
+  assert.match(viewText(exports.WelcomeScreen({ name: "  Asha Sharma " })), /Before you begin, Asha/);
   assert.doesNotMatch(viewText(exports.WelcomeScreen({ name: "Asha Sharma" })), /Rajkumar|Sharma/);
-  for (const name of [undefined, "", "   ", 123]) assert.match(viewText(exports.WelcomeScreen({ name })), /Welcome toPaperTrade IN/);
-  const disclaimer = viewText(exports.WelcomeScreen({ name: "Asha Sharma", showDisclaimer: true }));
-  assert.match(disclaimer, /Before you begin, AshaSEBI Disclaimer/);
+  for (const name of [undefined, "", "   ", 123]) assert.match(viewText(exports.WelcomeScreen({ name })), /before you begin/i);
+  const disclaimer = viewText(exports.WelcomeScreen({ name: "Asha Sharma" }));
+  assert.match(disclaimer, /Before you begin, AshaSEBI disclaimer/);
   assert.match(disclaimer, /not a SEBI-registered Investment Adviser or Research Analyst/);
-  assert.match(disclaimer, /I Understand/);
+  assert.doesNotMatch(disclaimer, /I Understand|acknowledgement|Welcome back/);
   const css = await source("app/refinements.css");
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(css, /welcome-candle-pulse/);
@@ -158,6 +158,62 @@ test("normal launches open Home while the selected chart timeframe remains the u
   assert.match(dashboard, /const pnlReviewTimeframe = timeframe/);
   assert.doesNotMatch(dashboard, /setTimeframe\("5m"\)/);
   assert.match(dashboard, /searchParams\.delete\("screen"\)/);
+});
+
+test("cold chart startup reads the saved hour before writing URL or storage defaults", async () => {
+  const { readChartTimeframe, saveChartTimeframe } = await import("../lib/chart-timeframe-preference.ts");
+  const values = new Map();
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const selectors = await source("components/CompactSelectors.tsx");
+  const periods = JSON.parse(selectors.match(/CHART_TIMEFRAMES = (\[[^\]]+\])/)[1]);
+  for (const period of periods) {
+    saveChartTimeframe(storage, "all-periods", period);
+    assert.equal(readChartTimeframe(storage, "all-periods", "5m", "5m"), period);
+  }
+  saveChartTimeframe(storage, "asha", "1H");
+  // A stale cloud chart or old startup URL cannot replace the explicit local selection.
+  assert.equal(readChartTimeframe(storage, "asha", "5m", "5m"), "1H");
+  assert.equal(readChartTimeframe(storage, "another-user", null, undefined), "5m");
+  saveChartTimeframe(storage, "asha", "1D");
+  assert.equal(readChartTimeframe(storage, "asha", null, "5m"), "1D");
+  saveChartTimeframe(storage, "asha", "invalid");
+  assert.equal(readChartTimeframe(storage, "asha", null, undefined), "1D");
+  saveChartTimeframe(storage, "asha", "1H");
+  const dashboard = await source("components/TradingDashboard.tsx");
+  const ast = ts.createSourceFile("dashboard.tsx", dashboard, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const effects = [];
+  const walk = node => {
+    if (ts.isCallExpression(node) && node.expression.getText(ast) === "useEffect") effects.push(node.getText(ast));
+    ts.forEachChild(node, walk);
+  };
+  walk(ast);
+  const startup = effects.find(text => text.includes("const applyRequestedChart"));
+  const urlWriter = effects.find(text => text.includes("const currentState = window.history.state"));
+  const timers = [], writes = [];
+  const instrument = { symbol: "RELIANCE", instrumentKey: "TEST", assetType: "EQUITY" };
+  const scope = {
+    localStorage: storage, user: { id: "asha" }, periods: ["5m", "1H", "1D"], instruments: [instrument],
+    selected: instrument, timeframe: "5m", workspaceMode: "trade", chartPreferencesReady: false,
+    LAST_CHART_STORAGE_KEY: "papertrade-last-chart", pendingChartRestoreRef: { current: null },
+    readChartTimeframe, URL, URLSearchParams,
+    useEffect: callback => callback(),
+    setTimeframe: value => { scope.timeframe = value; },
+    setChartPreferencesReady: value => { scope.chartPreferencesReady = value; },
+    setSelected: value => { scope.selected = value; },
+    window: {
+      location: { href: "https://papertrade.test/", search: "" },
+      setTimeout: callback => { timers.push(callback); return timers.length; }, clearTimeout() {},
+      history: { state: {}, replaceState: (state, unused, url) => { writes.push(String(url)); scope.window.location.href = String(url); scope.window.location.search = new URL(url).search; } },
+    },
+  };
+  const run = expression => new Function("scope", `with (scope) { ${ts.transpileModule(expression, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText} }`)(scope);
+  run(startup);
+  run(urlWriter);
+  assert.equal(writes.length, 0, "Mount must not write 5m before asynchronous restoration");
+  timers.forEach(callback => callback());
+  assert.equal(scope.timeframe, "1H");
+  run(urlWriter);
+  assert.match(writes.at(-1), /timeframe=1H/);
 });
 
 test("compact trade cards retain execution facts and only show the selection toolbar when selecting", async () => {

@@ -13,20 +13,26 @@ async function render() {
   );
 }
 
-test("server-renders the PaperTrade IN home dashboard", async () => {
+test("server-renders only the full-screen disclaimer before the home dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /PaperTrade IN/);
-  assert.match(html, /Build skill before you risk capital/);
-  assert.match(html, /Market pulse/);
-  assert.match(html, /Search stocks and indices/);
+  assert.match(html, /launch-disclaimer/);
+  assert.match(html, /SEBI disclaimer/);
+  assert.match(html, /Investments in securities are subject to market risks/);
+  assert.match(html, /Preparing your workspace/);
+  assert.doesNotMatch(html, /I Understand|acknowledgement|Welcome back/);
   assert.doesNotMatch(html, /Quick launch/);
   assert.doesNotMatch(html, /home-hero-actions|home-market-orbit|Check the market pulse, practise a setup/);
   assert.doesNotMatch(html, /IPO RADAR|Continue where you left off|No activity yet/);
-  assert.match(html, /Your paper portfolio/);
+  const dashboard = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
+  assert.match(dashboard, /Build skill before you risk capital/);
+  assert.match(dashboard, /Market pulse/);
+  assert.match(dashboard, /Search stocks and indices/);
+  assert.match(dashboard, /Your paper portfolio/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
@@ -76,7 +82,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(authProvider, /trading_states/);
   assert.match(authProvider, /CLOUD_STORAGE_KEYS/);
   assert.match(authProvider, /<WelcomeScreen name={session\?\.user.user_metadata\?\.full_name/);
-  assert.match(await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8"), /Welcome back/);
+  assert.match(await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8"), /SEBI disclaimer/);
   assert.match(authProvider, /Your information stays private/);
   assert.match(authProvider, /encrypted connections/);
   assert.match(authProvider, /do not sell or share your personal information for advertising/);
@@ -95,9 +101,9 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(webManifest, /"short_name": "PaperTrade"/);
   await access(new URL(`../public${apkPath}`, import.meta.url));
   const welcome = await readFile(new URL("../components/WelcomeScreen.tsx", import.meta.url), "utf8");
-  assert.match(welcome, /Preparing your paper trading workspace/);
-  assert.match(welcome, /A little practice/);
-  assert.match(welcome, /A more confident you/);
+  assert.match(welcome, /Preparing your workspace/);
+  assert.match(welcome, /<CandleLoader/);
+  assert.doesNotMatch(authProvider, /disclaimerAccepted|acceptDisclaimer|SEBI_DISCLAIMER_VERSION/);
   assert.match(authProvider, /WELCOME_MINIMUM_MS = 5_000/);
   assert.match(supabaseClient, /flowType: "pkce"/);
   assert.match(authMigration, /enable row level security/);

@@ -46,9 +46,9 @@ async function showSystemAlert(ipo: IpoAllotment, title: string, body: string, i
           changed();
         });
       }
-      await registration.showNotification(title, { body, icon: "/papertrade-icon-192.png", tag: id, data: { registrar: ipo.registrar } });
+      await registration.showNotification(title, { body, icon: "/papertrade-icon-192.png?v=1.22", tag: id, data: { registrar: ipo.registrar } });
     } else {
-      const notification = new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: id });
+      const notification = new Notification(title, { body, icon: "/papertrade-icon-192.png?v=1.22", tag: id });
       notification.onclick = () => { window.open(`/ipo-allotment/${encodeURIComponent(ipo.registrar)}`, "_blank", "noopener,noreferrer"); notification.close(); };
     }
   }

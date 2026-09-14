@@ -7,6 +7,6 @@ export default async function AdvancedChartPage({
 }) {
   const query = await searchParams;
   const symbol = (query.symbol ?? "RELIANCE").toUpperCase();
-  const timeframe = query.timeframe ?? "5m";
-  redirect(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`);
+  const timeframe = query.timeframe ? `&timeframe=${encodeURIComponent(query.timeframe)}` : "";
+  redirect(`/?symbol=${encodeURIComponent(symbol)}${timeframe}`);
 }

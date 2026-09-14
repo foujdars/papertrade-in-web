@@ -7,6 +7,7 @@ import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
 import { LongPressTradeRow } from "@/components/LongPressTradeRow";
 import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransientBack";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
+import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 
 import {
   Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
@@ -375,6 +376,12 @@ export function TradingDashboard() {
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
+  const [chartPreferencesReady, setChartPreferencesReady] = useState(false);
+  const chooseTimeframe = (period: string) => {
+    if (!periods.includes(period)) return;
+    saveChartTimeframe(localStorage, user?.id ?? "guest", period);
+    setTimeframe(period);
+  };
   const pnlReviewTimeframe = timeframe;
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
@@ -514,9 +521,8 @@ export function TradingDashboard() {
     const fallback = saved.instrument?.instrumentKey && saved.instrument.assetType !== "OPTION" && saved.instrument.assetType !== "FUTURE"
       ? saved.instrument
       : instruments[0];
-    const restoredTimeframe = saved.timeframe && periods.includes(saved.timeframe) ? saved.timeframe : timeframe;
+    const restoredTimeframe = timeframe;
     setSelected(fallback);
-    setTimeframe(restoredTimeframe);
     setSpotInstrument(null);
     const restoredUnderlying = saved.fnoUnderlying?.instrumentKey === fallback.instrumentKey ? saved.fnoUnderlying : null;
     const restoredFuture = restoredUnderlying?.futures?.[0];
@@ -617,7 +623,6 @@ export function TradingDashboard() {
           homeExperienceVersion?: number;
         };
         if (saved.watchlist) setWatchlist(saved.watchlist);
-        if (saved.timeframe && periods.includes(saved.timeframe)) setTimeframe(saved.timeframe);
         if (saved.marketGroup === "TRADING" || saved.marketGroup === "INVESTMENT" || saved.marketGroup === "IPO") setMarketsInitialGroup(saved.marketGroup);
         setHomeCards({ ...DEFAULT_HOME_CARDS, ...(saved.homeCards ?? {}) });
         setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
@@ -641,7 +646,7 @@ export function TradingDashboard() {
   }, [userPreferenceKey]);
 
   useEffect(() => {
-    if (!uiPreferencesReady) return;
+    if (!uiPreferencesReady || !chartPreferencesReady) return;
     localStorage.setItem(userPreferenceKey, JSON.stringify({
       activeSection: activeNavigationSection,
       watchlist,
@@ -654,7 +659,7 @@ export function TradingDashboard() {
       motionEnabled,
       homeExperienceVersion: HOME_EXPERIENCE_VERSION,
     }));
-  }, [activeNavigationSection, homeCards, marketsInitialGroup, motionEnabled, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
+  }, [activeNavigationSection, chartPreferencesReady, homeCards, marketsInitialGroup, motionEnabled, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -682,9 +687,7 @@ export function TradingDashboard() {
       const savedSymbol = typeof savedChart.symbol === "string" ? savedChart.symbol.toUpperCase() : undefined;
       const queryTimeframe = params.get("timeframe");
       const requestedSymbol = normalizedQuerySymbol ?? savedSymbol;
-      const requestedTimeframe = periods.includes(queryTimeframe ?? "")
-        ? queryTimeframe!
-        : typeof savedChart.timeframe === "string" && periods.includes(savedChart.timeframe) ? savedChart.timeframe : undefined;
+      const requestedTimeframe = readChartTimeframe(localStorage, user?.id ?? "guest", queryTimeframe, savedChart.timeframe);
 
       // Convert old ?sym= links to the supported URL and remove malformed
       // startup parameters without reloading the page.
@@ -731,22 +734,25 @@ export function TradingDashboard() {
           setSelected(fallbackInstrument);
         }
       }
+      setChartPreferencesReady(true);
     }, 0);
     return () => window.clearTimeout(applyRequestedChart);
   }, []);
 
   useEffect(() => {
+    if (!chartPreferencesReady) return;
     const pending = pendingChartRestoreRef.current;
     if (pending && selected.symbol !== pending.symbol) return;
     pendingChartRestoreRef.current = null;
     localStorage.setItem(LAST_CHART_STORAGE_KEY, JSON.stringify({ symbol: selected.symbol, timeframe, instrument: selected, spotInstrument, fnoUnderlying, workspaceMode, fnoTopMode }));
-  }, [fnoTopMode, fnoUnderlying, selected, spotInstrument, timeframe, workspaceMode]);
+  }, [chartPreferencesReady, fnoTopMode, fnoUnderlying, selected, spotInstrument, timeframe, workspaceMode]);
 
   useEffect(() => {
+    if (!chartPreferencesReady) return;
     if (selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
     const selectedUnderlying = fnoUnderlying?.instrumentKey === selected.instrumentKey ? fnoUnderlying : undefined;
     localStorage.setItem(LAST_CASH_CHART_STORAGE_KEY, JSON.stringify({ instrument: selected, timeframe, fnoUnderlying: selectedUnderlying }));
-  }, [fnoUnderlying, selected, timeframe]);
+  }, [chartPreferencesReady, fnoUnderlying, selected, timeframe]);
 
   useEffect(() => {
     if (workspaceMode !== "fno") return;
@@ -808,7 +814,6 @@ export function TradingDashboard() {
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
       setSelected(snapshot.instrument);
-      setTimeframe(periods.includes(snapshot.timeframe) ? snapshot.timeframe : timeframe);
       setWorkspaceMode("trade");
       setSpotInstrument(null);
       setFnoUnderlying(null);
@@ -824,13 +829,14 @@ export function TradingDashboard() {
   }, [timeframe, workspaceMode]);
 
   useEffect(() => {
+    if (!chartPreferencesReady) return;
     if (workspaceMode !== "trade" || selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
     const currentState = window.history.state ?? {};
     const url = new URL(window.location.href);
     url.searchParams.set("symbol", selected.symbol);
     url.searchParams.set("timeframe", timeframe);
     window.history.replaceState({ ...currentState, papertradeChart: { instrument: selected, timeframe } }, "", url);
-  }, [selected, timeframe, workspaceMode]);
+  }, [chartPreferencesReady, selected, timeframe, workspaceMode]);
 
   useEffect(() => {
     if (!showTradeSymbols) return;
@@ -2324,7 +2330,6 @@ export function TradingDashboard() {
       setFnoUnderlying(saved.underlying);
       setFnoFutureInstrument(saved.future);
       setFnoTopMode(saved.topMode);
-      setTimeframe(saved.timeframe);
       setWorkspaceMode("fno");
       setFnoListOpen(false);
       return;
@@ -2585,7 +2590,7 @@ export function TradingDashboard() {
             />
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
-            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { setTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
+            {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { chooseTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
             ) : (
@@ -2707,7 +2712,7 @@ export function TradingDashboard() {
           onSplitPointerDown={beginOptionSplitDrag}
           onOpenSymbols={() => setFnoListOpen(true)}
           onOptionChain={() => setOptionChainOpen(true)}
-          onTimeframeChange={setTimeframe}
+          onTimeframeChange={chooseTimeframe}
           onToggleTopMode={() => setFnoTopMode((current) => current === "SPOT" && fnoFutureInstrument ? "FUTURE" : "SPOT")}
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
@@ -2989,7 +2994,7 @@ export function TradingDashboard() {
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
                           <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
-                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => setTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => chooseTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
                         </div>
                         <div className="pnl-trade-review-body">
                           <MarketChart
@@ -3048,7 +3053,7 @@ export function TradingDashboard() {
               <article>
                 <b>Android app</b>
                 <small>Install the beta APK directly from the official website.</small>
-                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.21-beta.apk" download><Download size={18} /> Download Android APK</a>
+                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.22-beta.apk" download><Download size={18} /> Download Android APK</a>
               </article>
               <article>
                 <b>iPhone / iPad app</b>
@@ -3057,7 +3062,7 @@ export function TradingDashboard() {
               </article>
             </div>
             <div className="download-facts"><span><ShieldCheck size={15} /><b>Private sign-in</b><small>Google and Supabase handle authentication. The app never sees your Google password.</small></span><span><LockKeyhole size={15} /><b>Verifiable Android file</b><small>SHA-256 integrity fingerprint</small></span></div>
-            <code className="download-hash">4282080129C3B881037A18BBDD136F8108D3C57E62A9A5AF3D08326A6C84414A</code>
+            <code className="download-hash">CB244AA7CC288B2396F7BB59D7677F15043B6522BA77F99478481FDCFCF089D6</code>
             <p className="download-install-note">Android may ask you to allow installs from this browser because this beta is not yet distributed through Google Play. iOS does not allow direct APK/IPA installs from a website, so use Safari&apos;s Add to Home Screen option.</p>
           </section>
         </div>

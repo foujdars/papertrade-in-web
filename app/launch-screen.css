@@ -1,0 +1,17 @@
+.launch-disclaimer { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; min-height: 100dvh; overflow-y: auto; padding: max(28px, env(safe-area-inset-top)) clamp(22px, 5vw, 80px) max(30px, env(safe-area-inset-bottom)); color: #141638; background: radial-gradient(ellipse at 0 0, #eee7ff 0, transparent 42%), radial-gradient(ellipse at 100% 100%, #eadeff 0, transparent 46%), #fcfbff; }
+.launch-brand { display: flex; align-items: center; justify-content: center; gap: 13px; flex: 0 0 auto; }
+.launch-brand > span { display: grid; gap: 5px; }
+.launch-brand b { font-size: clamp(23px, 3vw, 30px); font-weight: 650; letter-spacing: -1px; line-height: 1.1; }
+.launch-brand em { color: #7938e8; font-style: normal; }
+.launch-brand small { color: #85809a; font-size: 10px; letter-spacing: .06em; }
+.launch-message { display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; justify-content: center; width: min(100%, 720px); padding-block: clamp(24px, 5vh, 64px); text-align: center; }
+.launch-shield { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 24px; color: #8245e7; background: #efe7fc; box-shadow: 0 0 0 10px #f5effe; margin-bottom: 24px; }
+.launch-personal { margin: 0 0 11px; font-size: 13px; letter-spacing: .03em; color: #867897; font-weight: 450; }
+.launch-message h1 { margin: 0; color: #17173d; font-size: clamp(30px, 5vw, 48px); line-height: 1.15; letter-spacing: -1.5px; font-weight: 500; }
+.launch-message h1::first-letter { color: #7938e8; }
+.launch-message .launch-rule { width: 44px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, #b287eb, #7b55ed); margin: 24px 0; }
+.launch-copy { display: grid; gap: 18px; }
+.launch-copy p { margin: 0; color: #57536e; font-size: clamp(14px, 1.6vw, 18px); font-weight: 400; line-height: 1.75; text-wrap: pretty; }
+.launch-risk { margin: 24px 0 0; max-width: 570px; color: #7845bd; font-size: clamp(13px, 1.5vw, 16px); font-weight: 500; line-height: 1.65; text-wrap: balance; }
+.launch-loading { flex: 0 0 auto; padding: 4px 0 18px; }
+@media (max-height: 720px) { .launch-disclaimer { padding-block: 20px; } .launch-message { padding-block: 20px; } .launch-shield { width: 48px; height: 48px; border-radius: 17px; margin-bottom: 15px; } .launch-shield svg { width: 28px; } .launch-message h1 { font-size: 29px; } .launch-message .launch-rule { margin-block: 16px; } .launch-copy { gap: 12px; } .launch-copy p { font-size: 13px; line-height: 1.6; } .launch-risk { margin-top: 16px; } .launch-loading { padding-bottom: 0; } }
