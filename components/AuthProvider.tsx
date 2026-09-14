@@ -30,6 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const NATIVE_AUTH_CALLBACK = "in.papertrade.app://auth/callback";
 const PRODUCTION_WEB_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://papertrade.site").replace(/\/+$/, "");
 const WELCOME_MINIMUM_MS = 5_000;
+const SEBI_DISCLAIMER_VERSION = "2026-09";
 const CLOUD_STORAGE_KEYS = [
   "papertrade-orders",
   "papertrade-protections",
@@ -71,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(configured);
   const [welcomeMinimumElapsed, setWelcomeMinimumElapsed] = useState(!configured);
   const [cloudReady, setCloudReady] = useState(!configured);
+  const [disclaimerReady, setDisclaimerReady] = useState(!configured);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(configured ? "loading" : "disabled");
   const [authError, setAuthError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
@@ -89,6 +92,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setTimeout(() => setWelcomeMinimumElapsed(true), WELCOME_MINIMUM_MS);
     return () => window.clearTimeout(timer);
   }, [configured]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    const timer = window.setTimeout(() => {
+      if (!userId) {
+        setDisclaimerAccepted(false);
+        setDisclaimerReady(true);
+        return;
+      }
+      setDisclaimerAccepted(window.localStorage.getItem(`papertrade-sebi-disclaimer-${SEBI_DISCLAIMER_VERSION}:${userId}`) === "accepted");
+      setDisclaimerReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [session?.user.id]);
 
   const finishNativeSignIn = useCallback(async (url: string) => {
     if (!url.startsWith(NATIVE_AUTH_CALLBACK)) return;
@@ -124,7 +141,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(nextSession);
       setAuthLoading(false);
       if (!nextSession) setCloudReady(true);
-      else if (userChanged) setCloudReady(false);
+      else if (userChanged) {
+        setCloudReady(false);
+        setDisclaimerReady(false);
+        setDisclaimerAccepted(false);
+      }
     });
 
     let removeDeepLinkListener: (() => Promise<void>) | undefined;
@@ -266,6 +287,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus(configured ? "loading" : "disabled");
   }, [configured, session]);
 
+  const acceptDisclaimer = useCallback(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+    window.localStorage.setItem(`papertrade-sebi-disclaimer-${SEBI_DISCLAIMER_VERSION}:${userId}`, "accepted");
+    setDisclaimerAccepted(true);
+  }, [session?.user.id]);
+
   const contextValue = useMemo<AuthContextValue>(() => ({
     configured,
     session,
@@ -278,8 +306,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {configured && (!welcomeMinimumElapsed || authLoading || (session && !cloudReady)) ? (
-        <WelcomeScreen name={session?.user.user_metadata?.full_name || session?.user.user_metadata?.name} />
+      {configured && (!welcomeMinimumElapsed || authLoading || (session && (!cloudReady || !disclaimerReady || !disclaimerAccepted))) ? (
+        <WelcomeScreen name={session?.user.user_metadata?.full_name || session?.user.user_metadata?.name}
+          showDisclaimer={Boolean(session && cloudReady && disclaimerReady && !disclaimerAccepted)}
+          onAcceptDisclaimer={acceptDisclaimer}
+        />
       ) : configured && !session ? (
         <main className="auth-screen">
           <section className="auth-card">

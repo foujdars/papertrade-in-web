@@ -141,9 +141,23 @@ test("welcome artwork uses each user's own name with a safe generic fallback", a
   assert.match(viewText(exports.WelcomeScreen({ name: "  Asha Sharma " })), /Welcome back,Asha/);
   assert.doesNotMatch(viewText(exports.WelcomeScreen({ name: "Asha Sharma" })), /Rajkumar|Sharma/);
   for (const name of [undefined, "", "   ", 123]) assert.match(viewText(exports.WelcomeScreen({ name })), /Welcome toPaperTrade IN/);
+  const disclaimer = viewText(exports.WelcomeScreen({ name: "Asha Sharma", showDisclaimer: true }));
+  assert.match(disclaimer, /Before you begin, AshaSEBI Disclaimer/);
+  assert.match(disclaimer, /not a SEBI-registered Investment Adviser or Research Analyst/);
+  assert.match(disclaimer, /I Understand/);
   const css = await source("app/refinements.css");
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(css, /welcome-candle-pulse/);
+});
+
+test("normal launches open Home while the selected chart timeframe remains the user's choice", async () => {
+  const dashboard = await source("components/TradingDashboard.tsx");
+  assert.match(dashboard, /Normal launches begin at Home/);
+  assert.match(dashboard, /setHomeOpen\(true\);[\s\S]+setSidebarOpen\(false\);[\s\S]+setMarketsOpen\(false\);[\s\S]+setPnlOpen\(false\);/);
+  assert.match(dashboard, /timeframe,[\s\S]+localStorage\.setItem\(userPreferenceKey/);
+  assert.match(dashboard, /const pnlReviewTimeframe = timeframe/);
+  assert.doesNotMatch(dashboard, /setTimeframe\("5m"\)/);
+  assert.match(dashboard, /searchParams\.delete\("screen"\)/);
 });
 
 test("compact trade cards retain execution facts and only show the selection toolbar when selecting", async () => {

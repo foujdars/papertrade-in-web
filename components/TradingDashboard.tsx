@@ -9,10 +9,10 @@ import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransien
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 
 import {
-  Activity, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
+  Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
-  TrendingUp, Bookmark, WalletCards, X,
+  TrendingDown, Bookmark, Percent, Trophy, WalletCards, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
@@ -375,7 +375,7 @@ export function TradingDashboard() {
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
-  const [pnlReviewTimeframe, setPnlReviewTimeframe] = useState("5m");
+  const pnlReviewTimeframe = timeframe;
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
@@ -514,7 +514,7 @@ export function TradingDashboard() {
     const fallback = saved.instrument?.instrumentKey && saved.instrument.assetType !== "OPTION" && saved.instrument.assetType !== "FUTURE"
       ? saved.instrument
       : instruments[0];
-    const restoredTimeframe = saved.timeframe && periods.includes(saved.timeframe) ? saved.timeframe : "5m";
+    const restoredTimeframe = saved.timeframe && periods.includes(saved.timeframe) ? saved.timeframe : timeframe;
     setSelected(fallback);
     setTimeframe(restoredTimeframe);
     setSpotInstrument(null);
@@ -532,7 +532,7 @@ export function TradingDashboard() {
     url.searchParams.set("symbol", fallback.symbol);
     url.searchParams.set("timeframe", restoredTimeframe);
     window.history.replaceState({}, "", url);
-  }, []);
+  }, [timeframe]);
 
   const returnToTradeFromBack = useCallback(() => {
     setTradeSelection(null);
@@ -599,6 +599,8 @@ export function TradingDashboard() {
   }, []);
 
   useEffect(() => {
+    // Switching accounts must pause writes before the new user's preferences load.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUiPreferencesReady(false);
     const restore = window.setTimeout(() => {
       try {
@@ -622,17 +624,16 @@ export function TradingDashboard() {
         setRecentScanners(Array.isArray(saved.recentScanners) ? saved.recentScanners.slice(0, 4) : []);
         setUiDensity(saved.density === "compact" ? "compact" : "comfortable");
         setMotionEnabled(saved.motionEnabled !== false);
-        const validSections: NavigationSection[] = ["home", "trade", "fno", "watchlist", "holdings", "orders", "markets", "ipo", "pnl"];
-        const section = saved.homeExperienceVersion === HOME_EXPERIENCE_VERSION && saved.activeSection && validSections.includes(saved.activeSection) ? saved.activeSection : "home";
-        setHomeOpen(section === "home");
-        setSidebarOpen(section === "watchlist");
-        setHoldingsOpen(section === "holdings");
-        setOrdersOpen(section === "orders");
-        setMarketsOpen(section === "markets" || section === "ipo");
-        if (section === "ipo") setMarketsInitialGroup("IPO");
-        setPnlOpen(section === "pnl");
-        setWorkspaceMode(section === "fno" ? "fno" : "trade");
-        setFnoListOpen(section === "fno");
+        // Normal launches begin at Home. The startup URL handler below still
+        // honours explicit notification deep links to IPO or P&L.
+        setHomeOpen(true);
+        setSidebarOpen(false);
+        setHoldingsOpen(false);
+        setOrdersOpen(false);
+        setMarketsOpen(false);
+        setPnlOpen(false);
+        setWorkspaceMode("trade");
+        setFnoListOpen(false);
       } catch { /* Ignore malformed per-user interface preferences. */ }
       setUiPreferencesReady(true);
     }, 0);
@@ -717,7 +718,12 @@ export function TradingDashboard() {
       }
       if (savedChart.fnoTopMode) setFnoTopMode(savedChart.fnoTopMode);
       const requestedScreen = params.get("screen");
-      if (requestedScreen === "ipo" || requestedScreen === "pnl") openNavigationSection(requestedScreen);
+      if (requestedScreen === "ipo" || requestedScreen === "pnl") {
+        openNavigationSection(requestedScreen);
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("screen");
+        window.history.replaceState(window.history.state, "", cleanUrl);
+      }
       const savedInstrumentSymbol = typeof savedChart.instrument?.symbol === "string" ? savedChart.instrument.symbol.toUpperCase() : "";
       if (requestedSymbol && savedInstrumentSymbol !== requestedSymbol) {
         const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
@@ -802,7 +808,7 @@ export function TradingDashboard() {
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
       setSelected(snapshot.instrument);
-      setTimeframe(periods.includes(snapshot.timeframe) ? snapshot.timeframe : "5m");
+      setTimeframe(periods.includes(snapshot.timeframe) ? snapshot.timeframe : timeframe);
       setWorkspaceMode("trade");
       setSpotInstrument(null);
       setFnoUnderlying(null);
@@ -815,7 +821,7 @@ export function TradingDashboard() {
     };
     window.addEventListener("popstate", restorePreviousChart);
     return () => window.removeEventListener("popstate", restorePreviousChart);
-  }, [workspaceMode]);
+  }, [timeframe, workspaceMode]);
 
   useEffect(() => {
     if (workspaceMode !== "trade" || selected.assetType === "OPTION" || selected.assetType === "FUTURE") return;
@@ -2091,7 +2097,6 @@ export function TradingDashboard() {
         optionToInstrument(contract, atmRow, underlying),
         underlyingToInstrument(underlying, atmRow.underlyingSpotPrice),
       );
-      setTimeframe("5m");
       setOptionSplitPercent(50);
       setToast(`${underlying.symbol} opened with the nearest ATM ${contract.optionType}.`);
       window.setTimeout(() => setToast(""), 2_800);
@@ -2907,17 +2912,17 @@ export function TradingDashboard() {
           <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
             {!pnlHistoryOnly && <>
             <div className="pnl-stat-grid">
-              <div><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></div>
-              <button type="button" className={pnlHistoryFilter === "all" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "all" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("all"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total trades</span><b>{closedTrades.length}</b><small>View all</small></button>
-              <div><span>Win rate</span><b>{pnlStats.winRate.toFixed(1)}%</b></div>
-              <button type="button" className={pnlHistoryFilter === "profit" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "profit" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("profit"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total profit</span><b className="positive">{formatInr(pnlStats.totalProfit)}</b><small>View winners</small></button>
-              <button type="button" className={pnlHistoryFilter === "loss" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "loss" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("loss"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b><small>View losers</small></button>
-              <div><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></div>
+              <div><i className="pnl-stat-icon"><ChartNoAxesCombined /></i><span className="pnl-stat-copy"><span>Net P&amp;L</span><b className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</b></span></div>
+              <button type="button" className={pnlHistoryFilter === "all" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "all" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("all"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><i className="pnl-stat-icon"><ChartNoAxesColumnIncreasing /></i><span className="pnl-stat-copy"><span>Total trades</span><b>{closedTrades.length}</b><small>View all</small></span></button>
+              <div><i className="pnl-stat-icon"><Percent /></i><span className="pnl-stat-copy"><span>Win rate</span><b>{pnlStats.winRate.toFixed(1)}%</b></span></div>
+              <button type="button" className={pnlHistoryFilter === "profit" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "profit" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("profit"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><i className="pnl-stat-icon"><Trophy /></i><span className="pnl-stat-copy"><span>Total profit</span><b className="positive">{formatInr(pnlStats.totalProfit)}</b><small>View winners</small></span></button>
+              <button type="button" className={pnlHistoryFilter === "loss" && !selectedPnlDateKey ? "active" : ""} aria-pressed={pnlHistoryFilter === "loss" && !selectedPnlDateKey} onClick={() => { setPnlHistoryFilter("loss"); setSelectedPnlDateKey(null); window.requestAnimationFrame(() => pnlTradeListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }}><i className="pnl-stat-icon loss"><TrendingDown /></i><span className="pnl-stat-copy"><span>Total loss</span><b className="negative">{formatInr(pnlStats.totalLoss)}</b><small>View losers</small></span></button>
+              <div><i className="pnl-stat-icon"><WalletCards /></i><span className="pnl-stat-copy"><span>Taxes &amp; charges</span><b>{formatInr(pnlStats.totalCharges)}</b></span></div>
             </div>
             <div className="pnl-analysis-grid">
               <div className="pnl-calendar-card">
                 <div className="pnl-calendar-head">
-                  <span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span>
+                  <div className="pnl-calendar-title"><i className="pnl-section-icon"><CalendarDays /></i><span><b>Daily P&amp;L heat map</b><small>{pnlCalendar.monthTrades} trade{pnlCalendar.monthTrades === 1 ? "" : "s"} · <i className={pnlCalendar.monthPnl >= 0 ? "positive" : "negative"}>{pnlCalendar.monthPnl >= 0 ? "+" : ""}{formatInr(pnlCalendar.monthPnl)}</i></small></span></div>
                   <div className="pnl-calendar-selectors">
                     <label>Month<select value={pnlCalendarMonth} onChange={(event) => { setPnlCalendarMonth(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{PNL_MONTHS.map((month, index) => <option key={month} value={index}>{month}</option>)}</select></label>
                     <label>Year<select value={pnlCalendarYear} onChange={(event) => { setPnlCalendarYear(Number(event.target.value)); setSelectedPnlDateKey(null); }}>{pnlCalendarYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
@@ -2932,7 +2937,7 @@ export function TradingDashboard() {
               </div>
               <div className="pnl-visuals">
                 <article className="pnl-equity-card">
-                  <div><span><b>Equity curve</b><small>Net performance across completed trades</small></span><strong className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</strong></div>
+                  <div><span className="pnl-equity-heading"><i className="pnl-section-icon"><LineChart /></i><span><b>Equity curve</b><small>Net performance across completed trades</small></span></span><strong className={pnlStats.netPnl >= 0 ? "positive" : "negative"}>{pnlStats.netPnl >= 0 ? "+" : ""}{formatInr(pnlStats.netPnl)}</strong></div>
                   <svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Cumulative paper trading profit and loss">
                     <defs><linearGradient id="pnlEquityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".28" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient></defs>
                     <polygon points={pnlVisuals.equityAreaPoints} fill="url(#pnlEquityFill)" />
@@ -2984,7 +2989,7 @@ export function TradingDashboard() {
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
                           <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
-                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => setPnlReviewTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => setTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
                         </div>
                         <div className="pnl-trade-review-body">
                           <MarketChart
