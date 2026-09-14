@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { CLOUD_CHANGE_EVENT, JOURNAL_STORAGE_KEY, mergeJournalCopies } from "@/lib/cloud-journal";
 import { disconnectPush } from "@/lib/push-client";
 
 import { App as CapacitorApp, type URLOpenListenerEvent } from "@capacitor/app";
@@ -31,6 +32,7 @@ const NATIVE_AUTH_CALLBACK = "in.papertrade.app://auth/callback";
 const PRODUCTION_WEB_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://papertrade.site").replace(/\/+$/, "");
 const WELCOME_MINIMUM_MS = 5_000;
 const CLOUD_STORAGE_KEYS = [
+  JOURNAL_STORAGE_KEY,
   "papertrade-orders",
   "papertrade-protections",
   "papertrade-balance",
@@ -55,6 +57,10 @@ function restoreCloudTradingState(state: unknown) {
   const record = state as Record<string, unknown>;
   for (const key of CLOUD_STORAGE_KEYS) {
     const value = record[key];
+    if (key === JOURNAL_STORAGE_KEY) {
+      window.localStorage.setItem(key, mergeJournalCopies(window.localStorage.getItem(key), typeof value === "string" ? value : null));
+      continue;
+    }
     if (typeof value === "string") window.localStorage.setItem(key, value);
   }
 }
@@ -166,6 +172,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let syncFailed = false;
         if (data?.state) {
           restoreCloudTradingState(data.state);
+          const mergedState = readCloudTradingState();
+          if (mergedState[JOURNAL_STORAGE_KEY] !== data.state[JOURNAL_STORAGE_KEY]) {
+            const result = await client.from("trading_states").upsert({ user_id: session.user.id, state: mergedState });
+            syncFailed = Boolean(result.error);
+            if (syncFailed) setSyncStatus("error");
+          }
         } else {
           const initialState = readCloudTradingState();
           const result = await client.from("trading_states").upsert({ user_id: session.user.id, state: initialState });
@@ -175,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setAuthError("Google login works, but cloud storage is not ready. Run the supplied Supabase database setup.");
           }
         }
-        lastUploadedState.current = JSON.stringify(readCloudTradingState());
+        lastUploadedState.current = syncFailed ? "" : JSON.stringify(readCloudTradingState());
         if (!syncFailed) setSyncStatus("synced");
         setCloudReady(true);
       });
@@ -187,23 +199,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const client = getSupabaseBrowserClient();
     if (!configured || !client || !session?.user.id || !cloudReady) return;
     let saving = false;
-    const interval = window.setInterval(async () => {
+    const save = async () => {
       if (saving) return;
       const state = readCloudTradingState();
       const serialized = JSON.stringify(state);
       if (serialized === lastUploadedState.current) return;
       saving = true;
       setSyncStatus("saving");
-      const { error } = await client.from("trading_states").upsert({ user_id: session.user.id, state });
-      if (error) {
-        setSyncStatus("error");
-      } else {
+      try {
+        const { error } = await client.from("trading_states").upsert({ user_id: session.user.id, state });
+        if (error) throw error;
         lastUploadedState.current = serialized;
-        setSyncStatus("synced");
+        setSyncStatus(JSON.stringify(readCloudTradingState()) === serialized ? "synced" : "saving");
+      } catch {
+        setSyncStatus("error");
+      } finally {
+        saving = false;
       }
-      saving = false;
-    }, 1_500);
-    return () => window.clearInterval(interval);
+    };
+    let debounce: number | undefined;
+    const changed = () => {
+      setSyncStatus("saving");
+      window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => void save(), 350);
+    };
+    const flush = () => { void save(); };
+    const interval = window.setInterval(flush, 1_500);
+    window.addEventListener(CLOUD_CHANGE_EVENT, changed);
+    window.addEventListener("online", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(debounce);
+      window.removeEventListener(CLOUD_CHANGE_EVENT, changed);
+      window.removeEventListener("online", flush);
+      document.removeEventListener("visibilitychange", flush);
+    };
   }, [cloudReady, configured, session?.user.id]);
 
   const signInWithGoogle = useCallback(async () => {

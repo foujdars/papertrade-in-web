@@ -5,8 +5,8 @@
   display: flex; align-items: center; gap: 8px; max-width: calc(100% - 20px);
   min-height: 36px; padding: 6px 10px; border: 1px solid currentColor;
   border-radius: 7px; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums;
-  background: var(--studio-panel, var(--surface, #fff)); color: var(--purple);
-  box-shadow: 0 2px 7px #0001; white-space: nowrap;
+  background: transparent; color: var(--purple);
+  box-shadow: none; white-space: nowrap;
 }
 .terminal-shell .chart-bracket-tool .bracket-entry-chip { pointer-events: auto; cursor: pointer; }
 .terminal-shell .chart-bracket-tool .bracket-entry-chip small { font-size: 11px; padding-left: 6px; border-left: 1px solid var(--line); }
@@ -17,8 +17,9 @@
 .terminal-shell .chart-bracket-tool .bracket-unset::before { display: none; }
 .terminal-shell .chart-bracket-tool .bracket-unset .bracket-level-chip { border-style: dashed; }
 .terminal-shell .chart-bracket-tool .bracket-help { position: absolute; bottom: 36px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
-.terminal-shell .chart-bracket-tool .bracket-help span { padding: 6px; border-radius: 6px; background: var(--studio-panel, var(--surface)); }
-.terminal-shell .chart-bracket-tool .bracket-help button { pointer-events: auto; min-height: 36px; padding: 6px 10px; border: 1px solid var(--red); border-radius: 8px; background: var(--studio-panel, var(--surface)); color: var(--red); font: inherit; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-help span { padding: 6px; background: transparent; }
+.terminal-shell .chart-bracket-tool .bracket-close-trade { position: absolute; top: 64px; right: 16px; display: grid; place-items: center; pointer-events: auto; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--red); font: inherit; font-size: 30px; cursor: pointer; }
+.terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip, .bracket-close-trade):hover { background: transparent; box-shadow: none; }
 .terminal-shell .chart-bracket-tool :is(button, [role="slider"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
 .terminal-shell .pnl-trade-row { -webkit-touch-callout: none; user-select: none; }
 .terminal-shell .pnl-trade-row :is(input, textarea) { user-select: text; }

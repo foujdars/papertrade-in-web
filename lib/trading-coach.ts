@@ -1,4 +1,5 @@
 import type { PaperOrder } from "./paper-trading.ts";
+import { CLOUD_CHANGE_EVENT } from "./cloud-journal.ts";
 import type { ClosedPaperTrade } from "./trade-analytics.ts";
 
 export type TradeJournalEntry = {
@@ -50,6 +51,7 @@ export function readTradeJournal(): Record<string, TradeJournalEntry> {
 
 export function writeTradeJournal(entries: Record<string, TradeJournalEntry>) {
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(entries));
+  window.dispatchEvent(new Event(CLOUD_CHANGE_EVENT));
 }
 
 export function readTradingLimits(): TradingLimits {

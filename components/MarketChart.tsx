@@ -2045,7 +2045,8 @@ export function MarketChart({
                 </div>
               </div>;
             })}
-            {branchesOpen && <div className="bracket-help"><span>Drag TP / SL to place protection</span>{onOrderToolExit && <button type="button" onClick={onOrderToolExit}>Close trade</button>}</div>}
+            {branchesOpen && <div className="bracket-help"><span>Drag TP / SL to place protection</span></div>}
+            {onOrderToolExit && <button type="button" className="bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
           </div>
         )}
         {typeof orderTool?.livePnl === "number" && Number.isFinite(orderTool.livePnl) && <div className={`chart-live-pnl ${orderTool.livePnl >= 0 ? "positive" : "negative"}`}>

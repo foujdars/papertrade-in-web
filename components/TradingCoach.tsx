@@ -2,6 +2,7 @@
 
 import { BarChart3, BookOpenText, ChevronRight, Play, ShieldCheck, Target, X } from "lucide-react";
 import { BarReplay } from "@/components/BarReplay";
+import { useAuth } from "@/components/AuthProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfidenceControl, StrategyPicker } from "@/components/TradePlanControls";
 import { StockLogo } from "@/components/StockLogo";
@@ -62,6 +63,7 @@ function PayoffChart({ legs, spot }: { legs: OptionPayoffLeg[]; spot: number }) 
 
 
 export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onClose, initialTab = "journal", timeframe = "5m", theme = "light" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; initialTab?: CoachTab; timeframe?: string; theme?: "light" | "neon"; }) {
+  const { user, syncStatus } = useAuth();
   const [tab, setTab] = useState<CoachTab>(initialTab);
   const [journal, setJournal] = useState<Record<string, TradeJournalEntry>>({});
   const dialogRef = useRef<HTMLElement>(null);
@@ -87,13 +89,11 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
   const chargeReversalCount = trades.filter((trade) => trade.grossPnl > 0 && trade.netPnl < 0).length;
   function updateJournal(trade: ClosedPaperTrade, patch: Partial<TradeJournalEntry>) {
     const entryOrder = ordersById.get(trade.sourceOrderIds[0]);
-    setJournal((current) => {
-      const previous = current[trade.id] ?? { tradeId: trade.id, strategy: entryOrder?.journalPlan?.strategy || "Other", thesis: entryOrder?.journalPlan?.thesis || "", confidence: entryOrder?.journalPlan?.confidence ?? 3, review: "", followedPlan: null, updatedAt: Date.now() };
-      const nextEntry: TradeJournalEntry = { ...previous, ...patch, tradeId: trade.id, updatedAt: Date.now() };
-      const next = { ...current, [trade.id]: nextEntry };
-      writeTradeJournal(next);
-      return next;
-    });
+    const previous = journal[trade.id] ?? { tradeId: trade.id, strategy: entryOrder?.journalPlan?.strategy || "Other", thesis: entryOrder?.journalPlan?.thesis || "", confidence: entryOrder?.journalPlan?.confidence ?? 3, review: "", followedPlan: null, updatedAt: Date.now() };
+    const nextEntry: TradeJournalEntry = { ...previous, ...patch, tradeId: trade.id, updatedAt: Date.now() };
+    const next = { ...journal, [trade.id]: nextEntry };
+    writeTradeJournal(next);
+    setJournal(next);
   }
   function saveLimits() { const sanitized = { ...draftLimits, dailyLossLimit: Math.max(0, draftLimits.dailyLossLimit || 0), maxTradesPerDay: Math.max(0, Math.round(draftLimits.maxTradesPerDay || 0)), cooldownAfterLosses: Math.max(0, Math.round(draftLimits.cooldownAfterLosses || 0)), cooldownMinutes: Math.max(0, Math.round(draftLimits.cooldownMinutes || 0)) }; writeTradingLimits(sanitized); onLimitsChange(sanitized); setDraftLimits(sanitized); setLimitsSaved(true); }
 
@@ -134,7 +134,7 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
                   <label className="wide">Entry reason<textarea value={entry?.thesis ?? entryOrder?.journalPlan?.thesis ?? ""} onChange={(event) => updateJournal(trade, { thesis: event.target.value })} placeholder="What was your setup?" /></label>
                   <label className="wide">Review<textarea value={entry?.review ?? ""} onChange={(event) => updateJournal(trade, { review: event.target.value })} placeholder="What worked? What would you change?" /></label>
                   <div className="coach-plan-check"><span>Followed your plan?</span><button type="button" aria-pressed={entry?.followedPlan === true} className={entry?.followedPlan === true ? "active" : ""} onClick={() => updateJournal(trade, { followedPlan: true })}>Yes</button><button type="button" aria-pressed={entry?.followedPlan === false} className={entry?.followedPlan === false ? "active" : ""} onClick={() => updateJournal(trade, { followedPlan: false })}>No</button></div>
-                </div><small className="coach-save-note">Notes saved on this device</small>
+                </div><small className="coach-save-note" role="status">{!user ? "Sign in to sync your notes to the cloud" : syncStatus === "synced" ? "Notes saved to your account" : syncStatus === "error" ? "Cloud sync pending — notes kept safely here. Retrying automatically." : "Saving notes to your account…"}</small>
               </div>}
             </article>;
           })}

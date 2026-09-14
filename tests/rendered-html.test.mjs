@@ -178,7 +178,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(dashboard, /defaultProtectionPrices|automaticProtection|DEFAULT_REWARD_AMOUNT/);
   assert.match(dashboard, /const \{ target, stopLoss \} = requestedProtection/);
   assert.match(dashboard, /selectedPnlDateKey/);
-  assert.match(chart, /onClick={onOrderToolExit}>Close trade/);
+  assert.match(chart, /aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}/);
   assert.match(dashboard, /chart-status-live-pnl/);
   assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
   assert.match(dashboard, /Daily P&amp;L heat map/);
