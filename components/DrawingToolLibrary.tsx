@@ -86,7 +86,7 @@ export function DrawingToolLibrary({
           })}
           {!filtered.length && <p>No matching drawing tool.</p>}
         </div>
-        <footer><Crosshair size={14} /> Drag to aim the crosshair; tap to place each point. Drag a drawing to move it, or a handle to reshape it. Magnet optionally snaps near candle OHLC.</footer>
+        <footer><Crosshair size={14} /> Drag the crosshair to your point, then tap anywhere on the chart to confirm that crosshair position. Repeat for each point. Drag completed drawings to move them or their handles to reshape them. Magnet optionally snaps near candle OHLC.</footer>
       </section>
     </div>
   );

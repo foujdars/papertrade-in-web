@@ -593,8 +593,9 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
+  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null } | null>(null);
   const drawingAimRef = useRef<Anchor | null>(null);
+  const lastCrosshairAnchorRef = useRef<Anchor | null>(null);
   const confirmDrawingPointRef = useRef<(() => void) | null>(null);
   const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number | null; target: number | null; stopLoss: number | null } | null>(null);
   const [tradeMarkerCoordinates, setTradeMarkerCoordinates] = useState<Array<ChartTradeMarker & { x: number; y: number; direction: "up" | "down" }>>([]);
@@ -1229,8 +1230,12 @@ export function MarketChart({
     chart?.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
     chartHost.current?.classList.toggle("is-drawing", activeTool !== "cursor");
     const definition = drawingType ? DRAWING_TOOL_CATALOG.find((tool) => tool.id === drawingType) : undefined;
-    drawingAimRef.current = null;
-    const hint = definition ? `${definition.label} · drag to aim, tap to place point 1` : drawingType ? "Drag to aim · tap to place" : "";
+    const pointTool = drawingType && !CONTINUOUS_TOOLS.has(drawingType);
+    const centerTime = chart ? drawingTimeAtCoordinate(chart.timeScale().width() / 2) : null;
+    const centerPrice = chart ? candleSeries.current?.coordinateToPrice((chart.panes()[0]?.getHeight() ?? 0) / 2) : null;
+    drawingAimRef.current = pointTool ? lastCrosshairAnchorRef.current ?? (centerTime !== null && centerPrice != null ? { time: centerTime, price: centerPrice } : null) : null;
+    if (drawingAimRef.current && candleSeries.current) chart?.setCrosshairPosition(drawingAimRef.current.price, drawingAimRef.current.time, candleSeries.current);
+    const hint = definition ? `${definition.label} · drag crosshair, tap anywhere to confirm` : drawingType ? "Drag crosshair · tap anywhere to confirm" : "";
     const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
     return () => window.clearTimeout(hintTimer);
   }, [activeTool, preservePageScroll, toolSignal]);
@@ -1397,6 +1402,11 @@ export function MarketChart({
       series.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
 
       crosshairMove = (event) => {
+        // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
+        if (!normalizeTool(activeToolRef.current) && event.point && event.time !== undefined && event.point.y <= (chart.panes()[0]?.getHeight() ?? 0)) {
+          const price = series.coordinateToPrice(event.point.y);
+          if (price !== null) lastCrosshairAnchorRef.current = { time: event.time, price };
+        }
         // Series data works in price and indicator panes, and for touch crosshairs.
         // Never feed a hovered historical price back into execution or live quotes.
         const bar = event.point ? event.seriesData.get(series) : undefined;
@@ -1443,6 +1453,7 @@ export function MarketChart({
         const anchor = pointerAnchor(event, true);
         if (!anchor) return;
         drawingAimRef.current = anchor;
+        lastCrosshairAnchorRef.current = anchor;
         chart.setCrosshairPosition(anchor.price, anchor.time, series);
         updateDraftPreview(anchor);
       };
@@ -1526,7 +1537,7 @@ export function MarketChart({
         }
         if (draftRef.current) {
           const placed = draftRef.current.confirmed.length;
-          setPlacementHint(`${placed}/${draftRef.current.requiredAnchors} points · drag to aim, tap next point`);
+          setPlacementHint(`${placed}/${draftRef.current.requiredAnchors} points · move crosshair, tap anywhere to confirm`);
         }
       };
 
@@ -1545,9 +1556,8 @@ export function MarketChart({
         }
         const tool = normalizeTool(activeToolRef.current);
         if (!tool || CONTINUOUS_TOOLS.has(tool)) { commitOrEdit(event); return; }
-        if (!pointerAnchor(event, false)) return;
-        drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
-        aim(event);
+        // Snapshot the existing crosshair BEFORE touching the screen. A tap is confirmation only.
+        drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, anchor: drawingAimRef.current ? { ...drawingAimRef.current } : null };
         host.setPointerCapture?.(event.pointerId);
         event.preventDefault(); event.stopPropagation();
       };
@@ -1581,7 +1591,10 @@ export function MarketChart({
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
-        if (tool && !CONTINUOUS_TOOLS.has(tool)) { aim(event); event.preventDefault(); event.stopPropagation(); return; }
+        if (tool && !CONTINUOUS_TOOLS.has(tool)) {
+          if (gesture?.pointerId === event.pointerId && gesture.moved) aim(event);
+          event.preventDefault(); event.stopPropagation(); return;
+        }
         const draft = draftRef.current;
         if (!draft) return;
         const anchor = pointerAnchor(event, true);
@@ -1615,7 +1628,7 @@ export function MarketChart({
           return;
         }
         if (gesture?.pointerId === event.pointerId) {
-          if (!gesture.moved) commitOrEdit(event);
+          if (!gesture.moved && gesture.anchor) commitOrEdit(event, gesture.anchor);
           if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
           event.preventDefault();
           event.stopPropagation();
@@ -1668,7 +1681,17 @@ export function MarketChart({
       // Stop browser page magnification inside the canvas; the chart still receives the pinch.
       const containChartTouch = (event: TouchEvent) => {
         if (event.touches.length > 1 || normalizeTool(activeToolRef.current) || editRef.current) event.preventDefault();
+        const tool = normalizeTool(activeToolRef.current);
+        if (event.touches.length === 1 && tool && !CONTINUOUS_TOOLS.has(tool) && !pinching) event.stopPropagation();
       };
+      // Native mouse hover must not move the crosshair to the confirmation-click location either.
+      const containDrawingMouse = (event: MouseEvent) => {
+        const tool = normalizeTool(activeToolRef.current);
+        if (tool && !CONTINUOUS_TOOLS.has(tool)) { event.preventDefault(); event.stopPropagation(); }
+      };
+      host.addEventListener("mousemove", containDrawingMouse, true);
+      host.addEventListener("mousedown", containDrawingMouse, true);
+      host.addEventListener("mouseup", containDrawingMouse, true);
       host.addEventListener("touchstart", containChartTouch, { passive: false, capture: true });
       host.addEventListener("touchmove", containChartTouch, { passive: false, capture: true });
       const releaseOutsidePointer = (event: PointerEvent) => {
@@ -1694,6 +1717,9 @@ export function MarketChart({
         host.removeEventListener("pointercancel", onPointerUp, true);
         host.removeEventListener("touchstart", containChartTouch, true);
         host.removeEventListener("touchmove", containChartTouch, true);
+        host.removeEventListener("mousemove", containDrawingMouse, true);
+        host.removeEventListener("mousedown", containDrawingMouse, true);
+        host.removeEventListener("mouseup", containDrawingMouse, true);
         window.removeEventListener("pointerup", releaseOutsidePointer);
         window.removeEventListener("pointercancel", releaseOutsidePointer);
         confirmDrawingPointRef.current = null;

@@ -4,8 +4,21 @@ import * as drawing from 'lightweight-charts-drawing';
 import {buildVolumeProfile} from '../lib/volume-profile.ts';
 import {createChartDrawingRegistry} from '../lib/chart-drawing-tools.ts';
 import {holdingPerformance} from '../lib/holding-performance.ts';
+import {readFile} from 'node:fs/promises';
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
+
+test('point confirmation snapshots the pinned crosshair, never the tap coordinates',async()=>{
+ const source=await readFile(new URL('../components/MarketChart.tsx',import.meta.url),'utf8');
+ const down=source.slice(source.indexOf('const onPointerDown ='),source.indexOf('const onPointerMove ='));
+ assert.match(down,/anchor: drawingAimRef\.current \? \{ \.\.\.drawingAimRef\.current \}/);
+ assert.doesNotMatch(down,/aim\(event\)/);
+ const up=source.slice(source.indexOf('const onPointerUp ='),source.indexOf('const onKeyDown ='));
+ assert.match(up,/!gesture\.moved && gesture\.anchor\) commitOrEdit\(event, gesture\.anchor\)/);
+ assert.match(source,/gesture\?\.pointerId === event\.pointerId && gesture\.moved\) aim\(event\)/);
+ assert.match(source,/pointTool \? lastCrosshairAnchorRef\.current/);
+ assert.match(source,/tap anywhere to confirm/);
+});
 test('volume profile preserves selected candle volume, including flat candles and reversed ranges',()=>{
  const bins=buildVolumeProfile([...candles,{time:3,low:110,high:110,volume:50}],3,1);
  assert.ok(Math.abs(bins.reduce((n,b)=>n+b.volume,0)-350)<1e-6);
