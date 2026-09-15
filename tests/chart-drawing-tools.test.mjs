@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as drawing from 'lightweight-charts-drawing';
 import {buildVolumeProfile} from '../lib/volume-profile.ts';
 import {createChartDrawingRegistry} from '../lib/chart-drawing-tools.ts';
+import {holdingPerformance} from '../lib/holding-performance.ts';
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
 test('volume profile preserves selected candle volume, including flat candles and reversed ranges',()=>{
@@ -43,4 +44,39 @@ test('Fibonacci labels and direction survive saving and restoring',()=>{
  assert.equal(restored.getPriceAtLevel(0),110);
  assert.equal(restored.getPriceAtLevel(1),100);
  assert.ok(restored.computeGeometry(viewport).some(g=>g.type==='text'&&g.text==='0.705'));
+});
+
+test('right-docked profile stays inside the plot and conserves up/down candle volume',()=>{
+ const data=[{...candles[0],open:102,close:108},{...candles[1],open:114,close:106}];
+ const bins=buildVolumeProfile(data,1,2);
+ assert.ok(Math.abs(bins.reduce((n,b)=>n+b.upVolume,0)-100)<1e-6);
+ assert.ok(Math.abs(bins.reduce((n,b)=>n+b.downVolume,0)-200)<1e-6);
+ const registry=createChartDrawingRegistry(drawing,()=>data,()=>({width:310,height:450}));
+ const profile=registry.createDrawing('volume-profile','vp',[{time:1,price:100},{time:2,price:115}]);
+ const bars=profile.computeGeometry(viewport).filter(g=>g.type==='polygon');
+ assert.ok(bars.length>0);
+ assert.equal(Math.max(...bars.flatMap(g=>g.points.map(p=>p.x))),308);
+ assert.ok(bars.every(g=>g.points.every(p=>p.x>=0&&p.x<=308&&p.y>=0&&p.y<=450)));
+ assert.ok(new Set(bars.map(g=>g.fill)).size>=2);
+});
+
+const today=Date.parse('2026-09-15T08:30:00Z');
+const buy=(id,quantity,price,createdAt)=>({id,symbol:'TEST',side:'BUY',quantity,price,createdAt,product:'DELIVERY',status:'COMPLETE',time:''});
+test('a new holding starts at zero daily return even when the stock is up 20 percent',()=>{
+ const result=holdingPerformance([buy('1',150,734.9,today)],'TEST',734.9,612.45,today);
+ assert.equal(result.dayPnl,0); assert.equal(result.purchasedAt,today);
+ assert.ok(Math.abs(holdingPerformance([buy('1',150,734.9,today)],'TEST',740,612.45,today).dayPnl-765)<1e-7);
+});
+test('daily holdings returns distinguish overnight shares, additions and partial sales',()=>{
+ const fills=[buy('1',10,90,today-86400000),buy('2',5,110,today)];
+ assert.equal(holdingPerformance(fills,'TEST',110,100,today).dayPnl,100);
+ const remaining=holdingPerformance([...fills,{...buy('3',12,110,today+1),side:'SELL'}],'TEST',112,100,today+2);
+ assert.equal(remaining.dayPnl,6); assert.equal(remaining.purchasedAt,today);
+ assert.equal(holdingPerformance(fills,'TEST',110,110,today+86400000).dayPnl,0);
+});
+test('holding day boundary uses IST and missing purchase dates are not invented',()=>{
+ const start=Date.parse('2026-09-14T18:35:00Z');
+ assert.equal(holdingPerformance([buy('legacy',1,100,start)],'TEST',100,80,start+3600000).dayPnl,0);
+ const unknown=holdingPerformance([buy('legacy',1,100,undefined)],'TEST',100,null,today);
+ assert.equal(unknown.purchasedAt,null);assert.equal(unknown.dayPnl,0);
 });

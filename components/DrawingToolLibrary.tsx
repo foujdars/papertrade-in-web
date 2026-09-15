@@ -80,13 +80,13 @@ export function DrawingToolLibrary({
             return (
               <button key={tool.id} className={activeTool === tool.id ? "active" : ""} onClick={() => { onSelect(tool.id); onClose(); }}>
                 <i><Icon size={17} /></i>
-                <span><b>{tool.label}</b><small>{tool.category} · {tool.anchors} {tool.anchors === 1 ? "point" : "points"}</small></span>
+                <span><b>{tool.label}</b><small>{tool.id === "volume-profile" ? "Candle-volume estimate · 2 range points" : `${tool.category} · ${tool.anchors} ${tool.anchors === 1 ? "point" : "points"}`}</small></span>
               </button>
             );
           })}
           {!filtered.length && <p>No matching drawing tool.</p>}
         </div>
-        <footer><Crosshair size={14} /> Select a tool, then tap its anchor points on the chart. Magnet snaps to candle OHLC.</footer>
+        <footer><Crosshair size={14} /> Drag to aim the crosshair; tap to place each point. Drag a drawing to move it, or a handle to reshape it. Magnet optionally snaps near candle OHLC.</footer>
       </section>
     </div>
   );

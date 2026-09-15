@@ -363,6 +363,7 @@ test("uses popup selectors and a focused default candle range", async () => {
   assert.match(dashboard, /workspaceMode/);
   assert.match(dashboard, /<span>F&amp;O<\/span>/);
   assert.match(dashboard, /Brand onClick/);
-  assert.match(dashboard, /trade-footer-hidden/);
+  assert.match(dashboard, /permanent-trade-footer/);
+  assert.doesNotMatch(dashboard, /setChartTradeFooterOpen/);
   assert.match(dashboard, /setFnoTradeDockOpen\(\(value\) => !value\)/);
 });

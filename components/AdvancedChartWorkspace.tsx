@@ -76,7 +76,7 @@ export function AdvancedChartWorkspace({
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
-  const [magnet, setMagnet] = useState(true);
+  const [magnet, setMagnet] = useState(false);
   const [drawingsHidden, setDrawingsHidden] = useState(false);
   const [drawingsLocked, setDrawingsLocked] = useState(false);
   const [visibleBars, setVisibleBars] = useState(375);

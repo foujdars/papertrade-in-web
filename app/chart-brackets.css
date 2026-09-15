@@ -34,3 +34,16 @@
   .terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip) { left: 0; gap: 4px; padding: 2px 5px; }
   .terminal-shell .chart-bracket-tool .bracket-level-chip strong { font-size: 11px; }
 }
+.terminal-shell .lightweight-chart { touch-action: none; overscroll-behavior: contain; }
+.terminal-shell .chart-placement-hint { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: calc(100% - 16px); pointer-events: auto; font-size: 11px; }
+.terminal-shell .chart-placement-hint button { border: 1px solid var(--purple); background: var(--surface); color: var(--purple); border-radius: 7px; padding: 6px 9px; min-height: 32px; cursor: pointer; }
+@media (max-width: 760px) {
+  .terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 74px; }
+  .terminal-shell .chart-area:has(.permanent-trade-footer .market-closed-note) { padding-bottom: 94px; }
+  .terminal-shell .permanent-trade-footer { position: fixed; z-index: 85; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); height: 74px; min-height: 74px; padding: 4px 10px 6px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); }
+  .terminal-shell .permanent-trade-footer:has(.market-closed-note) { height: 94px; min-height: 94px; }
+  .terminal-shell .permanent-trade-footer .chart-positions-trigger { order: -1; min-height: 14px; }
+  .terminal-shell .permanent-trade-footer .chart-trade-buttons { width: 100%; flex: none; }
+  .terminal-shell .permanent-trade-footer .chart-trade-buttons button { height: 40px; }
+  .terminal-shell .permanent-trade-footer .market-closed-note { order: -2; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+}

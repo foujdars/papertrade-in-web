@@ -189,6 +189,9 @@ type DrawingEdit = {
   anchorIndex: number | null;
   start: Anchor;
   originalAnchors: Anchor[];
+  startX: number;
+  pointerId: number;
+  originalPixels: (number | null)[];
 };
 
 const DRAWING_STORAGE_PREFIX = "papertrade-lwc-drawings-v1";
@@ -436,7 +439,7 @@ function chartInteractionOptions(enabled: boolean, preservePageScroll: boolean) 
           axisPressedMouseMove: true,
           axisDoubleClickReset: true,
         }
-      : false,
+      : { mouseWheel: false, pinch: true, axisPressedMouseMove: false, axisDoubleClickReset: false },
   };
 }
 
@@ -590,7 +593,9 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; count: number } | null>(null);
+  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
+  const drawingAimRef = useRef<Anchor | null>(null);
+  const confirmDrawingPointRef = useRef<(() => void) | null>(null);
   const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number | null; target: number | null; stopLoss: number | null } | null>(null);
   const [tradeMarkerCoordinates, setTradeMarkerCoordinates] = useState<Array<ChartTradeMarker & { x: number; y: number; direction: "up" | "down" }>>([]);
 
@@ -890,9 +895,9 @@ export function MarketChart({
           color: "#0ea5e9",
           lineWidth: 1,
           priceLineVisible: false,
-          lastValueVisible: true,
+          lastValueVisible: false,
           crosshairMarkerVisible: false,
-          title: "EMA 5",
+          title: "",
         });
       } else if (!next.ema5 && ema5Series.current) {
         chart.removeSeries(ema5Series.current);
@@ -903,9 +908,9 @@ export function MarketChart({
           color: "#ff8a00",
           lineWidth: 1,
           priceLineVisible: false,
-          lastValueVisible: true,
+          lastValueVisible: false,
           crosshairMarkerVisible: false,
-          title: "EMA 21",
+          title: "",
         });
       } else if (!next.ema21 && ema21Series.current) {
         chart.removeSeries(ema21Series.current);
@@ -924,7 +929,7 @@ export function MarketChart({
       ] as const;
       for (const [key, reference, points, color, title] of overlayDefinitions) {
         if (next[key] && !reference.current) {
-          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title });
+          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: !key.startsWith("ema"), crosshairMarkerVisible: false, title: key.startsWith("ema") ? "" : title });
           reference.current.setData(points.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value })));
         } else if (!next[key] && reference.current) {
           chart.removeSeries(reference.current);
@@ -1049,6 +1054,8 @@ export function MarketChart({
     }
     const prices = [nearest.open, nearest.high, nearest.low, nearest.close];
     const price = prices.reduce((best, value) => Math.abs(value - rawPrice) < Math.abs(best - rawPrice) ? value : best, prices[0]);
+    const rawY = candleSeries.current?.priceToCoordinate(rawPrice), snapY = candleSeries.current?.priceToCoordinate(price);
+    if (rawY == null || snapY == null || Math.abs(rawY - snapY) > 12) return { time: rawTime, price: rawPrice };
     return { time: chartTimeFromEpoch(Number(nearest.time), timeframe), price };
   }
 
@@ -1061,11 +1068,23 @@ export function MarketChart({
     const x = event.clientX - bounds.left;
     const y = event.clientY - bounds.top;
     const mainPaneHeight = chart.panes()[0]?.getHeight() ?? bounds.height;
-    if (x < 0 || x > bounds.width || y < 0 || y > mainPaneHeight) return null;
-    const time = chart.timeScale().coordinateToTime(x);
+    if (x < 0 || x > chart.timeScale().width() || y < 0 || y > mainPaneHeight) return null;
+    const time = drawingTimeAtCoordinate(x);
     const price = series.coordinateToPrice(y);
     if (time === null || price === null) return null;
     return useMagnet ? snapAnchor(time, price) : { time, price };
+  }
+
+  function drawingTimeAtCoordinate(x: number): Time | null {
+    const scale = chartApi.current?.timeScale();
+    if (!scale) return null;
+    const time = scale.coordinateToTime(x);
+    if (time !== null) return time;
+    const logical = scale.coordinateToLogical(x), bars = dataRef.current;
+    if (logical === null || bars.length < 2) return null;
+    const index = Math.round(Number(logical)), first = Number(bars[0].time), last = Number(bars.at(-1)!.time);
+    const step = (last - first) / (bars.length - 1);
+    return chartTimeFromEpoch(index < 0 ? first + index * step : last + (index - bars.length + 1) * step, timeframe);
   }
 
   function updateDraftPreview(anchor: Anchor) {
@@ -1086,8 +1105,10 @@ export function MarketChart({
     setPlacementHint("");
     persistDrawings(true);
     activeToolRef.current = "cursor";
-    drawingManager.current?.setActiveTool(null);
-    chartApi.current?.applyOptions({ handleScroll: true, handleScale: true });
+    drawingManager.current?.setActiveTool("pointer-controlled");
+    drawingAimRef.current = null;
+    chartApi.current?.clearCrosshairPosition();
+    chartApi.current?.applyOptions(chartInteractionOptions(true, preservePageScroll));
     chartHost.current?.classList.remove("is-drawing");
     onDrawingCompleteRef.current?.();
   }
@@ -1203,11 +1224,13 @@ export function MarketChart({
     const chart = chartApi.current;
     const manager = drawingManager.current;
     const drawingType = normalizeTool(activeTool);
-    manager?.setActiveTool(drawingType);
+    // Pointer input owns selection as well as placement; disable the library's competing mouse click selector.
+    manager?.setActiveTool("pointer-controlled");
     chart?.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
     chartHost.current?.classList.toggle("is-drawing", activeTool !== "cursor");
     const definition = drawingType ? DRAWING_TOOL_CATALOG.find((tool) => tool.id === drawingType) : undefined;
-    const hint = definition ? `Tap ${definition.anchors} ${definition.anchors === 1 ? "point" : "points"} · ${definition.label}` : drawingType ? "Tap on chart" : "";
+    drawingAimRef.current = null;
+    const hint = definition ? `${definition.label} · drag to aim, tap to place point 1` : drawingType ? "Drag to aim · tap to place" : "";
     const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
     return () => window.clearTimeout(hintTimer);
   }, [activeTool, preservePageScroll, toolSignal]);
@@ -1394,7 +1417,8 @@ export function MarketChart({
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
       drawingManager.current = manager;
-      drawingRegistry.current = createChartDrawingRegistry(drawing, () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })));
+      manager.setActiveTool("pointer-controlled");
+      drawingRegistry.current = createChartDrawingRegistry(drawing, () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })), () => ({ width: chart.timeScale().width(), height: chart.panes()[0]?.getHeight() ?? host.clientHeight }));
       const drawingScope = drawingStorageKey(instrument);
       const stored = isReplay ? (replayDrawingsRef.current?.scope === drawingScope ? replayDrawingsRef.current.snapshot : []) : readStoredDrawings(drawingScope, legacyDrawingStorageKey(instrument, timeframe));
       storageKeyRef.current = drawingScope;
@@ -1413,7 +1437,16 @@ export function MarketChart({
       manager.on("drawing:removed", syncSelectedDrawing);
       manager.on("drawing:cleared", syncSelectedDrawing);
 
-      const onPointerDown = (event: PointerEvent) => {
+      const pointers = new Set<number>();
+      let pinching = false;
+      const aim = (event: PointerEvent) => {
+        const anchor = pointerAnchor(event, true);
+        if (!anchor) return;
+        drawingAimRef.current = anchor;
+        chart.setCrosshairPosition(anchor.price, anchor.time, series);
+        updateDraftPreview(anchor);
+      };
+      const commitOrEdit = (event: PointerEvent, aimedAnchor?: Anchor) => {
         const currentManager = drawingManager.current;
         const registry = drawingRegistry.current;
         const chartInstance = chartApi.current;
@@ -1431,7 +1464,7 @@ export function MarketChart({
             const controls = drawingItem.getControlPoints(viewport);
             if (controls.some((control) => pointDistance(point, control) <= 18)) return true;
             if (controls.some((control, index) => index > 0 && pointToSegmentDistance(point, controls[index - 1], control) <= 12)) return true;
-            return drawingItem.testHit(point, viewport);
+            return [[0,0],[-8,0],[8,0],[0,-8],[0,8]].some(([dx,dy]) => drawingItem.testHit({x:point.x+dx,y:point.y+dy}, viewport));
           }) ?? null;
           if (!hit) {
             currentManager.deselectAll();
@@ -1444,6 +1477,9 @@ export function MarketChart({
           if (!start) return;
           editRef.current = {
             drawing: hit,
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            originalPixels: hit.anchors.map(anchor => chartInstance.timeScale().timeToCoordinate(anchor.time)),
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
@@ -1459,7 +1495,7 @@ export function MarketChart({
           return;
         }
 
-        const anchor = pointerAnchor(event, true);
+        const anchor = aimedAnchor ?? pointerAnchor(event, true);
         if (!anchor) return;
         event.preventDefault();
         event.stopPropagation();
@@ -1481,8 +1517,7 @@ export function MarketChart({
           created.setState("editing");
           draft = { toolType: selectedTool, requiredAnchors, confirmed: [anchor], drawing: created, continuous, pointerId: continuous ? event.pointerId : null };
           draftRef.current = draft;
-          host.setPointerCapture?.(event.pointerId);
-          if (!continuous && requiredAnchors > 1) drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, count: 1 };
+          if (continuous) host.setPointerCapture?.(event.pointerId);
           if (requiredAnchors === 1) finishDraft();
         } else if (!continuous) {
           draft.confirmed.push(anchor);
@@ -1491,30 +1526,53 @@ export function MarketChart({
         }
         if (draftRef.current) {
           const placed = draftRef.current.confirmed.length;
-          setPlacementHint(`${placed}/${draftRef.current.requiredAnchors} points · tap next anchor`);
+          setPlacementHint(`${placed}/${draftRef.current.requiredAnchors} points · drag to aim, tap next point`);
         }
+      };
+
+      confirmDrawingPointRef.current = () => {
+        if (drawingAimRef.current && normalizeTool(activeToolRef.current)) commitOrEdit(new PointerEvent("pointerup"), drawingAimRef.current);
+      };
+      const onPointerDown = (event: PointerEvent) => {
+        if (event.button !== 0) return;
+        pointers.add(event.pointerId);
+        if (pointers.size > 1) {
+          pinching = true;
+          drawingGestureRef.current = null;
+          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
+          chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
+          return;
+        }
+        const tool = normalizeTool(activeToolRef.current);
+        if (!tool || CONTINUOUS_TOOLS.has(tool)) { commitOrEdit(event); return; }
+        if (!pointerAnchor(event, false)) return;
+        drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+        aim(event);
+        host.setPointerCapture?.(event.pointerId);
+        event.preventDefault(); event.stopPropagation();
       };
 
       const onPointerMove = (event: PointerEvent) => {
         scheduleOverlayRefresh();
+        if (pinching) return;
+        const gesture = drawingGestureRef.current;
+        if (gesture?.pointerId === event.pointerId && Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>6) gesture.moved = true;
         const tap = tapGestureRef.current;
         if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) {
           tap.moved = true;
           viewportInteractedRef.current = true;
         }
         const edit = editRef.current;
-        if (edit) {
+        if (edit && edit.pointerId === event.pointerId) {
           const current = pointerAnchor(event, false);
           if (!current) return;
           if (edit.anchorIndex !== null) {
             edit.drawing.updateAnchor(edit.anchorIndex, magnetRef.current ? snapAnchor(current.time, current.price) : current);
           } else {
-            const startTime = typeof edit.start.time === "number" ? edit.start.time : 0;
-            const currentTime = typeof current.time === "number" ? current.time : startTime;
-            const timeDelta = currentTime - startTime;
             const priceDelta = current.price - edit.start.price;
-            edit.drawing.setAnchors(edit.originalAnchors.map((anchor) => ({
-              time: typeof anchor.time === "number" ? (anchor.time + timeDelta) as UTCTimestamp : anchor.time,
+            const dx = event.clientX - edit.startX;
+            edit.drawing.setAnchors(edit.originalAnchors.map((anchor,index) => ({
+              time: edit.originalPixels[index] !== null ? drawingTimeAtCoordinate(edit.originalPixels[index]! + dx) ?? anchor.time : anchor.time,
               price: anchor.price + priceDelta,
             })));
           }
@@ -1522,6 +1580,8 @@ export function MarketChart({
           event.stopPropagation();
           return;
         }
+        const tool = normalizeTool(activeToolRef.current);
+        if (tool && !CONTINUOUS_TOOLS.has(tool)) { aim(event); event.preventDefault(); event.stopPropagation(); return; }
         const draft = draftRef.current;
         if (!draft) return;
         const anchor = pointerAnchor(event, true);
@@ -1541,6 +1601,11 @@ export function MarketChart({
 
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
+        pointers.delete(event.pointerId);
+        if (pinching) {
+          if (!pointers.size) { pinching = false; chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll)); }
+          return;
+        }
         const gesture = drawingGestureRef.current;
         drawingGestureRef.current = null;
         if (event.type === "pointercancel") {
@@ -1549,12 +1614,11 @@ export function MarketChart({
           chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
           return;
         }
-        const dragged = draftRef.current;
-        if (gesture?.pointerId === event.pointerId && dragged && !dragged.continuous && dragged.confirmed.length === gesture.count && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) {
-          const anchor = pointerAnchor(event, true);
-          if (anchor) { dragged.confirmed.push(anchor); updateDraftPreview(anchor); if (dragged.confirmed.length >= dragged.requiredAnchors) finishDraft(); }
-          host.releasePointerCapture?.(event.pointerId);
+        if (gesture?.pointerId === event.pointerId) {
+          if (!gesture.moved) commitOrEdit(event);
+          if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
           event.preventDefault();
+          event.stopPropagation();
           return;
         }
         const tap = tapGestureRef.current;
@@ -1563,7 +1627,7 @@ export function MarketChart({
         if (editRef.current) {
           editRef.current.drawing.setState("selected");
           editRef.current = null;
-          chart.applyOptions({ handleScroll: true, handleScale: true });
+          chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
           persistDrawings(true);
           host.releasePointerCapture?.(event.pointerId);
           event.preventDefault();
@@ -1601,6 +1665,18 @@ export function MarketChart({
       host.addEventListener("pointermove", onPointerMove, true);
       host.addEventListener("pointerup", onPointerUp, true);
       host.addEventListener("pointercancel", onPointerUp, true);
+      // Stop browser page magnification inside the canvas; the chart still receives the pinch.
+      const containChartTouch = (event: TouchEvent) => {
+        if (event.touches.length > 1 || normalizeTool(activeToolRef.current) || editRef.current) event.preventDefault();
+      };
+      host.addEventListener("touchstart", containChartTouch, { passive: false, capture: true });
+      host.addEventListener("touchmove", containChartTouch, { passive: false, capture: true });
+      const releaseOutsidePointer = (event: PointerEvent) => {
+        pointers.delete(event.pointerId);
+        if (pinching && !pointers.size) { pinching = false; chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll)); }
+      };
+      window.addEventListener("pointerup", releaseOutsidePointer);
+      window.addEventListener("pointercancel", releaseOutsidePointer);
       const onWheel = () => {
         viewportInteractedRef.current = true;
         scheduleOverlayRefresh();
@@ -1616,6 +1692,11 @@ export function MarketChart({
         host.removeEventListener("pointermove", onPointerMove, true);
         host.removeEventListener("pointerup", onPointerUp, true);
         host.removeEventListener("pointercancel", onPointerUp, true);
+        host.removeEventListener("touchstart", containChartTouch, true);
+        host.removeEventListener("touchmove", containChartTouch, true);
+        window.removeEventListener("pointerup", releaseOutsidePointer);
+        window.removeEventListener("pointercancel", releaseOutsidePointer);
+        confirmDrawingPointRef.current = null;
         host.removeEventListener("wheel", onWheel);
         window.removeEventListener("keydown", onKeyDown);
       };
@@ -1647,7 +1728,7 @@ export function MarketChart({
       window.setTimeout(scheduleOverlayRefresh, 190);
       window.setTimeout(scheduleOverlayRefresh, 360);
       activeToolRef.current = activeTool;
-      manager.setActiveTool(normalizeTool(activeTool));
+      manager.setActiveTool("pointer-controlled");
       chart.applyOptions(chartInteractionOptions(activeTool === "cursor", preservePageScroll));
       host.classList.toggle("is-drawing", activeTool !== "cursor");
     });
@@ -2018,7 +2099,7 @@ export function MarketChart({
             {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
           </div>
         )}
-        {placementHint && <div className="chart-placement-hint">{placementHint}</div>}
+        {placementHint && <div className="chart-placement-hint">{placementHint}<button type="button" onClick={() => confirmDrawingPointRef.current?.()}>Place point at crosshair</button></div>}
         {selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
           <button type="button" aria-label="Delete selected drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}>Delete drawing</button>
           <button type="button" onClick={() => drawingManager.current?.deselectAll()}>Done</button>

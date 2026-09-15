@@ -1,4 +1,5 @@
 "use client";
+import { holdingPerformance } from "@/lib/holding-performance";
 import { CandleLoader } from "./CandleLoader";
 import { useNseSession } from "./useNseSession";
 import { TradeExecutionSummary } from "./TradeExecutionSummary";
@@ -395,7 +396,7 @@ export function TradingDashboard() {
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
   const [toolSignal, setToolSignal] = useState(0);
-  const [magnet, setMagnet] = useState(true);
+  const [magnet, setMagnet] = useState(false);
   const [hiddenDrawings, setHiddenDrawings] = useState(false);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
@@ -443,7 +444,6 @@ export function TradingDashboard() {
   const [fnoListQuoteKeys, setFnoListQuoteKeys] = useState<string[]>([]);
   const [marketScannerQuoteKeys, setMarketScannerQuoteKeys] = useState<string[]>([]);
   const [tradeToolbarCollapsed, setTradeToolbarCollapsed] = useState(true);
-  const [chartTradeFooterOpen, setChartTradeFooterOpen] = useState(false);
   const [pnlOpen, setPnlOpen] = useState(false);
   const [pnlTradeMenuId, setPnlTradeMenuId] = useState<string | null>(null);
   const [tradeSelection, setTradeSelection] = useState<{ scope: string; ids: string[] } | null>(null);
@@ -823,7 +823,6 @@ export function TradingDashboard() {
       setFnoTopMode("SPOT");
       setOptionChainOpen(false);
       setFnoTradeDockOpen(false);
-      setChartTradeFooterOpen(false);
       setSidebarOpen(false);
     };
     window.addEventListener("popstate", restorePreviousChart);
@@ -1505,10 +1504,10 @@ export function TradingDashboard() {
       invested: summary.invested + holding.averagePrice * holding.quantity,
       current: summary.current + holding.marketValue,
       pnl: summary.pnl + holding.unrealizedPnl,
-      dayPnl: summary.dayPnl + (quote?.netChange ?? 0) * holding.quantity,
+      dayPnl: summary.dayPnl + holdingPerformance(orders, holding.symbol, holding.livePrice, quote ? quote.lastPrice - quote.netChange : null, clock?.getTime() ?? Date.now()).dayPnl,
       exitCharges: summary.exitCharges + exitCharges,
     };
-  }, { invested: 0, current: 0, pnl: 0, dayPnl: 0, exitCharges: 0 }), [holdings, marketQuotes, tradingUniverse]);
+  }, { invested: 0, current: 0, pnl: 0, dayPnl: 0, exitCharges: 0 }), [holdings, marketQuotes, tradingUniverse, orders, clock]);
   const holdingsDayBase = holdingsSummary.current - holdingsSummary.dayPnl;
   const holdingsDayReturnPercent = holdingsDayBase > 0 ? holdingsSummary.dayPnl / holdingsDayBase * 100 : 0;
   const holdingsTotalReturnPercent = holdingsSummary.invested > 0 ? holdingsSummary.pnl / holdingsSummary.invested * 100 : 0;
@@ -2033,7 +2032,6 @@ export function TradingDashboard() {
     const nextInstrument = { ...item, price: price > 0 ? price : 0 };
     setRecentStocks((current) => [item.symbol, ...current.filter((symbol) => symbol !== item.symbol)].slice(0, 6));
     setSelected(nextInstrument);
-    setChartTradeFooterOpen(false);
     if (item.assetType !== "OPTION") {
       setWorkspaceMode("trade");
       setSpotInstrument(null);
@@ -2622,7 +2620,6 @@ export function TradingDashboard() {
                 chartAction={chartAction}
                 chartTheme={theme}
                 tradeMarkers={selectedTradeMarkers}
-                onChartTap={() => setChartTradeFooterOpen((value) => !value)}
                 orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
@@ -2639,7 +2636,7 @@ export function TradingDashboard() {
             <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
-          <div className={`chart-trade-footer ${chartTradeFooterOpen ? "" : "trade-footer-hidden"}`} aria-hidden={!chartTradeFooterOpen}>
+          <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">
               <button disabled={!marketOrdersAllowed} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
               <button disabled={!marketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
@@ -2817,9 +2814,10 @@ export function TradingDashboard() {
                 const instrument = tradingUniverse.find((item) => item.symbol === holding.symbol);
                 const exitCharges = calculateInstrumentCharges(instrument ?? { assetType: "EQUITY" }, { side: "SELL", product: "DELIVERY", quantity: holding.quantity, price: holding.livePrice }).total;
                 const holdingReturnPercent = holding.averagePrice > 0 ? (holding.livePrice - holding.averagePrice) / holding.averagePrice * 100 : 0;
+                const purchase = holdingPerformance(orders, holding.symbol, holding.livePrice, null, clock?.getTime() ?? Date.now());
                 return <div className="holding-row" key={holding.symbol}>
                   <button className="holding-symbol" onClick={() => openPositionChart(holding.symbol)}><StockLogo symbol={holding.symbol} /><span><b>{holding.symbol}</b><small>{holding.name}</small></span></button>
-                  <span className="holding-quantity"><b>{holding.quantity} shares</b><small>Avg. {formatInr(holding.averagePrice)}</small></span>
+                  <span className="holding-quantity"><b>{holding.quantity} shares</b><small>Avg. {formatInr(holding.averagePrice)}</small><small>{purchase.purchasedAt ? `Bought ${new Date(purchase.purchasedAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" })}` : "Purchase date unavailable"}</small>{purchase.latestPurchaseAt !== purchase.purchasedAt && purchase.latestPurchaseAt && <small>Last added {new Date(purchase.latestPurchaseAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}</small>}</span>
                   <span className="holding-values"><b>{formatInr(holding.marketValue)}</b><small>({formatInr(holding.averagePrice * holding.quantity)})</small></span>
                   <span className="holding-return"><b className={holding.unrealizedPnl >= 0 ? "positive" : "negative"}>{holding.unrealizedPnl >= 0 ? "+" : ""}{formatInr(holding.unrealizedPnl)}</b><small className={holdingReturnPercent >= 0 ? "positive" : "negative"}>{holdingReturnPercent >= 0 ? "+" : ""}{holdingReturnPercent.toFixed(2)}% · fees {formatInr(exitCharges)}</small></span>
                   <button className="holding-sell" onClick={() => openHoldingSell(holding.symbol, holding.quantity)}>Sell</button>
