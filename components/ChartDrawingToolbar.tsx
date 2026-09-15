@@ -1,49 +1,21 @@
 "use client";
 
 import {
-  ArrowUpRight,
-  BoxSelect,
-  Brush,
   ChevronLeft,
   ChevronRight,
   Eye,
   EyeOff,
-  FlipHorizontal2,
   Layers3,
   Lock,
   LockOpen,
   Magnet,
   MousePointer2,
-  MoveDiagonal2,
-  MoveVertical,
-  Radio,
   Redo2,
-  Ruler,
-  Target,
   Trash2,
-  TrendingDown,
-  TrendingUp,
   Undo2,
-  type LucideIcon,
 } from "lucide-react";
-import type { DrawingTool } from "@/components/MarketChart";
-
-const primaryDrawingTools: { id: DrawingTool; label: string; icon: LucideIcon }[] = [
-  { id: "cursor", label: "Cursor", icon: MousePointer2 },
-  { id: "trend-line", label: "Trend line", icon: TrendingUp },
-  { id: "extended-line", label: "Extended line", icon: MoveDiagonal2 },
-  { id: "ray", label: "Diagonal ray", icon: ArrowUpRight },
-  { id: "horizontal-line", label: "Horizontal line", icon: Radio },
-  { id: "horizontal-ray", label: "Horizontal ray", icon: MoveVertical },
-  { id: "vertical-line", label: "Vertical line", icon: FlipHorizontal2 },
-  { id: "parallel-channel", label: "Parallel channel", icon: Brush },
-  { id: "brush", label: "Brush", icon: Brush },
-  { id: "rectangle", label: "Rectangle + mid", icon: BoxSelect },
-  { id: "fib-retracement", label: "Fibonacci", icon: Target },
-  { id: "price-range", label: "Price range", icon: Ruler },
-  { id: "long-position", label: "Long position", icon: TrendingUp },
-  { id: "short-position", label: "Short position", icon: TrendingDown },
-];
+import { DRAWING_TOOL_CATALOG, type DrawingTool } from "@/components/MarketChart";
+import { DrawingToolIcon, QUICK_DRAWING_TOOLS } from "./DrawingToolIcons";
 
 export function ChartDrawingToolbar({
   activeTool,
@@ -82,10 +54,11 @@ export function ChartDrawingToolbar({
     <div className={`drawing-toolbar ${collapsed ? "collapsed" : ""} ${className}`.trim()} aria-label="Drawing tools">
       {onToggleCollapsed && <button className="drawing-toolbar-toggle" onClick={onToggleCollapsed} aria-label={collapsed ? "Show drawing toolbar" : "Hide drawing toolbar"} title={collapsed ? "Show tools" : "Hide tools"}>{collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>}
       {!collapsed && <>
-        {primaryDrawingTools.map(({ id, label, icon: Icon }) => (
-          <button key={id} className={activeTool === id ? "active" : ""} onClick={() => onSelect(id)} aria-label={label} title={label}><Icon size={18} /></button>
+        <button className={activeTool === "cursor" ? "active" : ""} onClick={() => onSelect("cursor")} aria-label="Cursor" title="Cursor"><MousePointer2 size={18} /></button>
+        {QUICK_DRAWING_TOOLS.map(({ id, label }) => (
+          <button key={id} className={activeTool === id ? "active" : ""} onClick={() => onSelect(id)} aria-label={label} title={label} aria-pressed={activeTool === id}><DrawingToolIcon tool={id} /></button>
         ))}
-        <button className="all-drawing-tools" onClick={onAllTools} aria-label="All 67 drawing tools" title="All 67 drawing tools"><Layers3 size={18} /><small>67</small></button>
+        <button className="all-drawing-tools" onClick={onAllTools} aria-label={`All ${DRAWING_TOOL_CATALOG.length} drawing tools`} title="Full drawing tools library"><Layers3 size={18} /><small>{DRAWING_TOOL_CATALOG.length}</small></button>
         <span />
         <button className={magnet ? "active" : ""} onClick={onToggleMagnet} aria-label="Magnet" title="Magnet"><Magnet size={18} /></button>
         <button onClick={onUndo} aria-label="Undo drawing" title="Undo drawing"><Undo2 size={18} /></button>

@@ -1,6 +1,7 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
+import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -18,7 +19,6 @@ import type {
   DrawingStyle,
   IDrawing,
   SerializedDrawing,
-  ToolRegistry,
 } from "lightweight-charts-drawing";
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
 import { openUpstoxLiveFeed, type UpstoxLiveTick } from "@/lib/upstox-live-feed";
@@ -64,6 +64,7 @@ export const DRAWING_TOOL_CATALOG = [
   { id: "bars-pattern", label: "Bars Pattern", category: "Trading", anchors: 3 },
   { id: "projection", label: "Projection", category: "Trading", anchors: 3 },
   { id: "price-range", label: "Price Range", category: "Measurement", anchors: 2 },
+  { id: "volume-profile", label: "Fixed-range Volume Profile", category: "Measurement", anchors: 2 },
   { id: "date-range", label: "Date Range", category: "Measurement", anchors: 2 },
   { id: "date-price-range", label: "Date and Price Range", category: "Measurement", anchors: 2 },
   { id: "rectangle", label: "Rectangle", category: "Shapes", anchors: 2 },
@@ -217,6 +218,7 @@ const DEFAULT_DRAWING_STYLE: Partial<DrawingStyle> = {
 };
 
 function toolStyle(tool: DrawingToolId): Partial<DrawingStyle> {
+  if (tool === "volume-profile") return { ...DEFAULT_DRAWING_STYLE, fillColor: "rgba(102,87,238,.28)" };
   if (tool === "long-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#00a67e", fillColor: "rgba(0, 166, 126, .12)" };
   if (tool === "short-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#f04458", fillColor: "rgba(240, 68, 88, .12)" };
   if (tool === "highlighter") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#f5b800", fillColor: "rgba(245, 184, 0, .22)" };
@@ -224,6 +226,10 @@ function toolStyle(tool: DrawingToolId): Partial<DrawingStyle> {
 }
 
 function toolOptions(tool: DrawingToolId) {
+  if (tool === "trend-line") return { visible: true, locked: false, extendRight: true };
+  if (tool === "rectangle") return { visible: true, locked: false, filled: true };
+  if (tool === "parallel-channel") return { visible: true, locked: false, filled: true, showMiddleLine: true, extendLines: true };
+  if (tool === "fib-retracement") return { visible: true, locked: false, levels: [0, .5, .618, .705, .786, 1, 1.618, 2.618], showPrices: false, showPercentages: false, extendLines: false, reverseDirection: true };
   if (tool.startsWith("fib-")) {
     return { visible: true, locked: false, showPrices: false, showPercentages: true, showLabels: true };
   }
@@ -529,7 +535,7 @@ export function MarketChart({
   const macdHistogramSeries = useRef<ISeriesApi<"Histogram"> | null>(null);
   const macdPaneIndexRef = useRef(1);
   const drawingManager = useRef<DrawingManager | null>(null);
-  const drawingRegistry = useRef<ToolRegistry | null>(null);
+  const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
   const editRef = useRef<DrawingEdit | null>(null);
   const activeToolRef = useRef(activeTool);
@@ -539,6 +545,7 @@ export function MarketChart({
   const [initialData] = useState<Candle[]>(() => replayCandles ?? []);
   const dataRef = useRef<Candle[]>(initialData);
   const storedDrawingsRef = useRef<SerializedDrawing[]>([]);
+  const replayDrawingsRef = useRef<{ scope: string; snapshot: SerializedDrawing[] } | null>(null);
   const historyRef = useRef<SerializedDrawing[][]>([]);
   const redoRef = useRef<SerializedDrawing[][]>([]);
   const restoringRef = useRef(false);
@@ -582,6 +589,8 @@ export function MarketChart({
   const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; count: number } | null>(null);
   const [riskCoordinates, setRiskCoordinates] = useState<{ entry: number | null; target: number | null; stopLoss: number | null } | null>(null);
   const [tradeMarkerCoordinates, setTradeMarkerCoordinates] = useState<Array<ChartTradeMarker & { x: number; y: number; direction: "up" | "down" }>>([]);
 
@@ -993,6 +1002,7 @@ export function MarketChart({
     if (!manager || restoringRef.current) return;
     const snapshot = manager.exportDrawings();
     storedDrawingsRef.current = snapshot;
+    if (isReplay) replayDrawingsRef.current = { scope: storageKeyRef.current, snapshot };
     if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     if (pushHistory) {
       const previous = historyRef.current.at(-1);
@@ -1020,6 +1030,7 @@ export function MarketChart({
     restoringRef.current = false;
     if (persist) {
       storedDrawingsRef.current = snapshot;
+      if (isReplay) replayDrawingsRef.current = { scope: storageKeyRef.current, snapshot };
       if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     }
   }
@@ -1383,9 +1394,10 @@ export function MarketChart({
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
       drawingManager.current = manager;
-      drawingRegistry.current = drawing.getToolRegistry();
-      storageKeyRef.current = drawingStorageKey(instrument);
-      const stored = isReplay ? [] : readStoredDrawings(storageKeyRef.current, legacyDrawingStorageKey(instrument, timeframe));
+      drawingRegistry.current = createChartDrawingRegistry(drawing, () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })));
+      const drawingScope = drawingStorageKey(instrument);
+      const stored = isReplay ? (replayDrawingsRef.current?.scope === drawingScope ? replayDrawingsRef.current.snapshot : []) : readStoredDrawings(drawingScope, legacyDrawingStorageKey(instrument, timeframe));
+      storageKeyRef.current = drawingScope;
       storedDrawingsRef.current = stored;
       if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
       restoreDrawings(projectDrawingsToCandles(stored, dataRef.current, timeframe), false);
@@ -1395,6 +1407,11 @@ export function MarketChart({
       manager.on("drawing:updated", () => persistDrawings(true));
       manager.on("drawing:removed", () => persistDrawings(true));
       manager.on("drawing:cleared", () => persistDrawings(true));
+      const syncSelectedDrawing = () => setSelectedDrawingId(manager?.getSelectedDrawing()?.id ?? null);
+      manager.on("drawing:selected", syncSelectedDrawing);
+      manager.on("drawing:deselected", syncSelectedDrawing);
+      manager.on("drawing:removed", syncSelectedDrawing);
+      manager.on("drawing:cleared", syncSelectedDrawing);
 
       const onPointerDown = (event: PointerEvent) => {
         const currentManager = drawingManager.current;
@@ -1464,7 +1481,8 @@ export function MarketChart({
           created.setState("editing");
           draft = { toolType: selectedTool, requiredAnchors, confirmed: [anchor], drawing: created, continuous, pointerId: continuous ? event.pointerId : null };
           draftRef.current = draft;
-          if (continuous) host.setPointerCapture?.(event.pointerId);
+          host.setPointerCapture?.(event.pointerId);
+          if (!continuous && requiredAnchors > 1) drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, count: 1 };
           if (requiredAnchors === 1) finishDraft();
         } else if (!continuous) {
           draft.confirmed.push(anchor);
@@ -1523,6 +1541,22 @@ export function MarketChart({
 
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
+        const gesture = drawingGestureRef.current;
+        drawingGestureRef.current = null;
+        if (event.type === "pointercancel") {
+          if (draftRef.current) cancelDraft();
+          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
+          chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
+          return;
+        }
+        const dragged = draftRef.current;
+        if (gesture?.pointerId === event.pointerId && dragged && !dragged.continuous && dragged.confirmed.length === gesture.count && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) {
+          const anchor = pointerAnchor(event, true);
+          if (anchor) { dragged.confirmed.push(anchor); updateDraftPreview(anchor); if (dragged.confirmed.length >= dragged.requiredAnchors) finishDraft(); }
+          host.releasePointerCapture?.(event.pointerId);
+          event.preventDefault();
+          return;
+        }
         const tap = tapGestureRef.current;
         tapGestureRef.current = null;
         if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) onChartTapRef.current?.();
@@ -1985,6 +2019,10 @@ export function MarketChart({
           </div>
         )}
         {placementHint && <div className="chart-placement-hint">{placementHint}</div>}
+        {selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
+          <button type="button" aria-label="Delete selected drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}>Delete drawing</button>
+          <button type="button" onClick={() => drawingManager.current?.deselectAll()}>Done</button>
+        </div>}
         {onOrderSide && (
           <div className="chart-quick-order-buttons" aria-label="Paper trade controls">
             <button className={`chart-sell-button ${orderTool?.enabled && orderTool.side === "SELL" ? "active" : ""}`} onClick={() => onOrderSide("SELL")}><span>Sell</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>

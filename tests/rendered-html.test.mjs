@@ -149,7 +149,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
-  assert.match(chartToolbar, /Fibonacci/);
+  assert.match(chartToolbar, /QUICK_DRAWING_TOOLS/);
+  const drawingShortcuts = await readFile(new URL("../components/DrawingToolIcons.tsx", import.meta.url), "utf8");
+  assert.match(drawingShortcuts, /Fibonacci/);
+  assert.match(drawingShortcuts, /volume-profile/);
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("lightweight-charts"\)/);
   assert.match(chart, /attributionLogo: true/);
@@ -296,7 +299,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(market, /function supertrend/);
   assert.match(market, /function classicPivotPoints/);
   const catalogSource = chart.slice(chart.indexOf("export const DRAWING_TOOL_CATALOG"), chart.indexOf("] as const;"));
-  assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 67);
+  assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 68);
   assert.match(chart, /api\/upstox\/candles/);
   assert.doesNotMatch(chart, /generateCandles/);
   assert.match(chart, /No simulation · retrying/);

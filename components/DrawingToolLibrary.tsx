@@ -66,7 +66,7 @@ export function DrawingToolLibrary({
     <div className="drawing-library-backdrop" role="presentation" onPointerDown={onClose}>
       <section className="drawing-library" role="dialog" aria-modal="true" aria-label="All drawing tools" onPointerDown={(event) => event.stopPropagation()}>
         <header>
-          <div><PenTool size={18} /><span><b>Drawing tools</b><small>{DRAWING_TOOL_CATALOG.length} TradingView-compatible tools</small></span></div>
+          <div><PenTool size={18} /><span><b>Drawing tools</b><small>{DRAWING_TOOL_CATALOG.length} chart drawing tools</small></span></div>
           <button onClick={onClose} aria-label="Close drawing tools"><X size={18} /></button>
         </header>
         <label className="drawing-library-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search lines, Fibonacci, Gann, shapes…" /></label>
