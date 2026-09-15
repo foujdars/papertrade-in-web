@@ -4,6 +4,7 @@ import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-l
 import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
 import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
+import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -11,6 +12,7 @@ import type {
   IChartApi,
   ISeriesApi,
   MouseEventParams,
+  Logical,
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
@@ -369,6 +371,7 @@ function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle
     ...item,
     anchors: item.anchors.map((anchor) => {
       const timestamp = timeToTimestamp(anchor.time);
+      if(timestamp<Number(candleTimes[0])||timestamp>Number(candleTimes.at(-1)))return anchor;
       let nearest = candleTimes[0];
       let distance = Math.abs(nearest - timestamp);
       for (let index = 1; index < candleTimes.length; index += 1) {
@@ -521,6 +524,7 @@ export function MarketChart({
   const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
   const chartHost = useRef<HTMLDivElement>(null);
+  const drawingCrosshairRef = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const ema5Series = useRef<ISeriesApi<"Line"> | null>(null);
@@ -695,6 +699,7 @@ export function MarketChart({
   function scheduleOverlayRefresh() {
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
+      refreshDrawingCrosshair();
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
@@ -1086,10 +1091,23 @@ export function MarketChart({
     const time = scale.coordinateToTime(x);
     if (time !== null) return time;
     const logical = scale.coordinateToLogical(x), bars = dataRef.current;
-    if (logical === null || bars.length < 2) return null;
-    const index = Math.round(Number(logical)), first = Number(bars[0].time), last = Number(bars.at(-1)!.time);
-    const step = (last - first) / (bars.length - 1);
-    return chartTimeFromEpoch(index < 0 ? first + index * step : last + (index - bars.length + 1) * step, timeframe);
+    if (logical === null || !bars.length) return null;
+    const epoch=drawingTimeAtLogical(Number(logical),bars.map(c=>Number(c.time)));
+    return epoch===null?null:chartTimeFromEpoch(epoch,timeframe);
+  }
+
+  function refreshDrawingCrosshair() {
+    const element=drawingCrosshairRef.current,chart=chartApi.current,series=candleSeries.current,anchor=drawingAimRef.current;
+    if(!element)return;
+    const tool=normalizeTool(activeToolRef.current);
+    if(!chart||!series||!anchor||!tool||CONTINUOUS_TOOLS.has(tool)){element.hidden=true;return;}
+    const logical=drawingLogicalAtTime(Number(anchor.time),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
+    const x=chart.timeScale().timeToCoordinate(anchor.time)??(logical===null?null:chart.timeScale().logicalToCoordinate(logical as Logical));
+    const y=series.priceToCoordinate(anchor.price),height=chart.panes()[0]?.getHeight()??0,width=chart.timeScale().width();
+    element.hidden=x===null||y===null||x<0||x>width||y<0||y>height;
+    if(element.hidden)return;
+    element.style.width=`${width}px`;element.style.height=`${height}px`;
+    element.style.setProperty("--aim-x",`${x}px`);element.style.setProperty("--aim-y",`${y}px`);
   }
 
   function updateDraftPreview(anchor: Anchor) {
@@ -1112,6 +1130,7 @@ export function MarketChart({
     activeToolRef.current = "cursor";
     drawingManager.current?.setActiveTool("pointer-controlled");
     drawingAimRef.current = null;
+    refreshDrawingCrosshair();
     chartApi.current?.clearCrosshairPosition();
     chartApi.current?.applyOptions(chartInteractionOptions(true, preservePageScroll));
     chartHost.current?.classList.remove("is-drawing");
@@ -1239,6 +1258,8 @@ export function MarketChart({
     const centerPrice = chart ? candleSeries.current?.coordinateToPrice((chart.panes()[0]?.getHeight() ?? 0) / 2) : null;
     drawingAimRef.current = pointTool ? lastCrosshairAnchorRef.current ?? (centerTime !== null && centerPrice != null ? { time: centerTime, price: centerPrice } : null) : null;
     if (drawingAimRef.current && candleSeries.current) chart?.setCrosshairPosition(drawingAimRef.current.price, drawingAimRef.current.time, candleSeries.current);
+    chart?.applyOptions({crosshair:{vertLine:{visible:!pointTool},horzLine:{visible:!pointTool}}});
+    refreshDrawingCrosshair();
     const hint = definition ? `${definition.label} · drag crosshair, tap anywhere to confirm` : drawingType ? "Drag crosshair · tap anywhere to confirm" : "";
     const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
     return () => window.clearTimeout(hintTimer);
@@ -1476,6 +1497,7 @@ export function MarketChart({
         drawingAimRef.current = anchor;
         lastCrosshairAnchorRef.current = anchor;
         chart.setCrosshairPosition(anchor.price, anchor.time, series);
+        refreshDrawingCrosshair();
         updateDraftPreview(anchor);
       };
       const commitOrEdit = (event: PointerEvent, aimedAnchor?: Anchor) => {
@@ -1511,7 +1533,7 @@ export function MarketChart({
             drawing: hit,
             pointerId: event.pointerId,
             startX: event.clientX,
-            originalPixels: hit.anchors.map(anchor => chartInstance.timeScale().timeToCoordinate(anchor.time)),
+            originalPixels: hit.anchors.map(anchor => hit.getViewport()?.timeScale.timeToCoordinate(anchor.time) ?? null),
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
@@ -2148,7 +2170,7 @@ export function MarketChart({
             {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
           </div>
         )}
-        {placementHint && <div className="chart-placement-hint">{placementHint}<button type="button" onClick={() => confirmDrawingPointRef.current?.()}>Place point at crosshair</button></div>}
+        <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
           <button type="button" aria-label="Delete selected drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}>Delete drawing</button>
           <button type="button" onClick={() => drawingManager.current?.deselectAll()}>Done</button>

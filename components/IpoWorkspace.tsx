@@ -2,7 +2,7 @@
 import { CandleLoader } from "./CandleLoader";
 
 import { Bell, Building2, Clock3, Rocket, Store } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
   IPO_ALERT_ENABLED_STORAGE_KEY,
@@ -153,8 +153,23 @@ export function IpoAlertMonitor() {
 }
 
 export function IpoWorkspace() {
+  const listRef=useRef<HTMLDivElement>(null);
+  const listReturn=useRef<{element:HTMLElement;top:number;focus:HTMLElement|null}[]>([]);
   const requestRef = useRef<AbortController | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const openDetail=(id:string)=>{
+    const saved:typeof listReturn.current=[];
+    for(let element:HTMLElement|null=listRef.current;element;element=element.parentElement) {
+      if(element.scrollHeight>element.clientHeight)saved.push({element,top:element.scrollTop,focus:document.activeElement instanceof HTMLElement?document.activeElement:null});
+    }
+    listReturn.current=saved;setSelectedId(id);
+  };
+  useLayoutEffect(()=>{
+    if(selectedId||!listReturn.current.length)return;
+    for(const saved of listReturn.current)if(saved.element.isConnected)saved.element.scrollTop=saved.top;
+    listReturn.current[0]?.focus?.focus({preventScroll:true});
+    listReturn.current=[];
+  },[selectedId]);
   const [now, setNow] = useState(() => new Date());
   const [board, setBoard] = useState<IpoBoard>("regular");
   const [filter, setFilter] = useState<IpoFilter>("open");
@@ -223,7 +238,7 @@ export function IpoWorkspace() {
   if (selectedIpo) return <IpoDetailView ipo={selectedIpo} stage={stageOf(selectedIpo)} directory={directory} onClose={() => setSelectedId(null)} />;
 
   return (
-    <div className="ipo-workspace">
+    <div className="ipo-workspace" ref={listRef}>
       <div className="ipo-board-tabs" role="group" aria-label="IPO market segment">
         <button type="button" className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => setBoard("regular")} title="Mainboard IPOs · NSE & BSE"><Building2 size={19} aria-hidden="true" /><b>Mainboard</b></button>
         <button type="button" className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => setBoard("sme")} title="SME IPOs · NSE Emerge & BSE SME"><Store size={19} aria-hidden="true" /><b>SME</b></button>
@@ -244,7 +259,7 @@ export function IpoWorkspace() {
       {error && <div className="scanner-inline-error ipo-error"><Bell size={16} /><span>{error}</span></div>}
 
       <div className="ipo-card-list">
-        {visibleIpos.map(ipo => <IpoLifecycleCard key={ipo.id} ipo={ipo} stage={stageOf(ipo)} directory={directory} onOpen={() => setSelectedId(ipo.id)} />)}
+        {visibleIpos.map(ipo => <IpoLifecycleCard key={ipo.id} ipo={ipo} stage={stageOf(ipo)} directory={directory} onOpen={() => openDetail(ipo.id)} />)}
         {loading && !visibleIpos.length && <CandleLoader label="Loading IPOs" />}
         {!loading && !error && !visibleIpos.length && <div className="positions-empty"><Rocket size={30} /><b>No {filter === "active" ? "active" : filter} {board === "regular" ? "Mainboard" : "SME"} IPOs</b><span>Try the other market segment or Upcoming. New issues appear automatically.</span></div>}
       </div>

@@ -2636,7 +2636,7 @@ export function TradingDashboard() {
             <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
             <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
-          <div className="chart-trade-footer permanent-trade-footer">
+          {activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">
               <button disabled={!marketOrdersAllowed} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
               <button disabled={!marketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
@@ -2645,7 +2645,7 @@ export function TradingDashboard() {
               <span>{selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
               <b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b>
             </button>
-          </div>
+          </div>}
         </section>
 
         {orderSheetOpen && <button className="order-sheet-backdrop" aria-label="Close paper order" onClick={() => setOrderSheetOpen(false)} />}

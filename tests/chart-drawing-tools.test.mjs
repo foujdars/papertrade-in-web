@@ -4,11 +4,40 @@ import * as drawing from 'lightweight-charts-drawing';
 import {buildVolumeProfile,volumeValueArea} from '../lib/volume-profile.ts';
 import {profilePeriod,profileFetchPlan,istSessionStart} from '../lib/profile-range.ts';
 import {createProfileDataClient} from '../lib/profile-data-client.ts';
+import {drawingLogicalAtTime,drawingTimeAtLogical} from '../lib/drawing-coordinates.ts';
 import {createChartDrawingRegistry} from '../lib/chart-drawing-tools.ts';
 import {holdingPerformance} from '../lib/holding-performance.ts';
 import {readFile} from 'node:fs/promises';
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
+
+test('drawing coordinate conversion remains reversible before, between and after candles',()=>{
+ const times=[100,200,500,600];
+ for(const logical of [-5,-.3,0,.4,1,2.5,3,4,20])assert.ok(Math.abs(drawingLogicalAtTime(drawingTimeAtLogical(logical,times),times)-logical)<1e-10);
+ assert.equal(drawingLogicalAtTime(3,[]),null);
+});
+
+test('all registered drawing factories resolve missing candle times through logical coordinates',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const entry of registry.getAll()){
+  const item=registry.createDrawing(entry.type,'qa',Array.from({length:Math.max(2,entry.requiredAnchors)},(_,i)=>({time:i+1,price:100+i*2})));
+  assert.ok(item,entry.type);
+  item.attached({chart:{timeScale:()=>({width:()=>400,timeToCoordinate:t=>t===1?0:t===2?100:null,logicalToCoordinate:l=>l*100,coordinateToTime:()=>null})},series:{priceToCoordinate:p=>600-p*4,coordinateToPrice:y=>(600-y)/4},requestUpdate:()=>{}});
+  const mapped=item.getViewport();
+  assert.equal(mapped.timeScale.timeToCoordinate(3),200,entry.type+' future');
+  assert.equal(mapped.timeScale.timeToCoordinate(0),-100,entry.type+' past');
+  assert.equal(mapped.timeScale.timeToCoordinate(1.5),50,entry.type+' between');
+ }
+});
+
+test('drawing mode uses a centre dot without a guidance banner and chart footer is scoped',async()=>{
+ const source=await readFile(new URL('../components/MarketChart.tsx',import.meta.url),'utf8');
+ assert.match(source,/className="drawing-crosshair"/);assert.doesNotMatch(source,/className="chart-placement-hint"/);
+ const dashboard=await readFile(new URL('../components/TradingDashboard.tsx',import.meta.url),'utf8');
+ assert.match(dashboard,/activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer"/);
+ const tools=await readFile(new URL('../lib/chart-drawing-tools.ts',import.meta.url),'utf8');
+ assert.doesNotMatch(tools,/fillRect\(x-offset/);
+});
 
 test('point confirmation snapshots the pinned crosshair, never the tap coordinates',async()=>{
  const source=await readFile(new URL('../components/MarketChart.tsx',import.meta.url),'utf8');

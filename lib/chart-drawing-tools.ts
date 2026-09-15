@@ -1,9 +1,10 @@
 import type { Anchor, DrawingOptions, DrawingStyle, Geometry, Point, Viewport } from "lightweight-charts-drawing";
-import type { IPrimitivePaneView } from "lightweight-charts";
+import type { IPrimitivePaneView, Logical } from "lightweight-charts";
 import { buildVolumeProfile, volumeValueArea, type VolumeCandle } from "./volume-profile.ts";
 import { istSessionStart } from "./profile-range.ts";
 import type { ProfileMode } from "./profile-range.ts";
 import type { ProfileData } from "./profile-data-client.ts";
+import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 const readableFont = () => "13px sans-serif";
 
 export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
@@ -14,7 +15,48 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     register(entry: Entry) { entries.set(entry.type, entry); },
     get(type: string) { return entries.get(type); },
     getAll() { return [...entries.values()]; },
-    createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) { return entries.get(type)?.factory(id, anchors, style, options) ?? null; },
+    createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
+      const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      const getViewport=item.getViewport.bind(item);
+      item.getViewport=()=>{
+        const viewport=getViewport();if(!viewport)return null;
+        const native=viewport.timeScale.timeToCoordinate;
+        return {...viewport,height:plotSize?.().height??viewport.height,timeScale:{...viewport.timeScale,timeToCoordinate:time=>{
+          const x=native(time);if(x!==null)return x;
+          const logical=drawingLogicalAtTime(Number(time),candles().map(c=>c.time));
+          return logical===null?null:viewport.timeScale.logicalToCoordinate(logical as Logical);
+        }}};
+      };
+      if(!["price-range","fib-retracement","volume-profile","anchored-volume-profile","session-volume-profile"].includes(type)) {
+        const nativeViews=item.paneViews.bind(item);
+        // Preserve specialized shapes (arrowheads, channels, risk/reward, etc.)
+        // while normalizing their canvas units and transparent label treatment.
+        item.paneViews=()=>nativeViews().map(view=>({zOrder:()=>view.zOrder?.()??"normal",renderer:()=>({draw:target=>target.useMediaCoordinateSpace(scope=>{
+          const viewport=item.getViewport();if(!viewport)return;
+          scope.context.save();scope.context.beginPath();scope.context.rect(0,0,viewport.width,viewport.height);scope.context.clip();
+          let labelBox=false;
+          const context=new Proxy(scope.context,{
+            get(ctx,key){
+              if(key==="beginPath")return ()=>{labelBox=false;ctx.beginPath();};
+              if(key==="roundRect")return (...args:Parameters<CanvasRenderingContext2D["roundRect"]>)=>{labelBox=true;ctx.roundRect(...args);};
+              if(key==="fill")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.fill,ctx,args);};
+              if(key==="fillText")return (text:string,x:number,y:number,maxWidth?:number)=>{
+                ctx.save();ctx.font=readableFont();
+                const width=Math.min(viewport.width-8,ctx.measureText(text).width),offset=ctx.textAlign==="center"?width/2:ctx.textAlign==="right"||ctx.textAlign==="end"?width:0;
+                const labelY=Math.max(15,Math.min(viewport.height-8,labelBox?y-10:y));
+                ctx.fillStyle=plotSize?.().dark?"#c4a2ff":item.style.lineColor;
+                ctx.fillText(text,Math.max(offset+4,Math.min(viewport.width-width+offset-4,x)),labelY,Math.min(maxWidth??Infinity,viewport.width-8));ctx.restore();
+              };
+              const value=Reflect.get(ctx,key);return typeof value==="function"?value.bind(ctx):value;
+            },
+            set(ctx,key,value){return Reflect.set(ctx,key,key==="font"?readableFont():value);},
+          });
+          view.renderer()?.draw({useBitmapCoordinateSpace:callback=>callback({context,horizontalPixelRatio:1,verticalPixelRatio:1,bitmapSize:scope.mediaSize,mediaSize:scope.mediaSize}),useMediaCoordinateSpace:callback=>callback({...scope,context})} as Parameters<NonNullable<ReturnType<IPrimitivePaneView["renderer"]>>["draw"]>[0]);
+          scope.context.restore();
+        })})}));
+      }
+      return item;
+    },
   };
 
   // Draw custom labels in CSS pixels, independent of the chart's backing-canvas ratio.
@@ -30,7 +72,6 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         const width=ctx.measureText(geometry.text).width;
         const offset=ctx.textAlign==="center"?width/2:ctx.textAlign==="right"?width:0;
         const x=Math.max(offset+3,Math.min(size.width-width+offset-3,geometry.position.x)),y=Math.max(15,Math.min(size.height-3,geometry.position.y));
-        ctx.fillStyle=plotSize?.().dark?"#0c142b":"#ffffff";ctx.fillRect(x-offset-2,y-14,width+4,15);
         ctx.fillStyle=geometry.color??item.style.lineColor;ctx.fillText(geometry.text,x,y);
       }
     }
