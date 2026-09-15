@@ -299,7 +299,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(market, /function supertrend/);
   assert.match(market, /function classicPivotPoints/);
   const catalogSource = chart.slice(chart.indexOf("export const DRAWING_TOOL_CATALOG"), chart.indexOf("] as const;"));
-  assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 68);
+  assert.equal((catalogSource.match(/\{ id:/g) ?? []).length, 70);
   assert.match(chart, /api\/upstox\/candles/);
   assert.doesNotMatch(chart, /generateCandles/);
   assert.match(chart, /No simulation · retrying/);

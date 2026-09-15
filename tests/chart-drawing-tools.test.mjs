@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as drawing from 'lightweight-charts-drawing';
-import {buildVolumeProfile} from '../lib/volume-profile.ts';
+import {buildVolumeProfile,volumeValueArea} from '../lib/volume-profile.ts';
+import {profilePeriod,profileFetchPlan,istSessionStart} from '../lib/profile-range.ts';
+import {createProfileDataClient} from '../lib/profile-data-client.ts';
 import {createChartDrawingRegistry} from '../lib/chart-drawing-tools.ts';
 import {holdingPerformance} from '../lib/holding-performance.ts';
 import {readFile} from 'node:fs/promises';
@@ -59,7 +61,7 @@ test('Fibonacci labels and direction survive saving and restoring',()=>{
  assert.ok(restored.computeGeometry(viewport).some(g=>g.type==='text'&&g.text==='0.705'));
 });
 
-test('right-docked profile stays inside the plot and conserves up/down candle volume',()=>{
+test('fixed-range profile is left placed at 30 percent width and conserves up/down candle volume',()=>{
  const data=[{...candles[0],open:102,close:108},{...candles[1],open:114,close:106}];
  const bins=buildVolumeProfile(data,1,2);
  assert.ok(Math.abs(bins.reduce((n,b)=>n+b.upVolume,0)-100)<1e-6);
@@ -68,9 +70,73 @@ test('right-docked profile stays inside the plot and conserves up/down candle vo
  const profile=registry.createDrawing('volume-profile','vp',[{time:1,price:100},{time:2,price:115}]);
  const bars=profile.computeGeometry(viewport).filter(g=>g.type==='polygon');
  assert.ok(bars.length>0);
- assert.equal(Math.max(...bars.flatMap(g=>g.points.map(p=>p.x))),308);
+ assert.equal(Math.min(...bars.flatMap(g=>g.points.map(p=>p.x))),100);
+ assert.equal(Math.max(...bars.flatMap(g=>g.points.map(p=>p.x))),130);
  assert.ok(bars.every(g=>g.points.every(p=>p.x>=0&&p.x<=308&&p.y>=0&&p.y<=450)));
  assert.ok(new Set(bars.map(g=>g.fill)).size>=2);
+});
+
+test('anchored and session profiles restore with one anchor and render at the plot right edge',()=>{
+ const modes=[];
+ const registry=createChartDrawingRegistry(drawing,()=>candles,()=>({width:310,height:450}),(_from,_to,mode)=>{modes.push(mode);return {candles,label:'1m volume'};});
+ for(const type of ['anchored-volume-profile','session-volume-profile']) {
+  assert.equal(registry.get(type).requiredAnchors,1);
+  const profile=registry.createDrawing(type,type,[{time:1,price:105}]);
+  const saved=profile.toJSON(),restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);
+  const bars=restored.computeGeometry(viewport).filter(g=>g.type==='polygon');
+  assert.equal(Math.max(...bars.flatMap(g=>g.points.map(p=>p.x))),308);
+  assert.equal(restored.clone('copy').type,type);
+ }
+ assert.deepEqual(modes,['anchored','session']);
+});
+
+test('profiles use 24 rows and value-area ties prefer the nearest row then above',()=>{
+ assert.equal(buildVolumeProfile(candles,1,2).length,24);
+ assert.deepEqual(volumeValueArea([10,20,40,20,10].map(volume=>({volume}))),{low:2,high:3,poc:2});
+ assert.deepEqual(volumeValueArea([]),{low:-1,high:-1,poc:-1});
+});
+
+test('daily fixed range includes both whole sessions while session mode isolates its chosen IST day',()=>{
+ const day=Date.parse('2026-09-15T00:00:00Z')/1000,previous=day-86400;
+ const fixed=profilePeriod(day,previous,'fixed',[previous,day],86400);
+ assert.equal(fixed.from,istSessionStart(previous));assert.equal(fixed.to,istSessionStart(day)+86399);
+ const session=profilePeriod(previous,day,'session',[previous,day],86400);
+ assert.deepEqual(session,{from:istSessionStart(previous),to:istSessionStart(previous)+86399});
+ const anchored=profilePeriod(previous,previous,'anchored',[previous,day],86400);
+ assert.deepEqual(anchored,fixed);
+ const intraday=profilePeriod(day,day+300,'fixed',[day,day+300,day+600],300);
+ assert.deepEqual(intraday,{from:day,to:day+599});
+});
+
+test('profile fetch planning uses one-minute session bars and bounded gap-free chunks',()=>{
+ const now=Date.parse('2026-09-15T10:00:00Z')/1000,start=istSessionStart(now);
+ assert.equal(profileFetchPlan(start,now,now).interval,1);
+ const plan=profileFetchPlan(start-364*86400,now,now);
+ assert.ok(plan.interval<=60);assert.ok(plan.chunks.length<=14);assert.ok(plan.includesToday);
+ for(let i=1;i<plan.chunks.length;i++)assert.equal(Date.parse(plan.chunks[i].from)-Date.parse(plan.chunks[i-1].to),86400000);
+ assert.throws(()=>profileFetchPlan(start-367*86400,now,now));
+ assert.throws(()=>profileFetchPlan(now+86400,now+90000,now));
+});
+
+test('profile periods respect calendar months and do not stretch intraday bars across gaps',()=>{
+ const february=Date.parse('2026-02-01T00:00:00Z')/1000;
+ assert.equal(profilePeriod(february,february,'fixed',[february],31*86400,'1M').to,Date.parse('2026-03-01T00:00:00+05:30')/1000-1);
+ assert.equal(profilePeriod(february,february,'fixed',[february,february+86400],300).to,february+299);
+});
+
+test('profile client debounces dragged anchors independently per drawing and cancels on disposal',async()=>{
+ const original=globalThis.fetch,calls=[];
+ globalThis.fetch=async url=>{calls.push(String(url));return {ok:true,json:async()=>({ok:true,candles,intervalMinutes:1})};};
+ const client=createProfileDataClient('NSE_EQ|TEST',()=>{});
+ try {
+  client.read(100,200,'first');client.read(110,200,'first');client.read(120,200,'first');
+  client.read(300,400,'second');
+  await new Promise(resolve=>setTimeout(resolve,480));
+  assert.equal(calls.length,2);assert.ok(calls.some(url=>url.includes('from=120')));
+  assert.equal(client.read(120,200,'first').candles,candles);
+  client.read(500,600,'first');client.dispose();await new Promise(resolve=>setTimeout(resolve,450));
+  assert.equal(calls.length,2);
+ } finally {client.dispose();globalThis.fetch=original;}
 });
 
 const today=Date.parse('2026-09-15T08:30:00Z');

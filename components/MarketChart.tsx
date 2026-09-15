@@ -2,6 +2,8 @@
 import { CandleLoader } from "./CandleLoader";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
 import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
+import { createProfileDataClient } from "@/lib/profile-data-client";
+import { profilePeriod } from "@/lib/profile-range";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
@@ -65,6 +67,8 @@ export const DRAWING_TOOL_CATALOG = [
   { id: "projection", label: "Projection", category: "Trading", anchors: 3 },
   { id: "price-range", label: "Price Range", category: "Measurement", anchors: 2 },
   { id: "volume-profile", label: "Fixed-range Volume Profile", category: "Measurement", anchors: 2 },
+  { id: "anchored-volume-profile", label: "Anchored Volume Profile", category: "Measurement", anchors: 1 },
+  { id: "session-volume-profile", label: "Session Volume Profile", category: "Measurement", anchors: 1 },
   { id: "date-range", label: "Date Range", category: "Measurement", anchors: 2 },
   { id: "date-price-range", label: "Date and Price Range", category: "Measurement", anchors: 2 },
   { id: "rectangle", label: "Rectangle", category: "Shapes", anchors: 2 },
@@ -217,7 +221,7 @@ const DEFAULT_DRAWING_STYLE: Partial<DrawingStyle> = {
   fillOpacity: 0.1,
   showLabels: true,
   labelColor: "#6657ee",
-  labelFont: "11px Inter, sans-serif",
+  labelFont: "13px Inter, sans-serif",
 };
 
 function toolStyle(tool: DrawingToolId): Partial<DrawingStyle> {
@@ -1027,7 +1031,7 @@ export function MarketChart({
     restoringRef.current = true;
     manager.clearAll();
     for (const item of snapshot) {
-      const drawing = registry.createDrawing(item.type, item.id, item.anchors, item.style, item.options);
+      const drawing = registry.createDrawing(item.type, item.id, item.anchors, { ...item.style, labelFont: "13px Inter, sans-serif" }, item.options);
       if (drawing) {
         drawing.updateOptions({ ...item.options, visible: !hiddenRef.current, locked: lockedRef.current });
         manager.addDrawing(drawing);
@@ -1316,6 +1320,8 @@ export function MarketChart({
     let crosshairMove: ((event: MouseEventParams<Time>) => void) | null = null;
     let replayClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
+    let profileClient: ReturnType<typeof createProfileDataClient> | undefined;
+    let profileRefresh: ReturnType<typeof setInterval> | undefined;
 
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
       if (cancelled) return;
@@ -1428,7 +1434,22 @@ export function MarketChart({
       manager.attach(chart, series, host);
       drawingManager.current = manager;
       manager.setActiveTool("pointer-controlled");
-      drawingRegistry.current = createChartDrawingRegistry(drawing, () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })), () => ({ width: chart.timeScale().width(), height: chart.panes()[0]?.getHeight() ?? host.clientHeight }));
+      const refreshProfiles = () => {
+        for (const item of manager?.getAllDrawings() ?? []) if (item.type.endsWith("volume-profile")) item.updateOptions({});
+      };
+      profileClient = createProfileDataClient(instrument.instrumentKey, refreshProfiles);
+      profileRefresh = setInterval(refreshProfiles, 60000);
+      drawingRegistry.current = createChartDrawingRegistry(drawing,
+        () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })),
+        () => ({ width: chart.timeScale().width(), height: chart.panes()[0]?.getHeight() ?? host.clientHeight, dark: neon }),
+        (from, to, mode, id) => {
+          const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
+          const interval = LIVE_TIMEFRAME_SECONDS[timeframe] ?? ({ "1D":86400, "1W":604800, "1M":2678400, "1Y":31622400 }[timeframe] ?? 86400);
+          const period = profilePeriod(from-shift, to-shift, mode, dataRef.current.map(c => Number(c.time)), interval, timeframe);
+          if (isReplay) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} replay volume · estimated distribution` };
+          // Profiles are independent of the quote feed: no profile candle can change a fill price.
+          return profileClient!.read(period.from, Math.min(period.to, Math.floor(Date.now()/60000)*60), id);
+        });
       const drawingScope = drawingStorageKey(instrument);
       const stored = isReplay ? (replayDrawingsRef.current?.scope === drawingScope ? replayDrawingsRef.current.snapshot : []) : readStoredDrawings(drawingScope, legacyDrawingStorageKey(instrument, timeframe));
       storageKeyRef.current = drawingScope;
@@ -1761,6 +1782,8 @@ export function MarketChart({
 
     return () => {
       cancelled = true;
+      profileClient?.dispose();
+      clearInterval(profileRefresh);
       observer?.disconnect();
       window.cancelAnimationFrame(resizeFrame);
       if (resizeChart) {

@@ -38,12 +38,22 @@
 .terminal-shell .chart-placement-hint { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: calc(100% - 16px); pointer-events: auto; font-size: 11px; }
 .terminal-shell .chart-placement-hint button { border: 1px solid var(--purple); background: var(--surface); color: var(--purple); border-radius: 7px; padding: 6px 9px; min-height: 32px; cursor: pointer; }
 @media (max-width: 760px) {
-  .terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 74px; }
-  .terminal-shell .chart-area:has(.permanent-trade-footer .market-closed-note) { padding-bottom: 94px; }
-  .terminal-shell .permanent-trade-footer { position: fixed; z-index: 85; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); height: 74px; min-height: 74px; padding: 4px 10px 6px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); }
-  .terminal-shell .permanent-trade-footer:has(.market-closed-note) { height: 94px; min-height: 94px; }
+  .terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 58px; height: calc(100svh - var(--mobile-header-height) - 56px); }
+  .terminal-shell .permanent-trade-footer { position: fixed; z-index: 85; left: 0; right: 0; bottom: 56px; height: 58px; min-height: 58px; padding: 2px 8px 4px; display: flex; flex-direction: column; gap: 2px; background: var(--surface); }
   .terminal-shell .permanent-trade-footer .chart-positions-trigger { order: -1; min-height: 14px; }
   .terminal-shell .permanent-trade-footer .chart-trade-buttons { width: 100%; flex: none; }
-  .terminal-shell .permanent-trade-footer .chart-trade-buttons button { height: 40px; }
-  .terminal-shell .permanent-trade-footer .market-closed-note { order: -2; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .terminal-shell .permanent-trade-footer .chart-trade-buttons button { height: 36px; border-radius: 9px; font-size: 12px; }
+  .terminal-shell .trade-cockpit .instrument-header { min-height: 52px; height: 52px; padding: 3px 8px; gap: 5px; align-items: center; }
+  .terminal-shell .trade-identity-cluster { gap: 1px; }
+  .terminal-shell .trade-context-line { height: 13px; }
+  .terminal-shell .trade-feed-chip { height: 13px; font-size: 7px; padding-inline: 4px; }
+  .terminal-shell .trade-identity-cluster .trade-symbol-trigger p { display: none; }
+  .terminal-shell .trade-identity-cluster .trade-symbol-trigger .title-line h1 { font-size: 16px; max-width: min(29vw, 160px); }
+  .terminal-shell .trade-cockpit .quote-block { padding: 0; min-width: 86px; flex-shrink: 0; }
+  .terminal-shell .trade-symbol-picker :is(.chart-watchlist-star, .chart-replay-link, .chart-derivatives-link) { width: 28px; height: 32px; min-width: 28px; }
+  .terminal-shell .trade-cockpit .chart-controls { height: 34px; flex-basis: 34px; padding-block: 1px 3px; }
+  .terminal-shell .trade-cockpit .chart-controls .compact-selector-trigger { height: 30px; min-height: 30px; }
+  .terminal-shell .chart-statusbar { min-height: 18px; }
+  .terminal-shell .chart-area > .chart-body .price-chart-wrap { min-height: 0; }
+  .terminal-shell .chart-selected-drawing { max-width: calc(100% - 16px); top: 48px; }
 }
