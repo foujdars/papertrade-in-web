@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeSmc } from '../lib/smc-learner.ts';
+import { analyzeSmc, untouchedSmcMarks, SMC_ZONE_COLOURS } from '../lib/smc-learner.ts';
 import { applyCandleTick, liveCandleBucket, reconcileLiveCandles, validCandleTick } from '../lib/live-candles.ts';
 
 const at = Date.parse('2026-09-16T10:08:01+05:30');
@@ -43,6 +43,19 @@ test('NSE boundaries do not invent pre/post-session candles',()=>{
   assert.equal(liveCandleBucket(at,'1D'),Date.parse('2026-09-16T00:00:00+05:30')/1000);
 });
 const t=Date.parse('2026-09-16T09:15:00+05:30')/1000;
+test('only untouched zones remain; live wick retests hide all three zone types immediately',()=>{
+  for(const kind of ['FVG','OB','Breaker']) for(const direction of ['bullish','bearish']) {
+    const zone={id:'z',kind,direction,origin:1,confirmed:2,low:100,high:105,status:'active'};
+    assert.equal(untouchedSmcMarks([zone]).length,1);
+    for(const status of ['touched','filled','invalidated']) assert.equal(untouchedSmcMarks([{...zone,status}]).length,0);
+    const live={time:3,open:110,high:112,low:104,close:110,volume:0};
+    assert.equal(untouchedSmcMarks([zone],live).length,0);
+    assert.equal(untouchedSmcMarks([zone],{...live,time:2}).length,1);
+    assert.equal(untouchedSmcMarks([zone],{...live,low:direction==='bullish'?106:90,high:direction==='bullish'?110:99}).length,1);
+  }
+  assert.equal(new Set(Object.values(SMC_ZONE_COLOURS)).size,3);
+  assert.equal(untouchedSmcMarks([{kind:'CHoCH',status:'confirmed'}]).length,1);
+});
 const b=(i,o,h,l,c)=>({time:t+i*300,open:o,high:h,low:l,close:c,volume:100});
 test('FVG is formed only after its third candle; retest and full fill differ',()=>{
   const bars=[b(0,100,102,99,101),b(1,101,108,100,107),b(2,107,110,105,109)];

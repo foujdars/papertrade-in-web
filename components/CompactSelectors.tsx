@@ -64,5 +64,5 @@ export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onCl
 }
 
 export function CompactSelectorButton({ label, value, onClick, className = "" }: { label: string; value: string; onClick: () => void; className?: string }) {
-  return <button className={`compact-selector-trigger ${className}`} onClick={onClick} aria-haspopup="dialog"><span><small>{label}</small><b>{value}</b></span><ChevronDown size={15} /></button>;
+  return <button className={`compact-selector-trigger ${className}`} onClick={onClick} aria-label={`${label}: ${value}`} aria-haspopup="dialog"><span><small>{label}</small><b>{value}</b></span><ChevronDown size={15} /></button>;
 }

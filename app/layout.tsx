@@ -20,6 +20,7 @@ import "./refinements.css";
 import "./polish.css";
 import "./notifications.css";
 import "./launch-screen.css";
+import "./chart-focus.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

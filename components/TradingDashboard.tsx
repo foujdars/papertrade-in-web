@@ -12,7 +12,7 @@ import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 
 import {
-  Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, History,
+  Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X,
@@ -2559,7 +2559,7 @@ export function TradingDashboard() {
                 >
                   <Link2 size={19} />
                 </button>}
-                <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><History size={18} /></button>
+                <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={18} /></button>
                 {showTradeSymbols && (
                   <div className="trade-symbol-menu">
                     <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
@@ -2596,7 +2596,7 @@ export function TradingDashboard() {
               </button>
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
               {selectedFnoUnderlying && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
-              <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><History size={17} /></button>
+              <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={17} /></button>
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
                 <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search all NSE symbols" /></label>
                 <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
@@ -3039,7 +3039,7 @@ export function TradingDashboard() {
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
-                          <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><History size={17} /></button>
+                          <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><StepBack size={17} /></button>
                           <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => chooseTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
                         </div>
                         <div className="pnl-trade-review-body">

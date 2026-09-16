@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { Check, Trash2 } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
@@ -2151,8 +2152,8 @@ export function MarketChart({
         )}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
-          <button type="button" aria-label="Delete selected drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}>Delete drawing</button>
-          <button type="button" onClick={() => drawingManager.current?.deselectAll()}>Done</button>
+          <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
+          <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
         </div>}
         {onOrderSide && (
           <div className="chart-quick-order-buttons" aria-label="Paper trade controls">

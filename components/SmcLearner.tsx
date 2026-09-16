@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "rea
 import { createPortal } from "react-dom";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
-import { analyzeSmc, isSmcZone, SMC_LESSONS, type SmcKind, type SmcMark } from "@/lib/smc-learner";
+import { analyzeSmc, isSmcZone, untouchedSmcMarks, SMC_ZONE_COLOURS, SMC_LESSONS, type SmcKind, type SmcMark } from "@/lib/smc-learner";
 import { useTransientBack } from "./useTransientBack";
 
 const groups: Record<string, SmcKind[]> = {
@@ -21,7 +21,6 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
   const [selected, setSelected] = useState<string | null>(null);
   const [lesson, setLesson] = useState<SmcKind>("FVG");
   const [filters, setFilters] = useState(Object.keys(groups));
-  const [history, setHistory] = useState(false);
   const [rangeVisible, setRangeVisible] = useState(false);
   const [, redraw] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -56,7 +55,7 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
     return result;
   }, [candles, timeframe, replay]);
   const allowed = new Set(filters.flatMap(group => groups[group]));
-  const relevant = analysis.marks.filter(m => allowed.has(m.kind) && (history || !m.end));
+  const relevant = untouchedSmcMarks(analysis.marks, replay ? undefined : candles.at(-1)).filter(m => allowed.has(m.kind));
   const recent = [...relevant].sort((a, b) => b.confirmed - a.confirmed).slice(0, 30);
   const focused = analysis.marks.find(m => m.id === selected);
   const enabledKinds = Object.keys(SMC_LESSONS) as SmcKind[];
@@ -82,18 +81,29 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
       {shapes.map(({ mark: m, left, right, top, bottom }) => {
         const colour = m.direction === "bullish" ? (dark ? "#44dfc0" : "#00856b") : (dark ? "#ff91aa" : "#c12d54");
         const zone = isSmcZone(m);
+        if (zone) {
+          const fill = SMC_ZONE_COLOURS[m.kind as keyof typeof SMC_ZONE_COLOURS];
+          const arrowX = Math.max(left + 4, right - 12);
+          const arrowY = Math.max(10, Math.min(pane.height - 10, (top + bottom) / 2));
+          const bull = m.direction === "bullish";
+          return <g key={m.id} data-smc-zone={m.kind} data-smc-direction={m.direction}>
+            <rect x={left} y={top} width={Math.max(2, right - left)} height={Math.max(2, bottom - top)} fill={fill} fillOpacity={dark ? ".28" : ".24"} stroke="none" />
+            <path d={bull ? `M${arrowX} ${arrowY - 5}l-5 9h10z` : `M${arrowX} ${arrowY + 5}l-5 -9h10z`} fill={bull ? (dark ? "#44dfc0" : "#009b7c") : (dark ? "#ff83ad" : "#e53572")} stroke="none" />
+          </g>;
+        }
         let labelY = Math.max(86, Math.min(pane.height - 12, top - 5));
         let attempts = 0;
         while (occupied.some(v => Math.abs(v - labelY) < 16) && attempts++ < 5) labelY += 16;
         const labelVisible = attempts <= 5 && labelY < pane.height - 10;
         if (labelVisible) occupied.push(labelY);
-        const label = `${m.kind}${m.status === "touched" ? " · retest" : m.end ? ` · ${m.status}` : ""}`;
+        const label = m.kind;
         return <g key={m.id} opacity={m.end ? .5 : 1}>
-          {zone ? <rect x={left} y={top} width={Math.max(2, right - left)} height={Math.max(2, bottom - top)} fill={colour} fillOpacity=".09" stroke={colour} strokeWidth={1} strokeDasharray={m.kind === "Breaker" ? "5 3" : undefined}/> : <path d={`M${Math.max(0, x(m.origin) ?? left)} ${top}H${right}`} stroke={colour} strokeDasharray={m.kind === "Sweep" ? "2 3" : "6 3"}/>}
+          <path d={`M${Math.max(0, x(m.origin) ?? left)} ${top}H${right}`} stroke={colour} strokeDasharray={m.kind === "Sweep" ? "2 3" : "6 3"}/>
           {labelVisible && <text x={Math.min(Math.max(left + 3, 4), Math.max(4, pane.width - label.length * 7))} y={labelY} fill={colour}>{label}</text>}
         </g>;
       })}
     </svg>
+    <div className="smc-zone-key" aria-label="SMC zone colours"><span><i style={{ background: SMC_ZONE_COLOURS.OB }}/>OB</span><span><i style={{ background: SMC_ZONE_COLOURS.FVG }}/>FVG</span><span><i style={{ background: SMC_ZONE_COLOURS.Breaker }}/>Breaker</span><span className="smc-direction-key"><b>▲</b><em>▼</em></span></div>
     <button className={`smc-learn-button ${dark ? "smc-dark" : ""}`} onClick={() => setOpen(true)} aria-label="Open SMC Learner">SMC <span>Learn</span></button>
     {open && createPortal(<div className={`smc-backdrop ${dark ? "smc-dark" : ""}`} onPointerDown={e => { if (e.target === e.currentTarget) setOpen(false); }}>
       <section className="smc-sheet" role="dialog" aria-modal="true" aria-label="SMC Learner" onKeyDown={e => {
@@ -106,7 +116,8 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
         <header><div><small>PRICE ACTION · LEARNING LAB</small><h2>SMC Learner</h2></div><button ref={closeRef} onClick={() => setOpen(false)} aria-label="Close SMC Learner">×</button></header>
         <p className="smc-summary">{analysis.direction} · {timeframe}<br/><small>{replay ? "Only revealed replay candles are analysed." : "Live candle excluded: confirmations appear when the next bar starts."} Swings need 3 bars on each side.</small></p>
         <div className="smc-filters" aria-label="Visible SMC concepts">{Object.keys(groups).map(group => <button key={group} aria-pressed={filters.includes(group)} onClick={() => setFilters(v => v.includes(group) ? v.filter(g => g !== group) : [...v, group])}>{group}</button>)}</div>
-        <div className="smc-options"><label><input type="checkbox" checked={history} onChange={e => setHistory(e.target.checked)}/> Show filled / invalidated zones</label><label><input type="checkbox" checked={rangeVisible} onChange={e => setRangeVisible(e.target.checked)}/> Premium / discount range</label></div>
+        <p className="smc-note">Only untouched zones are shown: purple = order block, gold = FVG, pink = breaker. ▲ Bullish / potential support · ▼ Bearish / potential resistance. Zones disappear on the first retest, including a touch by the live candle.</p>
+        <div className="smc-options"><label><input type="checkbox" checked={rangeVisible} onChange={e => setRangeVisible(e.target.checked)}/> Premium / discount range</label></div>
         {rangeVisible && <p className="smc-note">The latest confirmed swing high–low range is split at 50%. Premium and discount describe position in this range, not fair value or an entry recommendation.</p>}
         <label className="smc-lesson-select">Learn a concept<select value={lesson} onChange={e => { setLesson(e.target.value as SmcKind); setSelected(null); }}>{enabledKinds.map(k => <option key={k}>{k}</option>)}</select></label>
         <article ref={explanationRef} className="smc-explanation"><h3>{lesson}</h3><p>{SMC_LESSONS[lesson]}</p>{focused && <><strong>{focused.direction} · {focused.status}</strong><p>{focused.reason}</p><small>Source candle: {dateText(focused.origin)} IST<br/>Confirmation candle: {dateText(focused.confirmed)} IST — known after its close</small><button onClick={() => {

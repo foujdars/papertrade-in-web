@@ -23,6 +23,20 @@ type Swing = { index: number; price: number; broken: boolean; swept: boolean };
 const zoneKinds = new Set<SmcKind>(["FVG", "OB", "Breaker"]);
 export const isSmcZone = (mark: SmcMark) => zoneKinds.has(mark.kind);
 
+export const SMC_ZONE_COLOURS = { FVG: "#eab308", OB: "#8b5cf6", Breaker: "#ec4899" };
+
+/** Never present retested, filled or invalidated zones as fresh opportunities. */
+export function untouchedSmcMarks(marks: SmcMark[], liveBar?: Candle) {
+  return marks.filter(mark => {
+    if (!isSmcZone(mark)) return true;
+    if (mark.status !== "active" || mark.end !== undefined) return false;
+    if (!liveBar || liveBar.time <= mark.confirmed) return true;
+    const overlaps = liveBar.low <= mark.high && liveBar.high >= mark.low;
+    const crossesFarEdge = mark.direction === "bullish" ? liveBar.low <= mark.low : liveBar.high >= mark.high;
+    return !overlaps && !crossesFarEdge;
+  });
+}
+
 /** Original deterministic OHLC heuristics. Input must contain ONLY closed/revealed bars. */
 export function analyzeSmc(input: readonly Candle[], sameSessionOnly = false) {
   const bars = input.filter(b => [b.time, b.open, b.high, b.low, b.close].every(Number.isFinite) && b.high >= b.low);
