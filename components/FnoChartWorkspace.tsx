@@ -9,6 +9,7 @@ import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { MarketChart, type ChartAction, type ChartActionRequest, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, type Instrument } from "@/lib/market";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import type { CandleTick } from "@/lib/live-candles";
 
 const FNO_TIMEFRAME_GROUPS = [
   { label: "Minute", values: ["1m", "2m", "3m", "5m", "10m", "15m", "30m"] },
@@ -27,6 +28,8 @@ export function FnoChartWorkspace({
   option,
   timeframe,
   topPrice,
+  topTick,
+  optionTick,
   topChange,
   optionPrice,
   optionChange,
@@ -62,6 +65,8 @@ export function FnoChartWorkspace({
   option: Instrument;
   timeframe: string;
   topPrice: number;
+  topTick?: CandleTick;
+  optionTick?: CandleTick;
   topChange: number;
   optionPrice: number;
   optionChange: number;
@@ -155,6 +160,7 @@ export function FnoChartWorkspace({
             <MarketChart
               key={`focus-top-${topInstrument.instrumentKey}-${timeframe}`}
               instrument={topInstrument}
+              liveTick={topTick}
               onPriceAction={onPriceAction ? (price, mode) => onPriceAction(topInstrument, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}
@@ -192,6 +198,7 @@ export function FnoChartWorkspace({
             <MarketChart
               key={`focus-option-${option.instrumentKey}-${timeframe}`}
               instrument={option}
+              liveTick={optionTick}
               onPriceAction={onPriceAction ? (price, mode) => onPriceAction(option, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}

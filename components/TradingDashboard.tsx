@@ -65,6 +65,7 @@ import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import { useToastNotice } from "./useToastNotice";
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { RiskSizingPlan } from "@/components/RiskSizingPlan";
@@ -484,7 +485,7 @@ export function TradingDashboard() {
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
   const [tradeSymbolSearch, setTradeSymbolSearch] = useState("");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useToastNotice();
   const [clock, setClock] = useState<Date | null>(null);
   const [feedStatus, setFeedStatus] = useState<FeedStatus>({
     mode: "loading",
@@ -587,7 +588,6 @@ export function TradingDashboard() {
             writePaperOrders(restoredOrders);
             localStorage.setItem("papertrade-balance", String(restoredBalance));
             setToast("Removed the corrupted RATNAVEER simulated stop-loss trade and repaired cash");
-            window.setTimeout(() => setToast(""), 5_000);
           }
           localStorage.setItem(RATNAVEER_REPAIR_STORAGE_KEY, "done");
         }
@@ -1017,6 +1017,7 @@ export function TradingDashboard() {
     const updatedAt = new Date(timestampMs).toISOString();
     setMarketQuotes((current) => {
       const previous = current[instrument.instrumentKey] ?? current[instrument.symbol];
+      if (previous && Date.parse(previous.lastTradeAt) > timestampMs) return current;
       const changeDivisor = 1 + instrument.change / 100;
       const fallbackPreviousClose = instrument.price > 0 && Number.isFinite(instrument.change) && changeDivisor > 0
         ? instrument.price / changeDivisor
@@ -1043,8 +1044,8 @@ export function TradingDashboard() {
       [instrument.symbol]: receivedAt,
     }));
   }, []);
-  const handleChartPrice = useCallback((price: number) => {
-    applyRealtimeQuote(selected, price);
+  const handleChartPrice = useCallback((price: number, timestampMs: number) => {
+    applyRealtimeQuote(selected, price, timestampMs);
   }, [applyRealtimeQuote, selected]);
   const protectionFeedInstruments = useMemo(() => [...new Map(protections.flatMap((protection) => {
     const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
@@ -1119,7 +1120,16 @@ export function TradingDashboard() {
           error?: { code?: string; retryAfterSeconds?: number };
         };
         if (response.ok && payload.ok && payload.quotes) {
-          setMarketQuotes((current) => ({ ...current, ...payload.quotes }));
+          setMarketQuotes((current) => {
+            const next = { ...current };
+            for (const [key, quote] of Object.entries(payload.quotes ?? {})) {
+              const previousTime = Date.parse(current[key]?.lastTradeAt ?? "");
+              const incomingTime = Date.parse(quote.lastTradeAt ?? "");
+              if (Number.isFinite(previousTime) && (!Number.isFinite(incomingTime) || incomingTime < previousTime)) continue;
+              next[key] = quote;
+            }
+            return next;
+          });
           const receivedAt = Date.now();
           setMarketQuoteUpdatedAt((current) => ({
             ...current,
@@ -1129,7 +1139,6 @@ export function TradingDashboard() {
         } else if (payload.error?.code === "RATE_LIMITED") {
           retryAt = Date.now() + Math.max(30, payload.error.retryAfterSeconds ?? 30) * 1_000;
           setToast("Upstox rate limit reached. Live trading is paused; retrying automatically.");
-          window.setTimeout(() => setToast(""), 5_000);
         }
       } catch {
         retryAt = Date.now() + 30_000;
@@ -1260,7 +1269,6 @@ export function TradingDashboard() {
         return remaining;
       });
       setToast(`${automaticOrders.length} intraday position${automaticOrders.length > 1 ? "s" : ""} auto squared off for the exchange session`);
-      window.setTimeout(() => setToast(""), 4_000);
     }).finally(() => {
       autoSquareOffInFlightRef.current = false;
     });
@@ -1313,7 +1321,6 @@ export function TradingDashboard() {
         return correctedBalance;
       });
       setToast(`${replacements.size} auto square-off record${replacements.size > 1 ? "s" : ""} corrected from Upstox 3:00 PM candles`);
-      window.setTimeout(() => setToast(""), 4_000);
     }).finally(() => {
       autoSquareOffRepairInFlightRef.current = false;
     });
@@ -1405,7 +1412,6 @@ export function TradingDashboard() {
       ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
-    window.setTimeout(() => setToast(""), 7_000);
   }, [balance, clock, exchangeSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
@@ -1723,14 +1729,12 @@ export function TradingDashboard() {
     if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
     if (!verifiedLivePrice || !Number.isFinite(value) || value <= 0) {
       setToast("Live price unavailable. Protection was not placed.");
-      window.setTimeout(() => setToast(""), 3500);
       return;
     }
     const direction = selectedPosition.side === "LONG" ? 1 : -1;
     const validSide = (value - verifiedLivePrice) * direction * (level === "target" ? 1 : -1) > 0;
     if (!validSide) {
       setToast("That level is already crossed by the live price. Choose a new level.");
-      window.setTimeout(() => setToast(""), 3500);
       return;
     }
     const formatted = value.toFixed(2);
@@ -1748,7 +1752,6 @@ export function TradingDashboard() {
       createdAt: selectedProtection?.createdAt ?? new Date().getTime(),
     }, selected.symbol, positionProduct);
     setToast(`${level === "target" ? "Take profit" : "Stop loss"} paper order placed · ${selected.symbol} · ${selectedPosition.quantity} units at ${formatInr(value)}`);
-    window.setTimeout(() => setToast(""), 4_000);
   }
 
   function toggleTheme() {
@@ -1762,27 +1765,23 @@ export function TradingDashboard() {
   function copySuggestionContact(value: string, label: string) {
     void navigator.clipboard?.writeText(value);
     setToast(`${label} copied for suggestions`);
-    window.setTimeout(() => setToast(""), 2_500);
   }
 
   function addVirtualFunds() {
     const requestedAmount = Number(fundsInput);
     if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
       setToast("Enter a valid virtual amount");
-      window.setTimeout(() => setToast(""), 3_000);
       return;
     }
     const nextBalance = Math.min(MAX_VIRTUAL_BALANCE, balance + requestedAmount);
     if (nextBalance <= balance) {
       setToast("Maximum virtual balance of ₹10 crore already reached");
-      window.setTimeout(() => setToast(""), 3_000);
       return;
     }
     setBalance(nextBalance);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     setFundsOpen(false);
     setToast(`${formatInr(nextBalance - balance)} virtual money added`);
-    window.setTimeout(() => setToast(""), 3_000);
   }
 
   function confirmClosedTradeDeletion() {
@@ -1804,7 +1803,6 @@ export function TradingDashboard() {
     setTradeSelection(null);
     setPnlTradeMenuId(null);
     setToast(`${deletion.trades.length} trade${deletion.trades.length === 1 ? "" : "s"} deleted and account totals recalculated`);
-    window.setTimeout(() => setToast(""), 3_500);
   }
 
   function protectionError(direction: "LONG" | "SHORT", referencePrice: number) {
@@ -1829,13 +1827,11 @@ export function TradingDashboard() {
     if (!selectedPosition.quantity || selectedPosition.side === "FLAT") return;
     if (!verifiedLivePrice) {
       setToast("Live Upstox price unavailable. Protection was not changed.");
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     const error = protectionError(selectedPosition.side, verifiedLivePrice);
     if (error) {
       setToast(error);
-      window.setTimeout(() => setToast(""), 3_200);
       return;
     }
     const { target, stopLoss } = protectionValues();
@@ -1854,7 +1850,6 @@ export function TradingDashboard() {
       }, selected.symbol, positionProduct);
       setToast("Target and stop loss updated");
     }
-    window.setTimeout(() => setToast(""), 3_000);
   }
 
   function placeOrder() {
@@ -1868,35 +1863,29 @@ export function TradingDashboard() {
     if (!Number.isFinite(quantity) || quantity < 1) return;
     if (tradingLimitStatus.blocked && !orderReducesOpenPosition) {
       setToast(tradingLimitStatus.reasons[0] || "A personal trading limit is active.");
-      window.setTimeout(() => setToast(""), 4_000);
       return;
     }
     if (selected.assetType === "OPTION" && quantity % quantityStep !== 0) {
       setToast(`Option quantity must be a multiple of the ${quantityStep}-unit lot size.`);
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     const executionPrice = verifiedLivePrice;
     if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
       setToast("Live Upstox price unavailable. Paper order was not placed.");
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     if (!marketOrdersAllowed) {
       setToast(marketStatus.message);
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     if (product === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     if (isCashDeliveryOrder && side === "SELL") {
       const sellError = validateDeliverySell(orders, selected.symbol, quantity);
       if (sellError) {
         setToast(sellError);
-        window.setTimeout(() => setToast(""), 3_800);
         return;
       }
     }
@@ -1904,14 +1893,12 @@ export function TradingDashboard() {
     const executionCapital = paperOrderCapitalValue(selected.assetType, product, quantity, executionPrice);
     if (side === "BUY" && executionCapital + executionCharges.total > balance) {
       setToast(`Insufficient virtual cash. Required ${formatInr(executionCapital + executionCharges.total)}.`);
-      window.setTimeout(() => setToast(""), 3_800);
       return;
     }
     const intendedDirection = side === "BUY" ? "LONG" : "SHORT";
     const riskError = isCashDeliveryOrder && side === "SELL" ? null : protectionError(intendedDirection, executionPrice);
     if (riskError) {
       setToast(riskError);
-      window.setTimeout(() => setToast(""), 3_200);
       return;
     }
     prepareProtectionAlerts();
@@ -1958,7 +1945,6 @@ export function TradingDashboard() {
     setTradeThesis("");
     setOrderSheetOpen(false);
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
-    window.setTimeout(() => setToast(""), 3200);
   }
 
   function exitPosition(requestedQuantity: number, requestedPosition?: {
@@ -1978,17 +1964,14 @@ export function TradingDashboard() {
     if (!exitInstrument || exitPositionQuantity <= 0 || exitSide === "FLAT") return;
     if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
       setToast("Live Upstox price unavailable. Position was not exited.");
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     if (!marketOrdersAllowed) {
       setToast(marketStatus.message);
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     if (exitProduct === "INTRADAY" && !intradayOrdersAllowed) {
       setToast(intradayStatusMessage);
-      window.setTimeout(() => setToast(""), 3_500);
       return;
     }
     const closingQuantity = Math.min(exitPositionQuantity, Math.max(1, Math.floor(requestedQuantity)));
@@ -2027,7 +2010,6 @@ export function TradingDashboard() {
     localStorage.setItem("papertrade-balance", String(nextBalance));
     if (closingQuantity >= exitPositionQuantity) saveProtection(null, exitInstrument.symbol, exitProduct);
     setToast(`Exited ${closingQuantity} ${exitInstrument.symbol} · charges ${formatInr(exitCharges.total)}`);
-    window.setTimeout(() => setToast(""), 3_200);
   }
 
   function toggleIndicator(name: keyof ChartIndicators) {
@@ -2122,12 +2104,10 @@ export function TradingDashboard() {
       );
       setOptionSplitPercent(50);
       setToast(`${underlying.symbol} opened with the nearest ATM ${contract.optionType}.`);
-      window.setTimeout(() => setToast(""), 2_800);
     } catch (error) {
       setFnoUnderlying(null);
       setFnoFutureInstrument(null);
       setToast(error instanceof Error ? error.message : "Unable to open this F&O symbol.");
-      window.setTimeout(() => setToast(""), 4_000);
     } finally {
       setOpeningUnderlyingKey("");
     }
@@ -2144,7 +2124,6 @@ export function TradingDashboard() {
       chooseOptionTradeInstrument(optionToInstrument(contract, row, activeFnoUnderlying), underlyingToInstrument(activeFnoUnderlying, row.underlyingSpotPrice));
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to switch the option contract.");
-      window.setTimeout(() => setToast(""), 3_000);
     } finally {
       setFnoSwitchingOption(false);
     }
@@ -2216,7 +2195,6 @@ export function TradingDashboard() {
     if (!name || customWatchlists.length >= 5) return;
     if (customWatchlists.some((list) => list.name.toLowerCase() === name.toLowerCase())) {
       setToast("A watchlist with this name already exists");
-      window.setTimeout(() => setToast(""), 3_000);
       return;
     }
     const list: CustomWatchlist = {
@@ -2229,7 +2207,6 @@ export function TradingDashboard() {
     setWatchlistLimit(60);
     setWatchlistPickerOpen(false);
     setToast(watchlistTarget ? `${watchlistTarget.symbol} added to ${name}` : `${name} created`);
-    window.setTimeout(() => setToast(""), 3_000);
   }
 
   function renameCustomWatchlist(listId: string, name: string) {
@@ -2246,7 +2223,6 @@ export function TradingDashboard() {
   function removeStockFromCustomWatchlist(listId: string, symbol: string) {
     saveCustomWatchlists(customWatchlists.map((list) => list.id === listId ? { ...list, symbols: list.symbols.filter((item) => item !== symbol) } : list));
     setToast(`${symbol} removed from watchlist`);
-    window.setTimeout(() => setToast(""), 2_500);
   }
 
   function openPositionChart(symbol: string) {
@@ -2678,6 +2654,7 @@ export function TradingDashboard() {
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
+                liveTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
                 onPriceAction={(price, mode) => setPriceRequest({ instrument: selected, price, mode })}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onFeedStatus={handleFeedStatus}
@@ -2764,6 +2741,8 @@ export function TradingDashboard() {
           option={selected}
           timeframe={timeframe}
           topPrice={verifiedTopPrice}
+          topTick={topQuote && fnoTopInstrument ? { instrumentKey: fnoTopInstrument.instrumentKey, price: topQuote.lastPrice, timestampMs: Date.parse(topQuote.lastTradeAt) } : undefined}
+          optionTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
           topChange={verifiedTopChange}
           optionPrice={verifiedLivePrice ?? selected.price}
           optionChange={selectedChange}

@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import type { ChartAction, ChartIndicators } from "@/components/MarketChart";
 
 const studies: Array<{ key: keyof ChartIndicators; name: string; detail: string; color: string }> = [
+  { key: "smc", name: "SMC Learner", detail: "FVG, order blocks, structure & explanations", color: "#7c4dff" },
   { key: "ema5", name: "EMA 5", detail: "Fast exponential average", color: "#0ea5e9" },
   { key: "ema21", name: "EMA 21", detail: "Short trend average", color: "#ff8a00" },
   { key: "ema30", name: "EMA 30", detail: "30-candle exponential average", color: "#22c55e" },

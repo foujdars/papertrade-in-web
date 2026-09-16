@@ -33,7 +33,7 @@ let decoderPromise: Promise<Type> | null = null;
 function getDecoder() {
   decoderPromise ??= load("/MarketDataFeedV3.proto").then((root) =>
     root.lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse"),
-  );
+  ).catch(error => { decoderPromise = null; throw error; });
   return decoderPromise;
 }
 
@@ -88,24 +88,37 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
 
   const socket = new WebSocket(authorization.authorizedRedirectUri);
   socket.binaryType = "arraybuffer";
+  let intentionallyClosed = false;
   const abort = () => socket.close(1000, "Chart changed");
   signal.addEventListener("abort", abort, { once: true });
 
   await new Promise<void>((resolve, reject) => {
-    const fail = () => reject(new Error("Unable to open the Upstox live market feed."));
-    const closeBeforeOpen = () => reject(new Error("Upstox closed the live market feed before it opened."));
-    socket.addEventListener("error", fail, { once: true });
-    socket.addEventListener("close", closeBeforeOpen, { once: true });
-    socket.addEventListener("open", () => {
+    const cleanup = () => {
+      clearTimeout(timeout);
       socket.removeEventListener("error", fail);
-      socket.removeEventListener("close", closeBeforeOpen);
+      socket.removeEventListener("close", fail);
+      socket.removeEventListener("open", opened);
+    };
+    const fail = () => {
+      cleanup();
+      signal.removeEventListener("abort", abort);
+      intentionallyClosed = true;
+      socket.close();
+      reject(new Error("Unable to open the Upstox live market feed. Retrying automatically."));
+    };
+    const opened = () => {
+      cleanup();
       socket.send(new TextEncoder().encode(JSON.stringify({
         guid: crypto.randomUUID(),
         method: "sub",
         data: { mode: "full", instrumentKeys },
       })));
       resolve();
-    }, { once: true });
+    };
+    const timeout = setTimeout(fail, 15_000);
+    socket.addEventListener("error", fail, { once: true });
+    socket.addEventListener("close", fail, { once: true });
+    socket.addEventListener("open", opened, { once: true });
   });
 
   socket.addEventListener("message", (event) => {
@@ -125,10 +138,11 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
   });
   socket.addEventListener("close", () => {
     signal.removeEventListener("abort", abort);
-    if (!signal.aborted) onDisconnect();
+    if (!signal.aborted && !intentionallyClosed) onDisconnect();
   });
 
   return () => {
+    intentionallyClosed = true;
     signal.removeEventListener("abort", abort);
     if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
       socket.close(1000, "Chart changed");

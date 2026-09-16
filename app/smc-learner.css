@@ -1,0 +1,34 @@
+.smc-overlay { position: absolute; top: 0; left: 0; z-index: 6; overflow: hidden; pointer-events: none; }
+.smc-overlay text { font: 600 12px system-ui, sans-serif; }
+.smc-learn-button { position: absolute; bottom: 44px; right: 80px; z-index: 21; padding: 6px 10px; min-height: 32px; border: 1px solid #8b5cf655; border-radius: 18px; background: #ffffffed; color: #6d28d9; font-size: 12px; font-weight: 700; }
+.smc-learn-button span { margin-left: 5px; font-weight: 400; }
+.smc-backdrop { position: fixed; inset: 0; z-index: 700; background: #090b2666; display: flex; align-items: flex-end; justify-content: center; color: #242539; }
+.smc-sheet { box-sizing: border-box; width: min(100%, 540px); max-height: 88dvh; padding: 20px 18px max(22px, env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; background: #fff; border-radius: 24px 24px 0 0; display: grid; gap: 12px; font: 14px/1.5 system-ui, sans-serif; }
+.smc-sheet header { display: flex; justify-content: space-between; align-items: center; }
+.smc-sheet h2, .smc-sheet h3, .smc-sheet p { margin: 0; }
+.smc-sheet h2 { font-size: 24px; letter-spacing: -.6px; }
+.smc-sheet h3 { font-size: 16px; }
+.smc-sheet small { font-size: 12px; opacity: .8; }
+.smc-sheet button { min-height: 40px; color: inherit; background: transparent; border: 1px solid #8b5cf640; border-radius: 10px; padding: 8px 10px; text-align: left; }
+.smc-sheet header button { font-size: 24px; text-align: center; width: 44px; }
+.smc-summary { color: #6d28d9; font-weight: 650; }
+.smc-summary small { color: #555c70; font-weight: 400; }
+.smc-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.smc-sheet button[aria-pressed="true"] { background: #ede5ff; border-color: #8961db; color: #6134a9; }
+.smc-options { display: grid; gap: 8px; font-size: 13px; }
+.smc-options label { display: flex; align-items: center; gap: 8px; }
+.smc-options input { width: 17px; height: 17px; accent-color: #7c4dff; }
+.smc-lesson-select { display: grid; gap: 6px; font-weight: 600; }
+.smc-lesson-select select { width: 100%; padding: 10px; border: 1px solid #8b5cf64a; border-radius: 10px; font: inherit; color: inherit; background: transparent; }
+.smc-explanation { border-left: 3px solid #8b5cf6; background: #f7f4ff; padding: 14px; border-radius: 0 12px 12px 0; display: grid; gap: 8px; }
+.smc-examples { display: grid; gap: 6px; }
+.smc-examples button { display: grid; gap: 3px; }
+.smc-examples b span { font-size: 12px; opacity: .7; margin-left: 6px; font-weight: 400; }
+.smc-note { color: #656a7c; font-size: 12px; }
+.smc-dark { color: #e5eaff; }
+.smc-dark .smc-sheet, .smc-learn-button.smc-dark { background: #111d37; color: #e5eaff; }
+.smc-dark .smc-summary { color: #c5adff; }
+.smc-dark .smc-summary small, .smc-dark .smc-note { color: #abb8d2; }
+.smc-dark .smc-explanation { background: #202445; }
+.smc-dark button[aria-pressed="true"] { background: #392c5e; color: #e0d2ff; }
+.smc-dark option { background: #111d37; }

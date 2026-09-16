@@ -13,6 +13,7 @@ import "./bar-replay.css";
 import "./portfolio-controls.css";
 import "./chart-brackets.css";
 import "./price-actions.css";
+import "./smc-learner.css";
 import "./ipo-lifecycle.css";
 import "./list-density.css";
 import "./refinements.css";

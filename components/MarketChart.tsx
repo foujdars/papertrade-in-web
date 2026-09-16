@@ -1,5 +1,7 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { SmcLearner } from "./SmcLearner";
+import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
 import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
@@ -26,8 +28,9 @@ import type {
   SerializedDrawing,
 } from "lightweight-charts-drawing";
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
-import { openUpstoxLiveFeed, type UpstoxLiveTick } from "@/lib/upstox-live-feed";
+import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
+import { applyCandleTick, reconcileLiveCandles, validCandleTick, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
 
 export const DRAWING_TOOL_CATALOG = [
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
@@ -112,6 +115,7 @@ export type FeedStatus = {
 };
 
 export type ChartIndicators = {
+  smc: boolean;
   ema5: boolean;
   ema21: boolean;
   ema30: boolean;
@@ -130,6 +134,7 @@ export type ChartIndicators = {
 };
 
 export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
+  smc: false,
   ema5: false,
   ema21: false,
   ema30: false,
@@ -284,43 +289,8 @@ function readStoredDrawings(key: string, legacyKey?: string): SerializedDrawing[
   }
 }
 
-function mergeSeries(existing: Candle[], incoming: Candle[]) {
-  const byTime = new Map<number, Candle>();
-  for (const candle of [...existing, ...incoming]) byTime.set(Number(candle.time), candle);
-  return [...byTime.values()]
-    .sort((a, b) => Number(a.time) - Number(b.time))
-    .slice(-1_600);
-}
-
 const IST_OFFSET_SECONDS = 19_800;
 const CALENDAR_TIMEFRAMES = new Set(["1D", "1W", "1M", "1Y"]);
-const LIVE_TIMEFRAME_SECONDS: Record<string, number> = {
-  "1m": 60,
-  "2m": 120,
-  "3m": 180,
-  "5m": 300,
-  "10m": 600,
-  "15m": 900,
-  "30m": 1_800,
-  "1H": 3_600,
-  "2H": 7_200,
-  "3H": 10_800,
-  "4H": 14_400,
-  "1D": 86_400,
-};
-
-function liveCandleTime(timestampMs: number, timeframe: string) {
-  const epochSeconds = Math.floor(timestampMs / 1_000);
-  const localSeconds = epochSeconds + IST_OFFSET_SECONDS;
-  const localDayStart = Math.floor(localSeconds / 86_400) * 86_400;
-  if (timeframe === "1D") return localDayStart - IST_OFFSET_SECONDS;
-  const intervalSeconds = LIVE_TIMEFRAME_SECONDS[timeframe];
-  if (!intervalSeconds) return null;
-  const marketOpenLocal = localDayStart + 9 * 3_600 + 15 * 60;
-  const elapsed = Math.max(0, localSeconds - marketOpenLocal);
-  return marketOpenLocal + Math.floor(elapsed / intervalSeconds) * intervalSeconds - IST_OFFSET_SECONDS;
-}
-
 function usesIntradayAxisShift(timeframe: string) {
   return !CALENDAR_TIMEFRAMES.has(timeframe);
 }
@@ -485,6 +455,7 @@ export function MarketChart({
   onDrawingComplete,
   onChartTap,
   onPrice,
+  liveTick,
   onFeedStatus,
 }: {
   instrument: Instrument;
@@ -519,7 +490,8 @@ export function MarketChart({
   onOrderToolExit?: () => void;
   onDrawingComplete?: () => void;
   onChartTap?: () => void;
-  onPrice?: (value: number) => void;
+  onPrice?: (value: number, timestampMs: number) => void;
+  liveTick?: CandleTick;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
   const isReplay = replayCandles !== undefined;
@@ -594,6 +566,8 @@ export function MarketChart({
   const onFeedStatusRef = useRef(onFeedStatus);
   const liveStreamConnectedRef = useRef(false);
   const liveIndicatorTimerRef = useRef(0);
+  const lastLiveTickRef = useRef<CandleTick | null>(null);
+  const smcRefreshRef = useRef<(() => void) | null>(null);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -625,6 +599,29 @@ export function MarketChart({
   useEffect(() => {
     onPriceRef.current = onPrice;
   }, [onPrice]);
+
+  function acceptLiveTick(tick: CandleTick, publish: boolean) {
+    if (isReplay || !validCandleTick(tick, instrument.instrumentKey, lastLiveTickRef.current)) return;
+    lastLiveTickRef.current = tick;
+    const next = applyCandleTick(dataRef.current, tick, timeframe);
+    if (next === dataRef.current) return;
+    dataRef.current = next;
+    candleSeries.current?.update(toCandleData(next.at(-1)!, timeframe));
+    setLatestCandle(next.at(-1));
+    if (publish) onPriceRef.current?.(tick.price, tick.timestampMs);
+    if (!liveIndicatorTimerRef.current) {
+      liveIndicatorTimerRef.current = window.setTimeout(() => {
+        liveIndicatorTimerRef.current = 0;
+        syncIndicatorData();
+      }, 400);
+    }
+    scheduleOverlayRefresh();
+  }
+
+  useEffect(() => { lastLiveTickRef.current = null; }, [instrument.instrumentKey, timeframe, isReplay]);
+  useEffect(() => {
+    if (liveTick) acceptLiveTick(liveTick, false);
+  }, [liveTick?.instrumentKey, liveTick?.price, liveTick?.timestampMs, timeframe, isReplay]);
 
   useEffect(() => {
     onFeedStatusRef.current = onFeedStatus;
@@ -706,6 +703,7 @@ export function MarketChart({
     if (typeof window === "undefined") return;
     window.requestAnimationFrame(() => {
       refreshDrawingCrosshair();
+      smcRefreshRef.current?.();
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
@@ -714,6 +712,7 @@ export function MarketChart({
       window.requestAnimationFrame(() => {
         refreshRiskCoordinates();
         refreshTradeMarkerCoordinates();
+        smcRefreshRef.current?.();
       });
     });
   }
@@ -1302,7 +1301,7 @@ export function MarketChart({
     }
     if (chartAction.type === "screenshot") {
       const canvas = chart.takeScreenshot(true, true);
-      canvas.toBlob((blob) => {
+      void stampChartOverlay(canvas, chartHost.current).catch(() => undefined).then(() => canvas.toBlob((blob) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -1310,7 +1309,7 @@ export function MarketChart({
         link.download = `${instrument.symbol}-${timeframe}-chart.png`;
         link.click();
         URL.revokeObjectURL(url);
-      }, "image/png");
+      }, "image/png"));
     }
     if (chartAction.type === "toggle-grid") {
       gridVisibleRef.current = !gridVisibleRef.current;
@@ -1912,13 +1911,13 @@ export function MarketChart({
           failure.retryAfterSeconds = payload.error?.retryAfterSeconds ?? (payload.error?.code === "RATE_LIMITED" ? 30 : 15);
           throw failure;
         }
-        dataRef.current = payload.candles;
-        const latest = payload.candles.at(-1);
+        if (controller.signal.aborted) return;
+        dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
+        const latest = dataRef.current.at(-1);
         setLatestCandle(latest);
-        if (latest) onPriceRef.current?.(latest.close);
-        candleSeries.current?.setData(payload.candles.map((candle) => toCandleData(candle, timeframe)));
+        candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
         restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
-        syncIndicatorData(payload.candles);
+        syncIndicatorData();
         applyInitialVisibleRange(payload.candles);
         scheduleOverlayRefresh();
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
@@ -1957,50 +1956,9 @@ export function MarketChart({
     let closeSocket: (() => void) | undefined;
     let retryAttempt = 0;
 
-    const updateIndicatorsSoon = () => {
-      if (liveIndicatorTimerRef.current) return;
-      liveIndicatorTimerRef.current = window.setTimeout(() => {
-        liveIndicatorTimerRef.current = 0;
-        syncIndicatorData();
-      }, 400);
-    };
-
-    const applyLiveTick = ({ price, timestampMs }: UpstoxLiveTick) => {
-      const candleTime = liveCandleTime(timestampMs, timeframe);
-      if (candleTime === null) return;
-      const previous = dataRef.current.at(-1);
-      if (previous && candleTime < Number(previous.time)) return;
-
-      const next: Candle = previous && candleTime === Number(previous.time)
-        ? {
-            ...previous,
-            high: Math.max(previous.high, price),
-            low: Math.min(previous.low, price),
-            close: price,
-          }
-        : {
-            time: candleTime,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            volume: 0,
-          };
-
-      if (previous && candleTime === Number(previous.time)) {
-        dataRef.current[dataRef.current.length - 1] = next;
-      } else {
-        dataRef.current = [...dataRef.current, next].slice(-1_600);
-      }
-      candleSeries.current?.update(toCandleData(next, timeframe));
-      setLatestCandle(next);
-      onPriceRef.current?.(price);
-      updateIndicatorsSoon();
-      scheduleOverlayRefresh();
-    };
-
     const scheduleReconnect = (retryAfterSeconds?: number) => {
       if (stopped || controller.signal.aborted) return;
+      window.clearTimeout(reconnectTimer);
       liveStreamConnectedRef.current = false;
       retryAttempt += 1;
       const delaySeconds = retryAfterSeconds
@@ -2021,7 +1979,7 @@ export function MarketChart({
         closeSocket = await openUpstoxLiveFeed({
           instrumentKey: instrument.instrumentKey,
           signal: controller.signal,
-          onTick: applyLiveTick,
+          onTick: (tick) => acceptLiveTick(tick, true),
           onDisconnect: () => scheduleReconnect(),
         });
         if (stopped) {
@@ -2066,14 +2024,14 @@ export function MarketChart({
         const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[]; fetchedAt?: string; error?: { message?: string } };
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
-        dataRef.current = mergeSeries(dataRef.current, payload.candles);
+        if (controller.signal.aborted) return;
+        dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
         candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
         syncIndicatorData();
         scheduleOverlayRefresh();
         const latest = dataRef.current.at(-1);
         if (latest) {
           setLatestCandle(latest);
-          onPriceRef.current?.(latest.close);
         }
         setFeedMode("live");
         onFeedStatusRef.current({
@@ -2099,7 +2057,8 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
-        {!isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}>+</button>}
+        {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} />}
+        {!isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
           <header><b>{instrument.symbol} · ₹{priceMenu.toFixed(2)}</b><button aria-label="Close price menu" onClick={() => setPriceMenu(null)}>×</button></header>
           <button onClick={() => { onPriceAction?.(priceMenu, "alert"); setPriceMenu(null); }}>Add price alert at ₹{priceMenu.toFixed(2)}</button>
