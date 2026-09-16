@@ -16,7 +16,8 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usableHomeQuote, quoteChangeText, type HomeQuote } from "@/lib/home-quotes";
 import { formatInr } from "@/lib/market";
 
 export type HomeIndexQuote = {
@@ -93,11 +94,34 @@ export function HomeWorkspace({
   const safeName = firstName?.trim().split(/\s+/)[0];
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<HomeStockOption | null>(null);
+  const [quotes, setQuotes] = useState<Record<string, HomeQuote | null>>({});
+  const [loading, setLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
   const matches = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return [];
     return stockOptions.filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query)).slice(0, 6);
   }, [search, stockOptions]);
+  const quoteKeys = [...new Set((preview ? [preview] : matches).map((s) => s.instrumentKey).filter(Boolean))].join(",");
+  useEffect(() => {
+    if (!quoteKeys) { setLoading(false); return; }
+    const controller = new AbortController();
+    let disposed = false;
+    setLoading(true);
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    const debounce = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`, { signal: controller.signal });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error("Quote unavailable");
+        if (!disposed) setQuotes((current) => ({ ...current, ...Object.fromEntries(quoteKeys.split(",").map((key) => [key, usableHomeQuote(payload.quotes?.[key])])) }));
+      } catch {
+        if (!disposed) setQuotes((current) => ({ ...current, ...Object.fromEntries(quoteKeys.split(",").map((key) => [key, null])) }));
+      } finally { if (!disposed) setLoading(false); window.clearTimeout(timeout); }
+    }, 250);
+    return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); window.clearTimeout(debounce); };
+  }, [quoteKeys, retry]);
+  const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
 
   return (
     <section className="home-workspace" aria-label="PaperTrade home">
@@ -113,7 +137,7 @@ export function HomeWorkspace({
               {matches.length > 0 && <div className="home-search-results">
                 {matches.map((stock) => <button key={stock.symbol} onClick={() => { setPreview(stock); setSearch(""); }}>
                   <span className="stock-identity">{stock.assetType === "INDEX" ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
-                  <em className={stock.changePercent >= 0 ? "positive" : "negative"}>{stock.changePercent >= 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%</em>
+                  <em className={(quotes[stock.instrumentKey ?? ""]?.changePercent ?? 0) < 0 ? "negative" : "positive"}>{quoteChangeText(quotes[stock.instrumentKey ?? ""]?.changePercent)}</em>
                 </button>)}
               </div>}
             </div>
@@ -161,7 +185,8 @@ export function HomeWorkspace({
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>
         <section className="home-stock-preview" role="dialog" aria-modal="true" aria-label={`${preview.symbol} stock preview`} onClick={(event) => event.stopPropagation()}>
           <header><StockLogo symbol={preview.symbol} /><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
-          <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{preview.price > 0 ? formatInr(preview.price) : <CandleLoader compact label="Loading quote" />}</strong></span><b className={preview.changePercent >= 0 ? "positive" : "negative"}>{preview.changePercent >= 0 ? "+" : ""}{preview.changePercent.toFixed(2)}%</b></div>
+          <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{previewQuote ? formatInr(previewQuote.lastPrice) : loading ? <CandleLoader compact label="Loading quote" /> : "Quote unavailable"}</strong></span><b className={(previewQuote?.changePercent ?? 0) < 0 ? "negative" : "positive"}>{quoteChangeText(previewQuote?.changePercent)}</b></div>
+          {!loading && !previewQuote && <button onClick={() => setRetry((n) => n + 1)}>Retry quote</button>}
           <div className="home-stock-preview-tags">{preview.categories.length ? preview.categories.map((category) => <span key={category}>{category}</span>) : <span>ALL NSE</span>}</div>
           <p>Preview the stock first, then open its remembered chart setup when you are ready.</p>
           <div className="home-stock-preview-actions"><button onClick={onOpenWatchlist}><Layers3 size={16} /> Watchlists</button><button onClick={() => onOpenStock(preview.symbol)}><CandlestickChart size={16} /> Open chart <ArrowRight size={15} /></button></div>

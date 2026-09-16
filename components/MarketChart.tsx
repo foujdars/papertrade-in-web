@@ -1,5 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
+import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
 import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
 import { createProfileDataClient } from "@/lib/profile-data-client";
@@ -477,6 +478,7 @@ export function MarketChart({
   onReplayPlay,
   replayPrompt = false,
   onOrderSide,
+  onPriceAction,
   onOrderToolChange,
   onOrderToolClose,
   onOrderToolExit,
@@ -511,6 +513,7 @@ export function MarketChart({
   onReplayPlay?: () => void;
   replayPrompt?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
+  onPriceAction?: (price: number, mode: "alert" | "order") => void;
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
   onOrderToolExit?: () => void;
@@ -520,6 +523,9 @@ export function MarketChart({
   onFeedStatus: (status: FeedStatus) => void;
 }) {
   const isReplay = replayCandles !== undefined;
+  const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
+  const [priceMenu, setPriceMenu] = useState<number | null>(null);
+  useTransientBack(priceMenu !== null, () => setPriceMenu(null));
   const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect, onPreview: onReplayPreview });
   const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
@@ -1432,7 +1438,7 @@ export function MarketChart({
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.time !== undefined && event.point.y <= (chart.panes()[0]?.getHeight() ?? 0)) {
           const price = series.coordinateToPrice(event.point.y);
-          if (price !== null) lastCrosshairAnchorRef.current = { time: event.time, price };
+          if (price !== null) { lastCrosshairAnchorRef.current = { time: event.time, price }; setPriceCursor({ price: Math.round(price * 100) / 100, y: event.point.y }); }
         }
         // Series data works in price and indicator panes, and for touch crosshairs.
         // Never feed a hovered historical price back into execution or live quotes.
@@ -2093,6 +2099,20 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {!isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}>+</button>}
+        {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
+          <header><b>{instrument.symbol} · ₹{priceMenu.toFixed(2)}</b><button aria-label="Close price menu" onClick={() => setPriceMenu(null)}>×</button></header>
+          <button onClick={() => { onPriceAction?.(priceMenu, "alert"); setPriceMenu(null); }}>Add price alert at ₹{priceMenu.toFixed(2)}</button>
+          <button onClick={() => { onPriceAction?.(priceMenu, "order"); setPriceMenu(null); }}>Add paper order at ₹{priceMenu.toFixed(2)}</button>
+          <button onClick={() => {
+            const anchor = lastCrosshairAnchorRef.current;
+            if (anchor && drawingRegistry.current && drawingManager.current) {
+              const line = drawingRegistry.current.createDrawing("horizontal-line", crypto.randomUUID(), [{ ...anchor, price: priceMenu }], toolStyle("horizontal-line"), toolOptions("horizontal-line"));
+              if (line) { drawingManager.current.addDrawing(line); persistDrawings(true); }
+            }
+            setPriceMenu(null);
+          }}>Draw horizontal line at ₹{priceMenu.toFixed(2)}</button>
+        </section></div>}
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replayMarkerX !== null && <>
           {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}

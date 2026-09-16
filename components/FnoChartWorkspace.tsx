@@ -45,6 +45,7 @@ export function FnoChartWorkspace({
   onToggleOptionType,
   onQuantityChange,
   onOpenOrder,
+  onPriceAction,
   ordersEnabled = true,
   onFeedStatus,
   orderTool,
@@ -79,6 +80,7 @@ export function FnoChartWorkspace({
   onToggleOptionType: () => void;
   onQuantityChange: (quantity: number) => void;
   onOpenOrder: (side: "BUY" | "SELL", mode: "Market" | "Limit") => void;
+  onPriceAction?: (instrument: Instrument, price: number, mode: "alert" | "order") => void;
   ordersEnabled?: boolean;
   onFeedStatus: (status: FeedStatus) => void;
   orderTool?: ChartOrderTool;
@@ -153,6 +155,7 @@ export function FnoChartWorkspace({
             <MarketChart
               key={`focus-top-${topInstrument.instrumentKey}-${timeframe}`}
               instrument={topInstrument}
+              onPriceAction={onPriceAction ? (price, mode) => onPriceAction(topInstrument, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}
               toolSignal={toolSignal}
@@ -189,6 +192,7 @@ export function FnoChartWorkspace({
             <MarketChart
               key={`focus-option-${option.instrumentKey}-${timeframe}`}
               instrument={option}
+              onPriceAction={onPriceAction ? (price, mode) => onPriceAction(option, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}
               toolSignal={toolSignal}

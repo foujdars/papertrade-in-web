@@ -34,6 +34,8 @@ import { PushNotificationBridge } from "./PushNotificationBridge";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { HomeWorkspace } from "@/components/HomeWorkspace";
+import { PriceActions } from "@/components/PriceActions";
+import { priceTaskError, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
@@ -413,6 +415,7 @@ export function TradingDashboard() {
   const [tradeThesis, setTradeThesis] = useState("");
   const [tradeConfidence, setTradeConfidence] = useState(3);
   const [orderType, setOrderType] = useState("Market");
+  const [priceRequest, setPriceRequest] = useState<PriceRequest | null>(null);
   const [product, setProduct] = useState<"INTRADAY" | "DELIVERY">("INTRADAY");
   const [indicators, setIndicators] = usePersistentChartIndicators(user?.id);
   const [exitQuantity, setExitQuantity] = useState("1");
@@ -1855,6 +1858,11 @@ export function TradingDashboard() {
   }
 
   function placeOrder() {
+    if (orderType !== "Market") {
+      setOrderSheetOpen(false);
+      setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit" });
+      return;
+    }
     const currentSession = getNseMarketStatus(new Date(), exchangeSession);
     if (!currentSession.isOpen) { setToast(currentSession.message); return; }
     if (!Number.isFinite(quantity) || quantity < 1) return;
@@ -2361,6 +2369,51 @@ export function TradingDashboard() {
     setPnlOpen(section === "pnl");
   }
 
+  function fillPriceOrder(task: PriceTask, executionPrice: number): string | null {
+    if (!paperDataReady) return "Paper account is not ready. Please queue the order again.";
+    const invalid = priceTaskError(task);
+    if (invalid) return invalid;
+    if (!getNseMarketStatus(new Date(), exchangeSession).isOpen) return "Market is closed.";
+    if (task.product === "INTRADAY" && !intradayOrdersAllowed) return "Intraday trading is closed.";
+    const instrument = task.instrument;
+    const currentOrders = readPaperOrders();
+    if (currentOrders.some(o => o.id === task.id)) return null;
+    const storedCash = Number(localStorage.getItem("papertrade-balance"));
+    const currentCash = Number.isFinite(storedCash) ? storedCash : balance;
+    const position = calculatePosition(currentOrders, instrument.symbol, executionPrice, task.product);
+    const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
+    if (tradingLimitStatus.blocked && !reduces) return tradingLimitStatus.reasons[0] || "Personal trading limit is active.";
+    if (instrument.expiry && Date.parse(instrument.expiry) < new Date().setHours(0, 0, 0, 0)) return "The derivative has expired.";
+    if (task.product === "DELIVERY" && task.side === "SELL" && !["OPTION", "FUTURE"].includes(instrument.assetType ?? "")) {
+      const error = validateDeliverySell(currentOrders, instrument.symbol, task.quantity); if (error) return error;
+    }
+    const charges = calculateInstrumentCharges(instrument, { side: task.side, product: task.product, quantity: task.quantity, price: executionPrice });
+    const capital = paperOrderCapitalValue(instrument.assetType, task.product, task.quantity, executionPrice);
+    if (!reduces && capital + charges.total > currentCash) return "Insufficient virtual cash at the trigger price.";
+    const now = Date.now();
+    const order: PaperOrder = { ...instrument, id: task.id, symbol: instrument.symbol, instrumentName: instrument.name, side: task.side, product: task.product, quantity: task.quantity, price: executionPrice, status: "COMPLETE", createdAt: now, time: new Date(now).toLocaleTimeString("en-IN"), charges, priceSource: "UPSTOX_QUOTE" };
+    const next = [order, ...currentOrders];
+    const nextBalance = currentCash + (task.side === "BUY" ? -capital : capital) - charges.total;
+    setOrders(next); setBalance(nextBalance); writePaperOrders(next); localStorage.setItem("papertrade-balance", String(nextBalance));
+    const nextPosition = calculatePosition(next, instrument.symbol, executionPrice, task.product);
+    if (!nextPosition.quantity || nextPosition.side !== position.side) saveProtection(null, instrument.symbol, task.product);
+    return null;
+  }
+
+  function validateQueuedPriceOrder(task: PriceTask): string | null {
+    if (!paperDataReady) return "Please wait for your paper account to load.";
+    const position = calculatePosition(orders, task.instrument.symbol, task.price, task.product);
+    const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
+    if (tradingLimitStatus.blocked && !reduces) return tradingLimitStatus.reasons[0] || "Personal trading limit is active.";
+    if (task.product === "DELIVERY" && task.side === "SELL" && !["OPTION", "FUTURE"].includes(task.instrument.assetType ?? "")) {
+      const error = validateDeliverySell(orders, task.instrument.symbol, task.quantity); if (error) return error;
+    }
+    const charges = calculateInstrumentCharges(task.instrument, { side: task.side, product: task.product, quantity: task.quantity, price: task.price });
+    const capital = paperOrderCapitalValue(task.instrument.assetType, task.product, task.quantity, task.price);
+    if (!reduces && capital + charges.total > balance) return `Insufficient virtual cash. Estimated requirement: ${formatInr(capital + charges.total)}.`;
+    return null;
+  }
+
   const rememberScanner = useCallback((label: string) => {
     setRecentScanners((current) => [label, ...current.filter((item) => item !== label)].slice(0, 4));
   }, []);
@@ -2393,6 +2446,7 @@ export function TradingDashboard() {
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
+      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2624,6 +2678,7 @@ export function TradingDashboard() {
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
+                onPriceAction={(price, mode) => setPriceRequest({ instrument: selected, price, mode })}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onFeedStatus={handleFeedStatus}
               />
@@ -2654,7 +2709,7 @@ export function TradingDashboard() {
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
           <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2 className="stock-identity"><StockLogo {...selected} size={26} />{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
-          <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => setOrderType(type)}>{type}</button>)}</div>
+          <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit" }); } }}>{type}</button>)}</div>
           <div className="input-grid">
             <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{selected.assetType === "OPTION" && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot</small>}</label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
@@ -2701,6 +2756,7 @@ export function TradingDashboard() {
 
       {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
+          onPriceAction={(instrument, price, mode) => setPriceRequest({ instrument, price, mode })}
           onReplay={setReplayInstrument}
           topInstrument={fnoTopInstrument}
           topMode={fnoTopMode}
@@ -2725,7 +2781,7 @@ export function TradingDashboard() {
           onToggleTopMode={() => setFnoTopMode((current) => current === "SPOT" && fnoFutureInstrument ? "FUTURE" : "SPOT")}
           onToggleOptionType={() => void toggleFnoOptionType()}
           onQuantityChange={(nextQuantity) => setQuantityInput(String(nextQuantity))}
-          onOpenOrder={(nextSide, mode) => { setOrderType(mode); openOrderSheet(nextSide); }}
+          onOpenOrder={(nextSide, mode) => { if (mode === "Market") { setOrderType(mode); openOrderSheet(nextSide); } else setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side: nextSide, orderType: "Limit" }); }}
           ordersEnabled={marketOrdersAllowed}
           orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
           onOrderToolChange={updateChartRiskLevel}
