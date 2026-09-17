@@ -38,7 +38,7 @@ function getDecoder() {
 }
 
 function normalizeEpochMs(value: number | undefined) {
-  if (!Number.isFinite(value) || !value) return Date.now();
+  if (!Number.isFinite(value) || !value || value < 0) return NaN;
   if (value < 10_000_000_000) return value * 1_000;
   if (value > 10_000_000_000_000) return Math.floor(value / 1_000);
   return value;
@@ -52,11 +52,12 @@ function extractTick(payload: FeedObject, instrumentKey: string): UpstoxLiveTick
     ?? feed.fullFeed?.indexFF?.ltpc
     ?? feed.firstLevelWithGreeks?.ltpc;
   const price = Number(ltpc?.ltp);
-  if (!Number.isFinite(price) || price <= 0) return null;
+  const timestampMs = normalizeEpochMs(Number(ltpc?.ltt ?? payload.currentTs));
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return null;
   return {
     instrumentKey,
     price,
-    timestampMs: normalizeEpochMs(Number(ltpc?.ltt ?? payload.currentTs)),
+    timestampMs,
   };
 }
 
@@ -72,7 +73,7 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
   if (!instrumentKeys.length) throw new Error("Choose at least one instrument for the Upstox live feed.");
   const [decoder, response] = await Promise.all([
     getDecoder(),
-    fetch("/api/upstox/stream-authorize", { cache: "no-store", signal }),
+    fetch("/api/upstox/stream-authorize", { cache: "no-store", signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) }),
   ]);
   const authorization = await response.json() as {
     ok?: boolean;
@@ -91,6 +92,24 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
   let intentionallyClosed = false;
   const abort = () => socket.close(1000, "Chart changed");
   signal.addEventListener("abort", abort, { once: true });
+
+  // Subscribe to frames before sending the subscription so the initial quote
+  // cannot be lost. Ignore queued frames after a chart has disconnected.
+  socket.addEventListener("message", (event) => {
+    void messageBytes(event.data).then((bytes) => {
+      if (!bytes || signal.aborted || intentionallyClosed) return;
+      try {
+        const decoded = decoder.decode(bytes);
+        const payload = decoder.toObject(decoded, { longs: Number, enums: String }) as FeedObject;
+        instrumentKeys.forEach((key) => {
+          const tick = extractTick(payload, key);
+          if (tick) onTick(tick);
+        });
+      } catch {
+        // Ignore malformed/non-feed frames; REST reconciliation remains active.
+      }
+    });
+  });
 
   await new Promise<void>((resolve, reject) => {
     const cleanup = () => {
@@ -121,21 +140,6 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
     socket.addEventListener("open", opened, { once: true });
   });
 
-  socket.addEventListener("message", (event) => {
-    void messageBytes(event.data).then((bytes) => {
-      if (!bytes || signal.aborted) return;
-      try {
-        const decoded = decoder.decode(bytes);
-        const payload = decoder.toObject(decoded, { longs: Number, enums: String }) as FeedObject;
-        instrumentKeys.forEach((key) => {
-          const tick = extractTick(payload, key);
-          if (tick) onTick(tick);
-        });
-      } catch {
-        // Ignore malformed/non-feed frames; a REST reconciliation remains active.
-      }
-    });
-  });
   socket.addEventListener("close", () => {
     signal.removeEventListener("abort", abort);
     if (!signal.aborted && !intentionallyClosed) onDisconnect();

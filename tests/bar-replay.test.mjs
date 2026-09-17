@@ -125,7 +125,8 @@ test("original chart powers replay, hides future bars and never feeds replay pri
   assert.doesNotMatch(replay, /writePaperOrders|localStorage|onPrice=|onOrderSide=/);
   assert.match(chart, /if \(isReplay\) return;[\s\S]*?async function loadUpstoxCandles/);
   assert.match(chart, /if \(isReplay \|\| !LIVE_TIMEFRAME_SECONDS/);
-  assert.match(chart, /if \(isReplay \|\| \(feedMode/);
+  assert.match(chart, /if \(isReplay \|\| !LIVE_TIMEFRAME_SECONDS\[timeframe\]\) return;[\s\S]*?async function refreshIntradayCandles/);
+  assert.doesNotMatch(chart, /\[feedMode, instrument\.instrumentKey/);
   assert.match(chart, /const stored = isReplay \? \(replayDrawingsRef\.current\?\.scope === drawingScope/);
 });
 test("chart entry points and header coach use shared replay on the selected timeframe", async () => {

@@ -31,7 +31,7 @@ import type {
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
-import { applyCandleTick, reconcileLiveCandles, validCandleTick, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
+import { applyCandleTick, reconcileLiveCandles, validCandleTick, liveCandleBucket, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
 
 export const DRAWING_TOOL_CATALOG = [
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
@@ -1191,14 +1191,18 @@ export function MarketChart({
     });
     if (!enabled) {
       riskDragPriceRangeRef.current = null;
-      priceScale?.setAutoScale(true);
-      if (wasEnabled) applyVisibleRange();
+      // The unused entry price follows LTP. It must not reset a user's manual
+      // price scale on every tick when there is no open position.
+      if (wasEnabled && !viewportInteractedRef.current) {
+        priceScale?.setAutoScale(true);
+        applyInitialVisibleRange();
+      }
     } else if (frozenRange) {
       priceScale?.setAutoScale(false);
       priceScale?.setVisibleRange(frozenRange);
-    } else if (!wasEnabled) {
+    } else if (!wasEnabled && !viewportInteractedRef.current) {
       priceScale?.setAutoScale(true);
-      applyVisibleRange();
+      applyInitialVisibleRange();
     }
     scheduleOverlayRefresh();
     if (!enabled) return;
@@ -1217,7 +1221,6 @@ export function MarketChart({
     tradeMarkersRef.current = tradeMarkers;
     if (tradeMarkerKeyRef.current !== tradeMarkerKey) {
       tradeMarkerKeyRef.current = tradeMarkerKey;
-      viewportInteractedRef.current = false;
       applyInitialVisibleRange();
     }
     scheduleOverlayRefresh();
@@ -1295,12 +1298,22 @@ export function MarketChart({
   useEffect(() => {
     const chart = chartApi.current;
     if (!chartAction || !chart) return;
-    if (chartAction.type === "fit") chart.timeScale().fitContent();
+    if (chartAction.type === "fit") {
+      viewportInteractedRef.current = false;
+      chart.priceScale("right").setAutoScale(true);
+      chart.timeScale().fitContent();
+    }
     if (chartAction.type === "reset") {
+      viewportInteractedRef.current = false;
+      chart.priceScale("right").setAutoScale(true);
       applyVisibleRange();
       chart.timeScale().scrollToRealTime();
     }
-    if (chartAction.type === "live") chart.timeScale().scrollToRealTime();
+    if (chartAction.type === "live") {
+      viewportInteractedRef.current = false;
+      chart.priceScale("right").setAutoScale(true);
+      chart.timeScale().scrollToRealTime();
+    }
     if (chartAction.type === "zoom-in" || chartAction.type === "zoom-out") {
       const range = chart.timeScale().getVisibleLogicalRange();
       if (range) {
@@ -1398,7 +1411,9 @@ export function MarketChart({
           fixLeftEdge: false,
           fixRightEdge: false,
           rightBarStaysOnScroll: false,
-          shiftVisibleRangeOnNewBar: false,
+          // Follow new bars only at the live edge; Lightweight Charts preserves
+          // a viewport that the user has scrolled into history.
+          shiftVisibleRangeOnNewBar: true,
           lockVisibleTimeRangeOnResize: true,
         },
         crosshair: {
@@ -1614,6 +1629,7 @@ export function MarketChart({
         if (hiddenRef.current && normalizeTool(activeToolRef.current)) return;
         pointers.add(event.pointerId);
         if (pointers.size > 1) {
+          viewportInteractedRef.current = true;
           pinching = true;
           drawingGestureRef.current = null;
           if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
@@ -1980,6 +1996,7 @@ export function MarketChart({
     let reconnectTimer = 0;
     let closeSocket: (() => void) | undefined;
     let retryAttempt = 0;
+    let connecting = false;
 
     const scheduleReconnect = (retryAfterSeconds?: number) => {
       if (stopped || controller.signal.aborted) return;
@@ -1998,7 +2015,8 @@ export function MarketChart({
     };
 
     async function connect() {
-      if (stopped || controller.signal.aborted) return;
+      if (stopped || controller.signal.aborted || connecting) return;
+      connecting = true;
       try {
         closeSocket?.();
         closeSocket = await openUpstoxLiveFeed({
@@ -2023,12 +2041,23 @@ export function MarketChart({
         if (controller.signal.aborted) return;
         const retryAfterSeconds = Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds) || undefined;
         scheduleReconnect(retryAfterSeconds);
+      } finally {
+        connecting = false;
       }
     }
 
+    const resume = () => {
+      if (document.hidden) return;
+      window.clearTimeout(reconnectTimer);
+      void connect();
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
     void connect();
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
       liveStreamConnectedRef.current = false;
       controller.abort();
       closeSocket?.();
@@ -2039,17 +2068,21 @@ export function MarketChart({
   }, [instrument.instrumentKey, timeframe, isReplay]);
 
   useEffect(() => {
-    if (isReplay || (feedMode !== "live" && feedMode !== "stale") || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") return;
+    // Reconciliation has its own lifetime. Stream status changes must not keep
+    // restarting its timer and postponing recovery indefinitely.
+    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     let controller: AbortController | null = null;
     async function refreshIntradayCandles() {
-      controller?.abort();
-      controller = new AbortController();
+      if (controller || !dataRef.current.length) return;
+      const requestController = new AbortController();
+      controller = requestController;
+      const deadline = window.setTimeout(() => requestController.abort(), 15000);
       try {
         const params = new URLSearchParams({ instrumentKey: instrument.instrumentKey, timeframe, scope: "intraday" });
-        const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal });
+        const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: requestController.signal });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[]; fetchedAt?: string; error?: { message?: string } };
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
-        if (controller.signal.aborted) return;
+        if (requestController.signal.aborted) return;
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
         candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
         syncIndicatorData();
@@ -2065,10 +2098,13 @@ export function MarketChart({
           updatedAt: payload.fetchedAt,
         });
       } catch (error) {
-        if (controller?.signal.aborted) return;
+        if (requestController.signal.aborted) return;
         if (liveStreamConnectedRef.current) return;
         setFeedMode(dataRef.current.length ? "stale" : "error");
         onFeedStatusRef.current({ mode: dataRef.current.length ? "stale" : "error", message: `${error instanceof Error ? error.message : "Upstox candle refresh failed."} Chart paused · no simulation` });
+      } finally {
+        window.clearTimeout(deadline);
+        if (controller === requestController) controller = null;
       }
     }
     const interval = window.setInterval(() => void refreshIntradayCandles(), 20_000);
@@ -2076,7 +2112,47 @@ export function MarketChart({
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [feedMode, instrument.instrumentKey, timeframe, isReplay]);
+  }, [instrument.instrumentKey, timeframe, isReplay]);
+
+  useEffect(() => {
+    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    let disposed = false;
+    let request: AbortController | null = null;
+    let retryAt = 0;
+    async function recoverQuote() {
+      const now = Date.now();
+      const weekday = new Date(now + IST_OFFSET_SECONDS * 1000).getUTCDay();
+      if (disposed || document.hidden || request || now < retryAt || weekday === 0 || weekday === 6 || liveCandleBucket(now, timeframe) === null) return;
+      // A quiet/broken socket cannot prevent the selected symbol from updating.
+      // Preserve the exchange trade timestamp: a poll is not a new trade.
+      if (lastLiveTickRef.current && now - lastLiveTickRef.current.timestampMs < 10000) return;
+      request = new AbortController();
+      const current = request;
+      const deadline = window.setTimeout(() => current.abort(), 12000);
+      try {
+        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(instrument.instrumentKey)}`, { cache: "no-store", signal: current.signal });
+        const payload = await response.json() as {
+          ok?: boolean;
+          quotes?: Record<string, { lastPrice: number; lastTradeAt: string }>;
+          error?: { retryAfterSeconds?: number };
+        };
+        if (disposed || current.signal.aborted) return;
+        if (!response.ok || !payload.ok) {
+          retryAt = now + Math.max(10, Number(payload.error?.retryAfterSeconds) || 10) * 1000;
+          return;
+        }
+        const quote = payload.quotes?.[instrument.instrumentKey];
+        if (quote) acceptLiveTick({ instrumentKey: instrument.instrumentKey, price: quote.lastPrice, timestampMs: Date.parse(quote.lastTradeAt) }, true);
+      } catch { retryAt = Date.now() + 10000; }
+      finally { window.clearTimeout(deadline); request = null; }
+    }
+    void recoverQuote();
+    const timer = window.setInterval(() => void recoverQuote(), 5000);
+    const resume = () => { if (!document.hidden) void recoverQuote(); };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    return () => { disposed = true; request?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
+  }, [instrument.instrumentKey, timeframe, isReplay]);
 
   return (
     <div className="chart-stack lightweight-stack">
