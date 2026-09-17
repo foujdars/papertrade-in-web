@@ -56,3 +56,14 @@
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { width: 66px; min-width: 66px; flex-basis: 66px; }
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 42px; min-width: 42px; flex-basis: 42px; }
 }
+
+/* Equal side tracks keep Stocks exactly centered; the clock stays far right. */
+.terminal-shell .permanent-trade-footer .chart-trade-meta { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; height: 30px; min-height: 30px; }
+.terminal-shell .permanent-trade-footer .chart-positions-trigger { order: initial; justify-self: center; min-width: 0; height: 30px; min-height: 30px; background: transparent; }
+.terminal-shell .permanent-trade-footer .chart-positions-trigger span { font-size: 11px; }
+.chart-price-actions-slot { justify-self: end; }
+.terminal-shell .chart-footer-pnl { justify-self: start; font-size: 10px; font-weight: 650; padding: 0; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: 30px; border: 0; background: transparent; }
+.terminal-shell :is(.chart-price-actions-slot,.fno-price-actions-row) .price-tasks-button { position: relative; inset: auto; display: grid; place-items: center; width: 34px; height: 30px; min-height: 30px; padding: 0; color: var(--purple,#8054d9); }
+.price-tasks-count { position: absolute; right: 0; top: 0; min-width: 12px; height: 12px; padding-inline: 2px; border-radius: 8px; background: #8054d9; color: white; font-size: 8px; line-height: 12px; text-align: center; }
+@media (max-width: 760px) { .terminal-shell .permanent-trade-footer { height: 74px; min-height: 74px; }.terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 74px; } }
+@media (min-width: 761px) { .terminal-shell .permanent-trade-footer { height: 32px; min-height: 32px; flex-basis: 32px; } }

@@ -5,6 +5,7 @@ export type PriceTask = {
   condition: "above" | "below"; side: "BUY" | "SELL"; orderType: "Limit" | "SL";
   quantity: number; product: "DELIVERY" | "INTRADAY"; createdAt: number; expiresAt: number;
   status: "pending" | "triggered" | "filled" | "cancelled" | "expired" | "rejected"; message?: string;
+  completedAt?: number; triggeredPrice?: number;
 };
 export function priceTaskError(task: Pick<PriceTask, "instrument" | "price" | "quantity" | "kind">) {
   if (!Number.isFinite(task.price) || task.price < 0.01 || Math.abs(task.price * 100 - Math.round(task.price * 100)) > 0.00001) return "Enter a positive price with no more than two decimal places.";

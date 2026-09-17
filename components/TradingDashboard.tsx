@@ -403,6 +403,7 @@ export function TradingDashboard() {
   const [magnet, setMagnet] = useChartPreference("magnet");
   const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
   const [priceActionsHost, setPriceActionsHost] = useState<HTMLDivElement | null>(null);
+  const [priceTasks, setPriceTasks] = useState<PriceTask[]>([]);
   const [fnoPriceActionsHost, setFnoPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
@@ -2425,7 +2426,7 @@ export function TradingDashboard() {
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
-      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
+      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2660,6 +2661,7 @@ export function TradingDashboard() {
                 onPrice={handleChartPrice}
                 liveTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
                 onPriceAction={(price, mode) => setPriceRequest({ instrument: selected, price, mode })}
+                priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onFeedStatus={handleFeedStatus}
               />
@@ -2678,9 +2680,9 @@ export function TradingDashboard() {
               <button disabled={!marketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
             </div>
             <div className="chart-trade-meta">
+            <button className={`chart-footer-pnl ${totalOpenPnl >= 0 ? "positive" : "negative"}`} aria-label="Open positions profit and loss" onClick={() => setPositionsOpen(true)}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</button>
             <button className="chart-positions-trigger" onClick={() => setPositionsOpen(true)}>
               <span>{selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
-              <b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b>
             </button>
             <div className="chart-price-actions-slot" ref={setPriceActionsHost} />
             </div>
@@ -2741,6 +2743,7 @@ export function TradingDashboard() {
       {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
           priceActionsHostRef={setFnoPriceActionsHost}
+          priceTasks={priceTasks}
           onPriceAction={(instrument, price, mode) => setPriceRequest({ instrument, price, mode })}
           onReplay={setReplayInstrument}
           topInstrument={fnoTopInstrument}

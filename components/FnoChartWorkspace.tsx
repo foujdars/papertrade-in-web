@@ -11,6 +11,7 @@ import { formatInr, type Instrument } from "@/lib/market";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 import { useChartPreference } from "@/lib/chart-view-preferences";
 import type { CandleTick } from "@/lib/live-candles";
+import type { PriceTask } from "@/lib/price-actions";
 
 const FNO_TIMEFRAME_GROUPS = [
   { label: "Minute", values: ["1m", "2m", "3m", "5m", "10m", "15m", "30m"] },
@@ -24,6 +25,7 @@ function signedPercent(value: number) {
 
 export function FnoChartWorkspace({
   priceActionsHostRef,
+  priceTasks,
   topInstrument,
   topMode,
   canToggleFuture,
@@ -62,6 +64,7 @@ export function FnoChartWorkspace({
   onReplay,
 }: {
   priceActionsHostRef?: (element: HTMLDivElement | null) => void;
+  priceTasks?: PriceTask[];
   topInstrument: Instrument;
   topMode: "SPOT" | "FUTURE";
   canToggleFuture: boolean;
@@ -164,6 +167,7 @@ export function FnoChartWorkspace({
               key={`focus-top-${topInstrument.instrumentKey}-${timeframe}`}
               instrument={topInstrument}
               liveTick={topTick}
+              priceTasks={priceTasks}
               onPriceAction={onPriceAction ? (price, mode) => onPriceAction(topInstrument, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}
@@ -203,6 +207,7 @@ export function FnoChartWorkspace({
               key={`focus-option-${option.instrumentKey}-${timeframe}`}
               instrument={option}
               liveTick={optionTick}
+              priceTasks={priceTasks}
               onPriceAction={onPriceAction ? (price, mode) => onPriceAction(option, price, mode) : undefined}
               timeframe={timeframe}
               activeTool={activeTool}

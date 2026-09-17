@@ -30,6 +30,8 @@ import type {
 } from "lightweight-charts-drawing";
 import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
+import { ChartAlertLevels } from "@/components/ChartAlertLevels";
+import type { PriceTask } from "@/lib/price-actions";
 import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
 import { applyCandleTick, reconcileLiveCandles, validCandleTick, liveCandleBucket, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
 
@@ -451,6 +453,7 @@ export function MarketChart({
   replayPrompt = false,
   onOrderSide,
   onPriceAction,
+  priceTasks = [],
   onOrderToolChange,
   onOrderToolClose,
   onOrderToolExit,
@@ -488,6 +491,7 @@ export function MarketChart({
   replayPrompt?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
   onPriceAction?: (price: number, mode: "alert" | "order") => void;
+  priceTasks?: PriceTask[];
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
   onOrderToolExit?: () => void;
@@ -2158,6 +2162,7 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} />}
         {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>

@@ -15,3 +15,53 @@
 .price-tasks-button { position: fixed; right: 12px; bottom: 132px; z-index: 35; border: 1px solid #7c6caa55; border-radius: 8px; min-height: 28px; background: var(--panel, #fff); color: var(--text, #443166); padding: 4px 8px; font-size: 11px; }
 @media (min-width: 769px) { .price-action-backdrop { align-items: center; } .price-action-sheet { border-radius: 18px; } .price-tasks-button { bottom: 18px; right: 330px; } }
 [data-theme="neon"] .price-action-sheet, [data-theme="neon"] .price-tasks-button { background: #101a35; color: #e7e9fa; }
+
+/* Alerts: quiet chart annotations and a focused, searchable bottom sheet. */
+.chart-alert-levels { position: absolute; left: 0; top: 0; z-index: 8; pointer-events: none; overflow: hidden; font-family: inherit; }
+.price-action-sheet { padding: 10px 20px max(20px, env(safe-area-inset-bottom)); gap: 18px; outline: none; overscroll-behavior: contain; }
+.price-sheet-handle { width: 34px; height: 4px; border-radius: 4px; background: #8a83a72e; margin: 0 auto 2px; flex: 0 0 4px; }
+.price-sheet-title { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.price-sheet-title > svg { color: #8b5cf6; flex-shrink: 0; }
+.price-sheet-title h2 { font-size: 21px; line-height: 1.25; margin: 0; font-weight: 650; letter-spacing: -.5px; }
+.price-sheet-title small { display: block; font-size: 11px; opacity: .65; margin-top: 4px; }
+.price-action-sheet .price-icon-button { flex-shrink: 0; width: 36px; min-width: 36px; min-height: 36px; padding: 0; border: 0; display: grid; place-items: center; background: transparent; color: inherit; }
+.price-action-sheet :is(button,input,select):focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+.price-action-sheet .price-action-primary { min-height: 46px; display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; border: 0; background: linear-gradient(110deg,#8243db,#6546e7); color: #fff; border-radius: 13px; font-size: 14px; }
+.price-action-sheet.price-alert-manager { height: min(78dvh, 700px); display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.price-alert-manager > :not(.price-alert-results) { flex-shrink: 0; }
+.price-action-sheet .price-alert-search { display: flex; align-items: center; gap: 9px; background: #8b78b70b; border: 1px solid #8874b32b; border-radius: 13px; padding: 0 12px; color: inherit; }
+.price-alert-search > svg { opacity: .6; flex-shrink: 0; }
+.price-action-sheet .price-alert-search input { min-height: 44px; padding: 8px 0; border: 0; background: transparent; outline-offset: -2px; font-size: 14px; }
+.price-alert-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 13px; background: #8571b612; }
+.price-action-sheet .price-alert-tabs button { display: flex; justify-content: center; align-items: center; gap: 8px; border: 0; padding: 6px; min-height: 36px; text-align: center; font-size: 14px; opacity: .65; }
+.price-action-sheet .price-alert-tabs button[aria-selected="true"] { background: var(--panel,#fff); box-shadow: 0 2px 8px #33244e0b; opacity: 1; color: #8750d7; font-weight: 650; }
+.price-alert-tabs span { font-size: 10px; opacity: .7; }
+.price-alert-filters { display: flex; gap: 8px; }
+.price-action-sheet .price-alert-filters button { min-height: 28px; padding: 4px 10px; border: 0; border-radius: 20px; font-size: 11px; opacity: .65; }
+.price-action-sheet .price-alert-filters button[aria-pressed="true"] { background: #9161e01a; color: #8750d7; opacity: 1; }
+.price-alert-results { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.price-action-sheet .price-alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 18px 0; border-bottom: 1px solid #8a83a71c; }
+.price-alert-item-copy { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.price-alert-item-copy > b { font-size: 14px; overflow-wrap: anywhere; }
+.price-alert-item-copy > span { font-size: 12px; opacity: .85; }
+.price-alert-item-copy strong { font-weight: 650; }
+.price-alert-item-copy small { font-size: 10px; line-height: 1.6; opacity: .8; }
+.price-alert-status { font-style: normal; font-weight: 600; }.price-alert-status.pending,.price-alert-status.filled,.price-alert-status.triggered { color: #009a80; }.price-alert-status.rejected { color: #ed4777; }
+.price-alert-empty { min-height: 220px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 18px; box-sizing: border-box; }
+.price-alert-empty > div { width: 78px; height: 78px; display: grid; place-items: center; background: #9161e011; color: #9161e0; border-radius: 26px; }
+.price-alert-empty h3 { margin: 8px 0 0; font-size: 16px; font-weight: 650; }
+.price-alert-empty p { max-width: 250px; }
+.price-alert-footer { display: grid; gap: 12px; padding-top: 6px; border-top: 1px solid #8a83a71c; }
+.price-alert-footer p { font-size: 10px; text-align: center; }
+.price-condition { min-width: 0; margin: 0; padding: 0; border: 0; }
+.price-condition legend { font-size: 13px; margin-bottom: 8px; }
+.price-condition > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.price-action-sheet .price-condition button { display: flex; align-items: center; gap: 8px; min-height: 78px; padding: 12px 10px; border-radius: 13px; }
+.price-condition button > svg { flex-shrink: 0; }.price-condition button > svg:last-child:not(:first-child) { margin-left: auto; width: 13px; }
+.price-condition span { min-width: 0; display: grid; gap: 5px; }.price-condition b { font-size: 12px; }.price-condition small { font-size: 10px; line-height: 1.4; opacity: .65; }
+.price-action-sheet .price-condition button[aria-checked="true"] { background: #9161e014; border-color: #9b70dd; color: #8750d7; }
+.price-alert-form h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.price-alert-form > label:first-of-type input { font-size: 24px; padding: 15px 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+[data-theme="neon"] .price-action-sheet .price-alert-tabs button[aria-selected="true"] { background: #263052; color: #c6acff; }
+[data-theme="neon"] .price-action-sheet :is(.price-condition button[aria-checked="true"],.price-alert-filters button[aria-pressed="true"]) { color: #c6acff; }
+@media (max-width: 360px) { .price-action-sheet { padding-inline: 16px; }.price-condition > div { grid-template-columns: 1fr; }.price-action-sheet .price-condition button { min-height: 58px; } }
