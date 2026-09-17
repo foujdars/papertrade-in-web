@@ -65,6 +65,7 @@ import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import { useChartPreference } from "@/lib/chart-view-preferences";
 import { useToastNotice } from "./useToastNotice";
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
@@ -399,8 +400,10 @@ export function TradingDashboard() {
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
   const [toolSignal, setToolSignal] = useState(0);
-  const [magnet, setMagnet] = useState(false);
-  const [hiddenDrawings, setHiddenDrawings] = useState(false);
+  const [magnet, setMagnet] = useChartPreference("magnet");
+  const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
+  const [priceActionsHost, setPriceActionsHost] = useState<HTMLDivElement | null>(null);
+  const [fnoPriceActionsHost, setFnoPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [theme, setTheme] = useState<"light" | "neon">("light");
@@ -2422,7 +2425,7 @@ export function TradingDashboard() {
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
-      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
+      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2602,7 +2605,7 @@ export function TradingDashboard() {
                 <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>NSE</em></button>)}{!tradeSymbolMatches.length && <p>No matching NSE stock.</p>}</div>
               </div>}
             </div>
-            <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={showChartFunctions ? "active" : ""} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
+            <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={`chart-functions-trigger ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
             <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
               <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
@@ -2642,6 +2645,7 @@ export function TradingDashboard() {
                 toolSignal={toolSignal}
                 magnet={magnet}
                 hiddenDrawings={hiddenDrawings}
+                candlesOnly={hiddenDrawings}
                 lockedDrawings={drawingsLocked}
                 clearSignal={clearSignal}
                 undoSignal={undoSignal}
@@ -2673,10 +2677,13 @@ export function TradingDashboard() {
               <button disabled={!marketOrdersAllowed} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
               <button disabled={!marketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
             </div>
+            <div className="chart-trade-meta">
             <button className="chart-positions-trigger" onClick={() => setPositionsOpen(true)}>
               <span>{selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
               <b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b>
             </button>
+            <div className="chart-price-actions-slot" ref={setPriceActionsHost} />
+            </div>
           </div>}
         </section>
 
@@ -2733,6 +2740,7 @@ export function TradingDashboard() {
 
       {activeNavigationSection === "fno" && selected.assetType === "OPTION" && spotInstrument && fnoTopInstrument && (
         <FnoChartWorkspace
+          priceActionsHostRef={setFnoPriceActionsHost}
           onPriceAction={(instrument, price, mode) => setPriceRequest({ instrument, price, mode })}
           onReplay={setReplayInstrument}
           topInstrument={fnoTopInstrument}
@@ -2800,7 +2808,8 @@ export function TradingDashboard() {
           setPnlHistoryFilter("all");
           openNavigationSection("pnl");
           setPnlHistoryOnly(true);
-          setPnlTradeMenuId(closedTrades[0]?.id ?? null);
+          setPnlTradeMenuId(null);
+          setTradeSelection(null);
         }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
@@ -3048,8 +3057,9 @@ export function TradingDashboard() {
                             instrument={reviewInstrument}
                             timeframe={pnlReviewTimeframe}
                             activeTool="cursor"
-                            magnet={false}
+                            magnet={magnet}
                             hiddenDrawings
+                            candlesOnly={hiddenDrawings}
                             lockedDrawings
                             visibleBars={pnlReviewTimeframe === "1D" || pnlReviewTimeframe === "1W" || pnlReviewTimeframe === "1M" || pnlReviewTimeframe === "1Y" ? 72 : 46}
                             indicators={indicators}

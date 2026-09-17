@@ -10,7 +10,7 @@ import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   CandlestickData,
   IChartApi,
@@ -429,12 +429,13 @@ export function MarketChart({
   toolSignal = 0,
   magnet,
   hiddenDrawings,
+  candlesOnly = false,
   lockedDrawings = false,
   clearSignal = 0,
   undoSignal = 0,
   redoSignal = 0,
   visibleBars = 22,
-  indicators,
+  indicators: suppliedIndicators,
   chartAction,
   chartTheme = "light",
   orderTool: suppliedOrderTool,
@@ -465,6 +466,7 @@ export function MarketChart({
   toolSignal?: number;
   magnet: boolean;
   hiddenDrawings: boolean;
+  candlesOnly?: boolean;
   lockedDrawings?: boolean;
   clearSignal?: number;
   undoSignal?: number;
@@ -495,6 +497,10 @@ export function MarketChart({
   liveTick?: CandleTick;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
+  // Hiding studies never changes which studies the user has selected.
+  const indicators = useMemo(() => candlesOnly
+    ? Object.fromEntries(Object.keys(suppliedIndicators).map(key => [key, false])) as ChartIndicators
+    : suppliedIndicators, [candlesOnly, suppliedIndicators]);
   const isReplay = replayCandles !== undefined;
   const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
@@ -532,6 +538,8 @@ export function MarketChart({
   const magnetRef = useRef(magnet);
   const lockedRef = useRef(lockedDrawings);
   const hiddenRef = useRef(hiddenDrawings);
+  const candlesOnlyRef = useRef(candlesOnly);
+  candlesOnlyRef.current = candlesOnly;
   const [initialData] = useState<Candle[]>(() => replayCandles ?? []);
   const dataRef = useRef<Candle[]>(initialData);
   const storedDrawingsRef = useRef<SerializedDrawing[]>([]);
@@ -582,7 +590,7 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null } | null>(null);
+  const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
   const drawingAimRef = useRef<Anchor | null>(null);
   const lastCrosshairAnchorRef = useRef<Anchor | null>(null);
   const confirmDrawingPointRef = useRef<(() => void) | null>(null);
@@ -1106,7 +1114,7 @@ export function MarketChart({
     const element=drawingCrosshairRef.current,chart=chartApi.current,series=candleSeries.current,anchor=drawingAimRef.current;
     if(!element)return;
     const tool=normalizeTool(activeToolRef.current);
-    if(!chart||!series||!anchor||!tool||CONTINUOUS_TOOLS.has(tool)){element.hidden=true;return;}
+    if(!chart||!series||!anchor||!tool||hiddenRef.current||CONTINUOUS_TOOLS.has(tool)){element.hidden=true;return;}
     const logical=drawingLogicalAtTime(Number(anchor.time),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
     const x=chart.timeScale().timeToCoordinate(anchor.time)??(logical===null?null:chart.timeScale().logicalToCoordinate(logical as Logical));
     const y=series.priceToCoordinate(anchor.price),height=chart.panes()[0]?.getHeight()??0,width=chart.timeScale().width();
@@ -1280,6 +1288,7 @@ export function MarketChart({
   useEffect(() => {
     hiddenRef.current = hiddenDrawings;
     for (const drawing of drawingManager.current?.getAllDrawings() ?? []) drawing.updateOptions({ visible: !hiddenDrawings });
+    refreshDrawingCrosshair();
     persistDrawings();
   }, [hiddenDrawings]);
 
@@ -1421,7 +1430,7 @@ export function MarketChart({
         autoscaleInfoProvider: (baseImplementation: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
           const base = baseImplementation();
           const tool = orderToolRef.current;
-          if (!base || !tool?.enabled) return base;
+          if (!base || !tool?.enabled || candlesOnlyRef.current) return base;
           const levels = [tool.entryPrice, tool.targetPrice, tool.stopLossPrice].filter((value) => Number.isFinite(value) && value > 0);
           if (!levels.length) return base;
           const minValue = Math.min(base.priceRange.minValue, ...levels);
@@ -1498,7 +1507,14 @@ export function MarketChart({
       const pointers = new Set<number>();
       let pinching = false;
       const aim = (event: PointerEvent) => {
-        const anchor = pointerAnchor(event, true);
+        const gesture = drawingGestureRef.current;
+        const origin = gesture?.origin;
+        // Remote drags act like a trackpad, preserving the aim-to-finger offset.
+        const x = origin && gesture ? Math.max(0, Math.min(chart.timeScale().width(), origin.x + event.clientX - gesture.x)) : null;
+        const y = origin && gesture ? Math.max(0, Math.min(chart.panes()[0].getHeight(), origin.y + event.clientY - gesture.y)) : null;
+        const time = x === null ? null : drawingTimeAtCoordinate(x);
+        const price = y === null ? null : series.coordinateToPrice(y);
+        const anchor = time !== null && price !== null ? snapAnchor(time, price) : pointerAnchor(event, true);
         if (!anchor) return;
         drawingAimRef.current = anchor;
         lastCrosshairAnchorRef.current = anchor;
@@ -1595,6 +1611,7 @@ export function MarketChart({
       };
       const onPointerDown = (event: PointerEvent) => {
         if (event.button !== 0) return;
+        if (hiddenRef.current && normalizeTool(activeToolRef.current)) return;
         pointers.add(event.pointerId);
         if (pointers.size > 1) {
           pinching = true;
@@ -1606,7 +1623,11 @@ export function MarketChart({
         const tool = normalizeTool(activeToolRef.current);
         if (!tool || CONTINUOUS_TOOLS.has(tool)) { commitOrEdit(event); return; }
         // Snapshot the existing crosshair BEFORE touching the screen. A tap is confirmation only.
-        drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, anchor: drawingAimRef.current ? { ...drawingAimRef.current } : null };
+        const anchor = drawingAimRef.current ? { ...drawingAimRef.current } : null;
+        const logical = anchor ? drawingLogicalAtTime(Number(anchor.time), dataRef.current.map(c => Number(chartTimeFromEpoch(Number(c.time), timeframe)))) : null;
+        const aimX = anchor ? chart.timeScale().timeToCoordinate(anchor.time) ?? (logical === null ? null : chart.timeScale().logicalToCoordinate(logical as Logical)) : null;
+        const aimY = anchor ? series.priceToCoordinate(anchor.price) : null;
+        drawingGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, anchor, origin: aimX === null || aimY === null ? null : { x: aimX, y: aimY } };
         host.setPointerCapture?.(event.pointerId);
         event.preventDefault(); event.stopPropagation();
       };
@@ -1626,7 +1647,10 @@ export function MarketChart({
           const current = pointerAnchor(event, false);
           if (!current) return;
           if (edit.anchorIndex !== null) {
-            edit.drawing.updateAnchor(edit.anchorIndex, magnetRef.current ? snapAnchor(current.time, current.price) : current);
+            const original = edit.originalAnchors[edit.anchorIndex];
+            const originalX = edit.originalPixels[edit.anchorIndex];
+            const next = { time: originalX === null ? original.time : drawingTimeAtCoordinate(originalX + event.clientX - edit.startX) ?? original.time, price: original.price + current.price - edit.start.price };
+            edit.drawing.updateAnchor(edit.anchorIndex, magnetRef.current ? snapAnchor(next.time, next.price) : next);
           } else {
             const priceDelta = current.price - edit.start.price;
             const dx = event.clientX - edit.startX;
@@ -2059,7 +2083,7 @@ export function MarketChart({
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} />}
-        {!isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
+        {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
           <header><b>{instrument.symbol} · ₹{priceMenu.toFixed(2)}</b><button aria-label="Close price menu" onClick={() => setPriceMenu(null)}>×</button></header>
           <button onClick={() => { onPriceAction?.(priceMenu, "alert"); setPriceMenu(null); }}>Add price alert at ₹{priceMenu.toFixed(2)}</button>
@@ -2151,17 +2175,17 @@ export function MarketChart({
           </div>
         )}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
-        {selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
+        {!hiddenDrawings && selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
           <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
           <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
         </div>}
-        {onOrderSide && (
+        {!candlesOnly && onOrderSide && (
           <div className="chart-quick-order-buttons" aria-label="Paper trade controls">
             <button className={`chart-sell-button ${orderTool?.enabled && orderTool.side === "SELL" ? "active" : ""}`} onClick={() => onOrderSide("SELL")}><span>Sell</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
             <button className={`chart-buy-button ${orderTool?.enabled && orderTool.side === "BUY" ? "active" : ""}`} onClick={() => onOrderSide("BUY")}><span>Buy</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
           </div>
         )}
-        {tradeMarkerCoordinates.map((marker) => (
+        {!candlesOnly && tradeMarkerCoordinates.map((marker) => (
           <div
             key={marker.id}
             className={`chart-trade-marker stacked-marker ${marker.side.toLowerCase()} ${marker.role.toLowerCase()} ${marker.direction}`}
@@ -2173,7 +2197,7 @@ export function MarketChart({
             </svg>
           </div>
         ))}
-        {orderTool?.enabled && riskCoordinates && (
+        {!candlesOnly && orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
@@ -2213,7 +2237,7 @@ export function MarketChart({
             {onOrderToolExit && <button type="button" className="bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
           </div>
         )}
-        {typeof orderTool?.livePnl === "number" && Number.isFinite(orderTool.livePnl) && <div className={`chart-live-pnl ${orderTool.livePnl >= 0 ? "positive" : "negative"}`}>
+        {!candlesOnly && typeof orderTool?.livePnl === "number" && Number.isFinite(orderTool.livePnl) && <div className={`chart-live-pnl ${orderTool.livePnl >= 0 ? "positive" : "negative"}`}>
           <span>Live P&amp;L</span><b>{formatRiskPnl(orderTool.livePnl)}</b>
         </div>}
       </div>

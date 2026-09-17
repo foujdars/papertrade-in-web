@@ -9,11 +9,14 @@ import { ChartTimeframeMenu } from "@/components/CompactSelectors";
 import { StockLogo } from "@/components/StockLogo";
 import { formatInr, type Candle, type Instrument } from "@/lib/market";
 import { emptyReplayAccount, prepareReplayCandles, replayPnl, replayTrade } from "@/lib/bar-replay";
+import { useChartPreference } from "@/lib/chart-view-preferences";
 
 const ignoreFeed = () => undefined;
 const dateLabel = (time: number) => new Date(time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { instrument: Instrument; initialTimeframe: string; theme: "light" | "neon"; onClose?: () => void }) {
+  const [magnet] = useChartPreference("magnet");
+  const [hidden] = useChartPreference("hidden");
   const [timeframe, setTimeframe] = useState(initialTimeframe);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [cursor, setCursor] = useState(0);
@@ -96,7 +99,7 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
       <button type="button" onClick={() => setAction((value) => ({ type: "fit", token: (value?.token ?? 0) + 1 }))}>Fit</button>
     </div>
     <div className="bar-replay-chart">
-      {!!visible.length && <MarketChart key={`${instrument.instrumentKey}-${timeframe}`} instrument={instrument} timeframe={timeframe} activeTool={tool} magnet hiddenDrawings={selecting} indicators={indicators} chartAction={action} chartTheme={theme} visibleBars={60} replayCandles={visible} replaySelecting={selecting} replayStartTime={hasStarted ? null : selecting ? current?.time ?? null : startTime} replayPrompt={showStart && !hasStarted} onReplayPreview={previewAt} onReplaySelect={startAt} onReplayPlay={playFromHere} tradeMarkers={selecting ? [] : account.fills} clearSignal={clearSignal} onDrawingComplete={() => setTool("cursor")} onFeedStatus={ignoreFeed} />}
+      {!!visible.length && <MarketChart key={`${instrument.instrumentKey}-${timeframe}`} instrument={instrument} timeframe={timeframe} activeTool={tool} magnet={magnet} hiddenDrawings={selecting || hidden} candlesOnly={hidden} indicators={indicators} chartAction={action} chartTheme={theme} visibleBars={60} replayCandles={visible} replaySelecting={selecting} replayStartTime={hasStarted ? null : selecting ? current?.time ?? null : startTime} replayPrompt={showStart && !hasStarted} onReplayPreview={previewAt} onReplaySelect={startAt} onReplayPlay={playFromHere} tradeMarkers={selecting ? [] : account.fills} clearSignal={clearSignal} onDrawingComplete={() => setTool("cursor")} onFeedStatus={ignoreFeed} />}
       {!visible.length && <div className="bar-replay-empty" role="status">{loading ? <CandleLoader label={message} /> : <p>{message}</p>}{!loading && <button type="button" onClick={() => { reload(timeframe); setRetry((value) => value + 1); }}>Retry</button>}</div>}
       {timeMenu && <ChartTimeframeMenu current={timeframe} onSelect={reload} onClose={() => setTimeMenu(false)} />}
       {functionsOpen && <ChartFunctionMenu indicators={indicators} onToggleIndicator={(name) => setIndicators((value) => ({ ...value, [name]: !value[name] }))} onAction={(type) => setAction((value) => ({ type, token: (value?.token ?? 0) + 1 }))} onClose={() => setFunctionsOpen(false)} />}

@@ -21,6 +21,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
   let index = 0;
   const react = { ...require("react"), useState(initial) { const key = index++; if (!(key in states)) states[key] = typeof initial === "function" ? initial() : initial; return [states[key], next => { states[key] = typeof next === "function" ? next(states[key]) : next; }]; }, useEffect() {}, useMemo: fn => fn(), useRef: current => ({ current }) };
   const chart = () => null;
+  const preferences = { magnet: true, hidden: false };
   const mocks = {
     react,
     "./CandleLoader": { CandleLoader: () => null },
@@ -28,6 +29,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
     "@/components/ChartFunctionMenu": {}, "@/components/CompactSelectors": {}, "@/components/StockLogo": {},
     "@/lib/market": { formatInr: String },
     "@/lib/bar-replay": { emptyReplayAccount, replayTrade, prepareReplayCandles, replayPnl },
+    "@/lib/chart-view-preferences": { useChartPreference: key => [preferences[key], () => {}] },
   };
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {};
@@ -47,6 +49,12 @@ test("replay previews, confirms and starts on the chosen candle without showing 
   assert.equal(chartProps().replayPrompt, false);
   assert.equal(states[4], true, "Playback starts");
   assert.equal(states[2], 2, "Playback starts on the selected candle, not a later candle");
+  assert.equal(chartProps().magnet, true);
+  preferences.magnet = false;
+  preferences.hidden = true;
+  assert.equal(chartProps().magnet, false);
+  assert.equal(chartProps().hiddenDrawings, true);
+  assert.equal(chartProps().candlesOnly, true);
   assert.doesNotMatch(source, /type="range"|Tap a candle to start|Start here/);
 });
 

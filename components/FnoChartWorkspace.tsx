@@ -9,6 +9,7 @@ import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { MarketChart, type ChartAction, type ChartActionRequest, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
 import { formatInr, type Instrument } from "@/lib/market";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import { useChartPreference } from "@/lib/chart-view-preferences";
 import type { CandleTick } from "@/lib/live-candles";
 
 const FNO_TIMEFRAME_GROUPS = [
@@ -22,6 +23,7 @@ function signedPercent(value: number) {
 }
 
 export function FnoChartWorkspace({
+  priceActionsHostRef,
   topInstrument,
   topMode,
   canToggleFuture,
@@ -59,6 +61,7 @@ export function FnoChartWorkspace({
   chartTheme,
   onReplay,
 }: {
+  priceActionsHostRef?: (element: HTMLDivElement | null) => void;
   topInstrument: Instrument;
   topMode: "SPOT" | "FUTURE";
   canToggleFuture: boolean;
@@ -104,9 +107,9 @@ export function FnoChartWorkspace({
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [toolSignal, setToolSignal] = useState(0);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
-  const [magnet, setMagnet] = useState(true);
+  const [magnet, setMagnet] = useChartPreference("magnet");
   const [lockedDrawings, setLockedDrawings] = useState(false);
-  const [hiddenDrawings, setHiddenDrawings] = useState(false);
+  const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
   const [clearSignal, setClearSignal] = useState(0);
   const [undoSignal, setUndoSignal] = useState(0);
   const [redoSignal, setRedoSignal] = useState(0);
@@ -168,6 +171,7 @@ export function FnoChartWorkspace({
               onDrawingComplete={() => setActiveTool("cursor")}
               magnet={magnet}
               hiddenDrawings={hiddenDrawings}
+              candlesOnly={hiddenDrawings}
               lockedDrawings={lockedDrawings}
               clearSignal={clearSignal}
               undoSignal={undoSignal}
@@ -206,6 +210,7 @@ export function FnoChartWorkspace({
               onDrawingComplete={() => setActiveTool("cursor")}
               magnet={magnet}
               hiddenDrawings={hiddenDrawings}
+              candlesOnly={hiddenDrawings}
               lockedDrawings={lockedDrawings}
               clearSignal={clearSignal}
               undoSignal={undoSignal}
@@ -225,6 +230,7 @@ export function FnoChartWorkspace({
         </section>
       </div>
 
+      <div className="fno-price-actions-row" ref={priceActionsHostRef} />
       {tradeDockOpen && (
         <div className="fno-trade-dock">
           <div className="fno-order-modes"><button className={orderMode === "Market" ? "active" : ""} onClick={() => setOrderMode("Market")}>1-Tap Market</button><button className={orderMode === "Limit" ? "active" : ""} onClick={() => setOrderMode("Limit")}>Limit/Trigger on Chart</button></div>

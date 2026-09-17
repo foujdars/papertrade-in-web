@@ -6,6 +6,7 @@ import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import { analyzeSmc, isSmcZone, untouchedSmcMarks, SMC_ZONE_COLOURS, SMC_LESSONS, type SmcKind, type SmcMark } from "@/lib/smc-learner";
 import { useTransientBack } from "./useTransientBack";
+import { useChartPreference } from "@/lib/chart-view-preferences";
 
 const groups: Record<string, SmcKind[]> = {
   Structure: ["BOS / BMS", "CHoCH", "SMS / MSS"], FVG: ["FVG"], "Order blocks": ["OB"],
@@ -19,9 +20,9 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [lesson, setLesson] = useState<SmcKind>("FVG");
-  const [filters, setFilters] = useState(Object.keys(groups));
-  const [rangeVisible, setRangeVisible] = useState(false);
+  const [lesson, setLesson] = useChartPreference("smcLesson");
+  const [filters, setFilters] = useChartPreference("smcFilters");
+  const [rangeVisible, setRangeVisible] = useChartPreference("smcRange");
   const [, redraw] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
   const explanationRef = useRef<HTMLElement>(null);

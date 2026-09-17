@@ -11,6 +11,9 @@
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger small { font-size: 11px; line-height: 1.2; color: inherit; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger b { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger svg { width: 12px; flex: 0 0 12px; }
+.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger { justify-content: center; }
+.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > svg { display: none; }
+.terminal-shell .trade-cockpit .chart-functions-trigger small { white-space: nowrap; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 48px; min-width: 48px; flex-basis: 48px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger small { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger b { display: block; font-size: 12px; }
@@ -24,7 +27,24 @@
 .smc-zone-key span { display: inline-flex; align-items: center; gap: 3px; }
 .smc-zone-key i { width: 9px; height: 9px; opacity: .65; border-radius: 1px; }
 .smc-direction-key b { color: #009b7c; font-weight: 500; }.smc-direction-key em { color: #e53572; font-style: normal; }
+/* Alerts belong to the trade footer, not the chart's time scale. */
+.chart-trade-meta { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.chart-price-actions-slot { display: flex; align-items: center; min-width: 0; }
+.terminal-shell :is(.chart-price-actions-slot, .fno-price-actions-row) .price-tasks-button { position: static; padding: 0 3px; min-width: 0; min-height: 18px; white-space: nowrap; font-size: 11px; line-height: 18px; }
+.fno-price-actions-row { display: flex; justify-content: flex-end; flex: 0 0 auto; }
+.fno-focus-workspace.trade-dock-visible { grid-template-rows: minmax(0, 1fr) auto auto; }
+.home-portfolio-value > .home-today-pnl { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.home-today-pnl:focus-visible { outline: 2px solid var(--accent, #8054d9); outline-offset: 5px; border-radius: 4px; }
+@media (min-width: 761px) {
+  .terminal-shell .permanent-trade-footer { display: flex; height: 26px; min-height: 26px; flex: 0 0 26px; padding: 0 12px; }
+  .terminal-shell .permanent-trade-footer .chart-trade-buttons { display: none; }
+  .terminal-shell .permanent-trade-footer .chart-trade-meta { width: 100%; }
+  .terminal-shell .permanent-trade-footer .chart-positions-trigger { height: 22px; border: 0; background: transparent; }
+}
 @media (max-width: 768px) {
+  .terminal-shell .permanent-trade-footer .chart-trade-meta { order: -1; width: 100%; height: 14px; min-height: 14px; justify-content: center; gap: 14px; }
+  .terminal-shell .permanent-trade-footer .chart-positions-trigger { width: auto; height: 14px; min-height: 14px; flex: 0 1 auto; padding: 0; }
+  .terminal-shell .chart-price-actions-slot .price-tasks-button { min-height: 14px; line-height: 14px; }
   .terminal-shell .trade-cockpit .chart-controls :is(.desktop-live-pnl,.chart-control-orders) { display: none; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger { flex: 0 1 auto; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { max-width: none; }

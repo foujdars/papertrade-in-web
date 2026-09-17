@@ -164,7 +164,7 @@ export function HomeWorkspace({
           {cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></header>
             <div className="home-portfolio-value">
-              <span><small>TODAY</small><strong className={todayPnl >= 0 ? "positive" : "negative"}>{todayPnl >= 0 ? "+" : ""}{formatInr(todayPnl)}</strong></span>
+              <button className="home-today-pnl" onClick={onOpenPositions} aria-label="Today's profit and loss — open positions"><small>TODAY</small><strong className={todayPnl >= 0 ? "positive" : "negative"}>{todayPnl >= 0 ? "+" : ""}{formatInr(todayPnl)}</strong></button>
               <span><small>VIRTUAL CASH</small><b>{formatInr(balance)}</b></span>
             </div>
             <div className="home-portfolio-stats">

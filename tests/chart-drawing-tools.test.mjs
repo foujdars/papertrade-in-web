@@ -42,13 +42,17 @@ test('drawing mode uses a centre dot without a guidance banner and chart footer 
 test('point confirmation snapshots the pinned crosshair, never the tap coordinates',async()=>{
  const source=await readFile(new URL('../components/MarketChart.tsx',import.meta.url),'utf8');
  const down=source.slice(source.indexOf('const onPointerDown ='),source.indexOf('const onPointerMove ='));
- assert.match(down,/anchor: drawingAimRef\.current \? \{ \.\.\.drawingAimRef\.current \}/);
+ assert.match(down,/const anchor = drawingAimRef\.current \? \{ \.\.\.drawingAimRef\.current \}/);
  assert.doesNotMatch(down,/aim\(event\)/);
  const up=source.slice(source.indexOf('const onPointerUp ='),source.indexOf('const onKeyDown ='));
  assert.match(up,/!gesture\.moved && gesture\.anchor\) commitOrEdit\(event, gesture\.anchor\)/);
  assert.match(source,/gesture\?\.pointerId === event\.pointerId && gesture\.moved\) aim\(event\)/);
  assert.match(source,/pointTool \? lastCrosshairAnchorRef\.current/);
  assert.match(source,/tap anywhere to confirm/);
+ const aim=source.slice(source.indexOf('const aim ='),source.indexOf('const commitOrEdit ='));
+ assert.match(aim,/origin\.x \+ event\.clientX - gesture\.x/);
+ assert.match(aim,/origin\.y \+ event\.clientY - gesture\.y/);
+ assert.match(source,/price: original\.price \+ current\.price - edit\.start\.price/);
 });
 test('volume profile preserves selected candle volume, including flat candles and reversed ranges',()=>{
  const bins=buildVolumeProfile([...candles,{time:3,low:110,high:110,volume:50}],3,1);

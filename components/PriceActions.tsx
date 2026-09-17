@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { priceTaskError, priceTaskMatches, freshTaskQuote, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { useTransientBack } from "@/components/useTransientBack";
 const KEY = "papertrade-price-tasks-v1";
-export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, ownerId = "local" }: {
+export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, ownerId = "local" }: {
   request: PriceRequest | null; onClose: () => void; onFill: (task: PriceTask, price: number) => string | null;
   onValidate?: (task: PriceTask) => string | null;
   marketOpen: boolean; intradayOpen: boolean; onNotice: (message: string) => void; visible: boolean; ownerId?: string;
+  triggerHost?: HTMLElement | null;
 }) {
   const storageKey = `${KEY}:${ownerId}`;
   const [tasks, setTasks] = useState<PriceTask[]>([]);
@@ -87,7 +89,7 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
     onNotice(mode === "alert" ? "Price alert saved" : "Paper price order queued"); onClose();
   }
   return <>
-    {visible && <button className="price-tasks-button" onClick={() => setManage(true)}>Alerts &amp; price orders {tasks.filter(t => t.status === "pending").length || ""}</button>}
+    {visible && triggerHost && createPortal(<button className="price-tasks-button" onClick={() => setManage(true)}>Alerts &amp; price orders {tasks.filter(t => t.status === "pending").length || ""}</button>, triggerHost)}
     {(request || manage) && <div className="price-action-backdrop" onClick={() => { onClose(); setManage(false); }}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label={request ? "Price action" : "Alerts and price orders"} onClick={e => e.stopPropagation()}>
       <header><b>{request?.instrument.symbol ?? "Alerts & price orders"}</b><button onClick={() => { onClose(); setManage(false); }} aria-label="Close price actions">×</button></header>
       {request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
