@@ -1,4 +1,5 @@
 import { allotmentLink, type AllotmentRegistrar } from "./ipo-allotment";
+import type { Instrument } from "./market";
 
 export type PaperTradeNotificationKind = "trade" | "portfolio" | "ipo" | "market";
 
@@ -11,6 +12,8 @@ export type PaperTradeNotification = {
   read: boolean;
   symbol?: string;
   instrumentKey?: string;
+  timeframe?: string;
+  instrument?: Instrument;
   allotmentRegistrar?: AllotmentRegistrar;
   url?: string;
 };
@@ -43,6 +46,7 @@ export function addPaperTradeNotification(input: Omit<PaperTradeNotification, "i
   savePaperTradeNotifications([{ id, kind: input.kind, title: input.title, body: input.body, createdAt, read: false,
     ...(input.url && (/^\/\?screen=(ipo|pnl)$/.test(input.url) || /^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(input.url)) ? { url: input.url } : {}),
     ...(input.kind === "trade" && input.symbol ? { symbol: input.symbol, instrumentKey: input.instrumentKey } : {}),
+    ...(input.timeframe && ["1m", "3m", "5m", "15m", "30m", "1H", "1D"].includes(input.timeframe) ? { timeframe: input.timeframe, instrument: input.instrument } : {}),
     ...(input.kind === "ipo" && allotmentLink(input.allotmentRegistrar) ? { allotmentRegistrar: input.allotmentRegistrar } : {}),
   }, ...current]);
 }

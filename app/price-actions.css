@@ -65,3 +65,19 @@
 [data-theme="neon"] .price-action-sheet .price-alert-tabs button[aria-selected="true"] { background: #263052; color: #c6acff; }
 [data-theme="neon"] .price-action-sheet :is(.price-condition button[aria-checked="true"],.price-alert-filters button[aria-pressed="true"]) { color: #c6acff; }
 @media (max-width: 360px) { .price-action-sheet { padding-inline: 16px; }.price-condition > div { grid-template-columns: 1fr; }.price-action-sheet .price-condition button { min-height: 58px; } }
+
+/* Technical alerts share the same compact, themed sheet as price alerts. */
+.technical-alert-form { display: grid; gap: 17px; min-width: 0; }
+.technical-intro { display: flex; align-items: center; gap: 10px; }
+.technical-intro > svg, .technical-rule > svg, .technical-event > svg { color: #9b70dd; flex-shrink: 0; }
+.technical-summary { display: flex; gap: 10px; background: #9161e00d; border: 1px solid #9161e026; border-radius: 13px; padding: 13px; }
+.technical-summary > svg { flex-shrink: 0; color: #009a80; }
+.technical-summary b { font-size: 12px; }.technical-summary small { display: block; font-size: 10px; opacity: .65; margin-top: 7px; line-height: 1.6; }
+.technical-alert-form .modern-select { min-width: 0; }.technical-alert-form .modern-select-trigger { width: 100%; font-size: 13px; }
+.technical-alert-form .modern-select-dialog { color: var(--text); }
+.price-alert-item-copy em { font-size: 10px; font-style: normal; font-weight: 400; opacity: .65; margin-left: 4px; }
+.technical-monitor-state { color: #009a80; }
+.technical-rule-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.price-action-sheet .technical-rule-actions button { border: 0; min-height: 36px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; font-size: 11px; color: inherit; background: #9161e00c; }
+.price-alert-filters { flex-wrap: wrap; }.price-action-sheet [role="alert"] { color: #e84171; opacity: 1; }
+.technical-alert-form button:disabled { opacity: .5; cursor: wait; }

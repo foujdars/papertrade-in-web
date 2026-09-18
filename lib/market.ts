@@ -264,8 +264,8 @@ export function rsi(data: Candle[], period = 14) {
       averageGain = (averageGain * (period - 1) + gain) / period;
       averageLoss = (averageLoss * (period - 1) + loss) / period;
     }
-    const relativeStrength = averageLoss === 0 ? 100 : averageGain / averageLoss;
-    return { time: candle.time, value: 100 - 100 / (1 + relativeStrength) };
+    const value = averageLoss === 0 ? (averageGain === 0 ? 50 : 100) : 100 - 100 / (1 + averageGain / averageLoss);
+    return { time: candle.time, value };
   });
 }
 

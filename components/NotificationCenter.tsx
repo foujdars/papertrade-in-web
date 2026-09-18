@@ -79,6 +79,7 @@ export function NotificationCenter() {
               {item.kind === "trade" && item.symbol ? <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} size={32} /> : <span className="notification-item-icon"><NotificationIcon item={item} /></span>}
               <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small>
                 {item.url && <a className="allotment-result-link notification-result-link" href={item.url}>View update <ExternalLink size={14}/></a>}
+                {item.timeframe && item.instrument && <button className="allotment-result-link notification-result-link" onClick={() => { window.dispatchEvent(new CustomEvent("papertrade:open-technical-chart", { detail: { instrument: item.instrument, timeframe: item.timeframe } })); setOpen(false); }}>Open {item.timeframe} chart <ExternalLink size={14} /></button>}
                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
               </div>
             </article>)}
