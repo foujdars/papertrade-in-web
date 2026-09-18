@@ -52,10 +52,10 @@ export function IpoCompanyLogo({ name, entries }: { name: string; entries: IpoDi
   </span>;
 }
 
-export function IpoResearchLink({ name, entries }: { name: string; entries: IpoDirectoryEntry[] }) {
+export function IpoResearchLink({ name, entries, compact = false }: { name: string; entries: IpoDirectoryEntry[]; compact?: boolean }) {
   const entry = matchIpoDirectory(name, entries);
-  return <a className="ipo-research-link" href={entry?.url ?? CHITTORGARH_DIRECTORY_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
+  return <a className={compact ? "ipo-research-compact" : "ipo-research-link"} href={entry?.url ?? CHITTORGARH_DIRECTORY_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
     aria-label={entry ? `View ${name} on Chittorgarh (new tab)` : `Browse Chittorgarh for ${name} (new tab)`}>
-    <span>{entry ? "View on Chittorgarh" : "Browse Chittorgarh"}<small>{entry ? "Company details & IPO review" : "Exact IPO page not yet verified"}</small></span><ExternalLink size={16} />
+    <span>{compact ? entry ? "Research" : "Find research" : entry ? "View on Chittorgarh" : "Browse Chittorgarh"}{!compact && <small>{entry ? "Company details & IPO review" : "Exact IPO page not yet verified"}</small>}</span><ExternalLink size={14} />
   </a>;
 }

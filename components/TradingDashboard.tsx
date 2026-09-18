@@ -36,7 +36,8 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
-import { DEFAULT_PNL_SCOPE, filterPnlTrades, pnlDay, pnlOutcome, summarisePnl, type PnlScope } from "@/lib/pnl-analytics";
+import { PNL_SCOPE_KEY, readPnlScope, writePreference } from "@/lib/interface-preferences";
+import { filterPnlTrades, pnlDay, pnlOutcome, summarisePnl, type PnlScope } from "@/lib/pnl-analytics";
 import { priceTaskError, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
@@ -440,7 +441,7 @@ export function TradingDashboard() {
   const [pnlHistoryFilter, setPnlHistoryFilter] = useState<PnlHistoryFilter>("all");
   const [pnlHistoryOnly, setPnlHistoryOnly] = useState(false);
   const [pnlTab, setPnlTab] = useState<PnlTab>("overview");
-  const [pnlScope, setPnlScope] = useState<PnlScope>(DEFAULT_PNL_SCOPE);
+  const [pnlScope, setPnlScope] = useState<PnlScope>(readPnlScope);
   const [pnlDrill, setPnlDrill] = useState<{ ids: string[]; label: string } | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -2236,7 +2237,7 @@ export function TradingDashboard() {
     if (section === "pnl") {
       setPnlHistoryOnly(false);
       setPnlTab("overview");
-      setPnlScope(DEFAULT_PNL_SCOPE);
+      setPnlScope(readPnlScope());
       setPnlDrill(null);
       setPnlHistoryFilter("all");
       setSelectedPnlDateKey(null);
@@ -2813,7 +2814,7 @@ export function TradingDashboard() {
       {marketsOpen && marketsInitialGroup === "IPO" && (
         <section className="market-discovery-panel ipo-discovery-panel" aria-label="IPO opportunities">
 
-          <IpoWorkspace />
+          <IpoWorkspace ownerId={user?.id ?? "local"} key={user?.id ?? "local"} />
         </section>
       )}
       {marketsOpen && marketsInitialGroup !== "IPO" && (
@@ -2868,7 +2869,7 @@ export function TradingDashboard() {
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
           <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
-            <PnlAnalytics trades={pnlScopedTrades} calendarTrades={pnlCalendarTrades} orders={orders} scope={{ ...pnlScope, day: selectedPnlDateKey }} now={clock?.getTime() ?? Date.now()} tab={pnlHistoryOnly ? "trades" : pnlTab} onTab={tab => { setPnlHistoryOnly(false); setPnlTab(tab); setTradeSelection(null); setPnlTradeMenuId(null); }} onScope={scope => { setPnlScope({ ...scope, day: null }); setSelectedPnlDateKey(scope.day ?? null); setPnlDrill(null); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} onSelect={(ids, label) => { setPnlDrill({ ids, label }); setPnlHistoryOnly(false); setPnlTab("trades"); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} />
+            <PnlAnalytics trades={pnlScopedTrades} calendarTrades={pnlCalendarTrades} orders={orders} scope={{ ...pnlScope, day: selectedPnlDateKey }} now={clock?.getTime() ?? Date.now()} tab={pnlHistoryOnly ? "trades" : pnlTab} onTab={tab => { setPnlHistoryOnly(false); setPnlTab(tab); setTradeSelection(null); setPnlTradeMenuId(null); }} onScope={scope => { writePreference(PNL_SCOPE_KEY, scope); setPnlScope({ ...scope, day: null }); setSelectedPnlDateKey(scope.day ?? null); setPnlDrill(null); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} onSelect={(ids, label) => { setPnlDrill({ ids, label }); setPnlHistoryOnly(false); setPnlTab("trades"); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} />
             <div className="pnl-trade-list" ref={pnlTradeListRef} hidden={!pnlHistoryOnly && pnlTab !== "trades"}>
               {pnlDrill && <div className="pnl-drill-filter"><span>{pnlDrill.label} · {pnlDrilledTrades.length} exits</span><button onClick={() => { setPnlDrill(null); setTradeSelection(null); }}>Clear chart selection</button></div>}
               {!!visiblePnlTrades.length && selectingTrades && <div className={`pnl-selection-toolbar ${selectingTrades ? "is-selecting" : ""}`}>

@@ -23,6 +23,8 @@ export type IpoSummary = {
   gmpAmount: number | null;
   gmpPercent: number | null;
   gmpUpdatedAt: string;
+  gmpCheckedAt?: string;
+  gmpSource?: "ipoalerts" | "ipogram";
 };
 
 export type IpoListResponse = {

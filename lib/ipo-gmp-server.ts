@@ -6,6 +6,7 @@ const PUBLIC_GMP_TTL_MS = 15 * 60 * 1000;
 export type PublicGmpEntry = {
   name: string;
   amount: number;
+  checkedAt?: string;
 };
 
 let cachedFeed: { expiresAt: number; entries: PublicGmpEntry[] } | null = null;
@@ -66,7 +67,8 @@ export async function loadPublicGmpFeed() {
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) throw new Error(`Public GMP source returned ${response.status}`);
-  const entries = parsePublicGmpHtml(await response.text());
+  const checkedAt = new Date().toISOString();
+  const entries = parsePublicGmpHtml(await response.text()).map(entry => ({ ...entry, checkedAt }));
   if (!entries.length) throw new Error("Public GMP source returned no records");
   cachedFeed = { expiresAt: Date.now() + PUBLIC_GMP_TTL_MS, entries };
   return entries;

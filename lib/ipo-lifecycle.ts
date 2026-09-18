@@ -28,7 +28,7 @@ export function listingReturn(price: number | null | undefined, issuePrice: numb
   return typeof price === "number" && Number.isFinite(price) && price > 0 && typeof issuePrice === "number" && Number.isFinite(issuePrice) && issuePrice > 0
     ? (price / issuePrice - 1) * 100 : null;
 }
-export function gmpTone(percent: number | null) { return percent === null || !Number.isFinite(percent) ? "pending" : percent >= 15 ? "high" : "low"; }
+export function gmpTone(percent: number | null) { return percent === null || !Number.isFinite(percent) ? "pending" : percent > 0 ? "high" : percent < 0 ? "low" : "neutral"; }
 
 export function compactIpoName(name: string) { return name.replace(/\s+IPO\s*$/i, "").trim(); }
 export function sortIposByLifecycle(ipos: IpoSummary[], today: string, time = "00:00:00") {

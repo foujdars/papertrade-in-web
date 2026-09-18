@@ -44,7 +44,7 @@ test("KFin catalogue is parsed as data and release reports must match the primar
   assert.equal(reportedAllotmentOut(script, name), false, "registrar dropdown presence alone is not proof");
 });
 
-test("IPO stage keeps closed issues in Open until actual listing is known", () => {
+test("IPO stage distinguishes open, waiting, published allotment and verified listing", () => {
   const base = { status: "open", biddingStartDate: "2026-09-01", biddingEndDate: "2026-09-03", details: { dailyEndTime: "17:00:00", listingDate: "2026-09-08", listingPrice: null, allotmentPublished: false } };
   assert.equal(ipoStage(base, "2026-08-31"), "upcoming");
   assert.equal(ipoStage(base, "2026-09-03", "16:59:59"), "open");
@@ -64,10 +64,10 @@ test("Listed retention counts from listing, includes day 30, excludes the follow
   assert.equal(isRecentListing("invalid", "2026-09-11"), false);
 });
 
-test("GMP UI uses inclusive 15 percent boundary and missing data stays neutral", () => {
-  assert.equal(gmpTone(14.99), "low");
+test("GMP UI colours the sign, not an arbitrary return threshold", () => {
+  assert.equal(gmpTone(14.99), "high");
   assert.equal(gmpTone(15), "high");
-  assert.equal(gmpTone(0), "low");
+  assert.equal(gmpTone(0), "neutral");
   assert.equal(gmpTone(-3), "low");
   assert.equal(gmpTone(null), "pending");
   assert.equal(gmpTone(NaN), "pending");

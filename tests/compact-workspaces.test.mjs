@@ -442,14 +442,14 @@ test("IPO keeps filters and research links but replaces oversized missing-GMP me
   const ipo = await source("components/IpoWorkspace.tsx");
   const card = await source("components/IpoLifecycleCard.tsx");
   assert.doesNotMatch(ipo, /ipo-overview-banner|ipo-source-line|ipo-feed-note|Not available/);
-  assert.match(ipo, /setFilter\("listed"\)/);
+  assert.match(ipo, /matchesIpoFilter\(stageOf\(ipo\), filter\)/);
   assert.match(ipo, /isRecentListing/);
   assert.match(card, /<IpoResearchLink/);
   assert.match(card, /<IpoCompanyLogo/);
-  assert.match(card, /ipo.gmpPercent === null \? "Not reported"/);
+  assert.match(card, /reported \? <>/);
   assert.doesNotMatch(ipo, /GMP feed not connected/);
   assert.match(card, /gmpTone\(ipo.gmpPercent\)/);
-  assert.match(card, /ipo.gmpPercent.toFixed\(2\)/);
+  assert.match(card, /ipo.gmpPercent!\.toFixed\(2\)/);
   assert.match(card, /href={ipo.details.registrarUrl}/);
   assert.match(card, /<IpoChances/);
 });

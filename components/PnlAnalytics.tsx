@@ -5,9 +5,15 @@ import type { ClosedPaperTrade } from "@/lib/trade-analytics";
 import type { PaperOrder } from "@/lib/paper-trading";
 import { readTradeJournal, type TradeJournalEntry } from "@/lib/trading-coach";
 import { CLOUD_CHANGE_EVENT } from "@/lib/cloud-journal";
+import { ModernSelect } from "./ModernSelect";
+import { PNL_BREAKDOWN_KEY, readPreference, writePreference } from "@/lib/interface-preferences";
 import { DEFAULT_PNL_SCOPE, PNL_DIMENSIONS, groupPnl, pnlBounds, pnlCurve, pnlDay, pnlDistribution, pnlOutcome, rollingPnl, summarisePnl, type PnlDimension, type PnlScope } from "@/lib/pnl-analytics";
 
 export type PnlTab = "overview" | "insights" | "trades";
+function readBreakdown() {
+  const saved = readPreference(PNL_BREAKDOWN_KEY) as { dimension?: PnlDimension; measure?: string } | null;
+  return { dimension: saved && PNL_DIMENSIONS.includes(saved.dimension!) ? saved.dimension! : "Symbol" as PnlDimension, measure: saved?.measure === "average" ? "average" as const : "total" as const };
+}
 const rupees = (n: number | null) => n === null ? "—" : `${n < -.004 ? "−" : ""}₹${Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const compact = (n: number) => `${n < 0 ? "−" : ""}₹${Math.abs(n) >= 100000 ? `${(Math.abs(n) / 100000).toFixed(1)}L` : Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}k` : Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const dateText = (time: number | null) => time ? new Date(time).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" }) : "Period start";
@@ -41,11 +47,11 @@ function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly 
 }
 
 export function PnlBreakdown({ trades, orders, journal, onSelect }: { trades: ClosedPaperTrade[]; orders: PaperOrder[]; journal: Record<string, TradeJournalEntry>; onSelect: Drill }) {
-  const [dimension, setDimension] = useState<PnlDimension>("Symbol"), [measure, setMeasure] = useState<"total" | "average">("total");
+  const [dimension, setDimension] = useState<PnlDimension>(() => readBreakdown().dimension), [measure, setMeasure] = useState<"total" | "average">(() => readBreakdown().measure);
   const groups = useMemo(() => groupPnl(trades, orders, journal, dimension).sort((a, b) => (measure === "total" ? b.net - a.net : (b.average ?? 0) - (a.average ?? 0))), [trades, orders, journal, dimension, measure]);
   const max = Math.max(1, ...groups.map(g => Math.abs(measure === "total" ? g.net : g.average ?? 0)));
   return <section className="pnl-a-card pnl-breakdown"><header><div><span className="pnl-kicker">Where results come from</span><h3>Performance breakdown</h3></div><SlidersHorizontal size={18} /></header>
-    <div className="pnl-breakdown-controls"><label>Group by<select value={dimension} onChange={e => setDimension(e.target.value as PnlDimension)}>{PNL_DIMENSIONS.map(d => <option key={d}>{d}</option>)}</select></label><label>Compare<select value={measure} onChange={e => setMeasure(e.target.value as typeof measure)}><option value="total">Total net P&amp;L</option><option value="average">Average per trade</option></select></label></div>
+    <div className="pnl-breakdown-controls"><ModernSelect label="Group by" value={dimension} choices={PNL_DIMENSIONS.map(d => ({ value: d, label: d }))} onChange={value => { setDimension(value); writePreference(PNL_BREAKDOWN_KEY, { dimension: value, measure }); }} /><ModernSelect label="Compare" value={measure} choices={[{ value: "total", label: "Total net P&L", description: "Combined result after charges" }, { value: "average", label: "Average per trade", description: "Net result divided by completed exits" }]} onChange={value => { setMeasure(value); writePreference(PNL_BREAKDOWN_KEY, { dimension, measure: value }); }} /></div>
     {dimension === "Entry time" && <p className="pnl-help">Entry time in IST. Delivery / carry-forward trades stay separate.</p>}
     <div className="pnl-ranked-list">{groups.map(g => { const value = measure === "total" ? g.net : g.average ?? 0; return <button className="pnl-ranked-row" key={g.label} onClick={() => onSelect(g.trades.map(t => t.id), `${dimension}: ${g.label}`)}><span className="pnl-ranked-heading"><b>{g.label}</b><strong className={signClass(value)}>{rupees(value)}</strong></span><span className="pnl-diverging-track"><i style={{ left: `${value >= 0 ? 50 : 50 - Math.abs(value) / max * 50}%`, width: `${Math.abs(value) / max * 50}%`, background: value >= 0 ? "var(--green)" : "var(--red)" }} /></span><small>{g.count} trade{g.count === 1 ? "" : "s"} · Avg {rupees(g.average)} · {g.count < 10 ? "Small sample" : `${g.winRate?.toFixed(0)}% wins`}</small></button>; })}</div>
     {!groups.length && <p className="pnl-chart-empty">No trades match these filters.</p>}
@@ -112,7 +118,11 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
   const setScope = (patch: Partial<PnlScope>) => onScope({ ...scope, ...patch, day: null });
   return <div className="pnl-analytics">
     <header className="pnl-a-heading"><div><span className="pnl-kicker">Review. Understand. Improve.</span><h2>Your performance</h2></div><span className="pnl-realised-badge">Realised · after charges</span></header>
-    <div className="pnl-scope-controls"><label>Period<select aria-label="P&L period" value={scope.period} onChange={e => setScope({ period: e.target.value as PnlScope["period"], start: scope.start || `${pnlDay(now).slice(0, 7)}-01`, end: scope.end || pnlDay(now) })}><option value="all">All time</option><option value="month">This month</option><option value="30d">Last 30 days</option><option value="custom">Custom dates</option></select></label><label>Market<select aria-label="P&L market" value={scope.asset} onChange={e => setScope({ asset: e.target.value as PnlScope["asset"] })}><option value="all">All markets</option><option value="stocks">Stocks</option><option value="fno">F&amp;O</option></select></label><label>Product<select aria-label="P&L product" value={scope.product} onChange={e => setScope({ product: e.target.value as PnlScope["product"] })}><option value="all">All products</option><option value="INTRADAY">Intraday</option><option value="DELIVERY">Delivery / carry</option></select></label></div>
+    <div className="pnl-scope-controls">
+      <ModernSelect label="Period" ariaLabel="P&L period" value={scope.period} choices={[{ value: "all", label: "All time", description: "Every recorded completed exit" }, { value: "month", label: "This month", description: "From the first of this month, in IST" }, { value: "30d", label: "Last 30 days", description: "A rolling window including today" }, { value: "custom", label: "Custom dates", description: "Choose your own start and end dates" }]} onChange={period => setScope({ period, start: scope.start || `${pnlDay(now).slice(0, 7)}-01`, end: scope.end || pnlDay(now) })} />
+      <ModernSelect label="Market" ariaLabel="P&L market" value={scope.asset} choices={[{ value: "all", label: "All markets" }, { value: "stocks", label: "Stocks" }, { value: "fno", label: "F&O", description: "Options and futures" }]} onChange={asset => setScope({ asset })} />
+      <ModernSelect label="Product" ariaLabel="P&L product" value={scope.product} choices={[{ value: "all", label: "All products" }, { value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery / carry" }]} onChange={product => setScope({ product })} />
+    </div>
     {scope.period === "custom" && <div className="pnl-custom-dates"><label>From<input type="date" value={scope.start} onChange={e => setScope({ start: e.target.value })} /></label><label>Through<input type="date" value={scope.end} onChange={e => setScope({ end: e.target.value })} /></label></div>}
     {!bounds.valid && <p role="alert" className="pnl-filter-error">Choose a valid start and end date. The end date must not precede the start.</p>}
     <div className="pnl-scope-caption"><span>{scope.day ? `Day: ${scope.day}` : scope.period === "all" ? "All recorded dates" : `${bounds.start} → ${bounds.end}`} · IST</span><button onClick={() => onScope({ ...DEFAULT_PNL_SCOPE })}>Reset filters</button></div>

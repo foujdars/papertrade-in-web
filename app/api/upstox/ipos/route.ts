@@ -29,7 +29,7 @@ type GmpTrendPayload = {
 };
 const allowedStatuses = new Set<IpoStatus>(["open", "upcoming", "closed", "listed"]);
 const GMP_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const gmpCache = new Map<string, { expiresAt: number; amount: number | null; updatedAt: string }>();
+const gmpCache = new Map<string, { expiresAt: number; amount: number | null; updatedAt: string; checkedAt: string }>();
 
 async function bounded<T>(operation: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -61,11 +61,12 @@ async function loadLatestGmp(ipo: IpoSummary, apiKey: string) {
       expiresAt: Date.now() + GMP_CACHE_TTL_MS,
       amount: normalizeGmp(latest?.price),
       updatedAt: latest?.timestamp?.trim() ?? "",
+      checkedAt: new Date().toISOString(),
     };
     gmpCache.set(identifier, result);
     return result;
   } catch {
-    return { expiresAt: Date.now() + 15 * 60 * 1000, amount: null, updatedAt: "" };
+    return { expiresAt: Date.now() + 15 * 60 * 1000, amount: null, updatedAt: "", checkedAt: "" };
   }
 }
 
@@ -142,7 +143,9 @@ export async function GET(request: Request) {
         ...ipo,
         gmpAmount: amount,
         gmpPercent: calculateGmpPercent(amount, ipo.maximumPrice),
-        gmpUpdatedAt: keyedGmp?.updatedAt || (publicGmp ? new Date().toISOString() : ""),
+        gmpUpdatedAt: keyedGmp?.amount != null ? keyedGmp.updatedAt : "",
+        gmpCheckedAt: keyedGmp?.amount != null ? keyedGmp.checkedAt : publicGmp?.checkedAt ?? "",
+        gmpSource: keyedGmp?.amount != null ? "ipoalerts" as const : publicGmp ? "ipogram" as const : undefined,
       };
     }));
     const gmpFeedConfigured = Boolean(gmpApiKey || publicGmpEntries.length);

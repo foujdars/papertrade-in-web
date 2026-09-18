@@ -3,96 +3,46 @@
 import { useEffect, useState } from "react";
 import { ChartNoAxesColumnIncreasing } from "lucide-react";
 import { CandleLoader } from "./CandleLoader";
-import { chanceLabel, type IpoChances as Estimates } from "@/lib/ipo-chances";
+import type { IpoChances as Estimates } from "@/lib/ipo-chances";
 
-const categories = [
-  ["bnii", "bNII", "Above ₹10 lakh"],
-  ["snii", "sNII", "₹2–10 lakh"],
-  ["retail", "Retail", "Individual application"],
-] as const;
+const categories = [["bnii", "bNII"], ["snii", "sNII"], ["retail", "Retail"]] as const;
 
-function chancePercent(ratio: number | null) {
-  if (ratio === null || !Number.isFinite(ratio) || ratio <= 0) return "";
-  if (ratio < 1) return "Demand below 1×";
-  return `${Math.min(100, 100 / ratio).toFixed(2)}%`;
-}
-
-export function IpoChances({ name, upcoming }: { name: string; upcoming: boolean }) {
+export function IpoChances({ name, upcoming, issueType = "regular" }: { name: string; upcoming: boolean; issueType?: "regular" | "sme" }) {
   const [result, setResult] = useState<{ name: string; estimates: Estimates | null } | null>(null);
   const [error, setError] = useState("");
-
   useEffect(() => {
-    if (upcoming) return;
+    if (upcoming || issueType === "sme") return;
     let controller: AbortController | null = null;
     const refresh = async () => {
       if (document.visibilityState !== "visible") return;
-      controller?.abort();
-      controller = new AbortController();
-      const request = controller;
-      const timeout = window.setTimeout(() => request.abort(), 12_000);
+      controller?.abort(); controller = new AbortController();
+      const request = controller, timeout = window.setTimeout(() => request.abort(), 12_000);
       try {
         const response = await fetch(`/api/ipo-chances?name=${encodeURIComponent(name)}`, { signal: request.signal });
-        if (!response.ok) throw new Error("Application estimates could not be refreshed. Retrying automatically.");
+        if (!response.ok) throw new Error("Application demand could not be refreshed. Previously checked figures may be outdated.");
         const data = await response.json() as { name: string; estimates: Estimates | null };
-        if (!request.signal.aborted && data.name === name) {
-          setResult(data);
-          setError("");
-        }
+        if (!request.signal.aborted && data.name === name) { setResult(data); setError(""); }
+        else if (!request.signal.aborted) throw new Error("The research source could not be matched to this issuer.");
       } catch (cause) {
-        if (controller === request) setError(cause instanceof Error ? cause.message : "Research is temporarily unavailable.");
-      } finally {
-        window.clearTimeout(timeout);
-      }
+        if (controller === request) setError(cause instanceof DOMException && cause.name === "AbortError" ? "Research check timed out. We will retry automatically." : cause instanceof Error ? cause.message : "Research is temporarily unavailable.");
+      } finally { window.clearTimeout(timeout); }
     };
     void refresh();
     const timer = window.setInterval(refresh, 60_000);
-    window.addEventListener("online", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      controller?.abort();
-      controller = null;
-      window.clearInterval(timer);
-      window.removeEventListener("online", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, [name, upcoming]);
-
+    window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);
+    return () => { controller?.abort(); controller = null; window.clearInterval(timer); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [name, upcoming, issueType]);
   const current = result?.name === name ? result : null;
-  const retailRatio = current?.estimates?.retail ?? null;
-  const retailMostLikely = retailRatio !== null
-    && [current?.estimates?.bnii, current?.estimates?.snii]
-      .every((ratio) => ratio === null || ratio === undefined || retailRatio <= ratio);
-
-  return <section className="ipo-detail-section ipo-chances-card">
-    <h3><ChartNoAxesColumnIncreasing size={21} />Estimated allotment chances</h3>
-    {!upcoming && !current && !error ? <CandleLoader label="Checking application-based estimates" /> : <>
-      <div className="ipo-chance-list">
-        {categories.map(([key, label, detail]) => {
-          const ratio = current?.estimates?.[key] ?? null;
-          const unavailable = upcoming || Boolean(error && !current) || ratio === null;
-          return <div key={key} className={`${key === "retail" ? "retail-focus" : ""} ${unavailable ? "unavailable" : ""}`}>
-            <span className="ipo-chance-category">
-              <b>{label}</b><small>{detail}</small>
-              {key === "retail" && retailMostLikely && <em>Most likely</em>}
-            </span>
-            <span className="ipo-chance-odds">
-              <small>{upcoming ? "Bidding not started" : error && !current ? "Temporarily unavailable" : chanceLabel(ratio)}</small>
-              <strong>{chancePercent(ratio)}</strong>
-            </span>
-            <span className="ipo-chance-demand">
-              {ratio !== null ? <><b>{ratio.toFixed(2)}×</b><small>application demand</small></> : <small>Awaiting category data</small>}
-            </span>
-          </div>;
-        })}
-      </div>
-      <p>{error || (upcoming
-        ? "Estimates appear after applications begin and category data is published."
-        : current?.estimates
-          ? "Indicative estimates from application demand, not share subscription. Valid applications, category rules and the registrar's final basis determine allotment; these are not guaranteed odds."
-          : "Application-based category estimates have not been published by the research source yet. We check again automatically.")}</p>
-      {current?.estimates && <a className="ipo-chance-source" href={current.estimates.sourceUrl} target="_blank" rel="noopener noreferrer">
-        Source: IPO Ji · Checked {new Date(current.estimates.checkedAt).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })} IST ↗
-      </a>}
+  if (issueType === "sme") return <section className="ipo-detail-section ipo-demand-card"><h3><ChartNoAxesColumnIncreasing size={19}/> Category demand</h3><p>SME category rules differ from Mainboard. Issue-specific Individual Investor / NII data is not verified in the current research feed, so Mainboard retail estimates are not shown here.</p><a className="ipo-chance-source" href="https://www.nseindia.com/static/trade/e-ipo-faqs" target="_blank" rel="noopener noreferrer">Read NSE category guidance ↗</a></section>;
+  return <section className="ipo-detail-section ipo-demand-card">
+    <h3><ChartNoAxesColumnIncreasing size={19}/> Application demand</h3>
+    {!upcoming && !current && !error ? <CandleLoader label="Checking application demand"/> : <>
+      <div className="ipo-demand-rows">{categories.map(([key,label]) => {
+        const ratio = current?.estimates?.[key] ?? null;
+        return <div key={key}><span><b>{label}</b><small>{upcoming ? "Bidding not started" : ratio === null ? "Not published" : "Application-based multiple"}</small></span><strong>{!upcoming && ratio !== null ? `${ratio.toFixed(2)}×` : "—"}</strong></div>;
+      })}</div>
+      <p>{error || (upcoming ? "Figures appear after bidding starts and category data is available." : "Application demand is not share subscription or a personal allotment probability. Valid applications, category rules and the registrar's final basis determine the result.")}</p>
+      {current?.estimates && <a className="ipo-chance-source" href={current.estimates.sourceUrl} target="_blank" rel="noopener noreferrer">IPO Ji · Checked {new Date(current.estimates.checkedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day:"numeric",month:"short",hour:"2-digit",minute:"2-digit" })} IST ↗</a>}
     </>}
   </section>;
 }

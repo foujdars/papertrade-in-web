@@ -22,6 +22,8 @@ import "./notifications.css";
 import "./launch-screen.css";
 import "./chart-focus.css";
 import "./pnl-analytics.css";
+import "./modern-select.css";
+import "./ipo-studio.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
