@@ -67,3 +67,20 @@
 .price-tasks-count { position: absolute; right: 0; top: 0; min-width: 12px; height: 12px; padding-inline: 2px; border-radius: 8px; background: #8054d9; color: white; font-size: 8px; line-height: 12px; text-align: center; }
 @media (max-width: 760px) { .terminal-shell .permanent-trade-footer { height: 74px; min-height: 74px; }.terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 74px; } }
 @media (min-width: 761px) { .terminal-shell .permanent-trade-footer { height: 32px; min-height: 32px; flex-basis: 32px; } }
+
+/* Study names use the existing clock row, leaving candle space unobstructed. */
+.terminal-shell .chart-statusbar { display: flex; padding-inline: 8px; gap: 8px; }
+.terminal-shell .chart-statusbar .chart-indicator-slot { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 9px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
+.chart-indicator-slot::-webkit-scrollbar { display: none; }
+.chart-indicator-slot:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
+.terminal-shell .chart-statusbar .chart-indicator-strip { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; margin-left: 0; color: var(--muted); font-size: 9px; line-height: 22px; }
+.chart-indicator-strip > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.chart-indicator-strip i { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.chart-indicator-strip b { display: none; }
+.terminal-shell .chart-smc-learn { position: static; display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; padding: 0; min-height: 22px; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--purple); font: inherit; font-size: 9px; white-space: nowrap; cursor: pointer; }
+.chart-smc-learn:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
+.terminal-shell .chart-statusbar .chart-status-live-pnl:not(.visible) { display: none; }
+.terminal-shell .chart-statusbar .chart-status-live-pnl.visible { flex: 0 0 auto; min-width: 0; }
+.terminal-shell .chart-statusbar .chart-feed-warning { flex: 0 1 150px; max-width: 28%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.terminal-shell .chart-statusbar .chart-status-clock { flex: 0 0 auto; margin-left: auto; font-size: 9px; white-space: nowrap; }
+@media(max-width:360px) { .terminal-shell .chart-statusbar { gap: 5px; padding-inline: 5px; }.terminal-shell .chart-statusbar .chart-status-clock { font-size: 8px; } }

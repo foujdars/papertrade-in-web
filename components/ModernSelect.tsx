@@ -7,8 +7,8 @@ import { useTransientBack } from "./useTransientBack";
 export type SelectChoice<T extends string> = { value: T; label: string; description?: string };
 
 /** Native dialog supplies modality/focus containment; the options stay app-themed on Android. */
-export function ModernSelect<T extends string>({ label, ariaLabel = label, value, choices, onChange }: {
-  label: string; ariaLabel?: string; value: T; choices: readonly SelectChoice<T>[]; onChange: (value: T) => void;
+export function ModernSelect<T extends string>({ label, ariaLabel = label, value, choices, onChange, hideLabel = false }: {
+  label: string; ariaLabel?: string; value: T; choices: readonly SelectChoice<T>[]; onChange: (value: T) => void; hideLabel?: boolean;
 }) {
   const id = useId(), trigger = useRef<HTMLButtonElement>(null), dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false), [position, setPosition] = useState<CSSProperties>({});
@@ -54,7 +54,7 @@ export function ModernSelect<T extends string>({ label, ariaLabel = label, value
   }
 
   return <div className="modern-select">
-    <span className="modern-select-label" id={`${id}-label`}>{label}</span>
+    {!hideLabel && <span className="modern-select-label" id={`${id}-label`}>{label}</span>}
     <button ref={trigger} type="button" className="modern-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={`${id}-dialog`} onClick={() => setOpen(true)} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }}><span>{chosen?.label ?? "Choose"}</span><ChevronDown size={15} aria-hidden="true" /></button>
     {open && <dialog ref={dialog} id={`${id}-dialog`} className="modern-select-dialog" style={position} aria-labelledby={`${id}-title`} onCancel={event => { event.preventDefault(); setOpen(false); }} onClick={event => { event.stopPropagation(); if (event.target === event.currentTarget) setOpen(false); }}>
       <div className="modern-select-content">

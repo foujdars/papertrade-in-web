@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+(async()=>{const browser=await chromium.launch({headless:true});try{
+ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{localStorage.setItem('papertrade-chart-indicators-v1',JSON.stringify({smc:true,vwap:true,ema30:true}));localStorage.setItem('papertrade-chart-view-v1',JSON.stringify({hidden:false}));});
+ await page.route('**/*.supabase.co/**',r=>r.abort());
+ await page.route('**/api/**',r=>r.fulfill({json:r.request().url().includes('/api/upstox/candles')?{ok:true,segments:['historical'],candles:Array.from({length:90},(_,i)=>({time:1789712700+i*300,open:100+Math.sin(i/5)*3,close:102+Math.sin(i/5)*3,high:108+Math.sin(i/5)*2,low:94+Math.sin(i/5)*2,volume:1000}))}:{ok:true,quotes:{},underlyings:[],instruments:[],candles:[]}}));
+ await page.goto('http://localhost:3220');await page.locator('.launch-disclaimer').waitFor({state:'hidden',timeout:30000});await page.addStyleTag({content:'nextjs-portal{display:none!important}'});
+ await page.getByRole('button',{name:'Charts',exact:true}).last().click();await page.locator('.chart-indicator-slot .chart-smc-learn').waitFor();await page.waitForTimeout(900);
+ const strip=page.locator('.chart-indicator-slot');assert.match(await strip.textContent(),/SMC Learn/);assert.match(await strip.textContent(),/EMA 30/);assert.match(await strip.textContent(),/VWAP/);
+ assert.equal(await page.locator('.trade-cockpit .price-chart-wrap .smc-learn-button,.trade-cockpit .price-chart-wrap .indicator-legend').count(),0);
+ assert.equal(await page.locator('.chart-indicator-strip b').first().isVisible(),false);
+ await strip.getByRole('button',{name:'Open SMC Learner'}).click();await page.getByRole('dialog',{name:'SMC Learner',exact:true}).waitFor();await page.getByRole('button',{name:'Close SMC Learner'}).click();
+ for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:844});await page.waitForTimeout(220);const a=await strip.boundingBox(),b=await page.locator('.chart-status-clock').boundingBox();assert.ok(a.width>20&&a.x+a.width<=b.x,JSON.stringify({width,a,b}));assert.ok(b.x+b.width<=width);assert.ok(Math.abs(a.y-b.y)<8);await strip.evaluate(e=>e.scrollLeft=e.scrollWidth);assert.ok(await page.locator('.chart-area').evaluate(e=>e.scrollWidth<=e.clientWidth+1));if(process.env.IPO_SCREENSHOTS&&width===390){await strip.evaluate(e=>e.scrollLeft=0);await page.screenshot({path:'outputs/chart-function-labels.png'});}}
+ await page.setViewportSize({width:390,height:844});const show=page.getByRole('button',{name:'Show drawing toolbar',exact:true});if(await show.isVisible())await show.click();await page.getByRole('button',{name:'Hide drawings and indicators',exact:true}).click();assert.equal(await strip.textContent(),'');await page.getByRole('button',{name:'Show drawings and indicators',exact:true}).click();await strip.getByRole('button',{name:'Open SMC Learner'}).waitFor();assert.match(await strip.textContent(),/VWAP/);assert.deepEqual(errors,[]);
+ console.log('Chart function labels: SMC opens from clock row, EMA/VWAP names off candle canvas, no clock overlap at four widths, overflow scroll, eye hide/restore pass');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});

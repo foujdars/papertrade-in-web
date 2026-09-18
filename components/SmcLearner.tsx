@@ -14,9 +14,10 @@ const groups: Record<string, SmcKind[]> = {
 };
 const dateText = (time: number) => new Date(time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
-export function SmcLearner({ candles, chart, series, timeframe, replay, dark, refreshRef }: {
+export function SmcLearner({ candles, chart, series, timeframe, replay, dark, refreshRef, triggerHost }: {
   candles: Candle[]; chart: IChartApi | null; series: ISeriesApi<"Candlestick"> | null;
   timeframe: string; replay: boolean; dark: boolean; refreshRef: MutableRefObject<(() => void) | null>;
+  triggerHost?: HTMLElement | null;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
     return [{ mark: m, left: Math.max(0, left), right: Math.min(pane.width - 2, end + (isSmcZone(m) && !m.end ? 18 : 0)), top, bottom }];
   }).slice(0, 24);
   const showMark = (m: SmcMark) => { setSelected(m.id); setLesson(m.kind); requestAnimationFrame(() => explanationRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); };
+  const trigger = <button className={triggerHost !== undefined ? "chart-smc-learn" : `smc-learn-button ${dark ? "smc-dark" : ""}`} onClick={() => setOpen(true)} aria-label="Open SMC Learner">SMC <span>Learn</span></button>;
   return <>
     <svg className="smc-overlay" width={pane.width} height={pane.height} aria-hidden="true">
       {rangeVisible && analysis.range && (() => {
@@ -105,7 +107,7 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
       })}
     </svg>
     <div className="smc-zone-key" aria-label="SMC zone colours"><span><i style={{ background: SMC_ZONE_COLOURS.OB }}/>OB</span><span><i style={{ background: SMC_ZONE_COLOURS.FVG }}/>FVG</span><span><i style={{ background: SMC_ZONE_COLOURS.Breaker }}/>Breaker</span><span className="smc-direction-key"><b>▲</b><em>▼</em></span></div>
-    <button className={`smc-learn-button ${dark ? "smc-dark" : ""}`} onClick={() => setOpen(true)} aria-label="Open SMC Learner">SMC <span>Learn</span></button>
+    {triggerHost !== undefined ? triggerHost && createPortal(trigger, triggerHost) : trigger}
     {open && createPortal(<div className={`smc-backdrop ${dark ? "smc-dark" : ""}`} onPointerDown={e => { if (e.target === e.currentTarget) setOpen(false); }}>
       <section className="smc-sheet" role="dialog" aria-modal="true" aria-label="SMC Learner" onKeyDown={e => {
         if (e.key !== "Tab") return;

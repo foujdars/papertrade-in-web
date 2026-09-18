@@ -11,6 +11,7 @@ import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import type {
   CandlestickData,
   IChartApi,
@@ -438,6 +439,7 @@ export function MarketChart({
   redoSignal = 0,
   visibleBars = 22,
   indicators: suppliedIndicators,
+  indicatorHost,
   chartAction,
   chartTheme = "light",
   orderTool: suppliedOrderTool,
@@ -476,6 +478,7 @@ export function MarketChart({
   redoSignal?: number;
   visibleBars?: number;
   indicators: ChartIndicators;
+  indicatorHost?: HTMLElement | null;
   chartAction?: ChartActionRequest;
   chartTheme?: "light" | "neon";
   orderTool?: ChartOrderTool;
@@ -957,7 +960,7 @@ export function MarketChart({
       ] as const;
       for (const [key, reference, points, color, title] of overlayDefinitions) {
         if (next[key] && !reference.current) {
-          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: !key.startsWith("ema"), crosshairMarkerVisible: false, title: key.startsWith("ema") ? "" : title });
+          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: !key.startsWith("ema"), crosshairMarkerVisible: false, title: indicatorHost !== undefined || key.startsWith("ema") ? "" : title });
           reference.current.setData(points.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value })));
         } else if (!next[key] && reference.current) {
           chart.removeSeries(reference.current);
@@ -977,7 +980,7 @@ export function MarketChart({
       if (next.pivots && !Object.keys(pivotSeries.current).length) {
         const colors: Record<PivotLevel, string> = { r3: "#dc2626", r2: "#ef4444", r1: "#fb7185", pivot: "#7c3aed", s1: "#34d399", s2: "#10b981", s3: "#047857" };
         for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
-          pivotSeries.current[level] = chart.addSeries(LineSeries, { color: colors[level], lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: level === "pivot" ? "P" : level.toUpperCase() });
+          pivotSeries.current[level] = chart.addSeries(LineSeries, { color: colors[level], lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: indicatorHost !== undefined ? "" : level === "pivot" ? "P" : level.toUpperCase() });
         }
       } else if (!next.pivots && Object.keys(pivotSeries.current).length) {
         for (const series of Object.values(pivotSeries.current)) if (series) chart.removeSeries(series);
@@ -990,7 +993,7 @@ export function MarketChart({
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: false,
-          title: "RSI 14",
+          title: indicatorHost !== undefined ? "" : "RSI 14",
           autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
         }, 1);
         // Keep the overbought/oversold guides unbroken and deliberately darker
@@ -2158,12 +2161,31 @@ export function MarketChart({
     return () => { disposed = true; request?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
   }, [instrument.instrumentKey, timeframe, isReplay]);
 
+  const indicatorLegend = Object.values(indicators).some(Boolean) ? (
+    <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+      {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
+      {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
+      {indicators.ema30 && <span><i style={{ background: "#22c55e" }} />EMA 30 <b>{indicatorValues.ema30.toFixed(2)}</b></span>}
+      {indicators.ema50 && <span><i style={{ background: "#8b5cf6" }} />EMA 50 <b>{indicatorValues.ema50.toFixed(2)}</b></span>}
+      {indicators.ema100 && <span><i style={{ background: "#f97316" }} />EMA 100 <b>{indicatorValues.ema100.toFixed(2)}</b></span>}
+      {indicators.ema200 && <span><i style={{ background: "#e11d48" }} />EMA 200 <b>{indicatorValues.ema200.toFixed(2)}</b></span>}
+      {indicators.sma20 && <span><i style={{ background: "#14b8a6" }} />SMA 20 <b>{indicatorValues.sma20.toFixed(2)}</b></span>}
+      {indicators.sma50 && <span><i style={{ background: "#64748b" }} />SMA 50 <b>{indicatorValues.sma50.toFixed(2)}</b></span>}
+      {indicators.sma200 && <span><i style={{ background: "#111827" }} />SMA 200 <b>{indicatorValues.sma200.toFixed(2)}</b></span>}
+      {indicators.vwap && <span><i style={{ background: "#d946ef" }} />VWAP <b>{indicatorValues.vwap.toFixed(2)}</b></span>}
+      {indicators.supertrend && <span><i style={{ background: "#00a67e" }} />Supertrend</span>}
+      {indicators.bollinger && <span><i style={{ background: "#6366f1" }} />Bollinger 20</span>}
+      {indicators.pivots && <span><i style={{ background: "#7c3aed" }} />Classic Pivots</span>}
+      {indicators.rsi && <span><i className="rsi-color" />RSI 14 <b>{indicatorValues.rsi.toFixed(2)}</b></span>}
+      {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
+    </div>
+  ) : null;
   return (
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
-        {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} />}
+        {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} triggerHost={indicatorHost} />}
         {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
           <header><b>{instrument.symbol} · ₹{priceMenu.toFixed(2)}</b><button aria-label="Close price menu" onClick={() => setPriceMenu(null)}>×</button></header>
@@ -2236,25 +2258,7 @@ export function MarketChart({
             </span>
           )}
         </div>
-        {Object.values(indicators).some(Boolean) && (
-          <div className="indicator-legend lightweight-indicator-legend">
-            {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
-            {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
-            {indicators.ema30 && <span><i style={{ background: "#22c55e" }} />EMA 30 <b>{indicatorValues.ema30.toFixed(2)}</b></span>}
-            {indicators.ema50 && <span><i style={{ background: "#8b5cf6" }} />EMA 50 <b>{indicatorValues.ema50.toFixed(2)}</b></span>}
-            {indicators.ema100 && <span><i style={{ background: "#f97316" }} />EMA 100 <b>{indicatorValues.ema100.toFixed(2)}</b></span>}
-            {indicators.ema200 && <span><i style={{ background: "#e11d48" }} />EMA 200 <b>{indicatorValues.ema200.toFixed(2)}</b></span>}
-            {indicators.sma20 && <span><i style={{ background: "#14b8a6" }} />SMA 20 <b>{indicatorValues.sma20.toFixed(2)}</b></span>}
-            {indicators.sma50 && <span><i style={{ background: "#64748b" }} />SMA 50 <b>{indicatorValues.sma50.toFixed(2)}</b></span>}
-            {indicators.sma200 && <span><i style={{ background: "#111827" }} />SMA 200 <b>{indicatorValues.sma200.toFixed(2)}</b></span>}
-            {indicators.vwap && <span><i style={{ background: "#d946ef" }} />VWAP <b>{indicatorValues.vwap.toFixed(2)}</b></span>}
-            {indicators.supertrend && <span><i style={{ background: "#00a67e" }} />Supertrend</span>}
-            {indicators.bollinger && <span><i style={{ background: "#6366f1" }} />Bollinger 20</span>}
-            {indicators.pivots && <span><i style={{ background: "#7c3aed" }} />Classic Pivots</span>}
-            {indicators.rsi && <span><i className="rsi-color" />RSI 14 <b>{indicatorValues.rsi.toFixed(2)}</b></span>}
-            {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
-          </div>
-        )}
+        {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
           <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>

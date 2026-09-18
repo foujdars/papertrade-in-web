@@ -1,7 +1,7 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
 
-import { Bell, Bookmark, Building2, CalendarDays, Clock3, Compass, RefreshCw, Rocket, Search, Store, X } from "lucide-react";
+import { Bell, Bookmark, Building2, CalendarDays, Compass, Rocket, Store, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -24,6 +24,7 @@ import { useIpoDirectory } from "@/components/IpoCompany";
 import { filterIpoBoard } from "@/lib/ipo-directory";
 import { ModernSelect } from "./ModernSelect";
 import { IpoCalendar } from "./IpoCalendar";
+import { IpoSearch } from "./IpoSearch";
 import { IPO_FILTERS, matchesIpoFilter, normalizeIpoChoices, normalizeSavedIpos, sortExplorerIpos, type IpoChoices } from "@/lib/ipo-explorer";
 import { IPO_VIEW_KEY, readPreference, writePreference } from "@/lib/interface-preferences";
 
@@ -60,11 +61,6 @@ function formatIpoDate(value: string) {
   const date = new Date(`${value}T00:00:00+05:30`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }).format(date);
-}
-
-function formatRefreshTime(value: string) {
-  if (!value || !Number.isFinite(Date.parse(value))) return "time unavailable";
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(new Date(value));
 }
 
 
@@ -165,7 +161,6 @@ export function IpoWorkspace({ ownerId = "local" }: { ownerId?: string }) {
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => new Date());
   const [ipos, setIpos] = useState<IpoSummary[]>([]);
-  const [fetchedAt, setFetchedAt] = useState("");
   const [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null), requestRef = useRef<AbortController | null>(null);
@@ -202,7 +197,7 @@ export function IpoWorkspace({ ownerId = "local" }: { ownerId?: string }) {
     try {
       const result = await loadIpos("open,upcoming,closed,listed", controller.signal, true);
       if (controller.signal.aborted) return;
-      setIpos(result.ipos); setFetchedAt(result.fetchedAt); setNow(new Date());
+      setIpos(result.ipos); setNow(new Date());
       setSelectedId(id => id && result.ipos.some(ipo => ipo.id === id) ? id : null);
       setError(result.partial ? "Some details could not be verified. Missing dates and results remain unconfirmed; we will retry automatically." : "");
       if (readAlertEnabled() && Capacitor.getPlatform() !== "android") processIpoAlerts(result.ipos);
@@ -229,16 +224,12 @@ export function IpoWorkspace({ ownerId = "local" }: { ownerId?: string }) {
   const unavailableSaved = saved.filter(item => !ipos.some(ipo => ipo.id === item.id) && item.name.toLowerCase().includes(search.trim().toLowerCase()));
   const selectedIpo = ipos.find(ipo => ipo.id === selectedId);
 
-  return <div className="ipo-workspace ipo-studio">
+  return <div className="ipo-workspace ipo-studio" role="region" aria-label="IPO centre">
     <div ref={listRef} hidden={Boolean(selectedIpo)}>
-      <header className="ipo-studio-heading"><div><span className="ipo-eyebrow">RESEARCH. FOLLOW. STAY INFORMED.</span><h2>IPO centre</h2></div><button className="ipo-icon-button" aria-label="Refresh IPOs" disabled={loading} onClick={() => void refresh()}><RefreshCw size={18} className={loading ? "spin" : ""} /></button></header>
       <nav className="ipo-view-tabs" role="tablist" aria-label="IPO views">{(["explore", "saved", "calendar"] as const).map((item, index, tabs) => <button key={item} role="tab" aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose({ view: item })} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const next = (index + (event.key === "ArrowRight" ? 1 : 2)) % 3; choose({ view: tabs[next] }); (event.currentTarget.parentElement?.children[next] as HTMLElement)?.focus(); } }}>{item === "explore" ? <Compass size={16} /> : item === "saved" ? <Bookmark size={16} /> : <CalendarDays size={16} />}<span>{item[0].toUpperCase() + item.slice(1)}</span>{item === "saved" && saved.length > 0 && <small>{saved.length}</small>}</button>)}</nav>
-      <div className="ipo-discovery-controls"><div className="ipo-board-tabs" role="group" aria-label="IPO market segment"><button className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => choose({ board: "regular" })}><Building2 size={15} />Mainboard</button><button className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => choose({ board: "sme" })}><Store size={15} />SME</button></div>{view !== "calendar" && <ModernSelect label="Sort by" ariaLabel="Sort IPOs" value={sort} choices={[{ value: "event", label: "Next event", description: "Nearest date first; newest first for listed issues" }, { value: "name", label: "Company name" }, { value: "size", label: "Issue size", description: "Largest published issue size first" }]} onChange={sort => choose({ sort })} />}</div>
-      <div className="ipo-search"><Search size={17} /><input type="search" aria-label="Search IPOs" placeholder="Search company, symbol or sector" value={search} onChange={event => setSearch(event.target.value)} />{search && <button aria-label="Clear IPO search" onClick={() => setSearch("")}><X size={16} /></button>}</div>
+      <div className={`ipo-discovery-controls${view === "calendar" ? " calendar-controls" : ""}`}><div className="ipo-board-tabs" role="group" aria-label="IPO market segment"><button className={board === "regular" ? "active" : ""} aria-pressed={board === "regular"} onClick={() => choose({ board: "regular" })}><Building2 size={15} />Mainboard</button><button className={board === "sme" ? "active" : ""} aria-pressed={board === "sme"} onClick={() => choose({ board: "sme" })}><Store size={15} />SME</button></div>{view !== "calendar" && <ModernSelect hideLabel label="Sort by" ariaLabel="Sort IPOs" value={sort} choices={[{ value: "event", label: "Next event", description: "Nearest date first; newest first for listed issues" }, { value: "name", label: "Company name" }, { value: "size", label: "Issue size", description: "Largest published issue size first" }]} onChange={sort => choose({ sort })} />}<IpoSearch value={search} onChange={setSearch}/></div>
       {view === "explore" && <div className="ipo-status-chips" role="group" aria-label="IPO status">{IPO_FILTERS.map(item => <button key={item.value} aria-pressed={filter === item.value} onClick={() => choose({ filter: item.value })}>{item.label}<small>{searched.filter(ipo => matchesIpoFilter(stageOf(ipo), item.value) && recent(ipo)).length}</small></button>)}</div>}
-      <div className="ipo-data-caption"><Clock3 size={12} /><span>{fetchedAt ? `Issue data · Upstox · Checked ${formatRefreshTime(fetchedAt)} IST` : loading ? "Checking issue data…" : "Issue data has not loaded."}{fetchedAt && <small>Source publication times may differ.</small>}</span></div>
       {view === "saved" && <p className="ipo-context-note">Your bookmarked IPOs across all stages in this segment. Saved on this device for this account; saving does not create an application or a reminder.</p>}
-      {view === "explore" && filter === "listed" && <p className="ipo-context-note">Listing-day price and return · last 30 calendar days. Not a live quote or your personal P&amp;L.</p>}
       {error && <div className="ipo-status-message" role="status"><Bell size={16} /><span>{error}</span><button onClick={() => void refresh()}>Retry</button></div>}
       {storageNotice && <p className="ipo-context-note" role="status">{storageNotice}</p>}
       {view === "calendar" ? <IpoCalendar ipos={searched} today={today} time={time} onOpen={openDetail} /> : <div className="ipo-card-list">

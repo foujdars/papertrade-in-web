@@ -384,6 +384,7 @@ export function TradingDashboard() {
   const [magnet, setMagnet] = useChartPreference("magnet");
   const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
   const [priceActionsHost, setPriceActionsHost] = useState<HTMLDivElement | null>(null);
+  const [chartIndicatorHost, setChartIndicatorHost] = useState<HTMLDivElement | null>(null);
   const [priceTasks, setPriceTasks] = useState<PriceTask[]>([]);
   const [fnoPriceActionsHost, setFnoPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
@@ -2548,6 +2549,7 @@ export function TradingDashboard() {
                 undoSignal={undoSignal}
                 redoSignal={redoSignal}
                 indicators={indicators}
+                indicatorHost={chartIndicatorHost}
                 chartAction={chartAction}
                 chartTheme={theme}
                 tradeMarkers={selectedTradeMarkers}
@@ -2564,11 +2566,12 @@ export function TradingDashboard() {
             )}
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
+            <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
             <div className={`chart-status-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
               {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></> : null}
             </div>
-            <div className="chart-feed-warning">{feedStatus.mode === "error" ? feedStatus.message : ""}</div>
-            <div>{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
+            {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}
+            <div className="chart-status-clock">{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
           {activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">
