@@ -184,8 +184,10 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}/);
   assert.match(dashboard, /chart-status-live-pnl/);
   assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
-  assert.match(dashboard, /Daily P&amp;L heat map/);
-  assert.match(dashboard, /pnl-calendar-grid/);
+  const pnlAnalytics = await readFile(new URL("../components/PnlAnalytics.tsx", import.meta.url), "utf8");
+  assert.match(dashboard, /<PnlAnalytics/);
+  assert.match(pnlAnalytics, /Daily P&amp;L heat map/);
+  assert.match(pnlAnalytics, /pnl-calendar-grid/);
   assert.doesNotMatch(dashboard, />Holiday<|>No trade</);
   assert.doesNotMatch(dashboard, /pnlChartTrades|pnl-bars/);
   assert.match(dashboard, /papertrade-theme/);

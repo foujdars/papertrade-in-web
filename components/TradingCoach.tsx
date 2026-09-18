@@ -62,7 +62,7 @@ function PayoffChart({ legs, spot }: { legs: OptionPayoffLeg[]; spot: number }) 
 }
 
 
-export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onClose, initialTab = "journal", timeframe = "5m", theme = "light" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; initialTab?: CoachTab; timeframe?: string; theme?: "light" | "neon"; }) {
+export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onOpenInsights, onClose, initialTab = "journal", timeframe = "5m", theme = "light" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; onOpenInsights: () => void; initialTab?: CoachTab; timeframe?: string; theme?: "light" | "neon"; }) {
   const { user, syncStatus } = useAuth();
   const [tab, setTab] = useState<CoachTab>(initialTab);
   const [journal, setJournal] = useState<Record<string, TradeJournalEntry>>({});
@@ -75,18 +75,10 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
   }, []);
   const [draftLimits, setDraftLimits] = useState(limits);
   const [expandedTrade, setExpandedTrade] = useState<string | null>(trades[0]?.id ?? null);
-  const [insightGroup, setInsightGroup] = useState("Strategy");
   const [limitsSaved, setLimitsSaved] = useState(false);
   const openOptionLegs = useMemo(() => buildOpenOptionLegs(orders, selected), [orders, selected]);
   const payoffLegs = useMemo(() => proposedOptionLeg ? [...openOptionLegs, proposedOptionLeg] : openOptionLegs, [openOptionLegs, proposedOptionLeg]);
   const ordersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
-  const insights = useMemo(() => {
-    const groups = new Map<string, { pnl: number; count: number; wins: number }>();
-    const add = (key: string, trade: ClosedPaperTrade) => { const value = groups.get(key) ?? { pnl: 0, count: 0, wins: 0 }; groups.set(key, { pnl: value.pnl + trade.netPnl, count: value.count + 1, wins: value.wins + (trade.netPnl > 0 ? 1 : 0) }); };
-    trades.forEach((trade) => { const entry = ordersById.get(trade.sourceOrderIds[0]); const strategy = journal[trade.id]?.strategy || entry?.journalPlan?.strategy || "Unclassified"; const hour = Number(new Date(trade.openedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false })); const session = hour < 11 ? "Opening hour" : hour < 14 ? "Midday" : "Closing session"; add(`Strategy · ${strategy}`, trade); add(`Stock · ${trade.symbol}`, trade); add(`Direction · ${trade.direction}`, trade); add(`Time · ${session}`, trade); const duration = trade.closedAt - trade.openedAt; add(`Duration · ${duration < 30 * 60_000 ? "Under 30m" : duration < 2 * 60 * 60_000 ? "30m–2h" : "Over 2h"}`, trade); });
-    return [...groups.entries()].map(([label, value]) => ({ label, ...value, winRate: value.count ? value.wins / value.count * 100 : 0 })).sort((a, b) => b.count - a.count || b.pnl - a.pnl);
-  }, [journal, ordersById, trades]);
-  const chargeReversalCount = trades.filter((trade) => trade.grossPnl > 0 && trade.netPnl < 0).length;
   function updateJournal(trade: ClosedPaperTrade, patch: Partial<TradeJournalEntry>) {
     const entryOrder = ordersById.get(trade.sourceOrderIds[0]);
     const previous = journal[trade.id] ?? { tradeId: trade.id, strategy: entryOrder?.journalPlan?.strategy || "Other", thesis: entryOrder?.journalPlan?.thesis || "", confidence: entryOrder?.journalPlan?.confidence ?? 3, review: "", followedPlan: null, updatedAt: Date.now() };
@@ -140,13 +132,7 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
           })}
           {!trades.length && <div className="coach-empty"><BookOpenText size={30} /><b>Your journal starts with a trade</b><span>Completed trades and their chart reviews will appear here.</span></div>}
         </div>}
-        {tab === "insights" && <div className="coach-insights">
-          <div className="coach-section-heading"><h3>Performance breakdown</h3><span>After charges</span></div>
-          <div className="coach-group-filters" role="group" aria-label="Group performance">{["Strategy", "Stock", "Direction", "Time", "Duration"].map((group) => <button type="button" key={group} aria-pressed={insightGroup === group} onClick={() => setInsightGroup(group)}>{group}</button>)}</div>
-          <div className="coach-insight-cards">{insights.filter((item) => item.label.startsWith(insightGroup + " · ")).map((item) => <article key={item.label}><header><b>{item.label.split(" · ").slice(1).join(" · ")}</b><strong className={item.pnl >= 0 ? "positive" : "negative"}>{item.pnl >= 0 ? "+" : ""}{formatInr(item.pnl)}</strong></header><div><span>{item.count} trades</span><span>{item.winRate.toFixed(0)}% win rate</span></div><progress max="100" value={item.winRate} aria-label={`${item.label} win rate`} /></article>)}</div>
-          {chargeReversalCount > 0 && <p className="coach-footnote">{chargeReversalCount} gross winner{chargeReversalCount === 1 ? "" : "s"} became a loss after charges.</p>}
-          {!insights.length && <div className="coach-empty"><BarChart3 size={30} /><b>No results yet</b><span>Complete trades to compare your performance.</span></div>}
-        </div>}
+        {tab === "insights" && <div className="coach-empty"><BarChart3 size={30} /><h3>One place for performance insights</h3><p>Explore your results by strategy, symbol, direction, entry time and holding duration in P&amp;L. The same view also explains costs, trade distribution and recent consistency.</p><button className="primary-button" onClick={onOpenInsights}>Open P&amp;L insights<ChevronRight size={16} /></button></div>}
         {tab === "replay" && <BarReplay key={selected.instrumentKey} instrument={selected} initialTimeframe={timeframe} theme={theme} />}
         {tab === "limits" && <div className="coach-limits" onChange={() => setLimitsSaved(false)}>
           <div className="coach-section-heading"><h3>Your trading rules</h3></div>
