@@ -1,16 +1,17 @@
 // Push only: no page cache, PAN storage or app-open polling.
 self.addEventListener("install",()=>self.skipWaiting());
 function store(mode,operation){return new Promise((resolve,reject)=>{const request=indexedDB.open("papertrade-push-v3",1);request.onupgradeneeded=()=>request.result.createObjectStore("state");request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction("state",mode);let result;operation(tx.objectStore("state"),value=>{result=value;});tx.oncomplete=()=>{db.close();resolve(result);};tx.onerror=()=>{db.close();reject(tx.error);};};});}
-function safePath(path){return typeof path==="string"&&(/^\/\?screen=(ipo|pnl)$/.test(path)||/^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(path))?path:"/";}
+function safePath(path){return typeof path==="string"&&(/^\/\?screen=(ipo|pnl)$/.test(path)||/^\/\?symbol=[A-Za-z0-9%_.~!()*'\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|1D)$/.test(path)||/^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(path))?path:"/";}
 self.addEventListener("message",event=>{if(event.data?.type==="preferences")event.waitUntil(store("readwrite",state=>state.put(event.data.preferences,"preferences")));});
 self.addEventListener("push",event=>{event.waitUntil((async()=>{
   let payload;try{payload=event.data.json();}catch{return;}
   const notice=payload.data||payload;
-  if(!notice.id||typeof notice.title!=="string"||typeof notice.body!=="string"||!["ipo","allotment","portfolio","practice"].includes(notice.kind)||Number(notice.expiresAt)<=Date.now()||!Number.isFinite(Number(notice.expiresAt)))return;
+  if(!notice.id||typeof notice.title!=="string"||typeof notice.body!=="string"||!["ipo","allotment","portfolio","practice","trade"].includes(notice.kind)||Number(notice.expiresAt)<=Date.now()||!Number.isFinite(Number(notice.expiresAt)))return;
   const accepted=await store("readwrite",(state,done)=>{
     const prefs=state.get("preferences");prefs.onsuccess=()=>{
       const p=prefs.result;
-      if(!p||p.pausedUntil>Date.now()||!p[notice.kind==="allotment"?"allotment":notice.kind==="portfolio"?"reviews":notice.kind==="practice"?"practice":"ipo"]){done(false);return;}
+      if(!p||p.pausedUntil>Date.now()||!p[notice.kind==="trade"?"trades":notice.kind==="allotment"?"allotment":notice.kind==="portfolio"?"reviews":notice.kind==="practice"?"practice":"ipo"]){done(false);return;}
+      if(notice.kind==="trade"&&p.hideAmounts)notice.body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
       const seen=state.get("seen");seen.onsuccess=()=>{const ids=seen.result||[];if(ids.includes(notice.id)){done(false);return;}state.put([...ids.slice(-199),notice.id],"seen");done(true);};
     };
   });

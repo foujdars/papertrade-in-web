@@ -29,6 +29,11 @@ export async function removeUserPushDevices(userId: string) {
     }
     await device.ref.delete();
   }
+  const outbox = await db.collection("technicalOutbox").where("userId", "==", userId).get();
+  for (const item of outbox.docs) await item.ref.delete();
+  await db.doc(`technicalAccounts/${userId}`).delete();
+  const registry = db.doc("technicalSystem/registry");
+  await db.runTransaction(async tx => { const snapshot = await tx.get(registry); if (snapshot.exists) { const users = { ...snapshot.data()?.users }; delete users[userId]; tx.set(registry, { users }); } });
 }
 export async function sendPush(notice: PushNotice, target: { token: string } | { topic: string }) {
   const ttl = Math.max(0, Math.min(6 * 3600000, notice.expiresAt - Date.now()));
@@ -37,7 +42,7 @@ export async function sendPush(notice: PushNotice, target: { token: string } | {
   // consent, branding and event deduplication are checked on the device too.
   return (await pushServices()).messaging.send({ ...target,
     data: { ...notice, expiresAt: String(notice.expiresAt), silent: String(notice.silent) },
-    android: { priority: notice.kind === "allotment" ? "high" : "normal", ttl },
-    webpush: { headers: { TTL: String(Math.ceil(ttl / 1000)), Urgency: notice.kind === "allotment" ? "high" : "normal" } },
+    android: { priority: notice.kind === "allotment" || notice.kind === "trade" ? "high" : "normal", ttl },
+    webpush: { headers: { TTL: String(Math.ceil(ttl / 1000)), Urgency: notice.kind === "allotment" || notice.kind === "trade" ? "high" : "normal" } },
   });
 }

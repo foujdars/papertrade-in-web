@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useCloudTechnicalAlerts } from "./useCloudTechnicalAlerts";
 import type { Candle, Instrument } from "@/lib/market";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { advanceTechnical, emptyTechnicalStore, evaluateTechnical, parseTechnicalStore, technicalCheckDue, technicalConfigError, technicalDescription, technicalGroup, technicalLimitError, validTechnicalCandles, type TechnicalConfig, type TechnicalEvent, type TechnicalRule, type TechnicalStore } from "@/lib/technical-alerts";
 
 export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotice: (message: string) => void) {
+  const cloud = useCloudTechnicalAlerts(ownerId);
   const key = `papertrade-technical-alerts-v1:${ownerId}`;
   const [store, setStore] = useState<TechnicalStore>(emptyTechnicalStore);
   const [states, setStates] = useState<Record<string, string>>({});
@@ -22,7 +24,9 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
   async function save(config: TechnicalConfig, instrument: Instrument, editing?: TechnicalRule) {
     const invalid = technicalConfigError(config);
     if (invalid) return invalid;
-    if (config.family === "vwap" && instrument.assetType === "INDEX") return "Indices have no traded volume. Choose an equity or derivative for VWAP.";
+    if (["vwap", "volume"].includes(config.family) && (instrument.assetType === "INDEX" || instrument.instrumentKey.startsWith("NSE_INDEX|"))) return "Indices have no traded volume. Choose an equity or derivative for volume-based alerts.";
+    if (editing && (config.delivery ?? "device") !== (editing.delivery ?? "device")) return "Monitoring mode cannot change while editing. Delete the old rule before creating one in another mode.";
+    if (config.delivery === "server") return cloud.save(config, instrument, editing);
     return change(latest => {
       if (editing && !latest.rules.some(r => r.id === editing.id && r.revision === editing.revision)) throw new Error("This alert changed in another tab. Reopen it before editing.");
       const now = Date.now();
@@ -32,6 +36,7 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
     });
   }
   async function toggle(rule: TechnicalRule) {
+    if (rule.delivery === "server") { const failure = await cloud.toggle(rule); if (failure) setError(failure); return failure; }
     return change(latest => ({ ...latest, rules: latest.rules.map(r => {
       if (r.id !== rule.id) return r;
       if (r.revision !== rule.revision) throw new Error("This alert changed in another tab. Refresh its controls before changing it.");
@@ -40,7 +45,7 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
       return { ...r, status: r.status === "active" ? "paused" : "active", armedAt: Date.now(), revision: crypto.randomUUID(), lastBar: undefined };
     }) }));
   }
-  async function remove(id: string) { return change(latest => ({ ...latest, rules: latest.rules.filter(r => r.id !== id) })); }
+  async function remove(id: string) { const remote = cloud.rules.find(r => r.id === id); if (remote) { const failure = await cloud.remove(remote); if (failure) setError(failure); return failure; } return change(latest => ({ ...latest, rules: latest.rules.filter(r => r.id !== id) })); }
   useEffect(() => {
     let stopped = false, timer: ReturnType<typeof setTimeout>;
     const controllers = new Set<AbortController>();
@@ -54,7 +59,7 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
       const controller = new AbortController(); controllers.add(controller);
       const timeout = setTimeout(() => controller.abort(), 12000);
       try {
-        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(instrumentKey)}&timeframe=${timeframe}&scope=${combined ? "combined" : "intraday"}`, { signal: controller.signal, cache: "no-store" });
+        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(instrumentKey)}&timeframe=${timeframe}&scope=${combined ? "combined" : "intraday"}&strict=1`, { signal: controller.signal, cache: "no-store" });
         const payload = await response.json();
         if (!response.ok || !payload.ok || !Array.isArray(payload.candles) || !payload.candles.length) throw new Error("Waiting for candle data · retrying automatically");
         const clean = validTechnicalCandles(payload.candles);
@@ -74,7 +79,7 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
             const latest = read(), now = Date.now(), expired = latest.rules.filter(r => ["active", "paused"].includes(r.status) && r.expiresAt <= now);
             if (expired.length) write({ ...latest, rules: latest.rules.map(r => expired.some(e => e.id === r.id) ? { ...r, status: "expired" } : r), events: [...expired.map(r => ({ id: `expired:${r.id}:${r.revision}`, ruleId: r.id, instrument: r.instrument, timeframe: r.timeframe, description: technicalDescription(r), barTime: 0, createdAt: now, price: 0, detail: "Monitoring period ended", kind: "expired" as const })), ...latest.events].slice(0, 200) });
           });
-          const rules = read().rules.filter(r => r.status === "active");
+          const rules = read().rules.filter(r => r.status === "active" && r.delivery !== "server");
           const now = new Date(Date.now() + 19800000), minute = now.getUTCHours() * 60 + now.getUTCMinutes();
           const closeGrace = now.getUTCDay() > 0 && now.getUTCDay() < 6 && minute >= 930 && minute < 934;
           if (document.hidden || !navigator.onLine || (!current.current.marketOpen && !closeGrace)) {
@@ -125,5 +130,5 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
     void cycle();
     return () => { stopped = true; clearTimeout(timer); controllers.forEach(c => c.abort()); window.removeEventListener("storage", storage); };
   }, [key]); // The monitor outlives chart navigation; callbacks are read through a ref.
-  return { ...store, states, error, save, toggle, remove };
+  return { rules: [...cloud.rules, ...store.rules], events: [...cloud.events, ...store.events].sort((a, b) => b.createdAt - a.createdAt), states: { ...states, ...Object.fromEntries(cloud.rules.map(r => [r.id, cloud.message])) }, error, save, toggle, remove, cloudReady: cloud.ready, cloudMessage: cloud.message, enablePush: cloud.enablePush };
 }

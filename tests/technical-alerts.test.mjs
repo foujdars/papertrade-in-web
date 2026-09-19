@@ -125,3 +125,30 @@ test('candle validation sorts, deduplicates and excludes impossible OHLC', () =>
   const data = bars([100, 110]);
   assert.equal(validTechnicalCandles([data[1], data[0], data[1], { ...data[1], time: start + 900, high: 1 }]).length, 2);
 });
+test('volume spike excludes its own volume from the baseline and fires only on entry', () => {
+  const data = bars(Array(25).fill(100)); data.at(-1).volume = 2500;
+  const config = defaults('volume'), now = (data.at(-1).time + 310) * 1000;
+  const result = evaluateTechnical(config, data, [], now);
+  assert.equal(result.hit, true); assert.match(result.detail, /2.50×/);
+  data.push({ ...data.at(-1), time: data.at(-1).time + 300 });
+  assert.equal(evaluateTechnical(config, data, [], now + 300000).hit, false);
+});
+test('volume dry-up requires positive volume and a positive valid baseline', () => {
+  const data = bars(Array(25).fill(100)), config = { ...defaults('volume'), condition: 'dry', multiplier: 0.5 }, now = (data.at(-1).time + 310) * 1000;
+  data.at(-1).volume = 300; assert.equal(evaluateTechnical(config, data, [], now).hit, true);
+  data.at(-1).volume = 0; assert.match(evaluateTechnical(config, data, [], now).state, /zero\/missing/);
+  assert.ok(technicalConfigError({ ...config, multiplier: 2 }));
+  assert.ok(technicalConfigError({ ...defaults('volume'), multiplier: 0.5 }));
+});
+test('volume directional events use candle body, dojis excluded; bad history waits', () => {
+  const data = bars([...Array(24).fill(100), 110]), now = (data.at(-1).time + 310) * 1000;
+  data.at(-1).volume = 3000;
+  assert.equal(evaluateTechnical({ ...defaults('volume'), condition: 'bullish' }, data, [], now).hit, true);
+  assert.equal(evaluateTechnical({ ...defaults('volume'), condition: 'bearish' }, data, [], now).hit, false);
+  data.at(-1).open = 110;
+  assert.equal(evaluateTechnical({ ...defaults('volume'), condition: 'bullish' }, data, [], now).hit, false);
+  data.at(-1).open = 111;
+  assert.equal(evaluateTechnical({ ...defaults('volume'), condition: 'bearish' }, data, [], now).hit, true);
+  assert.match(evaluateTechnical(defaults('volume'), data.filter((_, i) => i !== 10), [], now).state, /uninterrupted/);
+  assert.match(evaluateTechnical(defaults('volume'), data.slice(-10), [], now).state, /Warming/);
+});

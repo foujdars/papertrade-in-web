@@ -24,7 +24,7 @@ public final class NotificationDelivery {
     return bitmap;
   }
   public static String safePath(String path) {
-    return path!=null && (path.matches("/\\?screen=(ipo|pnl)")||path.matches("/ipo-allotment/(mufg|kfin|bigshare|bse)"))?path:"/";
+    return path!=null && (path.matches("/\\?screen=(ipo|pnl)")||path.matches("/\\?symbol=[A-Za-z0-9%_.~!()*'\\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|1D)")||path.matches("/ipo-allotment/(mufg|kfin|bigshare|bse)"))?path:"/";
   }
   public static void refreshBranding(Context context) {
     if (Build.VERSION.SDK_INT < 24) return;
@@ -68,7 +68,7 @@ public final class NotificationDelivery {
       Intent intent=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("notificationPath",safePath(notice.optString("url")));
       PendingIntent pending=PendingIntent.getActivity(context,id.hashCode()&0x7fffffff,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
       String body=notice.optString("body");
-      if("trade".equals(kind)&&prefs.optBoolean("hideAmounts",true))body="A paper-trade protection event occurred. Open PaperTrade IN to review it.";
+      if("trade".equals(kind)&&prefs.optBoolean("hideAmounts",true))body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
       NotificationCompat.Builder builder=new NotificationCompat.Builder(context,channelId).setSmallIcon(R.drawable.ic_stat_papertrade_current).setLargeIcon(logo(context)).setContentTitle(notice.optString("title","PaperTrade IN")).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(silent).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_STATUS).setGroup("papertrade-"+kind);
       manager.notify(id.hashCode()&0x7fffffff,builder.build());
     }catch(Exception ignored){/* Never interrupt trading if notification delivery fails. */}

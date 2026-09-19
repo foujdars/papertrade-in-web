@@ -68,7 +68,51 @@ Routine IPO digests are capped at two a day. When both were sent, optional perso
 
 The 9:05, 1:30 and 5:15 slots each accept scheduler runs for ten minutes, with stable per-slot IDs. Delivery is not an exact-time guarantee: network loss, Doze, permission denial, browser restrictions and Android force-stop can delay or prevent it. Android normally needs to be opened once after installation and notification permission granted.
 
-Background browser notifications cover IPOs and opted-in summaries. This change does **not** implement an always-on server trade execution engine; closed-browser trade-price monitoring remains unsupported. Android price monitoring uses the existing foreground service and requires its ongoing notification.
+Background browser notifications cover IPOs, opted-in summaries and separately configured technical alerts (below). This does **not** implement an always-on server trade execution engine; closed-browser trade-price monitoring remains unsupported. Android price monitoring uses the existing foreground service and requires its ongoing notification.
+
+## Closed-app technical alerts
+
+Implementation is present, but production activation and real-device receipt are
+not verified. No scheduler or paid service has been provisioned automatically.
+
+1. Complete Firebase credentials, Web Push and consenting-device setup above.
+   Ensure the production Supabase public URL/key and Upstox access credentials
+   are valid. Set server-only `TECHNICAL_ALERTS_ENABLED=true` after setup.
+2. Deny all client access to `technicalAccounts`, `technicalOutbox` and
+   `technicalSystem`, as well as the existing notification collections. Access
+   runs through authenticated server handlers, not client Firestore SDKs.
+   Preserve any unrelated database rules. Technical records include the chosen
+   instrument, indicator parameters and detected candle-close price; they do
+   not include PAN, account balances or brokerage order credentials.
+3. Schedule an additional authenticated GET to
+   `https://www.papertrade.site/api/technical-alerts/dispatch` every minute using
+   the same secret header. It is separate from the IPO notification dispatcher.
+   Run the heartbeat outside market hours too: alert creation checks that the
+   last successful run was within three minutes. Market-session checks prevent
+   out-of-session candle evaluation. Review scheduler/Firestore/FCM costs before
+   activation; do not assume the current hosting plan supports minute-level runs.
+4. Initial capacity: 10 accounts, 24 global symbol/timeframe groups, 12 active or
+   paused rules and 6 groups per account. Budget is 60 seconds per dispatch,
+   three concurrent candle checks, with a 90-second overlap lease. Shard or use
+   a durable worker queue before increasing these caps. Monitor 503s, health
+   document age, `sending`/`needs-review` outbox records and quota consumption.
+5. On one test account, enable trade notifications, create one server technical
+   rule before a new confirmed close, then close the app normally. Check the
+   rule/event, one FCM delivery, privacy settings and symbol/timeframe tap-through.
+   Repeat the dispatcher and verify no duplicate. Test pause/delete, sign-out,
+   account deletion, stale/missing feed and permission denial. Do not broadcast
+   tests to production topics. Use the updated Android build for chart links.
+6. Keep the feature disabled if any acceptance check fails. To shut it down,
+   remove the enable flag and stop its scheduler; saved rules remain available
+   in Firestore for deliberate cleanup or later reactivation.
+
+Rules are not automatically migrated from local storage. Server events are
+retained in a bounded account log; outbox documents need an explicit retention
+policy. Current `expiresAt` fields are numeric milliseconds, **not** Firestore
+Timestamp values: do not attach a Firestore TTL policy directly to them. Plan a
+separate timestamp/cleanup migration after reviewing retention and billing.
+Account deletion removes technical rules, outbox records and the capacity entry.
+FCM transport acknowledgement alone is not evidence of end-device delivery.
 
 ## Before release
 
@@ -82,7 +126,7 @@ Release audit: Next.js was updated from 16.3.0 to 16.3.3, clearing the critical 
 6. Verify a scheduled digest once; repeating the dispatcher must not resend it. Verify a newly published allotment, followed by a temporary source failure, never re-alerts as a fresh result.
 7. Enable the scheduler only after these tests. Review delivery failures, Firestore usage and scheduler costs.
 
-The server cleans up inactive device records during its scan. Configure outbox TTL on expiresAt only after reviewing the provider's TTL costs; device TTL should not independently delete documents before topic unsubscription. No automatic TTL policy has been enabled.
+The server cleans up inactive device records during its scan. Review outbox retention and TTL costs, and migrate numeric expiry fields to a Firestore Timestamp field before configuring TTL. Device TTL should not independently delete documents before topic unsubscription. No automatic TTL policy has been enabled.
 
 ## Official references
 

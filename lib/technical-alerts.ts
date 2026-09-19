@@ -2,14 +2,15 @@ import { bollingerBands, ema, macd, rsi, sma, supertrend, vwap, type Candle, typ
 
 export const TECHNICAL_FRAMES = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1H": 3600, "1D": 86400 } as const;
 export type TechnicalFrame = keyof typeof TECHNICAL_FRAMES;
-export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels" } as const;
+export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume" } as const;
 export type TechnicalFamily = keyof typeof TECHNICAL_FAMILIES;
-export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number };
+export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number; delivery?: "device" | "server" };
 export type TechnicalRule = TechnicalConfig & { id: string; revision: string; instrument: Instrument; createdAt: number; armedAt: number; expiresAt: number; status: "active" | "paused" | "completed" | "expired"; lastBar?: number; lastTriggeredAt?: number };
 export type TechnicalEvent = { id: string; ruleId: string; instrument: Instrument; timeframe: TechnicalFrame; description: string; barTime: number; createdAt: number; price: number; detail: string; kind: "trigger" | "expired" };
 export type TechnicalStore = { version: 1; rules: TechnicalRule[]; events: TechnicalEvent[] };
 export const emptyTechnicalStore = (): TechnicalStore => ({ version: 1, rules: [], events: [] });
 export function technicalChoices(family: TechnicalFamily) {
+  if (family === "volume") return [{ value: "spike", label: "Volume spike above average" }, { value: "dry", label: "Volume falls below average" }, { value: "bullish", label: "High-volume bullish close" }, { value: "bearish", label: "High-volume bearish close" }];
   if (family === "ema" || family === "sma") return [{ value: "priceUp", label: "Price crosses above" }, { value: "priceDown", label: "Price crosses below" }, { value: "averageUp", label: "Fast average crosses above slow" }, { value: "averageDown", label: "Fast average crosses below slow" }];
   if (family === "bollinger") return [{ value: "upperOut", label: "Close breaks above upper band" }, { value: "lowerOut", label: "Close breaks below lower band" }, { value: "upperIn", label: "Returns inside from above" }, { value: "lowerIn", label: "Returns inside from below" }];
   if (family === "macd") return [{ value: "signalUp", label: "MACD crosses above signal" }, { value: "signalDown", label: "MACD crosses below signal" }, { value: "zeroUp", label: "Histogram crosses above zero" }, { value: "zeroDown", label: "Histogram crosses below zero" }];
@@ -22,16 +23,19 @@ export function defaultTechnicalConfig(family: TechnicalFamily = "ema", timefram
 }
 export function technicalConfigError(c: TechnicalConfig): string | null {
   if (!c || !Object.hasOwn(TECHNICAL_FAMILIES, c.family) || !Object.hasOwn(TECHNICAL_FRAMES, c.timeframe)) return "Choose a supported indicator and timeframe.";
+  if (c.delivery !== undefined && !["device", "server"].includes(c.delivery)) return "Choose a valid monitoring mode.";
   if (!technicalChoices(c.family).some(o => o.value === c.condition)) return "Choose a valid condition.";
   if (![c.period, c.slow, c.signal].every(n => Number.isInteger(n) && n >= 2 && n <= 200)) return "Periods must be whole numbers from 2 to 200.";
   if ((c.family === "macd" || c.condition.startsWith("average")) && c.slow <= c.period) return "The slow period must be greater than the fast period.";
   if (!Number.isFinite(c.threshold) || c.threshold <= 0 || c.threshold >= 100) return "RSI threshold must be between 0 and 100.";
   if (!Number.isFinite(c.multiplier) || c.multiplier < 0.1 || c.multiplier > 10) return "Multiplier must be between 0.1 and 10.";
+  if (c.family === "volume" && (c.condition === "dry" ? c.multiplier >= 1 : c.multiplier <= 1)) return c.condition === "dry" ? "Low-volume multiplier must be below 1×." : "High-volume multiplier must be above 1×.";
   if (!["once", "repeat"].includes(c.repeat) || !Number.isInteger(c.cooldown) || c.cooldown < 0 || c.cooldown > 1440 || ![1, 7, 30].includes(c.days)) return "Choose a valid repeat, cooldown and expiry.";
   if (c.family === "vwap" && c.timeframe === "1D") return "Session VWAP requires an intraday timeframe and traded volume.";
   return null;
 }
 export function technicalDescription(c: TechnicalConfig) {
+  if (c.family === "volume") return `Volume (${c.period} prior bars · ${c.multiplier}×) · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
   const name = TECHNICAL_FAMILIES[c.family];
   const parameters = ["ema", "sma"].includes(c.family) ? `${c.period}${c.condition.startsWith("average") ? ` / ${c.slow}` : ""}` : c.family === "rsi" ? `${c.period} · ${c.threshold}` : c.family === "macd" ? `${c.period}, ${c.slow}, ${c.signal}` : ["supertrend", "bollinger"].includes(c.family) ? `${c.period}, ${c.multiplier}` : "";
   return `${name}${parameters ? ` (${parameters})` : ""} · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
@@ -79,8 +83,18 @@ export function evaluateTechnical(rule: TechnicalConfig, raw: Candle[], daily: C
   const end = technicalBarEnd(last.time, rule.timeframe);
   if (now - end > 180) return { state: "Waiting for a fresh candle close" };
   const baseline = { barTime: last.time, end, price: last.close };
-  const required = rule.family === "macd" ? rule.slow + rule.signal + 1 : rule.family === "rsi" ? rule.period + 2 : ["ema", "sma", "supertrend", "bollinger"].includes(rule.family) ? (rule.condition.startsWith("average") ? rule.slow : rule.period) + 1 : 2;
+  const required = rule.family === "volume" ? rule.period + 2 : rule.family === "macd" ? rule.slow + rule.signal + 1 : rule.family === "rsi" ? rule.period + 2 : ["ema", "sma", "supertrend", "bollinger"].includes(rule.family) ? (rule.condition.startsWith("average") ? rule.slow : rule.period) + 1 : 2;
   if (data.length < required) return { state: `Warming up · ${data.length}/${required} closed candles` };
+  if (rule.family === "volume") {
+    // Compare each bar with strictly PRIOR bars, never its own volume or future data.
+    const window = data.slice(-required);
+    if (window.some(c => c.volume <= 0)) return { state: "Waiting for valid traded volume · zero/missing volume is not a low-volume signal" };
+    if (rule.timeframe !== "1D" && window.some((c, i) => i > 0 && day(c.time) === day(window[i - 1].time) && c.time - window[i - 1].time !== TECHNICAL_FRAMES[rule.timeframe])) return { state: "Waiting for uninterrupted volume history" };
+    const average = (offset: number) => window.slice(offset, offset + rule.period).reduce((sum, c) => sum + c.volume, 0) / rule.period;
+    const before = average(0), current = average(1), ratio0 = previous.volume / before, ratio1 = last.volume / current;
+    const matches = (c: Candle, ratio: number) => rule.condition === "dry" ? ratio < rule.multiplier : ratio > rule.multiplier && (rule.condition === "bullish" ? c.close > c.open : rule.condition === "bearish" ? c.close < c.open : true);
+    return { ...baseline, state: "Watching closed-candle volume", hit: matches(last, ratio1) && !matches(previous, ratio0), detail: `Volume ${last.volume.toLocaleString("en-IN")} · prior ${rule.period}-bar average ${current.toFixed(0)} · ${ratio1.toFixed(2)}×` };
+  }
   let left: number[] = [], right: number[] = [], upward = /Up$/.test(rule.condition) || rule.condition === "up";
   if (rule.family === "ema" || rule.family === "sma") {
     const calc = rule.family === "ema" ? ema : sma;

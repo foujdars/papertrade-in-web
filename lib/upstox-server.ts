@@ -79,6 +79,15 @@ export async function authorizeUpstoxMarketFeed() {
   return authorizedRedirectUri;
 }
 
+/** Alert decisions must never receive a stale-on-error candle response. */
+export async function upstoxFreshFetch<T>(path: string): Promise<T> {
+  const token = process.env.UPSTOX_ACCESS_TOKEN?.trim();
+  if (!token) throw new UpstoxServerError(503, "TOKEN_MISSING", "Market-data service is not configured.");
+  const response = await fetch(`https://api.upstox.com${path}`, { headers: { Accept: "application/json", Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new UpstoxServerError(503, "FRESH_DATA_UNAVAILABLE", "Fresh market data unavailable. Alert evaluation is paused.");
+  return await response.json() as T;
+}
+
 export async function upstoxFetch<T>(path: string): Promise<T> {
   const token = process.env.UPSTOX_ACCESS_TOKEN?.trim();
   if (!token) {

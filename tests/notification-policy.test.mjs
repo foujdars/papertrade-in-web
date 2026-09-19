@@ -118,6 +118,16 @@ test("visible app receives inbox events without an extra OS alert, and unsafe li
   worker.setVisible(false);await worker.push(push({id:"two",url:"https://evil.example"}));
   assert.equal(worker.shown[0].data.url,"/");
 });
+test("closed-app technical notifications require trade consent, hide amounts and keep safe chart links", async () => {
+  const disabled = await workerHarness({ ipo: true, trades: false });
+  await disabled.push(push({ kind: 'trade' })); assert.equal(disabled.shown.length, 0);
+  const worker = await workerHarness({ trades: true, hideAmounts: true });
+  await worker.push(push({ kind: 'trade', body: 'Close ₹500', url: '/?symbol=RELIANCE&timeframe=5m' }));
+  assert.equal(worker.shown.length, 1); assert.doesNotMatch(worker.shown[0].body, /500/);
+  assert.equal(worker.shown[0].data.url, '/?symbol=RELIANCE&timeframe=5m');
+  await worker.push(push({ id: 'unsafe', kind: 'trade', url: '/?symbol=X&timeframe=5m&redirect=https://evil.example' }));
+  assert.equal(worker.shown[1].data.url, '/');
+});
 
 test("browser push configuration rejects placeholders and requires Firebase-shaped public IDs", async () => {
   const route=await readFile(new URL("../app/api/notifications/config/route.ts",import.meta.url),"utf8");

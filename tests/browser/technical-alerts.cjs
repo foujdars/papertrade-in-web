@@ -1,7 +1,7 @@
 const fs = require('fs'), http = require('http'), esbuild = require('esbuild'), assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 (async () => {
-  const bundle = await esbuild.build({ entryPoints: ['tests/browser/technical-alerts.fixture.jsx'], bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
+  const bundle = await esbuild.build({ entryPoints: ['tests/browser/technical-alerts.fixture.jsx'], bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_SUPABASE_URL': 'undefined', 'process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY': 'undefined', 'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': 'undefined' } });
   const css = [...fs.readFileSync('app/layout.tsx', 'utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([, f]) => fs.readFileSync('app/' + f, 'utf8')).join('\n').replace(/@import[^;]+;/g, '');
   const start = Date.parse('2026-09-18T09:15:00+05:30') / 1000;
   let tail = [110], failFeed = false, calls = 0;
@@ -53,6 +53,27 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     failFeed = false; tail = [110, 80, 110, 80]; await page.clock.fastForward(30000); await page.waitForFunction(() => JSON.parse(localStorage.getItem('papertrade-technical-alerts-v1:qa')).rules[0].lastBar > 0);
     await page.getByLabel('Delete technical alert for TEST').click(); await page.getByText('No active alerts', { exact: true }).waitFor(); await page.getByRole('tab', { name: /Log/ }).click(); assert.equal(await page.locator('.technical-event').count(), 2);
     console.log('Account isolation, honest feed errors, keyboard dismissal, dark theme, four responsive widths and retained history after deletion pass');
+    await page.getByLabel('Close price actions').click(); await page.getByRole('button', { name: 'New alert', exact: true }).click(); await page.getByRole('button', { name: 'Technical', exact: true }).click();
+    await choose('Indicator', 'Volume');
+    await choose('Trigger condition', 'Volume falls below average');
+    assert.equal(await page.getByLabel('Volume multiplier (× average)', { exact: true }).inputValue(), '0.5');
+    await page.getByLabel('Period', { exact: true }).fill('10');
+    await page.getByRole('button', { name: 'Create technical alert' }).click(); await page.locator('.technical-rule').waitFor();
+    assert.equal((await stored()).rules[0].family, 'volume'); assert.equal((await stored()).rules[0].condition, 'dry');
+    await page.reload(); await open(); await page.getByLabel('Edit technical alert for TEST').click();
+    assert.equal(await page.getByLabel('Volume multiplier (× average)', { exact: true }).inputValue(), '0.5');
+    assert.equal(await page.getByLabel('Period', { exact: true }).inputValue(), '10');
+    await choose('Trigger condition', 'High-volume bullish close');
+    assert.equal(await page.getByLabel('Volume multiplier (× average)', { exact: true }).inputValue(), '2');
+    await page.getByRole('button', { name: 'Indicator', exact: true }).click();
+    assert.equal(await page.getByRole('option').filter({ hasText: /SMC/i }).count(), 0); await page.keyboard.press('Escape');
+    await page.getByLabel('Close price actions').click(); await page.getByLabel('Close price actions').click();
+    await page.getByRole('button', { name: 'New alert', exact: true }).click(); await page.getByRole('button', { name: 'Technical', exact: true }).click();
+    await choose('Monitoring', /Even when app is closed/);
+    assert.equal(await page.getByRole('button', { name: 'Closed-app setup required', exact: true }).isDisabled(), true);
+    await page.getByText('Sign in to use closed-app technical alerts.', { exact: true }).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: 'outputs/technical-alert-closed-setup.png' });
+    console.log('Volume settings persist and switch thresholds correctly; SMC is absent; unconfigured closed-app mode cannot be saved');
     assert.equal(errors.length, 0, errors.join('\n'));
   } finally { await browser.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

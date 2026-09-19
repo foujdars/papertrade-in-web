@@ -1,5 +1,5 @@
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
-import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
+import { upstoxErrorResponse, upstoxFetch, upstoxFreshFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +109,7 @@ export async function GET(request: Request) {
     const instrumentKey = url.searchParams.get("instrumentKey") ?? "";
     const timeframe = url.searchParams.get("timeframe") ?? "5m";
     const scope = url.searchParams.get("scope") ?? "combined";
+    const readCandles = url.searchParams.get("strict") === "1" ? upstoxFreshFetch : upstoxFetch;
     const config = timeframeMap[timeframe as keyof typeof timeframeMap];
 
     if (!isSupportedNseInstrumentKey(instrumentKey)) {
@@ -146,24 +147,25 @@ export async function GET(request: Request) {
     }
 
     if (config.historicalOnly) {
-      const historical = await upstoxFetch<UpstoxCandlePayload>(historicalPath);
+      const historical = await readCandles<UpstoxCandlePayload>(historicalPath);
       candles = mergeCandles([normalizeCandles(historical)]);
       if (config.aggregateYears) candles = aggregateAnnualCandles(candles);
       segments = ["historical"];
     } else if (scope === "intraday") {
-      const intraday = await upstoxFetch<UpstoxCandlePayload>(intradayPath);
+      const intraday = await readCandles<UpstoxCandlePayload>(intradayPath);
       candles = mergeCandles([normalizeCandles(intraday)]);
       segments = ["intraday"];
     } else {
       const results = await Promise.allSettled([
-        upstoxFetch<UpstoxCandlePayload>(historicalPath),
-        upstoxFetch<UpstoxCandlePayload>(intradayPath),
+        readCandles<UpstoxCandlePayload>(historicalPath),
+        readCandles<UpstoxCandlePayload>(intradayPath),
       ]);
       const successful = results
         .map((result, index) => result.status === "fulfilled"
           ? { payload: result.value, segment: index === 0 ? "historical" : "intraday" }
           : null)
         .filter((result): result is { payload: UpstoxCandlePayload; segment: string } => Boolean(result));
+      if (url.searchParams.get("strict") === "1" && successful.length !== 2) throw new Error("Complete fresh candle history is unavailable");
       if (!successful.length) {
         const failure = results.find((result) => result.status === "rejected");
         throw failure && failure.status === "rejected" ? failure.reason : new Error("Upstox candles are unavailable.");

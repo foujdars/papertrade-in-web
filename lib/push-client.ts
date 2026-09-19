@@ -66,7 +66,7 @@ export async function disconnectPush() {
     await getNativeTradeAlert().consumeNotifications().catch(()=>undefined);
   } else {
     const registration = await navigator.serviceWorker?.getRegistration("/notifications/");
-    registration?.active?.postMessage({type:"preferences",preferences:{ipo:false,allotment:false,reviews:false,practice:false}});
+    registration?.active?.postMessage({type:"preferences",preferences:{ipo:false,allotment:false,reviews:false,practice:false,trades:false}});
     const { getApps } = await import("firebase/app");
     const { getMessaging, deleteToken } = await import("firebase/messaging");
     const app=getApps().find(item=>item.name==="papertrade-push");
