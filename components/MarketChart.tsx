@@ -9,6 +9,7 @@ import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
 import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
+import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -37,6 +38,7 @@ import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
 import { applyCandleTick, reconcileLiveCandles, validCandleTick, liveCandleBucket, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
 
 export const DRAWING_TOOL_CATALOG = [
+  ...EXTRA_DRAWING_TOOLS,
   { id: "trend-line", label: "Trend Line", category: "Lines", anchors: 2 },
   { id: "horizontal-line", label: "Horizontal Line", category: "Lines", anchors: 1 },
   { id: "vertical-line", label: "Vertical Line", category: "Lines", anchors: 1 },

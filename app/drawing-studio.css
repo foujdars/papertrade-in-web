@@ -1,0 +1,44 @@
+.terminal-shell .chart-tools-trigger { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--purple); }
+.terminal-shell .drawing-studio-backdrop { position: fixed; inset: 0; z-index: 220; display: flex; justify-content: center; align-items: flex-end; padding: 0; background: #10112655; }
+.terminal-shell .drawing-studio { display: flex; flex-direction: column; width: min(640px,100%); height: min(850px,92dvh); max-height: 92dvh; border: 0; border-radius: 24px 24px 0 0; color: var(--ink); background: var(--surface,#fff); box-shadow: 0 -16px 64px #10082822; overflow: hidden; }
+.drawing-sheet-grip { width: 34px; height: 4px; flex: 0 0 4px; margin: 12px auto 4px; border-radius: 8px; background: var(--line,#dedee7); }
+.terminal-shell .drawing-studio > header { flex: 0 0 auto; padding: 10px 18px; border: 0; background: transparent; }
+.drawing-studio h2 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
+.terminal-shell .drawing-studio > header button { border: 0; background: transparent; color: inherit; }
+.terminal-shell .drawing-studio .drawing-library-search { flex: 0 0 46px; margin: 6px 16px 14px; border: 0; border-radius: 13px; color: var(--muted,#74738a); background: color-mix(in srgb,var(--purple,#7952d1) 7%,var(--surface,#fff)); }
+.terminal-shell .drawing-studio .drawing-library-search input { font-size: 16px; color: var(--ink); min-width: 0; }
+.drawing-library-search button { border: 0; padding: 4px; background: transparent; color: inherit; }
+.terminal-shell .drawing-studio > nav { flex: 0 0 auto; gap: 5px; padding: 0 16px 12px; touch-action: pan-x; }
+.terminal-shell .drawing-studio > nav button { height: 38px; border: 0; border-radius: 10px; padding: 0 12px; font-size: 13px; font-weight: 550; color: var(--muted,#737087); background: transparent; }
+.terminal-shell .drawing-studio > nav button.active { color: var(--purple); background: var(--purple-soft,#f0eafa); }
+.drawing-studio-content { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 0 16px 20px; overscroll-behavior: contain; }
+.drawing-tool-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 550; color: var(--muted,#807d8e); margin: 12px 0; }
+.drawing-group-hint { font-size: 11px; line-height: 1.5; color: var(--muted,#807d8e); margin: -4px 0 12px; }
+.drawing-tile-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.drawing-tile { position: relative; min-width: 0; border-radius: 13px; background: color-mix(in srgb,var(--purple,#7952d1) 6%,var(--surface,#fff)); }
+.drawing-tile.selected { background: var(--purple-soft,#eee4ff); box-shadow: inset 0 0 0 1px var(--purple); }
+.drawing-tile-select { display: flex; width: 100%; min-height: 106px; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 19px 6px 10px; border: 0; background: transparent; color: inherit; }
+.drawing-tile-select > svg { flex: 0 0 30px; }
+.drawing-tile-select span { font-size: 11px; line-height: 1.3; text-align: center; overflow-wrap: anywhere; }
+.drawing-favorite { position: absolute; right: 1px; top: 1px; display: grid; place-items: center; width: 30px; height: 30px; border: 0; background: transparent; color: var(--muted,#aaa3b7); opacity: .55; padding: 0; }
+.drawing-favorite.saved { color: #de9700; opacity: 1; }
+.drawing-favorite:focus-visible,.drawing-favorite:hover { opacity: 1; }
+.drawing-pointer { display: flex; align-items: center; gap: 9px; padding: 12px; width: 100%; border: 0; border-radius: 12px; background: var(--purple-soft); color: var(--purple); text-align: left; }
+.drawing-pointer small { margin-left: auto; font-size: 11px; }
+.drawing-empty { text-align: center; padding: 40px 16px; color: var(--muted); font-size: 14px; }
+.terminal-shell .drawing-studio > footer { flex: 0 0 auto; padding: 12px 18px max(12px,env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface,#fff); color: inherit; font-size: 13px; gap: 10px; }
+.drawing-studio > footer span { flex: 1; text-align: left; }
+.drawing-favorites-switch { width: 42px; height: 25px; padding: 3px; border: 0; border-radius: 20px; background: var(--muted,#999); }
+.drawing-favorites-switch i { display: block; width: 19px; height: 19px; border-radius: 50%; background: white; transition: transform 120ms; }
+.drawing-favorites-switch[aria-checked="true"] { background: var(--purple); }
+.drawing-favorites-switch[aria-checked="true"] i { transform: translateX(17px); }
+/* Prevent page pinch/double-tap zoom, but leave the chart's own gestures intact. */
+html, body { touch-action: pan-x pan-y; }
+.terminal-shell { touch-action: pan-x pan-y; }
+@media (max-width: 360px) {
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link) { width: 23px; min-width: 23px; flex-basis: 23px; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger .stock-logo { display: none; }
+  .drawing-tile-grid { gap: 6px; }
+  .drawing-tile-select span { font-size: 10px; }
+}
+@media (min-width: 761px) { .terminal-shell .drawing-studio-backdrop { align-items: center; padding: 20px; } .terminal-shell .drawing-studio { border-radius: 24px; height: min(820px,92dvh); } }

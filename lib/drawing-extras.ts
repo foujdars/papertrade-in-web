@@ -1,0 +1,21 @@
+/** Manual annotations, not pattern recognition or trade signals. */
+export const EXTRA_DRAWING_TOOLS = [
+  { id: "xabcd-pattern", label: "XABCD Pattern", category: "Patterns", anchors: 5, labels: "X A B C D" },
+  { id: "cypher-pattern", label: "Cypher Pattern", category: "Patterns", anchors: 5, labels: "X A B C D" },
+  { id: "head-shoulders", label: "Head and Shoulders", category: "Patterns", anchors: 7, labels: "0 1 2 3 4 5 6" },
+  { id: "abcd-pattern", label: "ABCD Pattern", category: "Patterns", anchors: 4, labels: "A B C D" },
+  { id: "triangle-pattern", label: "Triangle Pattern", category: "Patterns", anchors: 5, labels: "A B C D E" },
+  { id: "three-drives", label: "Three Drives", category: "Patterns", anchors: 6, labels: "0 1 2 3 4 5" },
+  { id: "elliott-impulse", label: "Elliott Impulse (12345)", category: "Patterns", anchors: 6, labels: "0 1 2 3 4 5" },
+  { id: "elliott-correction", label: "Elliott Correction (ABC)", category: "Patterns", anchors: 4, labels: "0 A B C" },
+  { id: "elliott-triangle", label: "Elliott Triangle (ABCDE)", category: "Patterns", anchors: 6, labels: "0 A B C D E" },
+  { id: "elliott-double", label: "Elliott Double Combo (WXY)", category: "Patterns", anchors: 4, labels: "0 W X Y" },
+  { id: "elliott-triple", label: "Elliott Triple Combo (WXYXZ)", category: "Patterns", anchors: 6, labels: "0 W X Y X Z" },
+  { id: "cyclic-lines", label: "Cyclic Lines", category: "Patterns", anchors: 2, labels: "" },
+  { id: "time-cycles", label: "Time Cycles", category: "Patterns", anchors: 2, labels: "" },
+  { id: "sine-line", label: "Sine Line", category: "Patterns", anchors: 2, labels: "" },
+  { id: "smile-stamp", label: "Smile", category: "Visuals", anchors: 1, labels: "☺" },
+  { id: "star-stamp", label: "Star", category: "Visuals", anchors: 1, labels: "★" },
+  { id: "heart-stamp", label: "Heart", category: "Visuals", anchors: 1, labels: "♥" },
+  { id: "check-stamp", label: "Check", category: "Visuals", anchors: 1, labels: "✓" },
+] as const;

@@ -24,6 +24,14 @@ public class MainActivity extends BridgeActivity {
         }
         registerPlugin(TradeAlertPlugin.class);
         super.onCreate(savedInstanceState);
+        // Page zoom is not chart zoom: keep the native app shell at its designed
+        // scale. Canvas chart gestures continue to handle pinch and axis scaling.
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            android.webkit.WebSettings settings = getBridge().getWebView().getSettings();
+            settings.setSupportZoom(false);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
+        }
         NotificationDelivery.refreshBranding(this);
         // Retire the imprecise device-polling schedules after the app update.
         IpoGmpAlertWorker.cancel(this);

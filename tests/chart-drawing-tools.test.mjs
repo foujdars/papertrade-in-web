@@ -8,8 +8,49 @@ import {drawingLogicalAtTime,drawingTimeAtLogical} from '../lib/drawing-coordina
 import {createChartDrawingRegistry} from '../lib/chart-drawing-tools.ts';
 import {holdingPerformance} from '../lib/holding-performance.ts';
 import {readFile} from 'node:fs/promises';
+import { layoutDrawingLabels } from '../lib/drawing-label-layout.ts';
+import { EXTRA_DRAWING_TOOLS } from '../lib/drawing-extras.ts';
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
+
+test('position drawings use actual anchor width, numeric per-unit values, distinct zones and serializable edits',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const [type,stop,target] of [['long-position',95,110],['short-position',105,90]]) {
+  const item=registry.createDrawing(type,'position',[{time:1,price:100},{time:1.8,price:stop},{time:2.2,price:target}],{}, {visible:true});
+  const geometry=item.computeGeometry(viewport), zones=geometry.filter(g=>g.type==='polygon'), labels=geometry.filter(g=>g.type==='text');
+  assert.equal(zones.length,2); assert.notEqual(zones[0].fill,zones[1].fill);
+  assert.equal(Math.max(...zones[0].points.map(p=>p.x)),220.00000000000003);
+  assert.ok(labels.every(g=>!/[A-Za-z$₹]/.test(g.text))); assert.ok(labels.some(g=>g.text==='100.00 · 1:2.00'));
+  assert.ok(labels.some(g=>g.text.includes('+10.00 (+10.00%)'))); assert.ok(labels.some(g=>g.text.includes('-5.00 (-5.00%)')));
+  const saved=item.toJSON(),restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);
+  assert.deepEqual(restored.computeGeometry(viewport),geometry); assert.equal(restored.clone('copy').type,type);
+  assert.equal(item.testHit({x:160,y:200},viewport),true); assert.equal(item.testHit({x:330,y:200},viewport),false);
+ }
+});
+test('dense labels stay inside narrow plots, shrink and never overlap each other',()=>{
+ for(const width of [120,240,320,768]) {
+  const labels=Array.from({length:14},(_,i)=>({text:i<3?'23380.15 · +77.61 (+0.35%)':`${i*.236}`,x:i%2?-15:width+90,y:95,align:'center'}));
+  const boxes=layoutDrawingLabels(labels,width,450,(text,size)=>text.length*size*.55);
+  assert.equal(boxes.length,14);
+  for(const [i,b] of boxes.entries()) {
+   assert.ok(b.x>=0&&b.x+b.width<=width&&b.y>=0&&b.y+b.height<=450);
+   for(const a of boxes.slice(0,i))assert.ok(b.x>=a.x+a.width||b.x+b.width<=a.x||b.y>=a.y+a.height||b.y+b.height<=a.y);
+  }
+  if(width===120)assert.equal(boxes[0].fontSize,10);
+ }
+ assert.equal(layoutDrawingLabels([{text:'$123',x:40,y:50}],150,150,(text,size)=>text.length*size)[0].text,'₹123');
+});
+test('every manual pattern and visual has a real restorable factory and geometry',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const tool of EXTRA_DRAWING_TOOLS) {
+  const anchors=Array.from({length:tool.anchors},(_,i)=>({time:1+i*.2,price:100+(i%2?10:0)}));
+  const item=registry.createDrawing(tool.id,tool.id,anchors,{}, {visible:true});
+  assert.equal(registry.get(tool.id).requiredAnchors,tool.anchors); assert.equal(item.isValid(),true);
+  const geometry=item.computeGeometry(viewport);assert.ok(geometry.length,tool.id);
+  const saved=item.toJSON();assert.deepEqual(registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options).computeGeometry(viewport),geometry);
+  assert.equal(item.clone('copy').type,tool.id);
+ }
+});
 
 test('drawing coordinate conversion remains reversible before, between and after candles',()=>{
  const times=[100,200,500,600];

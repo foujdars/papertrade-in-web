@@ -13,8 +13,10 @@ type Preferences = {
   smcFilters: string[];
   smcRange: boolean;
   smcLesson: SmcKind;
+  drawingFavorites: string[];
+  showDrawingFavorites: boolean;
 };
-const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG" };
+const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true };
 let snapshot = DEFAULTS;
 let cachedRaw: string | null | undefined;
 
@@ -23,6 +25,8 @@ function normalize(value: unknown): Preferences {
   return {
     magnet: v.magnet === true,
     hidden: v.hidden === true,
+    drawingFavorites: Array.isArray(v.drawingFavorites) ? Array.from(new Set(v.drawingFavorites.filter(x => typeof x === "string" && /^[a-z0-9-]{1,60}$/.test(x)))).slice(0, 120) : DEFAULTS.drawingFavorites,
+    showDrawingFavorites: v.showDrawingFavorites !== false,
     // An empty selection is deliberate, not a request to restore every filter.
     smcFilters: Array.isArray(v.smcFilters) ? GROUPS.filter(g => v.smcFilters!.includes(g)) : GROUPS,
     smcRange: v.smcRange === true,

@@ -149,7 +149,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(dashboard, /Top Gainers/);
   assert.match(paperTrading, /papertrade-orders/);
   assert.match(paperTrading, /unrealizedPnl/);
-  assert.match(chartToolbar, /QUICK_DRAWING_TOOLS/);
+  assert.match(chartToolbar, /DRAWING_TOOL_CATALOG\.filter\(t => favorites\.includes\(t\.id\)\)/);
+  assert.match(chartToolbar, /useChartPreference\("showDrawingFavorites"\)/);
   const drawingShortcuts = await readFile(new URL("../components/DrawingToolIcons.tsx", import.meta.url), "utf8");
   assert.match(drawingShortcuts, /Fibonacci/);
   assert.match(drawingShortcuts, /volume-profile/);

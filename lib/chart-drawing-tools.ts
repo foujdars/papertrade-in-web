@@ -5,6 +5,8 @@ import { istSessionStart } from "./profile-range.ts";
 import type { ProfileMode } from "./profile-range.ts";
 import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
+import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
+import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
 const readableFont = () => "13px sans-serif";
 
 export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
@@ -27,7 +29,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           return logical===null?null:viewport.timeScale.logicalToCoordinate(logical as Logical);
         }}};
       };
-      if(!["price-range","fib-retracement","volume-profile","anchored-volume-profile","session-volume-profile"].includes(type)) {
+      if(!["long-position","short-position","price-range","fib-retracement","volume-profile","anchored-volume-profile","session-volume-profile",...EXTRA_DRAWING_TOOLS.map(t=>t.id)].includes(type)) {
         const nativeViews=item.paneViews.bind(item);
         // Preserve specialized shapes (arrowheads, channels, risk/reward, etc.)
         // while normalizing their canvas units and transparent label treatment.
@@ -35,23 +37,24 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const viewport=item.getViewport();if(!viewport)return;
           scope.context.save();scope.context.beginPath();scope.context.rect(0,0,viewport.width,viewport.height);scope.context.clip();
           let labelBox=false;
+          const labels: DrawingLabel[] = [];
+          const baseTransform=scope.context.getTransform();
           const context=new Proxy(scope.context,{
             get(ctx,key){
               if(key==="beginPath")return ()=>{labelBox=false;ctx.beginPath();};
               if(key==="roundRect")return (...args:Parameters<CanvasRenderingContext2D["roundRect"]>)=>{labelBox=true;ctx.roundRect(...args);};
               if(key==="fill")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.fill,ctx,args);};
+              if(key==="stroke")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.stroke,ctx,args);};
               if(key==="fillText")return (text:string,x:number,y:number,maxWidth?:number)=>{
-                ctx.save();ctx.font=readableFont();
-                const width=Math.min(viewport.width-8,ctx.measureText(text).width),offset=ctx.textAlign==="center"?width/2:ctx.textAlign==="right"||ctx.textAlign==="end"?width:0;
-                const labelY=Math.max(15,Math.min(viewport.height-8,labelBox?y-10:y));
-                ctx.fillStyle=plotSize?.().dark?"#c4a2ff":item.style.lineColor;
-                ctx.fillText(text,Math.max(offset+4,Math.min(viewport.width-width+offset-4,x)),labelY,Math.min(maxWidth??Infinity,viewport.width-8));ctx.restore();
+                const point=baseTransform.inverse().multiply(ctx.getTransform()).transformPoint({x,y});
+                labels.push({text,x:point.x,y:labelBox?point.y-10:point.y,align:ctx.textAlign,color:plotSize?.().dark?"#c4a2ff":item.style.lineColor});
               };
               const value=Reflect.get(ctx,key);return typeof value==="function"?value.bind(ctx):value;
             },
             set(ctx,key,value){return Reflect.set(ctx,key,key==="font"?readableFont():value);},
           });
           view.renderer()?.draw({useBitmapCoordinateSpace:callback=>callback({context,horizontalPixelRatio:1,verticalPixelRatio:1,bitmapSize:scope.mediaSize,mediaSize:scope.mediaSize}),useMediaCoordinateSpace:callback=>callback({...scope,context})} as Parameters<NonNullable<ReturnType<IPrimitivePaneView["renderer"]>>["draw"]>[0]);
+          paintDrawingLabels(scope.context,labels,viewport.width,viewport.height);
           scope.context.restore();
         })})}));
       }
@@ -65,22 +68,96 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     const size=plotSize?.()??viewport;
     ctx.save();ctx.beginPath();ctx.rect(0,0,size.width,size.height);ctx.clip();
     ctx.strokeStyle=item.style.lineColor;ctx.lineWidth=item.style.lineWidth;ctx.setLineDash(item.style.lineDash??[]);
+    const labels: DrawingLabel[] = [];
     for(const geometry of item.computeGeometry(viewport)) {
       if(geometry.type==="line"){ctx.beginPath();ctx.moveTo(geometry.start.x,geometry.start.y);ctx.lineTo(geometry.end.x,geometry.end.y);ctx.stroke();}
       if(geometry.type==="text") {
-        ctx.font=readableFont();ctx.textAlign=geometry.align??"left";ctx.textBaseline="bottom";
-        const width=ctx.measureText(geometry.text).width;
-        const offset=ctx.textAlign==="center"?width/2:ctx.textAlign==="right"?width:0;
-        const x=Math.max(offset+3,Math.min(size.width-width+offset-3,geometry.position.x)),y=Math.max(15,Math.min(size.height-3,geometry.position.y));
-        ctx.fillStyle=geometry.color??item.style.lineColor;ctx.fillText(geometry.text,x,y);
+        labels.push({text:geometry.text,x:geometry.position.x,y:geometry.position.y,align:geometry.align??"left",color:geometry.color??(plotSize?.().dark?"#c4a2ff":item.style.lineColor),fontSize:geometry.font?parseInt(geometry.font):12});
       }
     }
+    paintDrawingLabels(ctx,labels,size.width,size.height);
     if(["selected","editing","hovered"].includes(item.state)) {
       ctx.setLineDash([]);ctx.lineWidth=1.5;
       for(const point of item.getControlPoints(viewport)){ctx.beginPath();ctx.arc(point.x,point.y,4,0,Math.PI*2);ctx.fillStyle=plotSize?.().dark?"#0c142b":"white";ctx.fill();ctx.stroke();}
     }
     ctx.restore();
   })})}];
+
+  class PositionDrawing extends drawing.Drawing {
+    readonly type: string;
+    constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors,style,options); this.type=type; }
+    isValid() { return this.anchors.length >= 3; }
+    computeGeometry(viewport: Viewport): (Geometry & { fill?: string })[] {
+      if (!this.isValid()) return [];
+      const points=this.anchors.map(a=>this.anchorToPixel(a,viewport));
+      if(points.some(p=>!p))return [];
+      const [entry,stop,target]=points as Point[], [e,s,t]=this.anchors.map(a=>a.price);
+      const left=Math.min(entry.x,stop.x,target.x), right=Math.max(entry.x,stop.x,target.x);
+      // Horizontal extent belongs to the selected anchors, never a fixed 200px overhang.
+      const end=right-left<8?left+64:right, center=(left+end)/2;
+      if(end<0||left>(plotSize?.().width??viewport.width))return [];
+      const sign=this.type==="long-position"?1:-1, reward=(t-e)*sign, risk=(e-s)*sign;
+      const riskColor=plotSize?.().dark?"#ff819b":"#ce355b", rewardColor=plotSize?.().dark?"#40dfb4":"#00876b";
+      const zone=(y:number,fill:string):Geometry & {fill:string}=>({type:"polygon",closed:true,points:[{x:left,y:entry.y},{x:end,y:entry.y},{x:end,y},{x:left,y}],fill});
+      const delta=(n:number)=>`${n>=0?"+":""}${n.toFixed(2)} (${n>=0?"+":""}${(e?n/e*100:0).toFixed(2)}%)`;
+      return [zone(target.y,"rgba(0,174,132,.19)"),zone(stop.y,"rgba(242,62,103,.18)"),
+        {type:"line",start:{x:left,y:entry.y},end:{x:end,y:entry.y}},
+        {type:"text",position:{x:center,y:target.y+(target.y<entry.y?-10:22)},text:`${t.toFixed(2)} · ${delta(reward)}`,align:"center",color:rewardColor},
+        {type:"text",position:{x:center,y:entry.y-6},text:`${e.toFixed(2)} · ${risk>0&&reward>=0?`1:${(reward/risk).toFixed(2)}`:"—"}`,align:"center",color:plotSize?.().dark?"#c4a2ff":"#7653bd"},
+        {type:"text",position:{x:center,y:stop.y+(stop.y<entry.y?-10:22)},text:`${s.toFixed(2)} · ${delta(-risk)}`,align:"center",color:riskColor},
+      ];
+    }
+    paneViews():IPrimitivePaneView[] {return [{renderer:()=>({draw:target=>target.useMediaCoordinateSpace(({context:ctx})=>{
+      const viewport=this.getViewport();if(!viewport||!this.options.visible)return;
+      const size=plotSize?.()??viewport, labels:DrawingLabel[]=[];
+      ctx.save();ctx.beginPath();ctx.rect(0,0,size.width,size.height);ctx.clip();
+      for(const g of this.computeGeometry(viewport)) {
+        if(g.type==="polygon") {ctx.beginPath();g.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=g.fill!;ctx.fill();}
+        else if(g.type==="line") {ctx.beginPath();ctx.moveTo(g.start.x,g.start.y);ctx.lineTo(g.end.x,g.end.y);ctx.strokeStyle=plotSize?.().dark?"#a694d0":"#8c81a7";ctx.lineWidth=1;ctx.stroke();}
+        else if(g.type==="text")labels.push({text:g.text,x:g.position.x,y:g.position.y,align:g.align,color:g.color});
+      }
+      paintDrawingLabels(ctx,labels,size.width,size.height);
+      if(["selected","editing","hovered"].includes(this.state))for(const p of this.getControlPoints(viewport)){ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#8657d9";ctx.stroke();}
+      ctx.restore();
+    })})}];}
+    testHit(point:Point,viewport:Viewport) {return this.computeGeometry(viewport).some(g=>g.type==="polygon"&&point.x>=Math.min(...g.points.map(p=>p.x))&&point.x<=Math.max(...g.points.map(p=>p.x))&&point.y>=Math.min(...g.points.map(p=>p.y))-5&&point.y<=Math.max(...g.points.map(p=>p.y))+5);}
+    clone(id:string){return new PositionDrawing(this.type,id,[...this.anchors],this.style,this.options);}
+  }
+  class ManualPattern extends drawing.Drawing {
+    readonly type:string;
+    constructor(type:string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}){super(id,anchors,style,options);this.type=type;}
+    definition(){return EXTRA_DRAWING_TOOLS.find(t=>t.id===this.type)!;}
+    isValid(){return this.anchors.length>=this.definition().anchors;}
+    paneViews(){return labeledPaneViews(this);}
+    computeGeometry(viewport:Viewport):Geometry[]{
+      if(!this.isValid())return [];
+      const points=this.anchors.map(a=>this.anchorToPixel(a,viewport));if(points.some(p=>!p))return [];
+      const p=points as Point[],definition=this.definition(), geometry:Geometry[]=[];
+      const line=(a:Point,b:Point)=>geometry.push({type:"line",start:a,end:b});
+      if(definition.category==="Visuals")return [{type:"text",position:p[0],text:definition.labels,align:"center",font:"24px sans-serif"}];
+      if(["cyclic-lines","time-cycles","sine-line"].includes(this.type)) {
+        const span=Math.max(12,Math.abs(p[1].x-p[0].x)),left=Math.min(p[0].x,p[1].x),width=plotSize?.().width??viewport.width;
+        if(this.type==="cyclic-lines") {for(let x=left-Math.ceil(left/span)*span;x<=width;x+=span)line({x,y:0},{x,y:viewport.height});}
+        else {
+          const start=Math.max(0,left-Math.ceil(left/span)*span),base=Math.max(p[0].y,p[1].y),height=Math.max(12,Math.abs(p[0].y-p[1].y));
+          let prev:Point|undefined;
+          for(let x=start;x<=width;x+=3){const phase=(x-left)/span*Math.PI*2,y=this.type==="sine-line"?(p[0].y+p[1].y)/2-Math.sin(phase)*height/2:base-Math.abs(Math.sin(phase/2))*height;const next={x,y};if(prev)line(prev,next);prev=next;}
+        }
+        return geometry;
+      }
+      p.forEach((point,i)=>{if(i)line(p[i-1],point);geometry.push({type:"text",position:{x:point.x,y:point.y+(i%2? -12:22)},text:definition.labels.split(" ")[i]??String(i),align:"center",font:readableFont()});});
+      if(["xabcd-pattern","cypher-pattern"].includes(this.type)){line(p[0],p[2]);line(p[2],p[4]);line(p[1],p[3]);}
+      if(this.type==="triangle-pattern"){line(p[0],p[4]);line(p[1],p[3]);}
+      if(this.type==="head-shoulders")line(p[2],p[4]);
+      return geometry;
+    }
+    testHit(point:Point,viewport:Viewport){return this.computeGeometry(viewport).some(g=>{
+      if(g.type==="text")return Math.hypot(point.x-g.position.x,point.y-g.position.y)<16;
+      if(g.type!=="line")return false;const dx=g.end.x-g.start.x,dy=g.end.y-g.start.y,d=dx*dx+dy*dy,t=d?Math.max(0,Math.min(1,((point.x-g.start.x)*dx+(point.y-g.start.y)*dy)/d)):0;
+      return Math.hypot(point.x-g.start.x-t*dx,point.y-g.start.y-t*dy)<7;
+    });}
+    clone(id:string){return new ManualPattern(this.type,id,[...this.anchors],this.style,this.options);}
+  }
 
   class PriceMeasurement extends drawing.Drawing {
     readonly type = "price-range";
@@ -198,6 +275,8 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     clone(id:string) { return new LabeledFibonacci(id,[...this.anchors],this.style,this.fibOptions); }
   }
   registry.register({...registry.get("fib-retracement")!,factory:(id,anchors,style,options)=>new LabeledFibonacci(id,anchors,style,options)});
+  for(const type of ["long-position","short-position"])registry.register({...registry.get(type)!,factory:(id,anchors,style,options)=>new PositionDrawing(type,id,anchors,style,options)});
+  for(const tool of EXTRA_DRAWING_TOOLS)registry.register({type:tool.id,name:tool.label,category:"shape",requiredAnchors:tool.anchors,factory:(id,anchors,style,options)=>new ManualPattern(tool.id,id,anchors,style,options)});
   for (const [type,name,Tool] of [["price-range","Price measurement",PriceMeasurement],["volume-profile","Fixed-range volume profile",VolumeProfile]] as const) {
     registry.register({type,name,category:"measurement",requiredAnchors:2,factory:(id:string,anchors?:Anchor[],style?:Partial<DrawingStyle>,options?:Partial<DrawingOptions>)=>new Tool(id,anchors,style,options)});
   }

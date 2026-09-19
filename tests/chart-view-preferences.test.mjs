@@ -29,12 +29,18 @@ test("chart view choices survive fresh modules/restarts, including no SMC filter
   use("smcFilters")[1]([]);
   use("smcRange")[1](true);
   use("smcLesson")[1]("CHoCH");
+  use("drawingFavorites")[1](["long-position", "xabcd-pattern"]);
+  use("showDrawingFavorites")[1](false);
   const restarted = d.load();
   assert.equal(restarted("magnet")[0], true);
   assert.equal(restarted("hidden")[0], true);
   assert.deepEqual(restarted("smcFilters")[0], []);
   assert.equal(restarted("smcRange")[0], true);
   assert.equal(restarted("smcLesson")[0], "CHoCH");
+  assert.deepEqual(restarted("drawingFavorites")[0], ["long-position", "xabcd-pattern"]);
+  assert.equal(restarted("showDrawingFavorites")[0], false);
+  restarted("drawingFavorites")[1]([]);
+  assert.deepEqual(d.load()("drawingFavorites")[0], []);
   restarted("magnet")[1](v => !v);
   assert.equal(d.load()("magnet")[0], false);
   assert.equal(JSON.parse(d.raw()).hidden, true);
