@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
-    if (!technicalServerConfigured()) return Response.json({ ok: true, ready: false, message: "Closed-app setup required: Firebase credentials, push delivery and minute-level scheduler.", store: null }, { headers: { "Cache-Control": "no-store" } });
+    if (!technicalServerConfigured()) return Response.json({ ok: true, ready: false, message: "Closed-app technical monitoring is not activated. Server setup and a verified minute-level scheduler are required.", store: null }, { headers: { "Cache-Control": "no-store" } });
     const userId = await technicalUser(request), { db } = await pushServices();
     const [health, document] = await Promise.all([technicalHealth(), db.doc(`technicalAccounts/${userId}`).get()]);
     return Response.json({ ok: true, ...health, store: readServerTechnicalStore(document.data()?.store) }, { headers: { "Cache-Control": "no-store" } });

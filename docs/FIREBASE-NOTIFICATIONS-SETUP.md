@@ -4,7 +4,7 @@
 
 The supplied Android configuration matches project `core-period-313622` and package `in.papertrade.app`. It is installed locally at `android/app/google-services.json` (gitignored). It is not a server credential.
 
-Code is prepared for Firebase Android/Web delivery, a protected server dispatcher, preferences, quiet hours, current-logo notifications and duplicate prevention. Real delivery has NOT been verified or activated. Existing downloaded v1.21 APKs do not contain the new receiver; a new, correctly signed Android update is required.
+Code is prepared for Firebase Android/Web delivery, a protected server dispatcher, preferences, quiet hours, current-logo notifications and duplicate prevention. On 19 September 2026, the production config endpoint reported `enabled: true` and `webEnabled: true`; the technical-alert endpoint still reported `ready: false` (not activated). Real-device delivery has not been verified in this task. Existing downloaded v1.21 APKs do not contain the new receiver; a new, correctly signed Android update is required. The setup steps below describe prerequisites, not a claim that all production settings are missing.
 
 ## 1. Database
 
