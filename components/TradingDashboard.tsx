@@ -2942,7 +2942,6 @@ export function TradingDashboard() {
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
             </div>
             {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} onCancel={() => setPendingDeleteIds(null)} onConfirm={confirmClosedTradeDeletion} />}
-            <p className="pnl-disclaimer">Charges are estimates using current Upstox NSE equity and option rates; actual margin and contract-note rounding can differ.</p>
           </section>
         </div>
       )}

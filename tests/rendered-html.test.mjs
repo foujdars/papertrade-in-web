@@ -187,7 +187,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.doesNotMatch(dashboard, /Click \+ drag to pan/);
   const pnlAnalytics = await readFile(new URL("../components/PnlAnalytics.tsx", import.meta.url), "utf8");
   assert.match(dashboard, /<PnlAnalytics/);
-  assert.match(pnlAnalytics, /Daily P&amp;L heat map/);
+  assert.ok(pnlAnalytics.includes('<h3>Calendar</h3>'));
+  assert.doesNotMatch(pnlAnalytics, /Daily P&amp;L heat map|Review. Understand. Improve.|Your path through the period|Darker cells mean|Historical, not predicted|Net winners ÷ net losses|pnl-scope-caption/);
   assert.match(pnlAnalytics, /pnl-calendar-grid/);
   assert.doesNotMatch(dashboard, />Holiday<|>No trade</);
   assert.doesNotMatch(dashboard, /pnlChartTrades|pnl-bars/);

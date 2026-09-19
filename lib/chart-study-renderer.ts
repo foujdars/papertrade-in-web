@@ -1,4 +1,4 @@
-import { LineSeries, HistogramSeries, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
+import { LineSeries, HistogramSeries, MismatchDirection, type Logical, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
 import type { Candle } from './market';
 import { computeStudy, type StudyResult } from './study-calculations';
 import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
@@ -65,5 +65,36 @@ export class ChartStudyRenderer {
   }b.primitive?.update(data);
  }}
  fit(height:number){const panes=this.chart.panes(),lower=panes.length-1;if(!lower){panes[0]?.setHeight(height);return;}const h=Math.max(58,Math.min(120,Math.floor(height*.52/lower)));panes[0]?.setHeight(Math.max(140,height-h*lower));for(let i=1;i<panes.length;i++)panes[i].setHeight(h);}
+ // Hit-test rendered pixels, not just the nearest timestamp: empty chart space is not a study.
+ hitTest(clientX:number,clientY:number,tolerance=9):string|null {
+  let closest=tolerance,hit:string|null=null;
+  const scale=this.chart.timeScale();
+  for(const b of this.bundles){
+   if(b.primitive||b.config.opacity===0)continue;
+   const rect=this.chart.panes()[b.pane]?.getHTMLElement()?.getBoundingClientRect();
+   if(!rect)continue;
+   const x=clientX-rect.left,y=clientY-rect.top;
+   if(x<0||x>scale.width()||y<0||y>rect.height)continue;
+   const logical=scale.coordinateToLogical(x);if(logical===null)continue;
+   for(const series of b.series){
+    if(!series.options().visible)continue;
+    const left=series.dataByIndex(Math.floor(logical),MismatchDirection.NearestLeft),right=series.dataByIndex(Math.ceil(logical),MismatchDirection.NearestRight);
+    const pixel=(p:typeof left)=>{if(!p||!('value' in p))return null;const px=scale.timeToCoordinate(p.time),py=series.priceToCoordinate(p.value);return px===null||py===null?null:{x:px,y:py};};
+    const a=pixel(left),z=pixel(right);let distance=Infinity;
+    if(series.seriesType()==='Histogram'){
+     const base=series.priceToCoordinate(0),next=scale.logicalToCoordinate((Math.floor(logical)+1) as Logical),prev=scale.logicalToCoordinate(Math.floor(logical) as Logical);
+     const half=next!==null&&prev!==null?Math.abs(next-prev)*.45:3;
+     for(const p of [a,z])if(p&&base!==null&&Math.abs(x-p.x)<=half&&y>=Math.min(base,p.y)&&y<=Math.max(base,p.y))distance=0;
+    }else if(b.result.plots[b.series.indexOf(series)]?.points){
+     for(const p of [a,z])if(p)distance=Math.min(distance,Math.hypot(x-p.x,y-p.y));
+    }else if(a&&z){
+     const dx=z.x-a.x,dy=z.y-a.y,t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy||1)));
+     distance=Math.hypot(x-a.x-t*dx,y-a.y-t*dy);
+    }
+    if(distance<closest){closest=distance;hit=b.id;}
+   }
+  }
+  return hit;
+ }
  summaries(){return this.bundles.map(b=>({id:b.id,pane:b.pane,message:b.result.message,value:b.result.plots[0]?.values.filter(Number.isFinite).at(-1)}));}
 }

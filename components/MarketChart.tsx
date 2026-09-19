@@ -505,6 +505,18 @@ export function MarketChart({
   const { settings: studySettings, setStudy } = useIndicatorSettings();
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
   const [editingStudy, setEditingStudy] = useState<string | null>(null);
+  const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
+  const lastStudyTap = useRef<{id:string;time:number;x:number;y:number}|null>(null);
+  const activateStudyRef = useRef((id:string,x:number,y:number) => {});
+  activateStudyRef.current = (id,x,y) => {
+    const previous=lastStudyTap.current,now=performance.now();
+    if(previous?.id===id&&now-previous.time<400&&Math.hypot(x-previous.x,y-previous.y)<24){
+      lastStudyTap.current=null;setSelectedStudy(null);setEditingStudy(id);
+    }else{lastStudyTap.current={id,time:now,x,y};setSelectedStudy(id);}
+  };
+  useTransientBack(selectedStudy !== null, () => {setSelectedStudy(null);lastStudyTap.current=null;});
+  useEffect(() => {setSelectedStudy(null);lastStudyTap.current=null;}, [instrument.instrumentKey,timeframe,candlesOnly]);
+  useEffect(() => {if(selectedStudy&&!indicators[selectedStudy])setSelectedStudy(null);}, [indicators,selectedStudy]);
   const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
   const isReplay = replayCandles !== undefined;
   const comparisonData=useComparisonCandles(isReplay?[]:STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),timeframe);
@@ -1110,6 +1122,8 @@ export function MarketChart({
 
   useEffect(() => {
     activeToolRef.current = activeTool;
+    setSelectedStudy(null);
+    lastStudyTap.current = null;
     cancelDraft();
     const chart = chartApi.current;
     const manager = drawingManager.current;
@@ -1478,6 +1492,7 @@ export function MarketChart({
         if (hiddenRef.current && normalizeTool(activeToolRef.current)) return;
         pointers.add(event.pointerId);
         if (pointers.size > 1) {
+          setSelectedStudy(null);lastStudyTap.current=null;
           viewportInteractedRef.current = true;
           pinching = true;
           drawingGestureRef.current = null;
@@ -1505,6 +1520,7 @@ export function MarketChart({
         const tap = tapGestureRef.current;
         if (tap?.pointerId === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) {
           tap.moved = true;
+          setSelectedStudy(null);lastStudyTap.current=null;
           viewportInteractedRef.current = true;
         }
         const edit = editRef.current;
@@ -1560,6 +1576,7 @@ export function MarketChart({
         const gesture = drawingGestureRef.current;
         drawingGestureRef.current = null;
         if (event.type === "pointercancel") {
+          lastStudyTap.current=null;
           if (draftRef.current) cancelDraft();
           if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
           chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
@@ -1574,7 +1591,12 @@ export function MarketChart({
         }
         const tap = tapGestureRef.current;
         tapGestureRef.current = null;
-        if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) onChartTapRef.current?.();
+        if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) {
+          const study=!replayRef.current.selecting&&!riskDragRef.current&&!normalizeTool(activeToolRef.current)
+            ? studyRenderer.current?.hitTest(event.clientX,event.clientY,event.pointerType==='touch'?12:8) : null;
+          if(study)activateStudyRef.current(study,event.clientX,event.clientY);
+          else {setSelectedStudy(null);lastStudyTap.current=null;onChartTapRef.current?.();}
+        }
         if (editRef.current) {
           editRef.current.drawing.setState("selected");
           editRef.current = null;
@@ -1989,13 +2011,19 @@ export function MarketChart({
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && indicators[s.id]);
   const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
-    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={() => setEditingStudy(s.id)} aria-label={'Settings for '+s.name}><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}<b>{latest?.value?.toFixed(2) ?? "—"}</b></button>; })}
+    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for actions; double-tap for settings"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}<b>{latest?.value?.toFixed(2) ?? "—"}</b></button>; })}
   </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
-        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={()=>setEditingStudy(s.id)}>{studyTitle(s.id,c)}</button>{s.message&&<small title={s.message}>{s.message}</small>}<button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}</div>;})}
+        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for actions; double-tap for settings">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
+        {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
+          <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
+          <button aria-label="Indicator settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={15}/></button>
+          {onRemoveIndicator&&<button onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={14}/>Remove indicator</button>}
+          <button aria-label="Close indicator actions" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={15}/></button>
+        </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} triggerHost={indicatorHost} />}

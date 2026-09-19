@@ -7,7 +7,7 @@ import { readTradeJournal, type TradeJournalEntry } from "@/lib/trading-coach";
 import { CLOUD_CHANGE_EVENT } from "@/lib/cloud-journal";
 import { ModernSelect } from "./ModernSelect";
 import { PNL_BREAKDOWN_KEY, readPreference, writePreference } from "@/lib/interface-preferences";
-import { DEFAULT_PNL_SCOPE, PNL_DIMENSIONS, groupPnl, pnlBounds, pnlCurve, pnlDay, pnlDistribution, pnlOutcome, rollingPnl, summarisePnl, type PnlDimension, type PnlScope } from "@/lib/pnl-analytics";
+import { PNL_DIMENSIONS, groupPnl, pnlBounds, pnlCurve, pnlDay, pnlDistribution, pnlOutcome, rollingPnl, summarisePnl, type PnlDimension, type PnlScope } from "@/lib/pnl-analytics";
 
 export type PnlTab = "overview" | "insights" | "trades";
 function readBreakdown() {
@@ -99,12 +99,11 @@ function PnlCalendar({ trades, scope, onScope, now, onSelect }: { trades: Closed
   const selectMonth = (value: string) => { if (!/^\d{4}-\d{2}$/.test(value)) return; const [y, m] = value.split("-").map(Number); setMonth(value); onScope({ ...scope, period: "custom", start: `${value}-01`, end: `${value}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`, day: null }); };
   const move = (delta: number) => selectMonth(new Date(Date.UTC(year, monthNumber - 1 + delta, 1)).toISOString().slice(0, 7));
   const selected = scope.day ? daily.get(scope.day) ?? [] : null;
-  return <section className="pnl-a-card pnl-calendar-card"><header><div><span className="pnl-kicker">Daily P&amp;L heat map</span><h3>Calendar</h3></div><div className="pnl-calendar-controls"><button aria-label="Previous P&L month" onClick={() => move(-1)}><ChevronLeft size={16} /></button><input aria-label="Calendar month" type="month" value={month} onChange={e => selectMonth(e.target.value)} /><button aria-label="Next P&L month" onClick={() => move(1)}><ChevronRight size={16} /></button></div></header>
+  return <section className="pnl-a-card pnl-calendar-card"><header><div><h3>Calendar</h3></div><div className="pnl-calendar-controls"><button aria-label="Previous P&L month" onClick={() => move(-1)}><ChevronLeft size={16} /></button><input aria-label="Calendar month" type="month" value={month} onChange={e => selectMonth(e.target.value)} /><button aria-label="Next P&L month" onClick={() => move(1)}><ChevronRight size={16} /></button></div></header>
     <div className="pnl-calendar-weekdays">{["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={i}>{d}</span>)}</div>
     <div className="pnl-calendar-grid">{Array.from({ length: first }, (_, i) => <span key={`blank-${i}`} />)}{Array.from({ length: days }, (_, i) => { const key = `${month}-${String(i + 1).padStart(2, "0")}`, items = daily.get(key), net = items ? summarisePnl(items).net : 0, outcome = items ? pnlOutcome(net) : "no-trade"; const excluded = !bounds.valid || Boolean(bounds.start && key < bounds.start || bounds.end && key > bounds.end); return <button key={key} disabled={excluded} className={`pnl-calendar-day ${outcome} ${scope.day === key ? "selected" : ""}`} aria-label={`${key}: ${items ? `${rupees(net)}, ${items.length} trades` : "No trades"}`} aria-pressed={scope.day === key} style={{ "--day-strength": items ? .12 + .48 * Math.abs(net) / max : 0 } as CSSProperties} onClick={() => onScope({ ...scope, day: scope.day === key ? null : key })}><b>{i + 1}</b><small>{items ? compact(net) : ""}</small></button>; })}</div>
     <p className="pnl-help pnl-calendar-legend"><span className="positive">Profit</span><span className="negative">Loss</span><span>Breakeven ₹0</span><span>Blank = no trades</span></p>
     {selected && <div className="pnl-day-detail"><span><b>{scope.day}</b>{selected.length} exits · Net {rupees(summarisePnl(selected).net)} · Charges {rupees(summarisePnl(selected).charges)}</span><button onClick={() => onSelect(selected.map(t => t.id), `Trades on ${scope.day}`)}>View trades<ChevronRight size={14} /></button></div>}
-    <p className="pnl-help">Darker cells mean larger results within this month. Selecting a day filters every view.</p>
   </section>;
 }
 
@@ -117,7 +116,6 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
   const bounds = pnlBounds(scope, now), allIds = trades.map(t => t.id);
   const setScope = (patch: Partial<PnlScope>) => onScope({ ...scope, ...patch, day: null });
   return <div className="pnl-analytics">
-    <header className="pnl-a-heading"><div><span className="pnl-kicker">Review. Understand. Improve.</span><h2>Your performance</h2></div><span className="pnl-realised-badge">Realised · after charges</span></header>
     <div className="pnl-scope-controls">
       <ModernSelect label="Period" ariaLabel="P&L period" value={scope.period} choices={[{ value: "all", label: "All time", description: "Every recorded completed exit" }, { value: "month", label: "This month", description: "From the first of this month, in IST" }, { value: "30d", label: "Last 30 days", description: "A rolling window including today" }, { value: "custom", label: "Custom dates", description: "Choose your own start and end dates" }]} onChange={period => setScope({ period, start: scope.start || `${pnlDay(now).slice(0, 7)}-01`, end: scope.end || pnlDay(now) })} />
       <ModernSelect label="Market" ariaLabel="P&L market" value={scope.asset} choices={[{ value: "all", label: "All markets" }, { value: "stocks", label: "Stocks" }, { value: "fno", label: "F&O", description: "Options and futures" }]} onChange={asset => setScope({ asset })} />
@@ -125,17 +123,16 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
     </div>
     {scope.period === "custom" && <div className="pnl-custom-dates"><label>From<input type="date" value={scope.start} onChange={e => setScope({ start: e.target.value })} /></label><label>Through<input type="date" value={scope.end} onChange={e => setScope({ end: e.target.value })} /></label></div>}
     {!bounds.valid && <p role="alert" className="pnl-filter-error">Choose a valid start and end date. The end date must not precede the start.</p>}
-    <div className="pnl-scope-caption"><span>{scope.day ? `Day: ${scope.day}` : scope.period === "all" ? "All recorded dates" : `${bounds.start} → ${bounds.end}`} · IST</span><button onClick={() => onScope({ ...DEFAULT_PNL_SCOPE })}>Reset filters</button></div>
     <nav className="pnl-view-tabs" role="tablist" aria-label="P&L views">{(["overview", "insights", "trades"] as const).map((value, i, tabs) => <button key={value} role="tab" tabIndex={tab === value ? 0 : -1} aria-selected={tab === value} onClick={() => onTab(value)} onKeyDown={e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const next = (i + (e.key === "ArrowRight" ? 1 : 2)) % 3; onTab(tabs[next]); (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus(); } }}>{value[0].toUpperCase() + value.slice(1)}</button>)}</nav>
     {tab !== "trades" && <><div className="pnl-summary-six">
       <div><span>Net P&amp;L</span><b data-testid="pnl-net" className={signClass(stats.net)}>{rupees(stats.net)}</b><small>Completed exits only</small></div>
       <button onClick={() => onSelect(allIds, "Completed trades")}><span>Completed trades</span><b data-testid="pnl-count">{stats.count}</b><small>View exits <ChevronRight size={11} /></small></button>
       <div><span>Win rate</span><b>{stats.winRate === null ? "—" : `${stats.winRate.toFixed(1)}%`}</b><small>{stats.wins} W · {stats.losses} L · {stats.breakevens} flat</small></div>
-      <div><span>Profit factor</span><b>{stats.profitFactor === null ? "—" : stats.profitFactor === Infinity ? "No losses" : stats.profitFactor.toFixed(2)}</b><small>Net winners ÷ net losses</small></div>
-      <div><span>Average net P&amp;L / trade</span><b className={signClass(stats.average ?? 0)}>{rupees(stats.average)}</b><small>Historical, not predicted</small></div>
+      <div><span>Profit factor</span><b>{stats.profitFactor === null ? "—" : stats.profitFactor === Infinity ? "No losses" : stats.profitFactor.toFixed(2)}</b></div>
+      <div><span>Average net P&amp;L / trade</span><b className={signClass(stats.average ?? 0)}>{rupees(stats.average)}</b></div>
       <div><span>Charges</span><b>{rupees(stats.charges)}</b><small>Included in net P&amp;L</small></div>
-    </div><p className="pnl-help">Completed exit records; partial exits count separately. No open-position P&amp;L or virtual deposits included.</p></>}
-    {tab === "overview" && <div className="pnl-overview-grid"><section className="pnl-a-card pnl-performance-card"><header><div><span className="pnl-kicker">Your path through the period</span><h3>Cumulative realised P&amp;L</h3></div></header><PnlLineChart points={points} label="Cumulative realised P&L" baseline onSelect={onSelect} />
+    </div></>}
+    {tab === "overview" && <div className="pnl-overview-grid"><section className="pnl-a-card pnl-performance-card"><header><div><h3>Cumulative realised P&amp;L</h3></div></header><PnlLineChart points={points} label="Cumulative realised P&L" baseline onSelect={onSelect} />
       {curve.undated > 0 && <p className="pnl-help">{curve.undated} undated legacy exits are in the totals, but excluded from dated charts.</p>}
       <div className="pnl-drawdown-heading"><div><ArrowDownRight size={18} /><b>Drawdown from prior peak</b></div><strong className="negative">Max {rupees(curve.maxDrawdown)}</strong></div><PnlLineChart points={drawdown} label="Closed-trade drawdown" negativeOnly onSelect={onSelect} />
       <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div><p className="pnl-help">Starts at ₹0 for this selection. Drawdown uses completed exits, not intratrade price swings.</p>
