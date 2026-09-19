@@ -27,6 +27,7 @@ import "./modern-select.css";
 import "./ipo-studio.css";
 import "./drawing-studio.css";
 import "./indicator-studio.css";
+import "./home-hub.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

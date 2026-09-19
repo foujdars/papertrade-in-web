@@ -33,6 +33,8 @@ import { IpoWorkspace } from "@/components/IpoWorkspace";
 import { PushNotificationBridge } from "./PushNotificationBridge";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
+import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
@@ -385,6 +387,8 @@ export function TradingDashboard() {
   const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
   const [priceActionsHost, setPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [chartIndicatorHost, setChartIndicatorHost] = useState<HTMLDivElement | null>(null);
+  const [homeAlerts,setHomeAlerts]=useState<HomeAlertSnapshot>({ownerId:"",items:[]});
+  const [homeAlertRequest,setHomeAlertRequest]=useState<HomeAlertRequest|null>(null);
   const [priceTasks, setPriceTasks] = useState<PriceTask[]>([]);
   const [fnoPriceActionsHost, setFnoPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
@@ -1480,6 +1484,7 @@ export function TradingDashboard() {
       ...calculatePosition(orders, symbol, positionLivePrice, positionProductName),
       name: instrument?.name ?? symbol,
       product: positionProductName,
+      quoteAvailable: Number.isFinite(positionLivePrice) && positionLivePrice > 0,
     })).filter((position) => position.quantity > 0);
   }), [clock, marketQuoteUpdatedAt, marketQuotes, orders, positionSymbols, selected.symbol, tradingUniverse, verifiedLivePrice]);
   const totalOpenPnl = openPositions.reduce((total, position) => total + position.unrealizedPnl, 0);
@@ -1560,7 +1565,7 @@ export function TradingDashboard() {
     const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
     const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
     return {
-      exposure: holdingsSummary.current,
+      exposure: holdings.every(p=>p.quoteAvailable) ? holdingsSummary.current : Number.NaN,
       topSymbol: topHolding.symbol,
       topConcentration,
       label: (topConcentration >= 40 ? "High" : topConcentration >= 25 ? "Moderate" : "Low") as "Low" | "Moderate" | "High",
@@ -1571,8 +1576,10 @@ export function TradingDashboard() {
     const todayKey = indiaDateKey(clock);
     return closedTrades.filter((trade) => trade.closedAt > 0 && indiaDateKey(trade.closedAt) === todayKey).reduce((sum, trade) => sum + trade.netPnl, 0);
   }, [clock, closedTrades]);
-  const intradayOpenPnl = openPositions.filter((position) => position.product === "INTRADAY").reduce((sum, position) => sum + position.unrealizedPnl, 0);
-  const currentDayPortfolioPnl = todayClosedPnl + intradayOpenPnl + holdingsSummary.dayPnl;
+  const homeOpenDayChange=useMemo(()=>homeOpenChange(orders,openPositions.map(p=>{
+    const instrument=tradingUniverse.find(i=>i.symbol===p.symbol),quote=marketQuotes[instrument?.instrumentKey??p.symbol]??marketQuotes[p.symbol];
+    return {symbol:p.symbol,product:p.product,price:p.quoteAvailable?p.livePrice:Number.NaN,previousClose:quote?.previousClose??null};
+  }),clock?.getTime()??0),[orders,openPositions,tradingUniverse,marketQuotes,clock]);
 
   // Scheduled portfolio reviews are delivered by the server, never on app resume.
   const pnlToday = pnlDay(clock?.getTime() ?? Date.now());
@@ -2323,7 +2330,7 @@ export function TradingDashboard() {
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
-      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
+      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2693,12 +2700,24 @@ export function TradingDashboard() {
         firstName={typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined}
         indices={LIVE_INDEX_TICKERS.map((item) => {
           const quote = marketQuotes[item.instrumentKey];
-          const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
-          return { symbol: item.symbol, label: item.label, price: quote?.lastPrice ?? null, points: quote?.netChange ?? null, changePercent: quote?.changePercent ?? null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live" };
+          const asOf=quote?.lastTradeAt||quote?.updatedAt,at=Date.parse(asOf??'');
+          const available=quote&&Number.isFinite(quote.lastPrice)&&quote.lastPrice>0;
+          const isFresh=Boolean(available&&clock&&Number.isFinite(at)&&at<=clock.getTime()+5000&&clock.getTime()-at<=90_000);
+          const hasChange=available&&Number.isFinite(quote.previousClose)&&quote.previousClose>0;
+          return { symbol: item.symbol, label: item.label, price: available?quote.lastPrice:null, points: hasChange&&Number.isFinite(quote.netChange)?quote.netChange:null, changePercent: hasChange&&Number.isFinite(quote.changePercent)?quote.changePercent:null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live", asOf };
         })}
         feedLive={feedStatus.mode === "live"}
         balance={balance}
-        todayPnl={currentDayPortfolioPnl}
+        todayPnl={todayClosedPnl+(homeOpenDayChange??0)}
+        realisedToday={todayClosedPnl}
+        openChangeToday={homeOpenDayChange}
+        sessionLabel={marketStatus.isOpen?'Market open':/holiday/i.test(marketStatus.message)?'Market holiday':/checking|unavailable/i.test(marketStatus.message)?'Session unconfirmed':'Market closed'}
+        sessionMessage={marketStatus.message}
+        attention={[...positionAttention(openPositions,protections),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
+        onAttention={(item:HomeAttention)=>{if(item.target.kind==='alerts'){setHomeAlertRequest({key:Date.now(),tab:item.target.tab,id:item.target.id});}else{setHomeOpen(false);setWorkspaceMode('trade');openPositionChart(item.target.symbol);setProduct(item.target.product);}}}
+        resumeChart={chartPreferencesReady?{symbol:selected.symbol,timeframe}:undefined}
+        onResumeChart={()=>openNavigationSection(workspaceMode==='fno'?'fno':'trade')}
+        onOpenRealised={()=>{setPnlScope({...DEFAULT_PNL_SCOPE,period:'custom',start:pnlToday,end:pnlToday});setSelectedPnlDateKey(null);setPnlDrill(null);setPnlHistoryFilter('all');openNavigationSection('pnl');setPnlTab('trades');}}
         holdingsCount={holdings.length}
         openPositionsCount={openPositions.length}
         closedTradesCount={closedTrades.length}

@@ -10,11 +10,13 @@ import { useTechnicalAlerts } from "./useTechnicalAlerts";
 import { TechnicalAlertForm } from "./TechnicalAlertForm";
 import { TECHNICAL_FRAMES, technicalDescription, defaultTechnicalConfig, type TechnicalRule } from "@/lib/technical-alerts";
 import { ModernSelect } from "./ModernSelect";
+import { alertAttention, type HomeAlertSnapshot, type HomeAlertRequest } from '@/lib/home-attention';
 import { AndroidDeliveryTest } from "./AndroidDeliveryTest";
 import type { Instrument } from "@/lib/market";
 const KEY = "papertrade-price-tasks-v1";
 const money = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", onOpenTechnical }: {
+export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", onOpenTechnical, onHomeAlertsChange, homeAlertRequest }: {
+  onHomeAlertsChange?:(snapshot:HomeAlertSnapshot)=>void;homeAlertRequest?:HomeAlertRequest|null;
   request: PriceRequest | null; onClose: () => void; onFill: (task: PriceTask, price: number) => string | null;
   onValidate?: (task: PriceTask) => string | null;
   marketOpen: boolean; intradayOpen: boolean; onNotice: (message: string) => void; visible: boolean; ownerId?: string;
@@ -54,6 +56,10 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
   const [condition, setCondition] = useState<"above" | "below">("above");
   const [error, setError] = useState("");
   const [feedError, setFeedError] = useState("");
+  const [homeFocus,setHomeFocus]=useState<string|undefined>();
+  const homeSnapshot=JSON.stringify({ownerId,items:alertAttention(tasks,technical.rules,technical.events,technical.cloudReady,technical.cloudMessage,technical.error||feedError,Date.now())});
+  useEffect(()=>{onHomeAlertsChange?.(JSON.parse(homeSnapshot));},[homeSnapshot,onHomeAlertsChange]);
+  useEffect(()=>{if(homeAlertRequest){setManage(true);setTab(homeAlertRequest.tab);setFilter('all');setSearch('');setHomeFocus(homeAlertRequest.id);}},[homeAlertRequest]);
   function save(next: PriceTask[]) { localStorage.setItem(storageKey, JSON.stringify(next.slice(0, 100))); tasksRef.current = next; setTasks(next); }
   useEffect(() => { try { const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]"); if (Array.isArray(saved)) { tasksRef.current = saved.filter(t => t?.id && t?.instrument?.instrumentKey && t.expiresAt && !priceTaskError(t)).slice(0, 100); setTasks(tasksRef.current); } } catch {} }, [storageKey]);
   useEffect(() => { onTasksChange?.(tasks); }, [tasks, onTasksChange]);
@@ -146,17 +152,18 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
   const archivedRules = technical.rules.filter(r => !["active", "paused"].includes(r.status) && !technical.events.some(e => e.ruleId === r.id));
   const query = search.toLowerCase().trim();
   const familyVisible = (price: boolean) => filter === "all" || (price ? filter === "alert" : filter === "technical");
-  const matchingRules = (tab === "list" ? technicalList : archivedRules).filter(r => familyVisible(r.family === "price") && `${r.instrument.symbol} ${r.instrument.name} ${technicalDescription(r)} ${r.timeframe} ${r.status}`.toLowerCase().includes(query));
-  const matchingEvents = tab === "log" ? technical.events.filter(e => familyVisible(e.description.startsWith("Price ")) && `${e.instrument.symbol} ${e.description} ${e.timeframe} ${e.detail}`.toLowerCase().includes(query)) : [];
+  const matchingRules = (tab === "list" ? technicalList : archivedRules).filter(r => (!homeFocus||r.id===homeFocus)&&familyVisible(r.family === "price") && `${r.instrument.symbol} ${r.instrument.name} ${technicalDescription(r)} ${r.timeframe} ${r.status}`.toLowerCase().includes(query));
+  const matchingEvents = tab === "log" ? technical.events.filter(e => (!homeFocus||e.id===homeFocus)&&familyVisible(e.description.startsWith("Price ")) && `${e.instrument.symbol} ${e.description} ${e.timeframe} ${e.detail}`.toLowerCase().includes(query)) : [];
   const activeCount = tasks.filter(t => t.status === "pending").length + technical.rules.filter(r => r.status === "active").length;
   const technicalForm = editingTechnical || (request && mode === "technical");
   function openTechnicalChart(instrument: Instrument, frame: string) { setManage(false); setEditingTechnical(undefined); onClose(); onOpenTechnical?.(instrument, frame); }
-  const matching = tasks.filter(t => (tab === "list" ? t.status === "pending" : t.status !== "pending") && (filter === "all" || t.kind === filter) && `${t.instrument.symbol} ${t.instrument.name} ${t.price} ${money(t.price)} ${t.condition} ${t.status} ${t.message ?? ""}`.toLowerCase().includes(search.toLowerCase().trim())).sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
+  const matching = tasks.filter(t => (!homeFocus||t.id===homeFocus)&&(tab === "list" ? t.status === "pending" : t.status !== "pending") && (filter === "all" || t.kind === filter) && `${t.instrument.symbol} ${t.instrument.name} ${t.price} ${money(t.price)} ${t.condition} ${t.status} ${t.message ?? ""}`.toLowerCase().includes(search.toLowerCase().trim())).sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
   return <>
-    {visible && triggerHost && createPortal(<button className="price-tasks-button" aria-label={`Open alerts${activeCount ? `, ${activeCount} active` : ""}`} title="Alerts and paper orders" onClick={() => setManage(true)}><AlarmClock size={20} strokeWidth={1.8} aria-hidden="true" />{activeCount > 0 && <span className="price-tasks-count">{activeCount}</span>}</button>, triggerHost)}
+    {visible && triggerHost && createPortal(<button className="price-tasks-button" aria-label={`Open alerts${activeCount ? `, ${activeCount} active` : ""}`} title="Alerts and paper orders" onClick={() => {setHomeFocus(undefined);setManage(true);}}><AlarmClock size={20} strokeWidth={1.8} aria-hidden="true" />{activeCount > 0 && <span className="price-tasks-count">{activeCount}</span>}</button>, triggerHost)}
     {(request || manage) && <div className="price-action-backdrop" onClick={dismiss}><section ref={sheetRef} tabIndex={-1} className={`price-action-sheet ${!request && !editingTechnical ? "price-alert-manager" : "price-alert-form"}`} role="dialog" aria-modal="true" aria-label={request || editingTechnical ? "Price action" : "Alerts"} onClick={e => e.stopPropagation()}>
       <div className="price-sheet-handle" aria-hidden="true" />
       <header><div className="price-sheet-title"><AlarmClock size={23} /><div><h2>{request?.instrument.symbol ?? "Alerts"}</h2><small>{request ? request.instrument.name : "Your levels. Your attention."}</small></div></div><button className="price-icon-button" onClick={dismiss} aria-label="Close price actions"><X size={21} /></button></header>
+      {!request&&homeFocus&&<button className="home-alert-clear" onClick={()=>setHomeFocus(undefined)}>Show all alerts</button>}
       {request && request.mode !== "order" && <div className="price-alert-tabs" aria-label="Alert type"><button aria-pressed={mode === "alert"} aria-selected={mode === "alert"} onClick={() => setMode("alert")}><AlarmClock size={16} />Price</button><button aria-pressed={mode === "technical"} aria-selected={mode === "technical"} onClick={() => setMode("technical")}><Activity size={16} />Technical</button></div>}
       {technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical?.family === "price" ? "Server price alert saved" : "Technical alert saved · watching new candle closes"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
         {mode === "alert" && <><ModernSelect label="Monitoring" value={delivery} choices={[{value:"device",label:"While app is open"},{value:"server",label:"Even when app is closed"}]} onChange={setDelivery}/>{delivery === "server" && <div className="technical-summary"><div><b>{technical.cloudMessage}</b><p>Requires sign-in and trade notifications on this Android phone.</p><button type="button" onClick={async()=>{const failure=await technical.enablePush();setError(failure??"Notifications connected.");}}>Connect notifications</button></div></div>}</>}
@@ -170,7 +177,7 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
         {error && <p role="alert">{error}</p>}<button className="price-action-primary" disabled={saving || (mode === "alert" && delivery === "server" && !technical.cloudReady)} onClick={() => void submit()}>{mode === "alert" ? "Create alert" : "Confirm paper order"}</button>
       </> : <>
         <label className="price-alert-search"><Search size={18} /><input aria-label={tab === "list" ? "Search alerts" : "Search alert log"} placeholder={tab === "list" ? "Search alerts or symbols" : "Search alert history"} value={search} onChange={e => setSearch(e.target.value)} />{search && <button className="price-icon-button" aria-label="Clear alert search" onClick={() => setSearch("")}><X size={16} /></button>}</label>
-        <div className="price-alert-tabs" role="tablist" aria-label="Alert views">{(["list", "log"] as const).map(value => <button role="tab" id={`alerts-tab-${value}`} aria-controls="alerts-panel" aria-selected={tab === value} key={value} onClick={() => setTab(value)}>{value === "list" ? "List" : "Log"}<span>{tasks.filter(t => value === "list" ? t.status === "pending" : t.status !== "pending").length + (value === "list" ? technicalList.length : technical.events.length + archivedRules.length)}</span></button>)}</div>
+        <div className="price-alert-tabs" role="tablist" aria-label="Alert views">{(["list", "log"] as const).map(value => <button role="tab" id={`alerts-tab-${value}`} aria-controls="alerts-panel" aria-selected={tab === value} key={value} onClick={() => {setHomeFocus(undefined);setTab(value);}}>{value === "list" ? "List" : "Log"}<span>{tasks.filter(t => value === "list" ? t.status === "pending" : t.status !== "pending").length + (value === "list" ? technicalList.length : technical.events.length + archivedRules.length)}</span></button>)}</div>
         <div className="price-alert-filters" aria-label="Item type">{(["all", "alert", "technical", "order"] as const).map(value => <button aria-pressed={filter === value} key={value} onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "alert" ? "Price" : value === "technical" ? "Technical" : "Paper orders"}</button>)}</div>
         {feedError && <p role="status">{feedError}</p>}
         {technical.error && <p role="alert">{technical.error}</p>}

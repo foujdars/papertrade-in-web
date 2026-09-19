@@ -525,7 +525,7 @@ test("portfolio exposes complete history filters and a separate open-position ex
   const shortcut = dashboard.slice(dashboard.indexOf("onOpenTradeHistory={() =>"), dashboard.indexOf("onOpenPnl={() =>"));
   assert.match(shortcut, /setPnlTradeMenuId\(null\)/);
   assert.doesNotMatch(shortcut, /closedTrades\[0\]/);
-  assert.match(home, /className="home-today-pnl" onClick={onOpenPositions}/);
+  assert.match(home, /className="home-today-pnl" onClick={onOpenPnl}/);
   assert.match(dashboard, /pnlHistoryOnly \? "history-only"/);
   assert.match(dashboard, /pnlHistoryFilter === "profit"/);
   assert.match(dashboard, /pnlHistoryFilter === "loss"/);

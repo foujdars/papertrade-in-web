@@ -29,7 +29,9 @@ test("server-renders only the full-screen disclaimer before the home dashboard",
   assert.doesNotMatch(html, /home-hero-actions|home-market-orbit|Check the market pulse, practise a setup/);
   assert.doesNotMatch(html, /IPO RADAR|Continue where you left off|No activity yet/);
   const dashboard = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
-  assert.match(dashboard, /Build skill before you risk capital/);
+  assert.match(dashboard, /Your trading day/);
+  assert.match(dashboard, /Needs attention/);
+  assert.match(dashboard, /Continue your chart/);
   assert.match(dashboard, /Market pulse/);
   assert.match(dashboard, /Search stocks and indices/);
   assert.match(dashboard, /Your paper portfolio/);

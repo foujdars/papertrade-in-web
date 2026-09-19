@@ -1,4 +1,6 @@
 "use client";
+import type { HomeAttention } from '@/lib/home-attention';
+import { Bell, AlertCircle, Play } from 'lucide-react';
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
@@ -27,6 +29,7 @@ export type HomeIndexQuote = {
   points: number | null;
   changePercent: number | null;
   live: boolean;
+  asOf?: string;
 };
 
 export type HomeStockOption = {
@@ -70,7 +73,11 @@ export function HomeWorkspace({
   onOpenTradeHistory,
   onOpenPnl,
   onOpenStock,
+  realisedToday=0, openChangeToday=0, sessionLabel="Checking session", sessionMessage="", attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
 }: {
+  realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
+  attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
+  resumeChart?:{symbol:string;timeframe:string};onResumeChart?:()=>void;onOpenRealised?:()=>void;
   firstName?: string;
   indices: HomeIndexQuote[];
   feedLive: boolean;
@@ -89,7 +96,7 @@ export function HomeWorkspace({
   onOpenPnl: () => void;
   onOpenStock: (symbol: string) => void;
 }) {
-  const hour = new Date().getHours();
+  const hour = Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const safeName = firstName?.trim().split(/\s+/)[0];
   const [search, setSearch] = useState("");
@@ -124,17 +131,17 @@ export function HomeWorkspace({
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
 
   return (
-    <section className="home-workspace" aria-label="PaperTrade home">
+    <section className="home-workspace home-hub" aria-label="PaperTrade home">
       <div className="home-dashboard-scroll">
         <section className="home-hero">
           <div className="home-hero-copy">
             <span className="home-kicker"><Sparkles size={14} /> {greeting}{safeName ? `, ${safeName}` : ""}</span>
-            <h1>Build skill before you risk capital.</h1>
+            <h1>Your trading day</h1>
             <div className="home-global-search">
               <Search size={18} />
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search stocks and indices" aria-label="Search stocks and indices" />
               {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
-              {matches.length > 0 && <div className="home-search-results">
+              {search.trim()&&!matches.length&&<div className="home-search-results home-search-empty" role="status">No matching stocks or indices.</div>}{matches.length > 0 && <div className="home-search-results">
                 {matches.map((stock) => <button key={stock.symbol} onClick={() => { setPreview(stock); setSearch(""); }}>
                   <span className="stock-identity">{stock.assetType === "INDEX" ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
                   <em className={(quotes[stock.instrumentKey ?? ""]?.changePercent ?? 0) < 0 ? "negative" : "positive"}>{quoteChangeText(quotes[stock.instrumentKey ?? ""]?.changePercent)}</em>
@@ -145,15 +152,15 @@ export function HomeWorkspace({
         </section>
 
         {cards.market && <section className="home-section home-pulse-section">
-          <header><span><TrendingUp size={17} /><b>Market pulse</b></span><small>{feedLive ? "Live Upstox quotes" : "Latest available quotes"}</small></header>
+          <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
           <div className="home-index-grid">
             {indices.map((index) => {
               const positive = (index.points ?? 0) >= 0;
               return (
                 <button key={index.symbol} className="home-index-card" onClick={() => onOpenStock(index.symbol)}>
-                  <span><b>{index.label}</b><i className={index.live ? "live" : ""}>{index.live ? "LIVE" : "LAST"}</i></span>
+                  <span><b>{index.label}</b><i className={index.live ? "live" : ""}>{index.price===null?"—":index.live ? "LIVE" : "LAST"}</i></span>
                   <strong>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
-                  <small className={positive ? "positive" : "negative"}>{index.points === null ? "Waiting for data" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>
+                  <small className={index.points===null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "Quote unavailable" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>{index.price!==null&&!index.live&&<time>{index.asOf&&Number.isFinite(Date.parse(index.asOf))?new Date(index.asOf).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" IST":"Time unavailable"}</time>}
                 </button>
               );
             })}
@@ -164,22 +171,25 @@ export function HomeWorkspace({
           {cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></header>
             <div className="home-portfolio-value">
-              <button className="home-today-pnl" onClick={onOpenPositions} aria-label="Today's profit and loss — open positions"><small>TODAY</small><strong className={todayPnl >= 0 ? "positive" : "negative"}>{todayPnl >= 0 ? "+" : ""}{formatInr(todayPnl)}</strong></button>
+              <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today’s profit and loss — view P&L"><small>TODAY’S P&amp;L</small><strong className={openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
               <span><small>VIRTUAL CASH</small><b>{formatInr(balance)}</b></span>
             </div>
+            <div className="home-pnl-split"><button onClick={onOpenRealised??onOpenPnl}><small>Realised today · net</small><b className={realisedToday>=0?'positive':'negative'}>{formatInr(realisedToday)}</b><ChevronRight size={13}/></button><button onClick={onOpenPositions}><small>Open · today’s change</small><b className={openChangeToday===null?'':openChangeToday>=0?'positive':'negative'}>{openChangeToday===null?'Quote unavailable':formatInr(openChangeToday)}</b><ChevronRight size={13}/></button></div>
             <div className="home-portfolio-stats">
               <button onClick={onOpenHoldings}><span><Layers3 size={16} /> Holdings</span><b>{holdingsCount}</b></button>
               <button onClick={onOpenPositions}><span><WalletCards size={16} /> Open positions</span><b>{openPositionsCount}</b></button>
               <button onClick={onOpenTradeHistory}><span><CheckCircle2 size={16} /> Closed trades</span><b>{closedTradesCount}</b></button>
             </div>
             <div className="home-risk-meter">
-              <span><ShieldCheck size={15} /><b>Portfolio risk</b><em className={`risk-${riskSummary.label.toLowerCase()}`}>{riskSummary.label}</em></span>
-              <div><i style={{ width: `${Math.min(100, riskSummary.topConcentration)}%` }} /></div>
-              <small>{riskSummary.exposure > 0 ? `${riskSummary.topSymbol} is ${riskSummary.topConcentration.toFixed(0)}% of invested value` : "Build a delivery portfolio to see concentration risk"}</small>
+              <span><ShieldCheck size={15} /><b>Holdings concentration</b><em>{holdingsCount===0?"No holdings":Number.isFinite(riskSummary.topConcentration)&&riskSummary.exposure>0?`${riskSummary.topConcentration.toFixed(0)}% largest`:"Quote unavailable"}</em></span>
+              {holdingsCount>0&&riskSummary.exposure>0&&Number.isFinite(riskSummary.topConcentration)&&<div><i style={{ width: `${Math.min(100, riskSummary.topConcentration)}%` }} /></div>}
+              <small>{riskSummary.exposure > 0 ? `${riskSummary.topSymbol} is ${riskSummary.topConcentration.toFixed(0)}% of invested value` : holdingsCount===0?"No delivery holdings to measure.":"Waiting for holding valuations."}</small>
             </div>
           </section>}
 
         </div>
+        {!!attention.length&&<section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{Math.min(3,attention.length)} to review</small></header><div>{attention.slice(0,3).map(item=><button key={item.id} onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button>)}</div></section>}
+        {resumeChart&&<button className="home-resume-card" onClick={onResumeChart}><span className="home-resume-icon"><CandlestickChart size={23}/></span><span><small>Continue your chart</small><b>{resumeChart.symbol} <em>· {resumeChart.timeframe}</em></b><small>Your saved chart setup</small></span><span className="home-resume-action">Resume <Play size={14}/></span></button>}
       </div>
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>
