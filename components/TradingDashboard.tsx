@@ -2532,7 +2532,7 @@ export function TradingDashboard() {
               onClear={() => setClearSignal((value) => value + 1)}
             />
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
-            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
             {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { chooseTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
@@ -2563,6 +2563,7 @@ export function TradingDashboard() {
                 onPriceAction={(price, mode) => setPriceRequest({ instrument: selected, price, mode })}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
+                onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
                 onFeedStatus={handleFeedStatus}
               />
             )}

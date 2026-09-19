@@ -353,7 +353,7 @@ export function AdvancedChartWorkspace({
         </aside>
         <div className="advanced-chart-canvas">
           {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={selectTool} onClose={() => setShowDrawingLibrary(false)} />}
-          {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+          {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={selectTool} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
           <MarketChart
             key={`${instrument.symbol}-${timeframe}`}
             instrument={instrument}
@@ -361,6 +361,7 @@ export function AdvancedChartWorkspace({
             activeTool={activeTool}
             toolSignal={toolSignal}
             onDrawingComplete={() => setActiveTool("cursor")}
+            onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
             magnet={magnet}
             hiddenDrawings={drawingsHidden}
             lockedDrawings={drawingsLocked}

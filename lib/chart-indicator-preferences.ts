@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { ChartIndicators } from "@/components/MarketChart";
+import { STUDIES } from "./indicator-catalog";
 
 const STORAGE_KEY = "papertrade-chart-indicators-v1";
 const CHANGE_EVENT = "papertrade:chart-indicators-change";
@@ -16,7 +17,7 @@ const EMPTY_INDICATORS: ChartIndicators = {
 function normalizeIndicators(value: unknown): ChartIndicators {
   const candidate = value && typeof value === "object" ? value as Partial<ChartIndicators> : {};
   return Object.fromEntries(
-    Object.keys(EMPTY_INDICATORS).map((key) => [key, candidate[key as keyof ChartIndicators] === true]),
+    STUDIES.map((study) => [study.id, !study.unavailable && candidate[study.id] === true]),
   ) as unknown as ChartIndicators;
 }
 

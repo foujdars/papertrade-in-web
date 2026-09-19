@@ -1,0 +1,13 @@
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {DrawingManager} from 'lightweight-charts-drawing';
+import {MarketChart} from '../../components/MarketChart';
+import {ChartFunctionMenu} from '../../components/ChartFunctionMenu';
+import {usePersistentChartIndicators} from '../../lib/chart-indicator-preferences';
+import {ChartStudyRenderer} from '../../lib/chart-study-renderer';
+const attach=DrawingManager.prototype.attach;DrawingManager.prototype.attach=function(...args){window.qaChart=args[0];window.qaCandles=args[1];return attach.apply(this,args);};
+const sync=ChartStudyRenderer.prototype.sync;ChartStudyRenderer.prototype.sync=function(...args){window.qaStudies=this;return sync.apply(this,args);};
+const instrument={symbol:'TEST',name:'Indicator test',price:110,change:0,exchange:'NSE',instrumentKey:'NSE_EQ|TEST',categories:[]};
+function App(){const [indicators,setIndicators]=usePersistentChartIndicators(),[open,setOpen]=useState(false),[theme,setTheme]=useState('light'),[timeframe,setTimeframe]=useState('5m'),[host,setHost]=useState(null);window.qaTimeframe=setTimeframe;window.qaIndicators=setIndicators;
+ return <main className="terminal-shell" data-theme={theme} style={{display:'block',height:'100dvh'}}><header style={{height:45,display:'flex',gap:10}}><button onClick={()=>setOpen(true)}>Functions</button><button onClick={()=>setTheme(t=>t==='light'?'neon':'light')}>Theme</button></header><div style={{height:'calc(100dvh - 75px)'}}><MarketChart instrument={instrument} timeframe={timeframe} activeTool="cursor" indicators={indicators} indicatorHost={host} chartTheme={theme} onFeedStatus={()=>{}} onRemoveIndicator={id=>setIndicators(v=>({...v,[id]:false}))}/></div><div className="chart-statusbar"><div className="chart-indicator-slot" ref={setHost}/></div>{open&&<ChartFunctionMenu indicators={indicators} onToggleIndicator={id=>setIndicators(v=>({...v,[id]:!v[id]}))} onAction={()=>{}} onClose={()=>setOpen(false)}/>}</main>;
+}createRoot(document.getElementById('root')).render(<App/>);

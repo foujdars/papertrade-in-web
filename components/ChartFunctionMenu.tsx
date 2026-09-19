@@ -1,93 +1,23 @@
 "use client";
-
-import {
-  Activity,
-  BarChart3,
-  Camera,
-  Crosshair,
-  Expand,
-  Grid3X3,
-  LineChart,
-  Radio,
-  Scan,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import type { ChartAction, ChartIndicators } from "@/components/MarketChart";
-
-const studies: Array<{ key: keyof ChartIndicators; name: string; detail: string; color: string }> = [
-  { key: "smc", name: "SMC Learner", detail: "FVG, order blocks, structure & explanations", color: "#7c4dff" },
-  { key: "ema5", name: "EMA 5", detail: "Fast exponential average", color: "#0ea5e9" },
-  { key: "ema21", name: "EMA 21", detail: "Short trend average", color: "#ff8a00" },
-  { key: "ema30", name: "EMA 30", detail: "30-candle exponential average", color: "#22c55e" },
-  { key: "ema50", name: "EMA 50", detail: "Medium trend average", color: "#8b5cf6" },
-  { key: "ema100", name: "EMA 100", detail: "100-candle exponential average", color: "#f97316" },
-  { key: "ema200", name: "EMA 200", detail: "Long trend average", color: "#e11d48" },
-  { key: "sma20", name: "SMA 20", detail: "20-candle simple average", color: "#14b8a6" },
-  { key: "sma50", name: "SMA 50", detail: "50-candle simple average", color: "#64748b" },
-  { key: "sma200", name: "SMA 200", detail: "200-candle simple average", color: "#111827" },
-  { key: "vwap", name: "VWAP", detail: "Session volume-weighted price", color: "#d946ef" },
-  { key: "supertrend", name: "Supertrend", detail: "ATR 10 · multiplier 3", color: "#00a67e" },
-  { key: "bollinger", name: "Bollinger Bands", detail: "20 period · 2 deviation", color: "#6366f1" },
-  { key: "rsi", name: "RSI 14", detail: "Separate 0–100 momentum pane", color: "#7c4dff" },
-  { key: "macd", name: "MACD", detail: "12, 26, 9 with histogram", color: "#2563eb" },
-  { key: "pivots", name: "Classic Pivots", detail: "P, R1–R3 and S1–S3", color: "#7c3aed" },
-];
-
-export function ChartFunctionMenu({
-  indicators,
-  onToggleIndicator,
-  onAction,
-  onClose,
-}: {
-  indicators: ChartIndicators;
-  onToggleIndicator: (indicator: keyof ChartIndicators) => void;
-  onAction: (action: ChartAction) => void;
-  onClose: () => void;
-}) {
-  const [gridVisible, setGridVisible] = useState(true);
-  const [crosshairVisible, setCrosshairVisible] = useState(true);
-  const [scale, setScale] = useState<"normal" | "log" | "percent" | "indexed">("normal");
-
-  useEffect(() => {
-    const closeWithEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", closeWithEscape);
-    return () => window.removeEventListener("keydown", closeWithEscape);
-  }, [onClose]);
-
-  return (
-    <div className="chart-function-backdrop" role="presentation" onPointerDown={onClose}>
-      <section className="chart-function-menu" role="dialog" aria-modal="true" aria-label="Functions" onPointerDown={(event) => event.stopPropagation()}>
-        <header><div><LineChart size={18} /><span><b>Functions</b><small>Indicators, view, scale and export</small></span></div><button onClick={onClose} aria-label="Close functions"><X size={18} /></button></header>
-        <div className="chart-function-section-title"><Activity size={15} /><span><b>Indicators</b><small>Switch each study on or off independently</small></span></div>
-        <div className="chart-study-grid">
-          {studies.map((study) => (
-            <button key={study.key} className={indicators[study.key] ? "active" : ""} onClick={() => onToggleIndicator(study.key)} aria-pressed={indicators[study.key]}>
-              <i style={{ background: study.color }} />
-              <span><b>{study.name}</b><small>{study.detail}</small></span>
-              <em>{indicators[study.key] ? "ON" : "OFF"}</em>
-            </button>
-          ))}
-        </div>
-        <div className="chart-function-section-title"><BarChart3 size={15} /><span><b>Chart controls</b><small>Navigation, appearance and export</small></span></div>
-        <div className="chart-function-grid">
-          <button onClick={() => onAction("fit")}><Scan size={18} /><span><b>Fit all data</b><small>Show complete loaded range</small></span></button>
-          <button onClick={() => onAction("live")}><Radio size={18} /><span><b>Go to live</b><small>Jump to latest candle</small></span></button>
-          <button onClick={() => onAction("zoom-in")}><ZoomIn size={18} /><span><b>Zoom in</b><small>Show fewer candles</small></span></button>
-          <button onClick={() => onAction("zoom-out")}><ZoomOut size={18} /><span><b>Zoom out</b><small>Show more candles</small></span></button>
-          <button className={gridVisible ? "active" : ""} onClick={() => { setGridVisible((value) => !value); onAction("toggle-grid"); }}><Grid3X3 size={18} /><span><b>Grid</b><small>{gridVisible ? "Visible" : "Hidden"}</small></span></button>
-          <button className={crosshairVisible ? "active" : ""} onClick={() => { setCrosshairVisible((value) => !value); onAction("toggle-crosshair"); }}><Crosshair size={18} /><span><b>Crosshair</b><small>{crosshairVisible ? "Visible" : "Hidden"}</small></span></button>
-          <button onClick={() => onAction("screenshot")}><Camera size={18} /><span><b>Save image</b><small>Download PNG chart</small></span></button>
-          <button onClick={() => onAction("reset")}><Expand size={18} /><span><b>Reset view</b><small>Restore default live range</small></span></button>
-        </div>
-        <div className="chart-scale-options">
-          <b>Price scale</b>
-          {(["normal", "log", "percent", "indexed"] as const).map((item) => <button key={item} className={scale === item ? "active" : ""} onClick={() => { setScale(item); onAction(`scale-${item}` as ChartAction); }}>{item === "indexed" ? "Indexed 100" : item === "percent" ? "Percentage" : item === "log" ? "Logarithmic" : "Normal"}</button>)}
-        </div>
-        <footer>VWAP uses Upstox candle volume · pinch or mouse-wheel to zoom · drag to pan</footer>
-      </section>
-    </div>
-  );
+import { Activity, Camera, Crosshair, Expand, Grid3X3, Radio, Scan, X, ZoomIn, ZoomOut, Search, Star, Plus, Settings2, Eye, EyeOff, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChartAction, ChartIndicators, DrawingTool } from './MarketChart';
+import { STUDIES, studyDefaults, studyTitle } from '@/lib/indicator-catalog';
+import { useIndicatorSettings } from '@/lib/indicator-settings';
+import { IndicatorSettings } from './IndicatorSettings';
+import { useTransientBack } from './useTransientBack';
+export function ChartFunctionMenu({indicators,onToggleIndicator,onAction,onClose,onDrawing}:{indicators:ChartIndicators;onToggleIndicator:(id:keyof ChartIndicators)=>void;onAction:(action:ChartAction)=>void;onClose:()=>void;onDrawing?:(id:DrawingTool)=>void}){
+ const [tab,setTab]=useState('All'),[query,setQuery]=useState(''),[group,setGroup]=useState('All types'),[editing,setEditing]=useState<string|null>(null),[controls,setControls]=useState(false),[notice,setNotice]=useState('');
+ const {settings,setStudy,favorites,toggleFavorite}=useIndicatorSettings(),panel=useRef<HTMLElement>(null);
+ useTransientBack(true,onClose);useEffect(()=>{const old=document.activeElement as HTMLElement;panel.current?.focus();return()=>{if(old?.isConnected)old.focus();};},[]);
+ const list=STUDIES.filter(s=>(tab!=='Favourites'||favorites.includes(s.id))&&(tab!=='On chart'||indicators[s.id])&&(group==='All types'||s.group===group)&&`${s.name} ${s.id} ${s.group}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ function toggle(id:string){const study=STUDIES.find(s=>s.id===id)!;if(!indicators[id]&&!study.overlay&&STUDIES.filter(s=>!s.overlay&&indicators[s.id]&&!settings[s.id]?.hidden).length>=6){setNotice('Six lower panes are already active. Hide or remove one before adding another.');return;}setNotice('');onToggleIndicator(id);}
+ return <div className="chart-function-backdrop indicator-studio-backdrop" onPointerDown={onClose}><section ref={panel} tabIndex={-1} className="chart-function-menu indicator-studio" role="dialog" aria-modal="true" aria-label="Functions" onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key!=='Tab'||editing)return;const nodes=Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input')??[]).filter(el=>el.getClientRects().length);if(e.shiftKey&&(document.activeElement===nodes[0]||document.activeElement===panel.current)){e.preventDefault();nodes.at(-1)?.focus();}else if(!e.shiftKey&&document.activeElement===nodes.at(-1)){e.preventDefault();nodes[0]?.focus();}}}>
+ <div className="indicator-grip"/><header><div><Activity size={22}/><span><b>Indicators</b><small>Your chart. Your way.</small></span></div><button aria-label="Close functions" onClick={onClose}><X size={21}/></button></header><label className="indicator-search"><Search size={19}/><input aria-label="Search indicators" placeholder="Search RSI, ADX, moving averages…" value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button aria-label="Clear indicator search" onClick={()=>setQuery('')}><X size={16}/></button>}</label>
+ <nav className="indicator-tabs" aria-label="Indicator lists">{['All','Favourites','On chart'].map(t=><button key={t} className={tab===t?'active':''} aria-pressed={tab===t} onClick={()=>setTab(t)}>{t}{t==='On chart'&&<small>{Object.values(indicators).filter(Boolean).length}</small>}</button>)}</nav><nav className="indicator-groups" aria-label="Indicator categories">{['All types','Trend','Momentum','Volume','Volatility','Price','Learning','Comparison','Market breadth'].map(g=><button key={g} aria-pressed={group===g} onClick={()=>setGroup(g)}>{g}</button>)}</nav>
+ <div className="indicator-studio-body">{notice&&<p role="status" className="indicator-help">{notice}</p>}{onDrawing&&tab==='All'&&(!query||'volume profile fixed range'.includes(query.toLowerCase()))&&(group==='All types'||group==='Volume')&&<button className="indicator-drawing-link" onClick={()=>{onDrawing('volume-profile');onClose();}}><SlidersHorizontal size={18}/><span><b>Volume Profile Fixed Range</b><small>Choose a range with the drawing tool</small></span><Plus size={18}/></button>}
+ {list.map(s=>{const config=settings[s.id]??studyDefaults(s.id),added=indicators[s.id];return <article className={`indicator-card ${added?'added':''}`} key={s.id}><button className={`indicator-star ${favorites.includes(s.id)?'saved':''}`} aria-label={`${favorites.includes(s.id)?'Unfavorite':'Favorite'} ${s.name}`} onClick={()=>toggleFavorite(s.id)}><Star size={17} fill={favorites.includes(s.id)?'currentColor':'none'}/></button><div className="indicator-card-name"><b>{studyTitle(s.id,config)}</b><small>{s.unavailable??`${s.group} · ${s.overlay?'On price chart':'Separate pane'}${added&&config.hidden?' · Hidden':''}`}</small></div>{!s.unavailable&&<div className="indicator-card-actions">{added&&s.id!=='smc'&&<button aria-label={`${config.hidden?'Show':'Hide'} ${s.name}`} onClick={()=>setStudy(s.id,{...config,hidden:!config.hidden})}>{config.hidden?<EyeOff size={18}/>:<Eye size={18}/>}</button>}{s.id!=='smc'&&<button aria-label={`Settings for ${s.name}`} onClick={()=>setEditing(s.id)}><Settings2 size={18}/></button>}<button className={added?'indicator-remove':'indicator-add'} aria-label={`${added?'Remove':'Add'} ${s.name}`} onClick={()=>toggle(s.id)}>{added?<X size={18}/>:<Plus size={18}/>}</button></div>}</article>;})}{!list.length&&<p className="indicator-empty">{tab==='On chart'?'Your chart is clear. Add an indicator from All.':'No matching indicators.'}</p>}</div>
+ <footer><button className="indicator-chart-controls" aria-expanded={controls} onClick={()=>setControls(v=>!v)}><SlidersHorizontal size={17}/>Chart controls</button><small>Settings saved on this device</small></footer>
+ {controls&&<div className="indicator-controls-panel"><header><b>Chart controls</b><button aria-label="Close chart controls" onClick={()=>setControls(false)}><X size={18}/></button></header><div className="chart-function-grid">{([['fit','Fit all data',Scan],['live','Go to live',Radio],['zoom-in','Zoom in',ZoomIn],['zoom-out','Zoom out',ZoomOut],['toggle-grid','Toggle grid',Grid3X3],['toggle-crosshair','Toggle crosshair',Crosshair],['screenshot','Save image',Camera],['reset','Reset view',Expand]] as const).map(([action,label,Icon])=><button key={action} onClick={()=>onAction(action)}><Icon size={18}/>{label}</button>)}</div><div className="chart-scale-options">{(['normal','log','percent','indexed'] as const).map(s=><button key={s} onClick={()=>onAction(`scale-${s}`)}>{s==='indexed'?'Indexed 100':s==='log'?'Logarithmic':s==='percent'?'Percentage':'Normal'}</button>)}</div></div>}
+ </section>{editing&&<IndicatorSettings key={editing} id={editing} onClose={()=>setEditing(null)}/>}</div>;
 }

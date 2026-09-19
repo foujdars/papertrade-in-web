@@ -1,6 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Trash2, Settings2, EyeOff, X } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
@@ -10,6 +10,11 @@ import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
+import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
+import { STUDIES, studyDefaults, studyTitle } from "@/lib/indicator-catalog";
+import { useIndicatorSettings } from "@/lib/indicator-settings";
+import { IndicatorSettings } from "./IndicatorSettings";
+import { useComparisonCandles } from "@/lib/indicator-comparison-feed";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -30,7 +35,7 @@ import type {
   IDrawing,
   SerializedDrawing,
 } from "lightweight-charts-drawing";
-import { bollingerBands, classicPivotPoints, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument, type PivotLevel } from "@/lib/market";
+import type { Candle, Instrument } from "@/lib/market";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { ChartAlertLevels } from "@/components/ChartAlertLevels";
 import type { PriceTask } from "@/lib/price-actions";
@@ -121,6 +126,7 @@ export type FeedStatus = {
 };
 
 export type ChartIndicators = {
+  [key: string]: boolean;
   smc: boolean;
   ema5: boolean;
   ema21: boolean;
@@ -319,22 +325,6 @@ function toCandleData(candle: Candle, timeframe: string): CandlestickData<Time> 
   };
 }
 
-function latestIndicatorValues(data: Candle[]) {
-  return {
-    ema5: ema(data, 5).at(-1)?.value ?? 0,
-    ema21: ema(data, 21).at(-1)?.value ?? 0,
-    ema30: ema(data, 30).at(-1)?.value ?? 0,
-    ema50: ema(data, 50).at(-1)?.value ?? 0,
-    ema100: ema(data, 100).at(-1)?.value ?? 0,
-    ema200: ema(data, 200).at(-1)?.value ?? 0,
-    sma20: sma(data, 20).at(-1)?.value ?? 0,
-    sma50: sma(data, 50).at(-1)?.value ?? 0,
-    sma200: sma(data, 200).at(-1)?.value ?? 0,
-    vwap: vwap(data).at(-1)?.value ?? 0,
-    rsi: rsi(data, 14).at(-1)?.value ?? 50,
-  };
-}
-
 function timeToTimestamp(time: Time) {
   if (typeof time === "number") return time;
   if (typeof time === "string") return Math.floor(new Date(time).getTime() / 1_000);
@@ -462,6 +452,7 @@ export function MarketChart({
   onOrderToolClose,
   onOrderToolExit,
   onDrawingComplete,
+  onRemoveIndicator,
   onChartTap,
   onPrice,
   liveTick,
@@ -501,6 +492,7 @@ export function MarketChart({
   onOrderToolClose?: () => void;
   onOrderToolExit?: () => void;
   onDrawingComplete?: () => void;
+  onRemoveIndicator?: (id: string) => void;
   onChartTap?: () => void;
   onPrice?: (value: number, timestampMs: number) => void;
   liveTick?: CandleTick;
@@ -510,7 +502,13 @@ export function MarketChart({
   const indicators = useMemo(() => candlesOnly
     ? Object.fromEntries(Object.keys(suppliedIndicators).map(key => [key, false])) as ChartIndicators
     : suppliedIndicators, [candlesOnly, suppliedIndicators]);
+  const { settings: studySettings, setStudy } = useIndicatorSettings();
+  const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
+  const [editingStudy, setEditingStudy] = useState<string | null>(null);
+  const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
   const isReplay = replayCandles !== undefined;
+  const comparisonData=useComparisonCandles(isReplay?[]:STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),timeframe);
+  const comparisonRef=useRef(comparisonData);comparisonRef.current=comparisonData;
   const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
   useTransientBack(priceMenu !== null, () => setPriceMenu(null));
@@ -521,24 +519,7 @@ export function MarketChart({
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
   const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const ema5Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema21Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema30Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema50Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema100Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const ema200Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const sma20Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const sma50Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const sma200Series = useRef<ISeriesApi<"Line"> | null>(null);
-  const vwapSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const supertrendSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const bollingerSeries = useRef<Array<ISeriesApi<"Line">>>([]);
-  const pivotSeries = useRef<Partial<Record<PivotLevel, ISeriesApi<"Line">>>>({});
-  const rsiSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const macdSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const macdSignalSeries = useRef<ISeriesApi<"Line"> | null>(null);
-  const macdHistogramSeries = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const macdPaneIndexRef = useRef(1);
+  const studyRenderer = useRef<ChartStudyRenderer | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
@@ -595,7 +576,6 @@ export function MarketChart({
   const [hoveredCandle, setHoveredCandle] = useState<{ scope: string; time: number | null } | null>(null);
   const legendScope = `${instrument.instrumentKey}|${timeframe}`;
   const legend = selectCandleLegend(dataRef.current, hoveredCandle?.scope === legendScope ? hoveredCandle.time : null);
-  const [indicatorValues, setIndicatorValues] = useState(() => latestIndicatorValues(initialData));
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
@@ -868,171 +848,31 @@ export function MarketChart({
     applyVisibleRange(data);
   }
 
-  function fitStudyPanes(next = indicatorsRef.current) {
-    const chart = chartApi.current;
-    const host = chartHost.current;
-    if (!chart || !host) return;
-    window.requestAnimationFrame(() => {
-      if (chartApi.current !== chart) return;
-      const panes = chart.panes();
-      const lowerPaneCount = Number(next.rsi) + Number(next.macd);
-      const totalHeight = Math.max(280, host.clientHeight);
-      if (!lowerPaneCount) {
-        panes[0]?.setHeight(totalHeight);
-        return;
-      }
-      const minimumLowerHeight = lowerPaneCount === 1 ? 88 : 72;
-      const lowerHeight = Math.max(minimumLowerHeight, Math.min(118, Math.floor(totalHeight * (lowerPaneCount === 1 ? 0.25 : 0.19))));
-      panes[0]?.setHeight(Math.max(150, totalHeight - lowerHeight * lowerPaneCount));
-      if (next.rsi) panes[1]?.setHeight(lowerHeight);
-      if (next.macd) panes[next.rsi ? 2 : 1]?.setHeight(lowerHeight);
-    });
-  }
-
-  function syncIndicatorData(data = dataRef.current) {
-    const indicatorPoint = (point: { time: number; value: number }) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value });
-    ema5Series.current?.setData(ema(data, 5).map(indicatorPoint));
-    ema21Series.current?.setData(ema(data, 21).map(indicatorPoint));
-    ema30Series.current?.setData(ema(data, 30).map(indicatorPoint));
-    ema50Series.current?.setData(ema(data, 50).map(indicatorPoint));
-    ema100Series.current?.setData(ema(data, 100).map(indicatorPoint));
-    ema200Series.current?.setData(ema(data, 200).map(indicatorPoint));
-    sma20Series.current?.setData(sma(data, 20).map(indicatorPoint));
-    sma50Series.current?.setData(sma(data, 50).map(indicatorPoint));
-    sma200Series.current?.setData(sma(data, 200).map(indicatorPoint));
-    vwapSeries.current?.setData(vwap(data).map(indicatorPoint));
-    supertrendSeries.current?.setData(supertrend(data).map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value, color: point.direction === "up" ? "#00a67e" : "#f04458" })));
-    const bands = bollingerBands(data);
-    bollingerSeries.current[0]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.upper })));
-    bollingerSeries.current[1]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.middle })));
-    bollingerSeries.current[2]?.setData(bands.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.lower })));
-    const pivots = classicPivotPoints(data);
-    for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
-      pivotSeries.current[level]?.setData(pivots.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.levels![level] })));
-    }
-    rsiSeries.current?.setData(rsi(data, 14).map(indicatorPoint));
-    const macdValues = macd(data);
-    macdSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.macd })));
-    macdSignalSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.signal })));
-    macdHistogramSeries.current?.setData(macdValues.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.histogram, color: point.histogram >= 0 ? "#00a67e80" : "#f0445880" })));
-    setIndicatorValues(latestIndicatorValues(data));
-  }
-
-  function syncIndicators(next: ChartIndicators) {
+  function refreshStudyHeaders() {
     const chart = chartApi.current;
     if (!chart) return;
-    void import("lightweight-charts").then(({ HistogramSeries, LineSeries, LineStyle }) => {
-      if (!chartApi.current || chartApi.current !== chart) return;
-      if (next.ema5 && !ema5Series.current) {
-        ema5Series.current = chart.addSeries(LineSeries, {
-          color: "#0ea5e9",
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          title: "",
-        });
-      } else if (!next.ema5 && ema5Series.current) {
-        chart.removeSeries(ema5Series.current);
-        ema5Series.current = null;
-      }
-      if (next.ema21 && !ema21Series.current) {
-        ema21Series.current = chart.addSeries(LineSeries, {
-          color: "#ff8a00",
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-          title: "",
-        });
-      } else if (!next.ema21 && ema21Series.current) {
-        chart.removeSeries(ema21Series.current);
-        ema21Series.current = null;
-      }
-      const overlayDefinitions = [
-        ["ema30", ema30Series, ema(dataRef.current, 30), "#22c55e", "EMA 30"],
-        ["ema50", ema50Series, ema(dataRef.current, 50), "#8b5cf6", "EMA 50"],
-        ["ema100", ema100Series, ema(dataRef.current, 100), "#f97316", "EMA 100"],
-        ["ema200", ema200Series, ema(dataRef.current, 200), "#e11d48", "EMA 200"],
-        ["sma20", sma20Series, sma(dataRef.current, 20), "#14b8a6", "SMA 20"],
-        ["sma50", sma50Series, sma(dataRef.current, 50), "#64748b", "SMA 50"],
-        ["sma200", sma200Series, sma(dataRef.current, 200), "#111827", "SMA 200"],
-        ["vwap", vwapSeries, vwap(dataRef.current), "#d946ef", "VWAP"],
-        ["supertrend", supertrendSeries, supertrend(dataRef.current), "#00a67e", "Supertrend 10 3"],
-      ] as const;
-      for (const [key, reference, points, color, title] of overlayDefinitions) {
-        if (next[key] && !reference.current) {
-          reference.current = chart.addSeries(LineSeries, { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: !key.startsWith("ema"), crosshairMarkerVisible: false, title: indicatorHost !== undefined || key.startsWith("ema") ? "" : title });
-          reference.current.setData(points.map((point) => ({ time: chartTimeFromEpoch(point.time, timeframe), value: point.value })));
-        } else if (!next[key] && reference.current) {
-          chart.removeSeries(reference.current);
-          reference.current = null;
-        }
-      }
-      if (next.bollinger && !bollingerSeries.current.length) {
-        bollingerSeries.current = [
-          chart.addSeries(LineSeries, { color: "#6366f1", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB Upper" }),
-          chart.addSeries(LineSeries, { color: "#a5b4fc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB 20" }),
-          chart.addSeries(LineSeries, { color: "#6366f1", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB Lower" }),
-        ];
-      } else if (!next.bollinger && bollingerSeries.current.length) {
-        for (const series of bollingerSeries.current) chart.removeSeries(series);
-        bollingerSeries.current = [];
-      }
-      if (next.pivots && !Object.keys(pivotSeries.current).length) {
-        const colors: Record<PivotLevel, string> = { r3: "#dc2626", r2: "#ef4444", r1: "#fb7185", pivot: "#7c3aed", s1: "#34d399", s2: "#10b981", s3: "#047857" };
-        for (const level of ["r3", "r2", "r1", "pivot", "s1", "s2", "s3"] as PivotLevel[]) {
-          pivotSeries.current[level] = chart.addSeries(LineSeries, { color: colors[level], lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: indicatorHost !== undefined ? "" : level === "pivot" ? "P" : level.toUpperCase() });
-        }
-      } else if (!next.pivots && Object.keys(pivotSeries.current).length) {
-        for (const series of Object.values(pivotSeries.current)) if (series) chart.removeSeries(series);
-        pivotSeries.current = {};
-      }
-      if (next.rsi && !rsiSeries.current) {
-        rsiSeries.current = chart.addSeries(LineSeries, {
-          color: "#7c4dff",
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: true,
-          crosshairMarkerVisible: false,
-          title: indicatorHost !== undefined ? "" : "RSI 14",
-          autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }),
-        }, 1);
-        // Keep the overbought/oversold guides unbroken and deliberately darker
-        // than the grid so both thresholds remain legible on either theme.
-        rsiSeries.current.createPriceLine({ price: 70, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
-        rsiSeries.current.createPriceLine({ price: 50, color: "#c084fc", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
-        rsiSeries.current.createPriceLine({ price: 30, color: "#334155", lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "" });
-        chart.panes()[1]?.setHeight(116);
-      } else if (!next.rsi && rsiSeries.current) {
-        chart.removeSeries(rsiSeries.current);
-        rsiSeries.current = null;
-      }
-      const requestedMacdPane = next.rsi ? 2 : 1;
-      if (next.macd && macdSeries.current && macdPaneIndexRef.current !== requestedMacdPane) {
-        chart.removeSeries(macdSeries.current);
-        if (macdSignalSeries.current) chart.removeSeries(macdSignalSeries.current);
-        if (macdHistogramSeries.current) chart.removeSeries(macdHistogramSeries.current);
-        macdSeries.current = null;
-        macdSignalSeries.current = null;
-        macdHistogramSeries.current = null;
-      }
-      if (next.macd && !macdSeries.current) {
-        macdPaneIndexRef.current = requestedMacdPane;
-        macdSeries.current = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "MACD" }, requestedMacdPane);
-        macdSignalSeries.current = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "macd", title: "Signal" }, requestedMacdPane);
-        macdHistogramSeries.current = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceScaleId: "macd", title: "Histogram" }, requestedMacdPane);
-      } else if (!next.macd && macdSeries.current) {
-        chart.removeSeries(macdSeries.current);
-        if (macdSignalSeries.current) chart.removeSeries(macdSignalSeries.current);
-        if (macdHistogramSeries.current) chart.removeSeries(macdHistogramSeries.current);
-        macdSeries.current = null;
-        macdSignalSeries.current = null;
-        macdHistogramSeries.current = null;
-      }
-      syncIndicatorData();
-      fitStudyPanes(next);
-    });
+    const panes = chart.panes(), tops = [0];
+    for (let i = 1; i < panes.length; i++) tops[i] = tops[i-1] + panes[i-1].getHeight();
+    const next = (studyRenderer.current?.summaries() ?? []).map(s => ({ ...s, top: tops[s.pane] ?? 0 }));
+    setStudySummaries(old => JSON.stringify(old) === JSON.stringify(next) ? old : next);
+  }
+  function fitStudyPanes() {
+    const chart = chartApi.current;
+    window.requestAnimationFrame(() => { if (chart && chartApi.current === chart) { studyRenderer.current?.fit(Math.max(280, chartHost.current?.clientHeight ?? 280)); window.requestAnimationFrame(()=>{if(chartApi.current===chart)refreshStudyHeaders();}); } });
+  }
+  function syncIndicatorData(data = dataRef.current) {
+    const chart = chartApi.current;
+    if (!chart) return;
+    if (!studyRenderer.current) studyRenderer.current = new ChartStudyRenderer(chart, epoch => chartTimeFromEpoch(epoch, timeframe));
+    const old = studyRenderer.current.signature;
+    studyRenderer.current.comparisons=comparisonRef.current;
+    studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data);
+    if (old !== studyRenderer.current.signature) fitStudyPanes();
+    refreshStudyHeaders();
+  }
+  function syncIndicators(next: ChartIndicators) {
+    indicatorsRef.current = next;
+    syncIndicatorData();
   }
 
   function persistDrawings(pushHistory = false) {
@@ -1171,7 +1011,7 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
     syncIndicators(indicators);
-  }, [indicators]);
+  }, [indicators, studySettings, comparisonData]);
 
   useEffect(() => {
     visibleBarsRef.current = visibleBars;
@@ -1838,7 +1678,7 @@ export function MarketChart({
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
           chart.resize(width, height, true);
-          fitStudyPanes(indicatorsRef.current);
+          fitStudyPanes();
           scheduleOverlayRefresh();
         });
       };
@@ -1880,23 +1720,7 @@ export function MarketChart({
       riskDragPriceRangeRef.current = null;
       orderToolEnabledRef.current = false;
       candleSeries.current = null;
-      ema5Series.current = null;
-      ema21Series.current = null;
-      ema30Series.current = null;
-      ema50Series.current = null;
-      ema100Series.current = null;
-      ema200Series.current = null;
-      sma20Series.current = null;
-      sma50Series.current = null;
-      sma200Series.current = null;
-      vwapSeries.current = null;
-      supertrendSeries.current = null;
-      bollingerSeries.current = [];
-      pivotSeries.current = {};
-      rsiSeries.current = null;
-      macdSeries.current = null;
-      macdSignalSeries.current = null;
-      macdHistogramSeries.current = null;
+      studyRenderer.current = null;
       drawingManager.current = null;
       drawingRegistry.current = null;
     };
@@ -2163,29 +1987,16 @@ export function MarketChart({
     return () => { disposed = true; request?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
   }, [instrument.instrumentKey, timeframe, isReplay]);
 
-  const indicatorLegend = Object.values(indicators).some(Boolean) ? (
-    <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
-      {indicators.ema5 && <span><i className="ema-five" />EMA 5 <b>{indicatorValues.ema5.toFixed(2)}</b></span>}
-      {indicators.ema21 && <span><i className="ema-twenty-one" />EMA 21 <b>{indicatorValues.ema21.toFixed(2)}</b></span>}
-      {indicators.ema30 && <span><i style={{ background: "#22c55e" }} />EMA 30 <b>{indicatorValues.ema30.toFixed(2)}</b></span>}
-      {indicators.ema50 && <span><i style={{ background: "#8b5cf6" }} />EMA 50 <b>{indicatorValues.ema50.toFixed(2)}</b></span>}
-      {indicators.ema100 && <span><i style={{ background: "#f97316" }} />EMA 100 <b>{indicatorValues.ema100.toFixed(2)}</b></span>}
-      {indicators.ema200 && <span><i style={{ background: "#e11d48" }} />EMA 200 <b>{indicatorValues.ema200.toFixed(2)}</b></span>}
-      {indicators.sma20 && <span><i style={{ background: "#14b8a6" }} />SMA 20 <b>{indicatorValues.sma20.toFixed(2)}</b></span>}
-      {indicators.sma50 && <span><i style={{ background: "#64748b" }} />SMA 50 <b>{indicatorValues.sma50.toFixed(2)}</b></span>}
-      {indicators.sma200 && <span><i style={{ background: "#111827" }} />SMA 200 <b>{indicatorValues.sma200.toFixed(2)}</b></span>}
-      {indicators.vwap && <span><i style={{ background: "#d946ef" }} />VWAP <b>{indicatorValues.vwap.toFixed(2)}</b></span>}
-      {indicators.supertrend && <span><i style={{ background: "#00a67e" }} />Supertrend</span>}
-      {indicators.bollinger && <span><i style={{ background: "#6366f1" }} />Bollinger 20</span>}
-      {indicators.pivots && <span><i style={{ background: "#7c3aed" }} />Classic Pivots</span>}
-      {indicators.rsi && <span><i className="rsi-color" />RSI 14 <b>{indicatorValues.rsi.toFixed(2)}</b></span>}
-      {indicators.macd && <span><i style={{ background: "#2563eb" }} />MACD 12 26 9</span>}
-    </div>
-  ) : null;
+  const activeStudies = STUDIES.filter(s => s.id !== "smc" && indicators[s.id]);
+  const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={() => setEditingStudy(s.id)} aria-label={'Settings for '+s.name}><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}<b>{latest?.value?.toFixed(2) ?? "—"}</b></button>; })}
+  </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={()=>setEditingStudy(s.id)}>{studyTitle(s.id,c)}</button>{s.message&&<small title={s.message}>{s.message}</small>}<button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}</div>;})}
+        {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} triggerHost={indicatorHost} />}
         {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
