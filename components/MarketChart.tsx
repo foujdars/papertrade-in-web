@@ -12,7 +12,7 @@ import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordi
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
 import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
 import { STUDIES, studyDefaults, studyTitle } from "@/lib/indicator-catalog";
-import { useIndicatorSettings } from "@/lib/indicator-settings";
+import { useIndicatorSettings, restoreHiddenStudies } from "@/lib/indicator-settings";
 import { IndicatorSettings } from "./IndicatorSettings";
 import { useComparisonCandles } from "@/lib/indicator-comparison-feed";
 
@@ -506,13 +506,10 @@ export function MarketChart({
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
   const [editingStudy, setEditingStudy] = useState<string | null>(null);
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
-  const lastStudyTap = useRef<{id:string;time:number;x:number;y:number}|null>(null);
+  const lastStudyTap = useRef<{time:number;x:number;y:number}|null>(null);
   const activateStudyRef = useRef((id:string,x:number,y:number) => {});
   activateStudyRef.current = (id,x,y) => {
-    const previous=lastStudyTap.current,now=performance.now();
-    if(previous?.id===id&&now-previous.time<400&&Math.hypot(x-previous.x,y-previous.y)<24){
-      lastStudyTap.current=null;setSelectedStudy(null);setEditingStudy(id);
-    }else{lastStudyTap.current={id,time:now,x,y};setSelectedStudy(id);}
+    setSelectedStudy(id);
   };
   useTransientBack(selectedStudy !== null, () => {setSelectedStudy(null);lastStudyTap.current=null;});
   useEffect(() => {setSelectedStudy(null);lastStudyTap.current=null;}, [instrument.instrumentKey,timeframe,candlesOnly]);
@@ -1592,10 +1589,19 @@ export function MarketChart({
         const tap = tapGestureRef.current;
         tapGestureRef.current = null;
         if (event.type === "pointerup" && tap?.pointerId === event.pointerId && !tap.moved && !editRef.current && !draftRef.current) {
-          const study=!replayRef.current.selecting&&!riskDragRef.current&&!normalizeTool(activeToolRef.current)
-            ? studyRenderer.current?.hitTest(event.clientX,event.clientY,event.pointerType==='touch'?12:8) : null;
-          if(study)activateStudyRef.current(study,event.clientX,event.clientY);
-          else {setSelectedStudy(null);lastStudyTap.current=null;onChartTapRef.current?.();}
+          const inPlot=chart.panes().some(p=>{const r=p.getHTMLElement()?.getBoundingClientRect();return r&&event.clientX>=r.left&&event.clientX<=r.left+chart.timeScale().width()&&event.clientY>=r.top&&event.clientY<r.bottom;});
+          if(inPlot&&!replayRef.current.selecting&&!riskDragRef.current&&!normalizeTool(activeToolRef.current)){
+            const previous=lastStudyTap.current,now=performance.now();
+            const doubleTap=previous&&now-previous.time<400&&Math.hypot(event.clientX-previous.x,event.clientY-previous.y)<24;
+            if(doubleTap){
+              lastStudyTap.current=null;setSelectedStudy(null);restoreHiddenStudies(indicatorsRef.current);
+            }else{
+              lastStudyTap.current={time:now,x:event.clientX,y:event.clientY};
+              const study=studyRenderer.current?.hitTest(event.clientX,event.clientY,event.pointerType==='touch'?12:8);
+              if(study)activateStudyRef.current(study,event.clientX,event.clientY);
+              else {setSelectedStudy(null);onChartTapRef.current?.();}
+            }
+          }else lastStudyTap.current=null;
         }
         if (editRef.current) {
           editRef.current.drawing.setState("selected");
@@ -2011,13 +2017,13 @@ export function MarketChart({
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && indicators[s.id]);
   const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
-    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for actions; double-tap for settings"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}<b>{latest?.value?.toFixed(2) ?? "—"}</b></button>; })}
+    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}<b>{latest?.value?.toFixed(2) ?? "—"}</b></button>; })}
   </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
-        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for actions; double-tap for settings">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
+        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
           <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
           <button aria-label="Indicator settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={15}/></button>
