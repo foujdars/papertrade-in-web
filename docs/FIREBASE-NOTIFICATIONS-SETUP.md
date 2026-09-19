@@ -68,7 +68,7 @@ Routine IPO digests are capped at two a day. When both were sent, optional perso
 
 The 9:05, 1:30 and 5:15 slots each accept scheduler runs for ten minutes, with stable per-slot IDs. Delivery is not an exact-time guarantee: network loss, Doze, permission denial, browser restrictions and Android force-stop can delay or prevent it. Android normally needs to be opened once after installation and notification permission granted.
 
-Background browser notifications cover IPOs, opted-in summaries and separately configured technical alerts (below). This does **not** implement an always-on server trade execution engine; closed-browser trade-price monitoring remains unsupported. Android price monitoring uses the existing foreground service and requires its ongoing notification.
+Background notifications cover IPOs, opted-in summaries and separately configured server alerts. Server price-level monitoring and a consenting Android delivery test are now implemented; activation is still gated on a healthy scheduler. See [Android activation](closed-app-android-activation.md). This does **not** implement an always-on trade execution engine. The existing Android foreground service remains separate protection for targets/stops.
 
 ## Closed-app technical alerts
 

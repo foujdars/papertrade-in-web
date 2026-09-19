@@ -6,6 +6,10 @@ import { advanceTechnical, evaluateTechnical, technicalCheckDue, technicalDescri
 import { notificationPreferences, quietTime, type PushNotice } from "@/lib/notification-policy";
 import { GET as getCandles } from "@/app/api/upstox/candles/route";
 import { GET as getSession } from "@/app/api/market/session/route";
+import { GET as getQuotes } from "@/app/api/upstox/quotes/route";
+import { evaluatePriceQuote } from "@/lib/technical-alerts";
+import { dispatchPushTests } from "@/lib/push-delivery-test";
+import type { NormalizedQuote } from "@/lib/upstox";
 import type { Candle } from "@/lib/market";
 import type { NseSession } from "@/lib/market-hours";
 export const runtime = "nodejs";
@@ -13,14 +17,16 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 export async function GET(request: Request) {
-  const secret = process.env.NOTIFICATION_CRON_SECRET ?? "", given = request.headers.get("authorization") ?? "", expected = `Bearer ${secret}`;
+  const secret = process.env.TECHNICAL_CRON_SECRET ?? process.env.NOTIFICATION_CRON_SECRET ?? "", given = request.headers.get("authorization") ?? "", expected = `Bearer ${secret}`;
   if (!technicalServerConfigured()) return Response.json({ error: "Technical monitoring setup required." }, { status: 503 });
-  if (Buffer.byteLength(given) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(given), Buffer.from(expected))) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (secret.length < 32 || Buffer.byteLength(given) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(given), Buffer.from(expected))) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const { db } = await pushServices(), lease = db.doc("technicalSystem/lease"), health = db.doc("technicalSystem/health"), owner = randomUUID(), started = Date.now();
   const acquired = await db.runTransaction(async tx => { const saved = await tx.get(lease); if ((saved.data()?.until ?? 0) > started) return false; tx.set(lease, { owner, until: started + 90000 }); return true; });
   if (!acquired) return Response.json({ ok: true, busy: true });
   let checked = 0, sent = 0, failed = 0;
   try {
+    // Delivery tests run outside market hours and do not create market signals.
+    await dispatchPushTests();
     const accounts = await db.collection("technicalAccounts").where("active", "==", true).limit(11).get();
     if (accounts.size > 10) throw new Error("Capacity requires a sharded scheduler");
     const sessionPayload = await (await getSession(new Request("https://www.papertrade.site/api/market/session"))).json();
@@ -44,14 +50,23 @@ export async function GET(request: Request) {
     };
     const entries = accounts.docs.flatMap(account => readServerTechnicalStore(account.data().store).rules.filter(r => r.status === "active").map(rule => ({ ref: account.ref, userId: account.id, rule })));
     if (new Set(entries.map(e => technicalGroup(e.rule))).size > 24) throw new Error("Monitoring group capacity exceeded");
+    const priceKeys = [...new Set(entries.filter(e => e.rule.family === "price" && e.rule.expiresAt > started).map(e => e.rule.instrument.instrumentKey))];
+    let quotes: Record<string, NormalizedQuote> = {};
+    const priceSession = regular && session.sessions.some(s => started >= s.start && started < s.end);
+    if (priceSession && priceKeys.length) {
+      const response = await getQuotes(new Request(`https://www.papertrade.site/api/upstox/quotes?keys=${encodeURIComponent(priceKeys.join(","))}`));
+      const payload = await response.json();
+      if (!response.ok || !payload.ok || !payload.quotes) failed++;
+      else quotes = payload.quotes;
+    }
     let cursor = 0;
     await Promise.all(Array.from({ length: 3 }, async () => {
       while (cursor < entries.length && Date.now() - started < 38000) {
         const entry = entries[cursor++], rule = entry.rule;
         try {
           const now = Date.now(), expired = rule.expiresAt <= now;
-          if (!expired && (!canEvaluate || !technicalCheckDue(rule.timeframe, now))) continue;
-          const evaluation = expired ? null : evaluateTechnical(rule, await load(rule), rule.family === "previousDay" ? await load(rule, "1D") : [], Date.now());
+          if (!expired && (rule.family === "price" ? !priceSession : !canEvaluate || !technicalCheckDue(rule.timeframe, now))) continue;
+          const evaluation = expired ? null : rule.family === "price" ? evaluatePriceQuote(rule, quotes[rule.instrument.instrumentKey], Date.now()) : evaluateTechnical(rule, await load(rule), rule.family === "previousDay" ? await load(rule, "1D") : [], Date.now());
           await db.runTransaction(async tx => {
             const saved = await tx.get(entry.ref), store = readServerTechnicalStore(saved.data()?.store), live = store.rules.find(r => r.id === rule.id && r.revision === rule.revision && r.status === "active");
             if (!live) return;
@@ -82,7 +97,8 @@ export async function GET(request: Request) {
           const target = device.data(), prefs = notificationPreferences(target.preferences);
           if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
-          const notice: PushNotice = { id: event.id, kind: "trade", title: `${event.instrument.symbol} · technical alert`, body: prefs.hideAmounts ? "A technical condition was confirmed at candle close. Open your alert log to review." : `${event.timeframe} · ${event.description} · close ₹${event.price.toFixed(2)}`, url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+          const isPrice = rule.family === "price";
+          const notice: PushNotice = { id: event.id, kind: "trade", title: `${event.instrument.symbol} · ${isPrice ? "price" : "technical"} alert`, body: prefs.hideAmounts ? (isPrice ? "Your price condition was observed. Open your alert log to review." : "A technical condition was confirmed at candle close. Open your alert log to review.") : `${isPrice ? "Price check" : event.timeframe} · ${event.description} · ${isPrice ? "quote" : "close"} ₹${event.price.toFixed(2)}`, url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
           await sendPush(notice, { token: target.token }); delivered++;
         }
         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

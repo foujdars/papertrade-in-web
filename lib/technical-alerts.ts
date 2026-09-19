@@ -2,7 +2,7 @@ import { bollingerBands, ema, macd, rsi, sma, supertrend, vwap, type Candle, typ
 
 export const TECHNICAL_FRAMES = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1H": 3600, "1D": 86400 } as const;
 export type TechnicalFrame = keyof typeof TECHNICAL_FRAMES;
-export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume" } as const;
+export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume", price: "Price level" } as const;
 export type TechnicalFamily = keyof typeof TECHNICAL_FAMILIES;
 export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number; delivery?: "device" | "server" };
 export type TechnicalRule = TechnicalConfig & { id: string; revision: string; instrument: Instrument; createdAt: number; armedAt: number; expiresAt: number; status: "active" | "paused" | "completed" | "expired"; lastBar?: number; lastTriggeredAt?: number };
@@ -10,6 +10,7 @@ export type TechnicalEvent = { id: string; ruleId: string; instrument: Instrumen
 export type TechnicalStore = { version: 1; rules: TechnicalRule[]; events: TechnicalEvent[] };
 export const emptyTechnicalStore = (): TechnicalStore => ({ version: 1, rules: [], events: [] });
 export function technicalChoices(family: TechnicalFamily) {
+  if (family === "price") return [{ value: "above", label: "Price at or above" }, { value: "below", label: "Price at or below" }];
   if (family === "volume") return [{ value: "spike", label: "Volume spike above average" }, { value: "dry", label: "Volume falls below average" }, { value: "bullish", label: "High-volume bullish close" }, { value: "bearish", label: "High-volume bearish close" }];
   if (family === "ema" || family === "sma") return [{ value: "priceUp", label: "Price crosses above" }, { value: "priceDown", label: "Price crosses below" }, { value: "averageUp", label: "Fast average crosses above slow" }, { value: "averageDown", label: "Fast average crosses below slow" }];
   if (family === "bollinger") return [{ value: "upperOut", label: "Close breaks above upper band" }, { value: "lowerOut", label: "Close breaks below lower band" }, { value: "upperIn", label: "Returns inside from above" }, { value: "lowerIn", label: "Returns inside from below" }];
@@ -19,6 +20,7 @@ export function technicalChoices(family: TechnicalFamily) {
   return [{ value: "up", label: family === "rsi" ? "Crosses above threshold" : "Price crosses above VWAP" }, { value: "down", label: family === "rsi" ? "Crosses below threshold" : "Price crosses below VWAP" }];
 }
 export function defaultTechnicalConfig(family: TechnicalFamily = "ema", timeframe: TechnicalFrame = "5m"): TechnicalConfig {
+  if (family === "price") return { ...defaultTechnicalConfig("ema", "1m"), family, condition: "above", threshold: 100, delivery: "server" };
   return { family, timeframe, condition: technicalChoices(family)[0].value, period: family === "rsi" ? 14 : family === "supertrend" ? 10 : family === "macd" ? 12 : 20, slow: family === "macd" ? 26 : 50, signal: 9, threshold: 70, multiplier: family === "supertrend" ? 3 : 2, repeat: "once", cooldown: 0, days: 7 };
 }
 export function technicalConfigError(c: TechnicalConfig): string | null {
@@ -27,7 +29,10 @@ export function technicalConfigError(c: TechnicalConfig): string | null {
   if (!technicalChoices(c.family).some(o => o.value === c.condition)) return "Choose a valid condition.";
   if (![c.period, c.slow, c.signal].every(n => Number.isInteger(n) && n >= 2 && n <= 200)) return "Periods must be whole numbers from 2 to 200.";
   if ((c.family === "macd" || c.condition.startsWith("average")) && c.slow <= c.period) return "The slow period must be greater than the fast period.";
-  if (!Number.isFinite(c.threshold) || c.threshold <= 0 || c.threshold >= 100) return "RSI threshold must be between 0 and 100.";
+  if (c.family === "price") {
+    if (c.delivery !== "server" || c.repeat !== "once" || c.timeframe !== "1m") return "Price monitoring uses the server, once only, with minute-level checks.";
+    if (!Number.isFinite(c.threshold) || c.threshold < .01 || c.threshold > 1e9 || Math.abs(c.threshold * 100 - Math.round(c.threshold * 100)) > .00001) return "Enter a positive alert price with at most two decimal places.";
+  } else if (!Number.isFinite(c.threshold) || c.threshold <= 0 || c.threshold >= 100) return "RSI threshold must be between 0 and 100.";
   if (!Number.isFinite(c.multiplier) || c.multiplier < 0.1 || c.multiplier > 10) return "Multiplier must be between 0.1 and 10.";
   if (c.family === "volume" && (c.condition === "dry" ? c.multiplier >= 1 : c.multiplier <= 1)) return c.condition === "dry" ? "Low-volume multiplier must be below 1×." : "High-volume multiplier must be above 1×.";
   if (!["once", "repeat"].includes(c.repeat) || !Number.isInteger(c.cooldown) || c.cooldown < 0 || c.cooldown > 1440 || ![1, 7, 30].includes(c.days)) return "Choose a valid repeat, cooldown and expiry.";
@@ -35,6 +40,7 @@ export function technicalConfigError(c: TechnicalConfig): string | null {
   return null;
 }
 export function technicalDescription(c: TechnicalConfig) {
+  if (c.family === "price") return `Price ${c.condition === "above" ? "at or above" : "at or below"} ₹${c.threshold.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (c.family === "volume") return `Volume (${c.period} prior bars · ${c.multiplier}×) · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
   const name = TECHNICAL_FAMILIES[c.family];
   const parameters = ["ema", "sma"].includes(c.family) ? `${c.period}${c.condition.startsWith("average") ? ` / ${c.slow}` : ""}` : c.family === "rsi" ? `${c.period} · ${c.threshold}` : c.family === "macd" ? `${c.period}, ${c.slow}, ${c.signal}` : ["supertrend", "bollinger"].includes(c.family) ? `${c.period}, ${c.multiplier}` : "";
@@ -74,7 +80,16 @@ export function validTechnicalCandles(input: Candle[]) {
   return [...new Map(input.filter(c => c && [c.time, c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite) && c.time > 0 && c.low > 0 && c.volume >= 0 && c.high >= Math.max(c.open, c.close, c.low) && c.low <= Math.min(c.open, c.close)).map(c => [c.time, c])).values()].sort((a, b) => a.time - b.time);
 }
 export type TechnicalEvaluation = { state: string; barTime?: number; end?: number; price?: number; hit?: boolean; detail?: string };
+/** Observed quote only: never infer an intraminute touch from a session high/low. */
+export function evaluatePriceQuote(rule: TechnicalRule, quote: { lastPrice?: number; lastTradeAt?: string; updatedAt?: string } | undefined, now: number): TechnicalEvaluation {
+  const time = Date.parse(quote?.lastTradeAt ?? quote?.updatedAt ?? ""), price = quote?.lastPrice;
+  if (!Number.isFinite(time) || time > now || now - time >= 90000 || time <= rule.armedAt || !Number.isFinite(price) || price! <= 0) return { state: "Waiting for a fresh quote after this alert was armed" };
+  return { state: "Watching live quotes · minute-level checks", barTime: time / 1000, end: time / 1000, price,
+    hit: rule.condition === "above" ? price! >= rule.threshold : price! <= rule.threshold,
+    detail: "Fresh price observed by the server; not a candle-close condition" };
+}
 export function evaluateTechnical(rule: TechnicalConfig, raw: Candle[], daily: Candle[], nowMs: number): TechnicalEvaluation {
+  if (rule.family === "price") return { state: "Price alerts require the server quote monitor" };
   const now = nowMs / 1000;
   // Allow the data provider five seconds to finalise a candle; never evaluate the forming bar.
   const data = validTechnicalCandles(raw).filter(c => (rule.timeframe === "1D" || ((c.time + 19800) % 86400 >= 33300 && (c.time + 19800) % 86400 < 55800)) && technicalBarEnd(c.time, rule.timeframe) + 5 <= now);

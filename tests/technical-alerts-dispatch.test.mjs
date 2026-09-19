@@ -39,9 +39,10 @@ const stubs = {
   'push-admin': `export const pushConfigured = () => true; export const pushServices = async () => ({db: globalThis.__technicalTest.db}); export const sendPush = async (notice, target) => { const s = globalThis.__technicalTest; s.sent.push({notice, target}); if(s.failSend) throw new Error('transport outcome unknown'); };`,
   'candles-route': `export async function GET(request) { const s = globalThis.__technicalTest; s.feedCalls.push(request.url); return Response.json(s.failFeed ? {ok:false} : {ok:true, candles:s.candles}, {status:s.failFeed?503:200}); }`,
   'session-route': `export async function GET() { return Response.json({session: globalThis.__technicalTest.session}); }`,
+  'quotes-route': `export async function GET() { const s=globalThis.__technicalTest; return Response.json(s.failFeed?{ok:false}:{ok:true,quotes:s.quotes??{}},{status:s.failFeed?503:200}); }`,
 };
 const plugin = { name: 'isolated-services', setup(b) {
-  b.onResolve({ filter: /server-only|@supabase\/supabase-js|push-admin|api\/upstox\/candles\/route|api\/market\/session\/route/ }, args => ({ path: args.path.includes('push-admin') ? 'push-admin' : args.path.includes('/candles/') ? 'candles-route' : args.path.includes('/session/') ? 'session-route' : args.path, namespace: 'stub' }));
+  b.onResolve({ filter: /server-only|@supabase\/supabase-js|push-admin|api\/upstox\/(candles|quotes)\/route|api\/market\/session\/route/ }, args => ({ path: args.path.includes('push-admin') ? 'push-admin' : args.path.includes('/candles/') ? 'candles-route' : args.path.includes('/quotes/') ? 'quotes-route' : args.path.includes('/session/') ? 'session-route' : args.path, namespace: 'stub' }));
   b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: stubs[args.path], loader: 'js' }));
 } };
 async function bundle(entry) {
@@ -50,6 +51,7 @@ async function bundle(entry) {
 }
 const dispatcher = await bundle('app/api/technical-alerts/dispatch/route.ts');
 const manager = await bundle('app/api/technical-alerts/route.ts');
+const deliveryTest = await bundle('app/api/technical-alerts/test/route.ts');
 const now = Date.parse('2026-09-18T13:00:10+05:30'), start = Date.parse('2026-09-18T09:15:00+05:30');
 const instrument = { symbol: 'TEST', name: 'Test company', instrumentKey: 'NSE_EQ|INE002A01018', exchange: 'NSE', assetType: 'EQUITY', price: 0, change: 0, categories: [] };
 const config = { family: 'volume', timeframe: '5m', condition: 'spike', period: 20, slow: 50, signal: 9, threshold: 70, multiplier: 2, repeat: 'repeat', cooldown: 0, days: 7 };
@@ -58,6 +60,7 @@ function reset(t, overrides = {}) {
   process.env.TECHNICAL_ALERTS_ENABLED = 'true'; process.env.NOTIFICATION_CRON_SECRET = 'a'.repeat(32);
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.invalid'; process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test';
   state.sent = []; state.feedCalls = []; state.failFeed = false; state.failSend = false; state.validUser = 'alice';
+  state.quotes = { [instrument.instrumentKey]: { lastPrice: 110, lastTradeAt: new Date(now - 1000).toISOString() } };
   state.session = { status: 'OPEN', sessions: [{ start, end: Date.parse('2026-09-18T15:30:00+05:30') }] };
   state.candles = Array.from({ length: 45 }, (_, i) => ({ time: start / 1000 + 300 * i, open: 100, high: 111, low: 99, close: i === 44 ? 110 : 100, volume: i === 44 ? 3000 : 1000 }));
   const rule = { ...config, delivery: 'server', instrument, id: 'rule-1', revision: 'revision-1', status: 'active', createdAt: now - 600000, armedAt: now - 600000, expiresAt: now + 86400000, ...overrides };
@@ -132,4 +135,48 @@ test('management isolates accounts and enforces revisions, malformed requests an
   const unavailable = await manager.GET(new Request('https://test.invalid/api/technical-alerts'));
   assert.deepEqual(Object.keys(await unavailable.json()).sort(), ['message', 'ok', 'ready', 'store']);
   assert.equal((await manage({ action: 'delete', id: 'rule-1', revision: 'revision-1' })).status, 503);
+});
+
+test('price alerts use fresh observed quotes once only, without candles or automatic orders', async t => {
+  reset(t, { family:'price', threshold:105, condition:'above', timeframe:'1m', repeat:'once' });
+  assert.equal((await dispatch()).status,200); assert.equal(read().rules[0].status,'completed');
+  assert.equal(state.sent.length,1); assert.match(state.sent[0].notice.title,/price alert/); assert.match(state.sent[0].notice.body,/quote/); assert.equal(state.feedCalls.length,0);
+  await dispatch(); assert.equal(state.sent.length,1);
+});
+test('stale, future, pre-arm quotes and closed sessions never fire price alerts',async t=>{
+  for(const offset of [-90001,1000,-600001]){
+    reset(t,{family:'price',threshold:105,condition:'above',timeframe:'1m',repeat:'once'});
+    state.quotes[instrument.instrumentKey].lastTradeAt=new Date(now+offset).toISOString();
+    await dispatch();assert.equal(state.sent.length,0);
+  }
+  reset(t,{family:'price',threshold:115,condition:'below',timeframe:'1m',repeat:'once'});
+  state.session.sessions=[];await dispatch();assert.equal(state.sent.length,0);
+});
+test('delayed delivery test is private, outside-session, once-only and separately receipt-confirmed',async t=>{
+  reset(t,{status:'paused'});state.session.sessions=[];
+  const {createHash}=await import('node:crypto'),token='consenting-android-device-token',deviceId=createHash('sha256').update(token).digest('hex');
+  await state.db.doc('notificationDevices/'+deviceId).set({userId:'alice',token,platform:'android',lastActive:now,preferences:{trades:true}});
+  const call=body=>deliveryTest.POST(new Request('https://test.invalid/api/technical-alerts/test',{method:'POST',headers:{authorization:'Bearer valid'},body:JSON.stringify(body)}));
+  assert.equal((await call({action:'queue',token:'another-user-token-is-not-owned'})).status,403);
+  const queued=await call({action:'queue',token});assert.equal(queued.status,200);const {id}=await queued.json();
+  assert.equal((await call({action:'queue',token})).status,429);
+  await dispatch();assert.equal(state.sent.length,0);
+  state.db.records.get('technicalPushTests/alice').notBefore=now-1;
+  await dispatch();assert.equal(state.sent.length,1);assert.equal(state.sent[0].target.token,token);assert.match(state.sent[0].notice.title,/delivery test/);
+  assert.equal(state.db.records.get('technicalPushTests/alice').status,'accepted');
+  await dispatch();assert.equal(state.sent.length,1);
+  assert.equal((await call({action:'confirm',id})).status,200);
+  assert.equal(state.db.records.get('technicalPushTests/alice').status,'confirmed');
+  state.validUser='bob';assert.equal((await call({action:'confirm',id})).status,409);
+});
+test('delivery test honours expiry, opt-out and uncertain transport without blind retries',async t=>{
+  for(const scenario of ['expired','opt-out','failed']){
+    reset(t,{status:'paused'});state.session.sessions=[];
+    await state.db.doc('technicalPushTests/alice').set({id:'test',deviceId:'device-1',status:'pending',notBefore:now-1,expiresAt:scenario==='expired'?now-1:now+60000});
+    if(scenario==='opt-out')state.db.records.get('notificationDevices/device-1').preferences.trades=false;
+    if(scenario==='failed')state.failSend=true;
+    await dispatch();await dispatch();
+    assert.equal(state.db.records.get('technicalPushTests/alice').status,scenario==='expired'?'expired':scenario==='opt-out'?'cancelled':'needs-review');
+    assert.equal(state.sent.length,scenario==='failed'?1:0);
+  }
 });

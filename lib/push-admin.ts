@@ -32,6 +32,7 @@ export async function removeUserPushDevices(userId: string) {
   const outbox = await db.collection("technicalOutbox").where("userId", "==", userId).get();
   for (const item of outbox.docs) await item.ref.delete();
   await db.doc(`technicalAccounts/${userId}`).delete();
+  await db.doc(`technicalPushTests/${userId}`).delete();
   const registry = db.doc("technicalSystem/registry");
   await db.runTransaction(async tx => { const snapshot = await tx.get(registry); if (snapshot.exists) { const users = { ...snapshot.data()?.users }; delete users[userId]; tx.set(registry, { users }); } });
 }

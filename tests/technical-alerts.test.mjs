@@ -7,6 +7,12 @@ const { defaultTechnicalConfig: defaults, technicalConfigError, evaluateTechnica
 const start = Date.parse('2026-09-18T09:15:00+05:30') / 1000;
 const bars = values => values.map((close, i) => ({ time: start + i * 300, open: 100, high: Math.max(100, close) + 1, low: Math.min(100, close) - 1, close, volume: 1000 }));
 const flat = Array(45).fill(100);
+test('price configuration is server-only, once-only and validates rupee precision',()=>{
+  const config=defaults('price');assert.equal(technicalConfigError(config),null);
+  for(const threshold of [0,-1,NaN,Infinity,100.123])assert.ok(technicalConfigError({...config,threshold}));
+  for(const change of [{delivery:'device'},{repeat:'repeat'},{timeframe:'5m'}])assert.ok(technicalConfigError({...config,...change}));
+  assert.equal(technicalConfigError({...config,threshold:56358.7}),null);
+});
 const evaluate = (family, condition, values, settings = {}, daily = []) => {
   const data = bars(values), config = { ...defaults(family), condition, ...settings };
   return evaluateTechnical(config, data, daily, (data.at(-1).time + 310) * 1000);

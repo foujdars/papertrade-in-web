@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     if (body.remove) { await ref.delete(); return Response.json({ ok: true }); }
     const count = Math.min(10000, Math.max(0, Math.floor(Number(body.reviewCount) || 0)));
     // Store no holdings, PAN, P&L amount, names or credentials with push tokens.
-    await ref.set({ userId: data.user.id, token: body.token, preferences, lastActive: Date.now(), reviewDate: indiaClock(Date.now()).day, reviewCount: count, expiresAt: new Date(Date.now() + 90 * 86400000) }, { merge: true });
+    await ref.set({ userId: data.user.id, token: body.token, platform: body.platform === "android" ? "android" : "web", preferences, lastActive: Date.now(), reviewDate: indiaClock(Date.now()).day, reviewCount: count, expiresAt: new Date(Date.now() + 90 * 86400000) }, { merge: true });
     return Response.json({ ok: true });
   } catch { return Response.json({ error: "Could not register background delivery. Please retry." }, { status: 503 }); }
 }

@@ -51,6 +51,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByRole('button', { name: 'Open chart', exact: true }).click(); assert.equal(await page.locator('[data-opened]').textContent(), 'TEST 5m');
     await open(); await page.getByRole('tab', { name: /List/ }).click(); await page.getByLabel('Delete technical alert for TEST').click(); await page.getByText('No active alerts', { exact: true }).waitFor();
     await page.getByRole('tab', { name: /Log/ }).click(); assert.equal(await page.locator('.technical-event').count(), 1);
-    assert.deepEqual(errors, []); console.log('Cloud form/save, server-only monitoring, persistence, pause/resume, account isolation, fetched Log, chart navigation and deletion pass with mocked server/auth');
+    await page.getByLabel('Close price actions').click();
+    await page.getByRole('button', {name:'New alert',exact:true}).click();
+    await choose('Monitoring',/Even when app is closed/);
+    await page.getByLabel('Alert price (₹)').fill('125.50');
+    await page.getByRole('button',{name:'Create alert',exact:true}).click();
+    await page.waitForFunction(()=>!document.querySelector('.price-action-sheet'));
+    assert.equal(store.rules[0].family,'price');assert.equal(store.rules[0].threshold,125.5);assert.equal(store.rules[0].delivery,'server');
+    await open();await page.getByRole('tab',{name:/List/}).click();await page.getByRole('button',{name:'Price',exact:true}).click();await page.locator('.technical-rule').waitFor();
+    assert.match(await page.locator('.technical-rule').innerText(),/Price · server/);
+    await page.getByLabel('Edit technical alert for TEST').click();
+    await page.getByLabel('Alert price (₹)').fill('130');await page.getByRole('button',{name:'Save technical alert',exact:true}).click();
+    assert.equal(store.rules[0].threshold,130);assert.equal(candleCalls,0);
+    assert.deepEqual(errors, []); console.log('Cloud technical and price forms, server-only monitoring, persistence, edit/pause/resume, isolation, Log and navigation pass with mocked server/auth');
   } finally { await browser.close(); server.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

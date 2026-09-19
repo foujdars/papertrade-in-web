@@ -13,7 +13,7 @@ export async function syncPushDevice(remove = false) {
   if (!activeToken) return;
   const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
   if (!session) throw new Error("Sign in to enable background notifications.");
-  const response = await fetch("/api/notifications/device", { method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({token:activeToken,preferences:readNotificationPreferences(),reviewCount,remove}) });
+  const response = await fetch("/api/notifications/device", { method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({token:activeToken,platform:Capacitor.getPlatform(),preferences:readNotificationPreferences(),reviewCount,remove}) });
   if (!response.ok) throw new Error("Background delivery could not be saved. Please retry.");
   if(remove) activeToken="";
 }
@@ -21,6 +21,16 @@ export function connectPush(askPermission: boolean) {
   if (disconnecting) return Promise.resolve();
   if (!connecting) connecting = connect(askPermission).finally(() => { connecting = null; });
   return connecting;
+}
+export async function requestAndroidDeliveryTest(action: "queue" | "status" | "confirm", id?: string) {
+  if (Capacitor.getPlatform() !== "android") throw new Error("Run this delivery test in the Android app.");
+  if (action === "queue") await connectPush(true);
+  const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
+  if (!session) throw new Error("Sign in first.");
+  const response = await fetch("/api/technical-alerts/test", { method: action === "status" ? "GET" : "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, ...(action === "status" ? {} : { body: JSON.stringify({ action, id, ...(action === "queue" ? { token: activeToken } : {}) }) }), cache: "no-store", signal: AbortSignal.timeout(15000) });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Delivery test could not complete.");
+  return payload;
 }
 async function connect(askPermission: boolean) {
   const response = await fetch("/api/notifications/config");
