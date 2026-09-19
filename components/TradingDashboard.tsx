@@ -2697,6 +2697,9 @@ export function TradingDashboard() {
       }} />}
 
       {homeOpen && <HomeWorkspace
+        key={user?.id ?? 'guest'}
+        preferenceOwner={user?.id ?? 'guest'}
+        favouriteSymbols={[...new Set(customWatchlists.flatMap(list => list.symbols))]}
         firstName={typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined}
         indices={LIVE_INDEX_TICKERS.map((item) => {
           const quote = marketQuotes[item.instrumentKey];
@@ -2713,7 +2716,7 @@ export function TradingDashboard() {
         openChangeToday={homeOpenDayChange}
         sessionLabel={marketStatus.isOpen?'Market open':/holiday/i.test(marketStatus.message)?'Market holiday':/checking|unavailable/i.test(marketStatus.message)?'Session unconfirmed':'Market closed'}
         sessionMessage={marketStatus.message}
-        attention={[...positionAttention(openPositions,protections),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
+        attention={[...positionAttention(openPositions,protections,orders),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
         onAttention={(item:HomeAttention)=>{if(item.target.kind==='alerts'){setHomeAlertRequest({key:Date.now(),tab:item.target.tab,id:item.target.id});}else{setHomeOpen(false);setWorkspaceMode('trade');openPositionChart(item.target.symbol);setProduct(item.target.product);}}}
         resumeChart={chartPreferencesReady?{symbol:selected.symbol,timeframe}:undefined}
         onResumeChart={()=>openNavigationSection(workspaceMode==='fno'?'fno':'trade')}
