@@ -1,0 +1,63 @@
+.global-ticket { color: var(--ink); min-width: 0; font-size: 12px; }
+.order-ticket > .global-ticket { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.global-ticket .ticket-heading h2 { margin: 5px 0 0; font-size: 20px; letter-spacing: -.5px; }
+.global-ticket-tabs { display: flex; gap: 3px; padding: 4px; margin: 16px 0 12px; border-radius: 12px; background: var(--soft); overflow-x: auto; scrollbar-width: none; }
+.global-ticket-tabs button { flex: 1; white-space: nowrap; border: 0; border-radius: 9px; padding: 10px 7px; color: var(--muted); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.global-ticket-tabs button[aria-pressed="true"] { color: var(--purple); background: var(--surface, white); box-shadow: 0 2px 7px #2822430a; }
+.global-wallet-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; color: var(--muted); }
+.global-wallet-line b { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+.global-quote-strip { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; padding: 12px 0 6px; }
+.global-quote-strip span { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
+.global-quote-strip b { color: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.global-funding { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 10px; margin-bottom: 10px; }
+.global-ticket .side-switch { height: 45px; }
+.global-ticket .side-switch button { font-size: 13px; }
+.global-ticket-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; margin: 10px 0; align-items: end; }
+.global-ticket label:not(.global-check) { display: grid; gap: 6px; color: var(--muted); font-size: 11px; min-width: 0; margin: 8px 0; }
+.global-ticket input:not([type="checkbox"]) { width: 100%; min-width: 0; height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface,white); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; outline: none; }
+.global-ticket input:focus-visible { border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb,var(--purple) 14%,transparent); }
+.global-ticket .modern-select { min-width: 0; margin-bottom: 8px; }
+.global-ticket .modern-select-trigger { min-height: 44px; padding: 0 11px; font-size: 12px; }
+.global-ticket .modern-select-label { font-size: 11px; }
+.global-number-suffix { position: relative; }
+.global-number-suffix input { padding-right: 30px !important; }
+.global-number-suffix > span { position: absolute; right: 12px; top: 12px; }
+.global-percent-row { display: flex; gap: 5px; margin: 8px 0; }
+.global-percent-row button { flex: 1; min-width: 0; min-height: 33px; border: 0; border-radius: 8px; background: var(--soft); color: var(--muted); cursor: pointer; font-size: 11px; }
+.global-percent-row button[aria-pressed="true"] { background: color-mix(in srgb,var(--purple) 14%,var(--surface,white)); color: var(--purple); }
+.global-size-card { padding: 5px 12px 10px; margin-top: 12px; background: color-mix(in srgb,var(--soft) 70%,var(--surface,white)); border: 1px solid var(--line); border-radius: 14px; }
+.global-size-card .global-ticket-grid { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); margin: 0; }
+.global-size-caption { display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: space-between; color: var(--muted); font-size: 10px; }
+.global-check { display: flex; gap: 9px; align-items: center; margin: 16px 0; cursor: pointer; }
+.global-check input { width: 18px; height: 18px; accent-color: var(--purple); }
+.global-check span { display: grid; gap: 3px; }
+.global-ticket small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.global-protection { border: 1px solid var(--line); border-radius: 13px; padding: 12px; margin: 12px 0; }
+.global-protection summary { display: flex; gap: 8px; align-items: center; cursor: pointer; font-weight: 600; list-style: none; }
+.global-protection summary::-webkit-details-marker { display: none; }
+.global-protection summary span { margin-left: auto; color: var(--purple); }
+.global-protection > .modern-select { margin-top: 14px; }
+.global-exit-editor { border: 0; border-top: 1px solid var(--line); padding: 12px 0 0; margin: 16px 0; min-width: 0; }
+.global-exit-editor legend { padding-right: 8px; font-weight: 650; }
+.global-exit-editor .global-ticket-grid { margin: 0; }
+.global-exit-preview { display: grid; gap: 7px; padding: 10px 0; }
+.global-exit-preview > span { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+.global-exit-preview b { color: var(--ink); text-align: right; }
+.global-text-button { border: 0; color: var(--purple); background: transparent; padding: 10px 0; cursor: pointer; font: inherit; font-size: 11px; }
+.global-secondary { align-self: center; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; color: var(--purple); background: var(--soft); cursor: pointer; }
+.global-ticket button:disabled { opacity: .5; cursor: not-allowed; }
+.global-ticket .margin-card { background: var(--soft); }
+.global-ticket .margin-card div { color: var(--muted); font-size: 11px; }
+.global-ticket .margin-card b { color: var(--ink); }
+.global-ticket .place-order { min-height: 46px; font-size: 13px; }
+.global-account-list article { padding: 15px 0; border-bottom: 1px solid var(--line); }
+.global-account-list article header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.global-account-list article header > span { font-size: 11px; color: var(--muted); }
+.global-account-list article > strong { font-size: 20px; }
+.global-account-list time { display: block; margin-top: 8px; color: var(--muted); font-size: 10px; }
+.global-empty { padding: 35px 15px; text-align: center; color: var(--muted); line-height: 1.6; }
+.global-ticket-notice { display: flex; gap: 8px; align-items: flex-start; padding: 12px; background: color-mix(in srgb,var(--green) 9%,transparent); color: var(--green); border-radius: 10px; line-height: 1.5; }
+.global-ticket-notice svg { flex-shrink: 0; margin-top: 2px; }
+.global-ticket-error { padding: 10px 0; color: var(--red); line-height: 1.5; }
+.global-ticket-footnote { margin: 15px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+@media (max-width: 380px) { .global-ticket-tabs button { font-size: 10px; padding-inline: 5px; } .global-ticket-grid { gap: 7px; } }

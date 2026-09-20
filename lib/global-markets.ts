@@ -1,5 +1,6 @@
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
+import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine";
 
 export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
@@ -99,6 +100,7 @@ export type PerpQuote = {
   symbol: PerpSymbol;
   last: number;
   mark: number;
+  index?: number;
   bid: number;
   ask: number;
   bidSize: number;
@@ -174,6 +176,7 @@ export function normalizePerpQuote(
     symbol,
     last: Number(raw.close),
     mark: Number(raw.mark_price),
+    index: positive(raw.spot_price) ? Number(raw.spot_price) : undefined,
     bid: Number(raw.quotes?.best_bid),
     ask: Number(raw.quotes?.best_ask),
     bidSize: Number(raw.quotes?.bid_size),
@@ -240,10 +243,12 @@ export function marginRate(
       (maintenance ? spec.maintenanceScale : spec.initialScale)
   );
 }
-export const tradingFee = (spec: PerpSpec, notional: number, maker = false) =>
-  notional * (maker ? spec.maker : spec.taker) * 1.18 * USD_INR;
+export const tradingFee = (spec: PerpSpec, notional: number, maker = false, currency: "INR" | "USD" = "INR") =>
+  notional * (maker ? spec.maker : spec.taker) * 1.18 * (currency === "USD" ? 1 : USD_INR);
 
 export type PerpPosition = {
+  currency?: "USD";
+  protection?: GlobalProtection;
   symbol: PerpSymbol;
   side: "BUY" | "SELL";
   contracts: number;
@@ -256,7 +261,7 @@ export type PerpPosition = {
   nextFunding: number;
   spec: PerpSpec;
 };
-export type PerpOrder = {
+export type PerpOrder = GlobalOrderFields & {
   id: string;
   symbol: PerpSymbol;
   side: "BUY" | "SELL";
@@ -280,6 +285,7 @@ export type PerpEvent = {
   detail: string;
 };
 export type PerpAccount = {
+  currency?: "USD";
   version: 1;
   wallet: number;
   positions: PerpPosition[];
@@ -350,11 +356,11 @@ export function readPerpAccount(text: string | null): PerpAccount {
       throw new Error("Practice position data is invalid.");
   for (const o of a.orders)
     if (
-      !["BTCUSD", "XAUTUSD"].includes(o.symbol) ||
+    !["BTCUSD", "XAUTUSD"].includes(o.symbol) ||
       !["BUY", "SELL"].includes(o.side) ||
       !Number.isSafeInteger(o.contracts) ||
       o.contracts <= 0 ||
-      ![o.limit, o.leverage, o.reserve].every(positive)
+      ![o.limit, o.leverage].every(positive) || !Number.isFinite(o.reserve) || o.reserve < 0 || (!o.reduceOnly && o.reserve === 0)
     )
       throw new Error("Practice order data is invalid.");
   if (
@@ -396,7 +402,7 @@ export const positionPnl = (p: PerpPosition, price: number) =>
   p.contracts *
   p.spec.lot *
   (p.side === "BUY" ? 1 : -1) *
-  USD_INR;
+  (p.currency === "USD" ? 1 : USD_INR);
 export function liquidationPrice(p: PerpPosition): number {
   const equity = (price: number) =>
     p.margin +
@@ -405,7 +411,7 @@ export function liquidationPrice(p: PerpPosition): number {
       p.contracts *
       p.spec.lot *
       marginRate(p.spec, price * p.contracts * p.spec.lot, true) *
-      USD_INR;
+      (p.currency === "USD" ? 1 : USD_INR);
   let lo = 0,
     hi = p.entry * 2;
   if (p.side === "SELL") for (let i = 0; i < 20 && equity(hi) > 0; i++) hi *= 2;
@@ -496,6 +502,7 @@ export function openPerp(
   stop?: number,
   target?: number,
   limit?: number,
+  maker = false,
 ): PerpAccount {
   const price = limit ?? (side === "BUY" ? q.ask : q.bid);
   validateTrade(a, s, q, side, contracts, leverage, price, now, stop, target);
@@ -506,13 +513,14 @@ export function openPerp(
     throw new Error(`Limit price must use a ${s.tick} USD increment.`);
   const prior = a.positions.find((p) => p.symbol === s.symbol),
     newNotional = contracts * s.lot * price;
+  const fx = a.currency === "USD" ? 1 : USD_INR;
   const required = Math.max(
-    (newNotional / leverage) * USD_INR,
+    (newNotional / leverage) * fx,
     ((newNotional + (prior?.contracts ?? 0) * s.lot * price) / leverage) *
-      USD_INR -
+      fx -
       (prior?.margin ?? 0),
   );
-  const fee = tradingFee(s, newNotional);
+  const fee = tradingFee(s, newNotional, maker, a.currency);
   if (required + fee > availablePerpCash(a) + 1e-8)
     throw new Error("Insufficient available practice funds.");
   const n = copy(a);
@@ -549,6 +557,7 @@ export function openPerp(
     if (target !== undefined) p.target = target;
   } else
     n.positions.push({
+      currency: a.currency,
       symbol: s.symbol,
       side,
       contracts,
@@ -572,7 +581,7 @@ export function openPerp(
     price,
     pnl: 0,
     fee,
-    detail: `${side === "BUY" ? "Long" : "Short"} · taker · isolated`,
+    detail: `${side === "BUY" ? "Long" : "Short"} · ${maker ? "maker" : "taker"} · isolated`,
   });
   return n;
 }
@@ -584,6 +593,7 @@ export function closePerp(
   now: number,
   kind: "CLOSE" | "LIQUIDATION" = "CLOSE",
   detail = "Manual reduce-only close",
+  maker = false,
 ): PerpAccount {
   const p = a.positions.find((p) => p.symbol === symbol);
   if (!p) throw new Error("No position to close.");
@@ -606,9 +616,9 @@ export function closePerp(
     price = p.side === "BUY" ? q.bid : q.ask,
     share = contracts / p.contracts;
   const fee =
-    tradingFee(p.spec, price * contracts * p.spec.lot) +
+    tradingFee(p.spec, price * contracts * p.spec.lot, maker, a.currency) +
     (kind === "LIQUIDATION"
-      ? price * contracts * p.spec.lot * p.spec.liquidation * 1.18 * USD_INR
+      ? price * contracts * p.spec.lot * p.spec.liquidation * 1.18 * (a.currency === "USD" ? 1 : USD_INR)
       : 0);
   const raw = positionPnl(p, price) * share,
     net = Math.max(-p.margin * share, raw - fee);
@@ -662,6 +672,7 @@ export function advancePerps(
   quotes: Partial<Record<PerpSymbol, PerpQuote>>,
   specs: Partial<Record<PerpSymbol, PerpSpec>>,
   now: number,
+  manageOrders = true,
 ): PerpAccount {
   let n = a;
   for (const p of [...n.positions]) {
@@ -681,7 +692,7 @@ export function advancePerps(
           p.contracts *
           p.spec.lot *
           (p.side === "BUY" ? 1 : -1) *
-          USD_INR;
+          (a.currency === "USD" ? 1 : USD_INR);
         const applied = Math.max(-current.margin, amount);
         n.wallet += applied;
         current.margin += applied;
@@ -704,7 +715,7 @@ export function advancePerps(
       p.contracts *
       p.spec.lot *
       marginRate(p.spec, q.mark * p.contracts * p.spec.lot, true) *
-      USD_INR;
+      (a.currency === "USD" ? 1 : USD_INR);
     if (current.margin + positionPnl(current, q.mark) <= mm)
       n = closePerp(
         n,
@@ -715,12 +726,12 @@ export function advancePerps(
         "LIQUIDATION",
         "Mark-price liquidation · observed quote",
       );
-    else if (
+    else if (!p.protection && (
       (p.stop !== undefined &&
         (p.side === "BUY" ? q.mark <= p.stop : q.mark >= p.stop)) ||
       (p.target !== undefined &&
         (p.side === "BUY" ? q.mark >= p.target : q.mark <= p.target))
-    ) {
+    )) {
       if (p.contracts <= (p.side === "BUY" ? q.bidSize : q.askSize))
         n = closePerp(
           n,
@@ -733,7 +744,7 @@ export function advancePerps(
         );
     }
   }
-  if (!n.fundingGap)
+  if (manageOrders && !n.fundingGap)
     for (const o of [...n.orders]) {
       const q = quotes[o.symbol],
         s = specs[o.symbol];

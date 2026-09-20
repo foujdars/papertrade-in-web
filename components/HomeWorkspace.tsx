@@ -153,7 +153,10 @@ export function HomeWorkspace({
   const matches = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return [];
-    return stockOptions.filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query)).slice(0, 6);
+    return stockOptions
+      .filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
+      .sort((a, b) => Number(isGlobalSymbol(b.symbol)) - Number(isGlobalSymbol(a.symbol)))
+      .slice(0, 6);
   }, [search, stockOptions]);
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {

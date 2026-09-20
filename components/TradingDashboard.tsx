@@ -37,6 +37,10 @@ import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAle
 import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { GLOBAL_CHART_INSTRUMENTS, deltaSymbolFromInstrumentKey, isGlobalInstrumentKey, type PerpQuote, type PerpSymbol } from '@/lib/global-markets';
+import { positionPnl, freshPerpQuote } from '@/lib/global-markets';
+import { formatUsd } from '@/lib/global-order-engine';
+import { useGlobalTrading } from './useGlobalTrading';
+import { GlobalOrderTicket, type GlobalTicketTab } from './GlobalOrderTicket';
 import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
 import { PNL_SCOPE_KEY, readPnlScope, writePreference } from "@/lib/interface-preferences";
@@ -374,6 +378,8 @@ export function TradingDashboard() {
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
+  const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey));
+  const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
@@ -751,7 +757,7 @@ export function TradingDashboard() {
       }
       const savedInstrumentSymbol = typeof savedChart.instrument?.symbol === "string" ? savedChart.instrument.symbol.toUpperCase() : "";
       if (requestedSymbol && savedInstrumentSymbol !== requestedSymbol) {
-        const fallbackInstrument = instruments.find((item) => item.symbol === requestedSymbol);
+        const fallbackInstrument = [...instruments, ...GLOBAL_CHART_INSTRUMENTS].find((item) => item.symbol === requestedSymbol);
         if (fallbackInstrument) {
           setSelected(fallbackInstrument);
         }
@@ -902,7 +908,7 @@ export function TradingDashboard() {
       instrumentUniverseLoadRef.current.loaded = true;
       instrumentUniverseLoadRef.current.lastRefreshAt = Date.now();
       setStockUniverse(merged);
-      setSelected((current) => merged.find((item) => item.symbol === (requestedSymbol || current.symbol)) ?? current);
+      setSelected((current) => [...merged, ...GLOBAL_CHART_INSTRUMENTS].find((item) => item.symbol === (requestedSymbol || current.symbol)) ?? current);
     } catch {
       // Keep the built-in liquid-stock list available while the current master is unavailable.
     }
@@ -973,6 +979,7 @@ export function TradingDashboard() {
     const term = tradeSymbolSearch.trim().toLowerCase();
     return [...stockUniverse, ...GLOBAL_CHART_INSTRUMENTS]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
+      .sort((a, b) => term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0)
       .slice(0, 120);
   }, [stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
@@ -1647,6 +1654,16 @@ export function TradingDashboard() {
   );
   const marketOrdersAllowed = Boolean(clock && marketStatus.isOpen);
   const selectedMarketOrdersAllowed = selectedIsWatchOnly ? false : selectedDeltaSymbol ? selectedQuoteIsFresh : marketOrdersAllowed;
+  const selectedGlobalPosition = globalTrading.account?.positions.find(p => p.symbol === selectedDeltaSymbol);
+  const selectedGlobalQuote = selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.quote : undefined;
+  const globalOpenPnl = globalTrading.account?.positions.reduce((sum, p) => sum + (globalTrading.snapshots[p.symbol]?.quote ? positionPnl(p, globalTrading.snapshots[p.symbol]!.quote.mark) : 0), 0) ?? 0;
+  const chartPnl = selectedDeltaSymbol ? selectedGlobalPosition && selectedGlobalQuote ? positionPnl(selectedGlobalPosition, selectedGlobalQuote.mark) : 0 : selectedPosition.unrealizedPnl;
+  const chartPnlVisible = selectedDeltaSymbol ? !!selectedGlobalPosition && freshPerpQuote(selectedGlobalQuote, globalTrading.clock) : selectedPosition.quantity > 0 && selectedQuoteIsFresh;
+  const chartPnlText = selectedDeltaSymbol ? formatUsd(chartPnl) : `${chartPnl >= 0 ? "+" : ""}${formatInr(chartPnl)}`;
+  function openChartPositions() {
+    if (selectedDeltaSymbol) { setGlobalTicketTab("Positions"); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true); }
+    else setPositionsOpen(true);
+  }
   const intradayStatusMessage = marketStatus.isOpen && !intradayOrdersAllowed
     ? "Intraday entry is closed for this session’s auto square-off window"
     : marketStatus.message;
@@ -1898,6 +1915,7 @@ export function TradingDashboard() {
   }
 
   function placeOrder() {
+    if (isGlobalInstrumentKey(selected.instrumentKey)) { setOrderSheetOpen(true); setGlobalTicketTab("Order"); return; }
     if (orderType !== "Market") {
       setOrderSheetOpen(false);
       setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit" });
@@ -2208,7 +2226,8 @@ export function TradingDashboard() {
   function openOrderSheet(nextSide: "BUY" | "SELL") {
     if (selectedIsWatchOnly) { setToast("Brent is available as a watch-only global reference."); return; }
     if (!selectedDeltaSymbol && !getNseMarketStatus(new Date(), exchangeSession).isOpen) { setToast(marketStatus.message); return; }
-    activateRiskTool(nextSide);
+    if (selectedDeltaSymbol) { setSide(nextSide); setGlobalTicketTab("Order"); setDesktopOrderPanelOpen(true); }
+    else activateRiskTool(nextSide);
     setOrderSheetOpen(true);
   }
 
@@ -2401,6 +2420,7 @@ export function TradingDashboard() {
   }
 
   function fillPriceOrder(task: PriceTask, executionPrice: number): string | null {
+    if (isGlobalInstrumentKey(task.instrument.instrumentKey)) return "Use the Global USD order ticket for this instrument.";
     if (!paperDataReady) return "Paper account is not ready. Please queue the order again.";
     const invalid = priceTaskError(task);
     if (invalid) return invalid;
@@ -2432,6 +2452,7 @@ export function TradingDashboard() {
   }
 
   function validateQueuedPriceOrder(task: PriceTask): string | null {
+    if (isGlobalInstrumentKey(task.instrument.instrumentKey)) return "Use the Global USD order ticket for this instrument.";
     if (!paperDataReady) return "Please wait for your paper account to load.";
     const position = calculatePosition(orders, task.instrument.symbol, task.price, task.product);
     const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
@@ -2487,7 +2508,7 @@ export function TradingDashboard() {
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
-          <button className="funds-button" onClick={() => setFundsOpen(true)} title="Add virtual money"><WalletCards size={16} /> {formatInr(balance)}</button>
+          <button className="funds-button" onClick={() => selectedDeltaSymbol && activeNavigationSection === "trade" ? openChartPositions() : setFundsOpen(true)} title={selectedDeltaSymbol && activeNavigationSection === "trade" ? "Global USD wallet" : "Add virtual money"}><WalletCards size={16} /> {selectedDeltaSymbol && activeNavigationSection === "trade" ? formatUsd(globalTrading.account?.wallet ?? 0) : formatInr(balance)}</button>
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
@@ -2660,8 +2681,8 @@ export function TradingDashboard() {
             <button className="chart-tools-trigger" aria-label="Open drawing tools" title="Drawing tools" onClick={() => setShowDrawingLibrary(true)}><PencilRuler size={19} /></button>
             <CompactSelectorButton label="Functions" value={`${activeIndicatorCount} active`} className={`chart-functions-trigger ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} />
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
-            <button type="button" className={`desktop-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`} onClick={() => setPositionsOpen(true)}>
-              <span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.quantity > 0 && selectedQuoteIsFresh ? `${selectedPosition.unrealizedPnl >= 0 ? "+" : ""}${formatInr(selectedPosition.unrealizedPnl)}` : formatInr(0)}</b>
+            <button type="button" className={`desktop-live-pnl ${chartPnlVisible ? "visible" : ""}`} onClick={openChartPositions}>
+              <span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b>
             </button>
             <div className="chart-control-orders"><button disabled={!selectedMarketOrdersAllowed} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button disabled={!selectedMarketOrdersAllowed} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
           </div>
@@ -2711,12 +2732,12 @@ export function TradingDashboard() {
                 externalCandles={selectedDeltaSymbol ? globalCandles : undefined}
                 exchangeLabel={selectedVenueLabel}
                 tradeMarkers={selectedTradeMarkers}
-                orderTool={{ enabled: activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
+                orderTool={{ enabled: !selectedDeltaSymbol && activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
                 liveTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
-                onPriceAction={(price, mode) => setPriceRequest({ instrument: selected, price, mode })}
+                onPriceAction={(price, mode) => { if (selectedDeltaSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode }); }}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
@@ -2726,8 +2747,8 @@ export function TradingDashboard() {
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
-            <div className={`chart-status-live-pnl ${selectedPosition.quantity > 0 && selectedQuoteIsFresh ? "visible" : ""}`}>
-              {selectedPosition.quantity > 0 && selectedQuoteIsFresh ? <><Radio size={12} /><span>Live P&amp;L</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></> : null}
+            <div className={`chart-status-live-pnl ${chartPnlVisible ? "visible" : ""}`}>
+              {chartPnlVisible ? <><Radio size={12} /><span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b></> : null}
             </div>
             {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}
             <div className="chart-status-clock">{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
@@ -2738,9 +2759,9 @@ export function TradingDashboard() {
               <button disabled={!selectedMarketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
             </div>
             <div className="chart-trade-meta">
-            <button className={`chart-footer-pnl ${totalOpenPnl >= 0 ? "positive" : "negative"}`} aria-label="Open positions profit and loss" onClick={() => setPositionsOpen(true)}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</button>
-            <button className="chart-positions-trigger" onClick={() => setPositionsOpen(true)}>
-              <span>{selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
+            <button className={`chart-footer-pnl ${(selectedDeltaSymbol ? globalOpenPnl : totalOpenPnl) >= 0 ? "positive" : "negative"}`} aria-label="Open positions profit and loss" onClick={openChartPositions}>{selectedDeltaSymbol ? formatUsd(globalOpenPnl) : `${totalOpenPnl >= 0 ? "+" : ""}${formatInr(totalOpenPnl)}`}</button>
+            <button className="chart-positions-trigger" onClick={openChartPositions}>
+              <span>{selectedDeltaSymbol ? "Global · USD" : selected.assetType === "OPTION" ? "F&O" : "Stocks"} <ChevronDown size={14} /></span>
             </button>
             <div className="chart-price-actions-slot" ref={setPriceActionsHost} />
             </div>
@@ -2751,6 +2772,7 @@ export function TradingDashboard() {
         <button type="button" className="desktop-order-panel-toggle" onClick={() => setDesktopOrderPanelOpen((value) => !value)} aria-label={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"} title={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"}><ChevronRight size={16} /></button>
         <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
+          {selectedDeltaSymbol ? <GlobalOrderTicket key={`${user?.id ?? "guest"}:${selectedDeltaSymbol}`} owner={user?.id ?? "guest"} symbol={selectedDeltaSymbol} side={side} onSide={setSide} trading={globalTrading} tab={globalTicketTab} onTab={setGlobalTicketTab} /> : <>
           <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2 className="stock-identity"><StockLogo {...selected} size={26} />{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit" }); } }}>{type}</button>)}</div>
@@ -2795,6 +2817,7 @@ export function TradingDashboard() {
             {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><button className="mini-order-symbol stock-identity" onClick={() => openPositionChart(order.symbol)}><StockLogo {...order} size={28} /><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span></button><small>{order.time}</small></div>)}
             {!todayOrders.length && <div className="no-orders">Today&apos;s simulated trades will appear here.</div>}
           </div>
+          </>}
         </aside>
       </div>}
 

@@ -45,8 +45,11 @@ test('the dashboard fill path rechecks funds and holdings, records actual price 
   const javascript = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   let orders=[], cash=1000;
   const bindings={ paperDataReady:true, priceTaskError, getNseMarketStatus:()=>({isOpen:true}), exchangeSession:null, intradayOrdersAllowed:true, readPaperOrders:()=>orders, localStorage:{getItem:()=>String(cash),setItem:(_key,value)=>{cash=Number(value)}}, balance:1000, calculatePosition, tradingLimitStatus:{blocked:false}, validateDeliverySell, calculateInstrumentCharges:()=>({total:1}),paperOrderCapitalValue,setOrders:value=>{orders=value},setBalance:value=>{cash=value},writePaperOrders:value=>{orders=value},saveProtection:()=>{} };
+  bindings.isGlobalInstrumentKey = (await import('../lib/global-markets.ts')).isGlobalInstrumentKey;
   const fill = new Function(...Object.keys(bindings), javascript+';return fillPriceOrder;')(...Object.values(bindings));
   const buy={...task,id:'buy',product:'DELIVERY',quantity:3};
+  assert.match(fill({...buy,instrument:{...buy.instrument,instrumentKey:'DELTA|BTCUSD'}},81000), /Global USD/);
+  assert.equal(cash,1000); assert.equal(orders.length,0);
   assert.equal(fill(buy,99),null); assert.equal(orders[0].price,99); assert.equal(cash,702);
   assert.equal(fill(buy,99),null); assert.equal(orders.length,1); assert.equal(cash,702);
   assert.match(fill({...buy,id:'unfunded',quantity:10},99),/Insufficient/); assert.equal(orders.length,1);

@@ -1289,8 +1289,8 @@ export function MarketChart({
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
         localization: {
-          locale: "en-IN",
-          priceFormatter: (price: number) => price.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+          locale: instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN",
+          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
