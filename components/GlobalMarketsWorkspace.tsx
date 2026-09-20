@@ -88,10 +88,9 @@ function BrentChart({ dark }: { dark: boolean }) {
   }, [dark]);
   return (
     <>
-      <div
-        className="global-brent-chart tradingview-widget-container"
-        ref={host}
-      />
+      <div className="global-brent-frame">
+        <div className="global-brent-chart tradingview-widget-container" ref={host}/>
+      </div>
       {failed && (
         <p role="status">
           Brent chart could not load. Use the source link below.

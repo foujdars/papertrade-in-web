@@ -203,6 +203,7 @@ const { chromium } = require(
       0,
     );
     await page.locator('.global-brent-chart[data-widget="loaded"]').waitFor();
+    assert.ok(await page.locator('.global-brent-frame').evaluate(e=>e.clientHeight>=500),'Brent has a usable chart height');
     assert.match(
       await page.locator(".global-brent").innerText(),
       /TVC:UKOIL Brent CFD reference/,

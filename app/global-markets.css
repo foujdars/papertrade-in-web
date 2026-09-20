@@ -303,11 +303,12 @@
   border-radius: 22px;
   padding: 22px;
 }
-.global-brent-chart {
+.global-brent-frame {
   height: 520px;
   width: 100%;
   margin: 16px 0;
 }
+.global-brent-chart { height: 100%; width: 100%; }
 .global-brent a {
   color: var(--purple);
   display: block;
