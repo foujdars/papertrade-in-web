@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import * as homeQuotes from "../lib/home-quotes.ts";
 import * as homePreferences from "../lib/home-preferences.ts";
+import * as globalMarkets from "../lib/global-markets.ts";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -280,6 +281,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/components/StockLogo": { StockLogo: () => null },
     "@/lib/home-quotes": homeQuotes,
     "@/lib/home-preferences": homePreferences,
+    "@/lib/global-markets": globalMarkets,
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
     "@/lib/market": { formatInr: String, deriveNetChange: () => 0, formatSignedMarketMove: String },
     "@/lib/nimble-scanner": { NIMBLE_STRATEGIES: {

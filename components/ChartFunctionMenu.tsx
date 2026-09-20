@@ -6,11 +6,11 @@ import { STUDIES, studyDefaults, studyTitle } from '@/lib/indicator-catalog';
 import { useIndicatorSettings } from '@/lib/indicator-settings';
 import { IndicatorSettings } from './IndicatorSettings';
 import { useTransientBack } from './useTransientBack';
-export function ChartFunctionMenu({indicators,onToggleIndicator,onAction,onClose,onDrawing}:{indicators:ChartIndicators;onToggleIndicator:(id:keyof ChartIndicators)=>void;onAction:(action:ChartAction)=>void;onClose:()=>void;onDrawing?:(id:DrawingTool)=>void}){
+export function ChartFunctionMenu({indicators,onToggleIndicator,onAction,onClose,onDrawing,excluded=[]}:{indicators:ChartIndicators;onToggleIndicator:(id:keyof ChartIndicators)=>void;onAction:(action:ChartAction)=>void;onClose:()=>void;onDrawing?:(id:DrawingTool)=>void;excluded?:string[]}){
  const [tab,setTab]=useState('All'),[query,setQuery]=useState(''),[group,setGroup]=useState('All types'),[editing,setEditing]=useState<string|null>(null),[controls,setControls]=useState(false),[notice,setNotice]=useState('');
  const {settings,setStudy,favorites,toggleFavorite}=useIndicatorSettings(),panel=useRef<HTMLElement>(null);
  useTransientBack(true,onClose);useEffect(()=>{const old=document.activeElement as HTMLElement;panel.current?.focus();return()=>{if(old?.isConnected)old.focus();};},[]);
- const list=STUDIES.filter(s=>(tab!=='Favourites'||favorites.includes(s.id))&&(tab!=='On chart'||indicators[s.id])&&(group==='All types'||s.group===group)&&`${s.name} ${s.id} ${s.group}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ const list=STUDIES.filter(s=>!excluded.includes(s.id)&&(tab!=='Favourites'||favorites.includes(s.id))&&(tab!=='On chart'||indicators[s.id])&&(group==='All types'||s.group===group)&&`${s.name} ${s.id} ${s.group}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
  function toggle(id:string){const study=STUDIES.find(s=>s.id===id)!;if(!indicators[id]&&!study.overlay&&STUDIES.filter(s=>!s.overlay&&indicators[s.id]&&!settings[s.id]?.hidden).length>=6){setNotice('Six lower panes are already active. Hide or remove one before adding another.');return;}setNotice('');onToggleIndicator(id);}
  function apply(id:string){
   const study=STUDIES.find(s=>s.id===id)!;if(study.unavailable)return;

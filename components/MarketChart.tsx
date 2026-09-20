@@ -439,6 +439,8 @@ export function MarketChart({
   focusTradeMarkers = false,
   preservePageScroll = false,
   replayCandles,
+  externalCandles,
+  exchangeLabel = 'NSE',
   replaySelecting = false,
   replayStartTime = null,
   onReplaySelect,
@@ -479,6 +481,8 @@ export function MarketChart({
   focusTradeMarkers?: boolean;
   preservePageScroll?: boolean;
   replayCandles?: Candle[];
+  externalCandles?: Candle[];
+  exchangeLabel?: string;
   replaySelecting?: boolean;
   replayStartTime?: number | null;
   onReplaySelect?: (time: number) => void;
@@ -516,7 +520,8 @@ export function MarketChart({
   useEffect(() => {if(selectedStudy&&!indicators[selectedStudy])setSelectedStudy(null);}, [indicators,selectedStudy]);
   const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
   const isReplay = replayCandles !== undefined;
-  const comparisonData=useComparisonCandles(isReplay?[]:STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),timeframe);
+  const externalFeed = externalCandles !== undefined;
+  const comparisonData=useComparisonCandles(isReplay||externalFeed?[]:STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),timeframe);
   const comparisonRef=useRef(comparisonData);comparisonRef.current=comparisonData;
   const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
@@ -608,7 +613,7 @@ export function MarketChart({
   }, [onPrice]);
 
   function acceptLiveTick(tick: CandleTick, publish: boolean) {
-    if (isReplay || !validCandleTick(tick, instrument.instrumentKey, lastLiveTickRef.current)) return;
+    if (isReplay || externalFeed || !validCandleTick(tick, instrument.instrumentKey, lastLiveTickRef.current)) return;
     lastLiveTickRef.current = tick;
     const next = applyCandleTick(dataRef.current, tick, timeframe);
     if (next === dataRef.current) return;
@@ -1357,7 +1362,7 @@ export function MarketChart({
           const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
           const interval = LIVE_TIMEFRAME_SECONDS[timeframe] ?? ({ "1D":86400, "1W":604800, "1M":2678400, "1Y":31622400 }[timeframe] ?? 86400);
           const period = profilePeriod(from-shift, to-shift, mode, dataRef.current.map(c => Number(c.time)), interval, timeframe);
-          if (isReplay) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} replay volume · estimated distribution` };
+          if (isReplay || externalFeed) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} ${externalFeed?'Delta':'replay'} volume · estimated distribution` };
           // Profiles are independent of the quote feed: no profile candle can change a fill price.
           return profileClient!.read(period.from, Math.min(period.to, Math.floor(Date.now()/60000)*60), id);
         });
@@ -1792,7 +1797,19 @@ export function MarketChart({
   }, [replayCandles, replaySelecting, timeframe]);
 
   useEffect(() => {
-    if (isReplay) return;
+    if (externalCandles === undefined) return;
+    const initial = dataRef.current.length === 0;
+    dataRef.current = externalCandles;
+    candleSeries.current?.setData(externalCandles.map(c => toCandleData(c,timeframe)));
+    setLatestCandle(externalCandles.at(-1));
+    syncIndicatorData(externalCandles);
+    if(initial&&externalCandles.length)applyInitialVisibleRange(externalCandles);
+    setFeedMode(externalCandles.length?'live':'loading');
+    scheduleOverlayRefresh();
+  }, [externalCandles,timeframe]);
+
+  useEffect(() => {
+    if (isReplay || externalFeed) return;
     const controller = new AbortController();
     let retryTimer = 0;
     onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
@@ -1851,7 +1868,7 @@ export function MarketChart({
   }, [instrument.instrumentKey, timeframe, isReplay]);
 
   useEffect(() => {
-    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     const controller = new AbortController();
     let stopped = false;
     let reconnectTimer = 0;
@@ -1931,7 +1948,7 @@ export function MarketChart({
   useEffect(() => {
     // Reconciliation has its own lifetime. Stream status changes must not keep
     // restarting its timer and postponing recovery indefinitely.
-    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     let controller: AbortController | null = null;
     async function refreshIntradayCandles() {
       if (controller || !dataRef.current.length) return;
@@ -1976,7 +1993,7 @@ export function MarketChart({
   }, [instrument.instrumentKey, timeframe, isReplay]);
 
   useEffect(() => {
-    if (isReplay || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     let disposed = false;
     let request: AbortController | null = null;
     let retryAt = 0;
@@ -2091,7 +2108,7 @@ export function MarketChart({
           </div>}
         </>}
         <div className="chart-symbol-legend lightweight-symbol-legend">
-          <b>{instrument.name.toUpperCase()} · {timeframe} · NSE</b>
+          <b>{instrument.name.toUpperCase()} · {timeframe} · {exchangeLabel}</b>
           {legend && (
             <span className="candle-ohlc" aria-label={`Candle OHLC and change from previous ${timeframe} candle close`}>
               <span className="candle-stat">O <i>{legend.candle.open.toFixed(2)}</i></span>

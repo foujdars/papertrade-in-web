@@ -36,6 +36,8 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
 import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
+import { GlobalMarketsWorkspace, type GlobalMarketRequest } from './GlobalMarketsWorkspace';
+import { GLOBAL_INSTRUMENTS, isGlobalSymbol } from '@/lib/global-markets';
 import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
 import { PNL_SCOPE_KEY, readPnlScope, writePreference } from "@/lib/interface-preferences";
@@ -348,6 +350,8 @@ export function TradingDashboard() {
   const exchangeSession = useNseSession();
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
+  const [globalRequest,setGlobalRequest]=useState<GlobalMarketRequest|null>(null);
+  const [globalFavourites,setGlobalFavourites]=useState<string[]>([]);
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
@@ -1560,7 +1564,7 @@ export function TradingDashboard() {
       instrumentKey: instrument.instrumentKey,
       assetType: "EQUITY" as const,
     };
-  })], [marketQuotes, stockUniverse]);
+  }), ...GLOBAL_INSTRUMENTS.map(i=>({...i,categories:[...i.categories]}))], [marketQuotes, stockUniverse]);
   const homeRiskSummary = useMemo(() => {
     const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
     const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
@@ -2198,6 +2202,7 @@ export function TradingDashboard() {
   }
 
   function openNavigationSection(section: NavigationSection) {
+    setGlobalRequest(null);
     setOptionChainOpen(false);
     if (section === "home") {
       setHomeOpen(true);
@@ -2699,7 +2704,8 @@ export function TradingDashboard() {
       {homeOpen && <HomeWorkspace
         key={user?.id ?? 'guest'}
         preferenceOwner={user?.id ?? 'guest'}
-        favouriteSymbols={[...new Set(customWatchlists.flatMap(list => list.symbols))]}
+        favouriteSymbols={[...new Set([...customWatchlists.flatMap(list => list.symbols),...globalFavourites])]}
+        onOpenGlobal={()=>setGlobalRequest({symbol:'BTCUSD',key:Date.now()})}
         firstName={typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined}
         indices={LIVE_INDEX_TICKERS.map((item) => {
           const quote = marketQuotes[item.instrumentKey];
@@ -2740,6 +2746,7 @@ export function TradingDashboard() {
         }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
+          if(isGlobalSymbol(symbol)){setGlobalRequest({symbol,key:Date.now()});return;}
           const stock = stockUniverse.find((item) => item.symbol === symbol);
           const index = SEARCHABLE_INDEX_TICKERS.find((item) => item.symbol === symbol);
           openNavigationSection("trade");
@@ -2751,6 +2758,7 @@ export function TradingDashboard() {
         }}
       />}
 
+      <GlobalMarketsWorkspace key={`global-${user?.id??'guest'}`} owner={user?.id??'guest'} request={globalRequest} onClose={()=>setGlobalRequest(null)} dark={theme==='neon'} onFavourites={setGlobalFavourites}/>
       <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={true} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : activeNavigationSection === "trade" ? 1 : activeNavigationSection === "fno" ? 2 : marketNavigationActive ? 3 : activeNavigationSection === "ipo" ? 4 : 5 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={activeNavigationSection === "trade" ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
@@ -2897,6 +2905,7 @@ export function TradingDashboard() {
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
           <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="global-entry" onClick={()=>setGlobalRequest({symbol:'BTCUSD',view:'history',key:Date.now()})}>BTC & gold practice P&L <ChevronRight size={16}/></button>
             <PnlAnalytics trades={pnlScopedTrades} calendarTrades={pnlCalendarTrades} orders={orders} scope={{ ...pnlScope, day: selectedPnlDateKey }} now={clock?.getTime() ?? Date.now()} tab={pnlHistoryOnly ? "trades" : pnlTab} onTab={tab => { setPnlHistoryOnly(false); setPnlTab(tab); setTradeSelection(null); setPnlTradeMenuId(null); }} onScope={scope => { writePreference(PNL_SCOPE_KEY, scope); setPnlScope({ ...scope, day: null }); setSelectedPnlDateKey(scope.day ?? null); setPnlDrill(null); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} onSelect={(ids, label) => { setPnlDrill({ ids, label }); setPnlHistoryOnly(false); setPnlTab("trades"); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} />
             <div className="pnl-trade-list" ref={pnlTradeListRef} hidden={!pnlHistoryOnly && pnlTab !== "trades"}>
               {pnlDrill && <div className="pnl-drill-filter"><span>{pnlDrill.label} · {pnlDrilledTrades.length} exits</span><button onClick={() => { setPnlDrill(null); setTradeSelection(null); }}>Clear chart selection</button></div>}

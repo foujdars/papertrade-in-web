@@ -1,6 +1,7 @@
 "use client";
 import type { HomeAttention } from '@/lib/home-attention';
-import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3 } from 'lucide-react';
+import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3, Globe2 } from 'lucide-react';
+import { isGlobalSymbol } from '@/lib/global-markets';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
@@ -75,9 +76,11 @@ export function HomeWorkspace({
   onOpenPnl,
   onOpenStock,
   preferenceOwner='guest', favouriteSymbols=[],
+  onOpenGlobal,
   realisedToday=0, openChangeToday=0, sessionLabel="Checking session", sessionMessage="", attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];
+  onOpenGlobal?:()=>void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
   resumeChart?:{symbol:string;timeframe:string};onResumeChart?:()=>void;onOpenRealised?:()=>void;
@@ -136,7 +139,7 @@ export function HomeWorkspace({
   const chooseSearch = (stock: HomeStockOption, chart = false) => {
     updatePreferences(rememberHomeSearch(preferences, stock.symbol));
     setSearch(''); setSearchFocused(false);
-    if (chart) onOpenStock(stock.symbol); else setPreview(stock);
+    if (chart || isGlobalSymbol(stock.symbol)) onOpenStock(stock.symbol); else setPreview(stock);
   };
   const deferReminder = (item: HomeAttention, reviewed: boolean) => {
     updatePreferences(deferHomeReminder(preferences, item, reviewed, Date.now()));
@@ -219,6 +222,8 @@ export function HomeWorkspace({
             })}
           </div>
         </section>}
+
+        {onOpenGlobal&&<button className="global-entry" onClick={onOpenGlobal}><Globe2 size={20}/><span>Bitcoin · Gold · Brent<br/><small>Global charts & perpetual practice</small></span><ChevronRight size={18}/></button>}
 
         <div className="home-main-grid home-main-grid-clean">
           {cards.portfolio && <section className="home-section home-portfolio-card">
