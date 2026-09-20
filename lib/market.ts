@@ -12,11 +12,11 @@ export type Candle = {
 export type Instrument = {
   symbol: string;
   name: string;
-  exchange: "NSE";
+  exchange: "NSE" | "DELTA" | "GLOBAL" | "TVC";
   price: number;
   change: number;
   instrumentKey: string;
-  categories: Array<"NIFTY 50" | "BANK NIFTY" | "NIFTY 500">;
+  categories: string[];
   assetType?: "EQUITY" | "INDEX" | "OPTION" | "FUTURE";
   optionType?: "CE" | "PE";
   strikePrice?: number;

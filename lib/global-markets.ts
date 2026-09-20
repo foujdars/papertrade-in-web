@@ -1,4 +1,5 @@
 import type { Candle } from "./market";
+import type { Instrument } from "./market";
 
 export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
@@ -31,6 +32,50 @@ export const GLOBAL_INSTRUMENTS = [
 ] as const;
 export const isGlobalSymbol = (value: string): value is GlobalSymbol =>
   (GLOBAL_SYMBOLS as readonly string[]).includes(value);
+export const GLOBAL_CHART_INSTRUMENTS: Instrument[] = [
+  {
+    symbol: "BTCUSD",
+    name: "Bitcoin perpetual",
+    exchange: "DELTA",
+    price: 0,
+    change: 0,
+    instrumentKey: "DELTA|BTCUSD",
+    categories: ["GLOBAL", "CRYPTO"],
+    assetType: "FUTURE",
+    lotSize: 1,
+    underlyingSymbol: "BTC",
+  },
+  {
+    symbol: "XAUTUSD",
+    name: "Gold perpetual",
+    exchange: "DELTA",
+    price: 0,
+    change: 0,
+    instrumentKey: "DELTA|XAUTUSD",
+    categories: ["GLOBAL", "GOLD"],
+    assetType: "FUTURE",
+    lotSize: 1,
+    underlyingSymbol: "XAUT",
+  },
+  {
+    symbol: "BRENT",
+    name: "Brent crude oil",
+    exchange: "TVC",
+    price: 0,
+    change: 0,
+    instrumentKey: "TVC|UKOIL",
+    categories: ["GLOBAL", "ENERGY"],
+    assetType: "INDEX",
+  },
+];
+export const deltaSymbolFromInstrumentKey = (
+  value?: string,
+): PerpSymbol | null => {
+  const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
+  return symbol === "BTCUSD" || symbol === "XAUTUSD" ? symbol : null;
+};
+export const isGlobalInstrumentKey = (value?: string) =>
+  Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|"));
 export const USD_INR = 85;
 export const PERP_SEED_INR = 100000;
 export type PerpSpec = {
