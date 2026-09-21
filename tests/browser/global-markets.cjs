@@ -17,15 +17,17 @@ const { chromium } = require(
       const url = new URL(route.request().url());
       if (url.pathname === "/api/global-markets") {
         const symbol = url.searchParams.get("symbol"),
-          gold = symbol === "XAUTUSD",
-          price = gold ? 4000 : 100000,
+          prices = { BTCUSD: 100000, ETHUSD: 4000, SOLUSD: 180, XAUTUSD: 4000 },
+          ticks = { BTCUSD: 0.5, ETHUSD: 0.05, SOLUSD: 0.0001, XAUTUSD: 0.01 },
+          lots = { BTCUSD: 0.001, ETHUSD: 0.01, SOLUSD: 1, XAUTUSD: 0.001 },
+          price = prices[symbol] ?? 100000,
           now = Date.now();
         const spec = {
           symbol,
-          lot: 0.001,
-          tick: gold ? 0.01 : 0.5,
-          initial: gold ? 0.01 : 0.005,
-          maintenance: gold ? 0.005 : 0.0025,
+          lot: lots[symbol] ?? 0.001,
+          tick: ticks[symbol] ?? 0.5,
+          initial: symbol === "BTCUSD" ? 0.005 : 0.01,
+          maintenance: symbol === "BTCUSD" ? 0.0025 : 0.005,
           initialScale: 0.000000025,
           maintenanceScale: 0.0000000125,
           scalingThreshold: 100000,
@@ -33,7 +35,7 @@ const { chromium } = require(
           maker: 0.0002,
           taker: 0.0005,
           liquidation: 0.0005,
-          fundingSeconds: gold ? 14400 : 28800,
+          fundingSeconds: symbol === "XAUTUSD" ? 14400 : 28800,
           operational: true,
           fetchedAt: now,
         };
@@ -161,7 +163,7 @@ const { chromium } = require(
       .getByRole("button", { name: "P&L", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "BTC & gold · practice P&L" })
+      .getByRole("heading", { name: "Crypto & gold · practice P&L" })
       .waitFor();
     await page.getByRole("button", { name: "Chart", exact: true }).click();
     await page.getByRole("button", { name: "Indicators", exact: true }).click();
@@ -241,10 +243,10 @@ const { chromium } = require(
       .getByRole("dialog", { name: "Global markets", exact: true })
       .waitFor({ state: "hidden" });
     await page
-      .getByRole("button", { name: "BTC & gold practice P&L", exact: true })
+      .getByRole("button", { name: "Crypto & gold practice P&L", exact: true })
       .click();
     await page
-      .getByRole("heading", { name: "BTC & gold · practice P&L" })
+      .getByRole("heading", { name: "Crypto & gold · practice P&L" })
       .waitFor();
     assert.deepEqual(
       await page.evaluate(() => [

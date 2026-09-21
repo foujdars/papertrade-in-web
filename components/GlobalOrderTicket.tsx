@@ -11,13 +11,13 @@ import {
 } from "@/lib/global-order-engine";
 import {
   availablePerpCash, cancelPerpOrder, closePerp, freshPerpQuote, liquidationPrice,
-  marginRate, positionPnl, tradingFee, type PerpSpec, type PerpSymbol,
+  marginRate, PERP_ASSET, positionPnl, tradingFee, type PerpSpec, type PerpSymbol,
 } from "@/lib/global-markets";
 
 export type GlobalTicketTab = "Order" | "Positions" | "Open orders" | "History";
 type ExitInput = { mode: "Market" | "Limit" | "Trail"; value: string; limit: string; unit: "USD" | "%" };
 const blankExit = (): ExitInput => ({ mode: "Market", value: "", limit: "", unit: "USD" });
-const assetName = (s: PerpSymbol) => s === "BTCUSD" ? "BTC" : "XAUT";
+const assetName = (s: PerpSymbol) => PERP_ASSET[s];
 const number = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 8 });
 const options = <T extends string>(values: readonly T[]) => values.map(value => ({ value, label: value }));
 function exitFromInput(input: ExitInput, target: boolean, entry: number, side: "BUY" | "SELL", spec: PerpSpec): GlobalExit | undefined {

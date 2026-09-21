@@ -1,8 +1,8 @@
 import {
+  isPerpSymbol,
   normalizeGlobalCandles,
   normalizePerpQuote,
   normalizePerpSpec,
-  type PerpSymbol,
 } from "@/lib/global-markets";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
     mode = params.get("mode") ?? "snapshot";
-  if (symbol !== "BTCUSD" && symbol !== "XAUTUSD")
+  if (!isPerpSymbol(symbol))
     return Response.json(
       { ok: false, error: "Unsupported contract. Brent is watch-only." },
       { status: 400 },
@@ -97,8 +97,8 @@ export async function GET(request: Request) {
     return Response.json(
       {
         ok: true,
-        spec: normalizePerpSpec(product, symbol as PerpSymbol, Date.now()),
-        quote: normalizePerpQuote(ticker, symbol as PerpSymbol),
+        spec: normalizePerpSpec(product, symbol, Date.now()),
+        quote: normalizePerpQuote(ticker, symbol),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

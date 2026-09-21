@@ -75,11 +75,17 @@
   display: flex;
   gap: 6px;
 }
+.global-instruments {
+  flex-wrap: wrap;
+}
 .global-instruments button,
 .global-tabs button,
 .global-side button {
   flex: 1;
   min-width: 0;
+}
+.global-instruments button {
+  flex: 1 1 72px;
 }
 .global-instruments b,
 .global-instruments small {

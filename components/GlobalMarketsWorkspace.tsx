@@ -22,10 +22,13 @@ import {
   closePerp,
   freshPerpQuote,
   GLOBAL_INSTRUMENTS,
+  GLOBAL_SHORT_LABEL,
   liquidationPrice,
   marginRate,
   openPerp,
+  PERP_ASSET,
   PERP_SEED_INR,
+  PERP_SYMBOLS,
   positionPnl,
   readPerpAccount,
   tradingFee,
@@ -267,7 +270,7 @@ export function GlobalMarketsWorkspace({
       if (stopped || running || document.hidden) return;
       running = true;
       const results = await Promise.allSettled(
-        (["BTCUSD", "XAUTUSD"] as const).map(async (s) => {
+        PERP_SYMBOLS.map(async (s) => {
           const r = await fetch(`/api/global-markets?symbol=${s}`, {
             cache: "no-store",
             signal: controller.signal,
@@ -290,17 +293,18 @@ export function GlobalMarketsWorkspace({
           accountRef.current &&
           (accountRef.current.positions.length ||
             accountRef.current.orders.length)
-        )
+        ) {
+          const quotes: Partial<Record<PerpSymbol, PerpQuote>> = {};
+          const specs: Partial<Record<PerpSymbol, PerpSpec>> = {};
+          for (const s of PERP_SYMBOLS) {
+            quotes[s] = next[s]?.quote;
+            specs[s] = next[s]?.spec;
+          }
           await transaction(
-            (a) =>
-              advancePerps(
-                a,
-                { BTCUSD: next.BTCUSD?.quote, XAUTUSD: next.XAUTUSD?.quote },
-                { BTCUSD: next.BTCUSD?.spec, XAUTUSD: next.XAUTUSD?.spec },
-                Date.now(),
-              ),
+            (a) => advancePerps(a, quotes, specs, Date.now()),
             true,
           );
+        }
       }
       running = false;
     };
@@ -369,11 +373,8 @@ export function GlobalMarketsWorkspace({
     () => ({
       symbol,
       name:
-        symbol === "BTCUSD"
-          ? "Bitcoin"
-          : symbol === "XAUTUSD"
-            ? "Tether Gold"
-            : "Brent",
+        GLOBAL_INSTRUMENTS.find((i) => i.symbol === symbol)?.name ??
+        GLOBAL_SHORT_LABEL[symbol],
       exchange: "NSE",
       price: 0,
       change: 0,
@@ -465,13 +466,7 @@ export function GlobalMarketsWorkspace({
                   setTarget("");
                 }}
               >
-                <b>
-                  {i.symbol === "BTCUSD"
-                    ? "Bitcoin"
-                    : i.symbol === "XAUTUSD"
-                      ? "Gold"
-                      : "Brent"}
-                </b>
+                <b>{GLOBAL_SHORT_LABEL[i.symbol]}</b>
                 <small>
                   {i.symbol === "BRENT" ? "Watch only" : "Perpetual"}
                 </small>
@@ -747,7 +742,7 @@ export function GlobalMarketsWorkspace({
                       </div>
                       <small>
                         {spec
-                          ? `1 contract = ${spec.lot} ${symbol === "BTCUSD" ? "BTC" : "XAUT"} · tick $${spec.tick}`
+                          ? `1 contract = ${spec.lot} ${symbol === "BRENT" ? "" : PERP_ASSET[symbol]} · tick $${spec.tick}`
                           : "Loading contract rules"}
                       </small>
                       <dl className="global-metrics">
@@ -918,7 +913,7 @@ export function GlobalMarketsWorkspace({
               )}
               {view === "history" && (
                 <div className="global-history">
-                  <h3>BTC & gold · practice P&L</h3>
+                  <h3>Crypto & gold · practice P&L</h3>
                   <p>
                     Separate from your NSE portfolio. All amounts below are INR.
                   </p>

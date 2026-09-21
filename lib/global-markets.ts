@@ -2,13 +2,45 @@ import type { Candle } from "./market";
 import type { Instrument } from "./market";
 import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine";
 
-export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
+export const PERP_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD", "XAUTUSD"] as const;
+export type PerpSymbol = (typeof PERP_SYMBOLS)[number];
+export const GLOBAL_SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
-export type PerpSymbol = Exclude<GlobalSymbol, "BRENT">;
+export const isPerpSymbol = (value: string): value is PerpSymbol =>
+  (PERP_SYMBOLS as readonly string[]).includes(value);
+export const PERP_ASSET: Record<PerpSymbol, string> = {
+  BTCUSD: "BTC",
+  ETHUSD: "ETH",
+  SOLUSD: "SOL",
+  XAUTUSD: "XAUT",
+};
+export const GLOBAL_SHORT_LABEL: Record<GlobalSymbol, string> = {
+  BTCUSD: "Bitcoin",
+  ETHUSD: "Ether",
+  SOLUSD: "Solana",
+  XAUTUSD: "Gold",
+  BRENT: "Brent",
+};
 export const GLOBAL_INSTRUMENTS = [
   {
     symbol: "BTCUSD",
     name: "Bitcoin",
+    subtitle: "Delta India · perpetual",
+    categories: ["Crypto"],
+    price: 0,
+    changePercent: 0,
+  },
+  {
+    symbol: "ETHUSD",
+    name: "Ethereum",
+    subtitle: "Delta India · perpetual",
+    categories: ["Crypto"],
+    price: 0,
+    changePercent: 0,
+  },
+  {
+    symbol: "SOLUSD",
+    name: "Solana",
     subtitle: "Delta India · perpetual",
     categories: ["Crypto"],
     price: 0,
@@ -47,6 +79,30 @@ export const GLOBAL_CHART_INSTRUMENTS: Instrument[] = [
     underlyingSymbol: "BTC",
   },
   {
+    symbol: "ETHUSD",
+    name: "Ethereum perpetual",
+    exchange: "DELTA",
+    price: 0,
+    change: 0,
+    instrumentKey: "DELTA|ETHUSD",
+    categories: ["GLOBAL", "CRYPTO"],
+    assetType: "FUTURE",
+    lotSize: 1,
+    underlyingSymbol: "ETH",
+  },
+  {
+    symbol: "SOLUSD",
+    name: "Solana perpetual",
+    exchange: "DELTA",
+    price: 0,
+    change: 0,
+    instrumentKey: "DELTA|SOLUSD",
+    categories: ["GLOBAL", "CRYPTO"],
+    assetType: "FUTURE",
+    lotSize: 1,
+    underlyingSymbol: "SOL",
+  },
+  {
     symbol: "XAUTUSD",
     name: "Gold perpetual",
     exchange: "DELTA",
@@ -73,7 +129,7 @@ export const deltaSymbolFromInstrumentKey = (
   value?: string,
 ): PerpSymbol | null => {
   const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
-  return symbol === "BTCUSD" || symbol === "XAUTUSD" ? symbol : null;
+  return isPerpSymbol(symbol) ? symbol : null;
 };
 export const isGlobalInstrumentKey = (value?: string) =>
   Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|"));
@@ -316,7 +372,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
     !Array.isArray(a.positions) ||
     !Array.isArray(a.orders) ||
     !Array.isArray(a.events) ||
-    a.positions.length > 2 ||
+    a.positions.length > PERP_SYMBOLS.length ||
     a.orders.length > 20
   )
     throw new Error(
@@ -324,7 +380,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
     );
   for (const p of a.positions)
     if (
-      !["BTCUSD", "XAUTUSD"].includes(p.symbol) ||
+      !isPerpSymbol(p.symbol) ||
       !["BUY", "SELL"].includes(p.side) ||
       !Number.isSafeInteger(p.contracts) ||
       p.contracts <= 0 ||
@@ -356,7 +412,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
       throw new Error("Practice position data is invalid.");
   for (const o of a.orders)
     if (
-    !["BTCUSD", "XAUTUSD"].includes(o.symbol) ||
+    !isPerpSymbol(o.symbol) ||
       !["BUY", "SELL"].includes(o.side) ||
       !Number.isSafeInteger(o.contracts) ||
       o.contracts <= 0 ||
@@ -377,7 +433,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
       (e) =>
         !e ||
         typeof e.id !== "string" ||
-        !["BTCUSD", "XAUTUSD"].includes(e.symbol) ||
+        !isPerpSymbol(e.symbol) ||
         !["OPEN", "CLOSE", "LIQUIDATION", "FUNDING", "CANCEL"].includes(
           e.kind,
         ) ||

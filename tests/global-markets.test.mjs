@@ -14,6 +14,8 @@ import {
   normalizePerpQuote,
   normalizeGlobalCandles,
   cancelPerpOrder,
+  isPerpSymbol,
+  PERP_SYMBOLS,
 } from "../lib/global-markets.ts";
 import { evaluateGlobalAlert, globalAlertError } from "../lib/global-alerts.ts";
 const now = 1800000000000;
@@ -375,6 +377,55 @@ test("volume alert excludes its own completed candle from the baseline and ignor
     false,
     "old history cannot trigger",
   );
+});
+
+test("ethereum and solana are first-class global perps", () => {
+  assert.deepEqual([...PERP_SYMBOLS], ["BTCUSD", "ETHUSD", "SOLUSD", "XAUTUSD"]);
+  assert.equal(isPerpSymbol("ETHUSD"), true);
+  assert.equal(isPerpSymbol("SOLUSD"), true);
+  assert.equal(isPerpSymbol("BRENT"), false);
+  const ethSpec = { ...spec, symbol: "ETHUSD", lot: 0.01, tick: 0.05 };
+  const ethQuote = { ...quote, symbol: "ETHUSD", last: 4000, mark: 4000, bid: 3999.95, ask: 4000 };
+  const opened = openPerp(newPerpAccount(), ethSpec, ethQuote, "BUY", 1, 5, now);
+  assert.equal(opened.positions[0].symbol, "ETHUSD");
+  const saved = readPerpAccount(
+    JSON.stringify({
+      version: 1,
+      wallet: 100000,
+      revision: 1,
+      lastChecked: 0,
+      fundingGap: false,
+      positions: [
+        {
+          symbol: "SOLUSD",
+          side: "BUY",
+          contracts: 1,
+          entry: 180,
+          margin: 3600,
+          leverage: 5,
+          openedAt: now,
+          nextFunding: now + 28800000,
+          spec: { ...spec, symbol: "SOLUSD", lot: 1, tick: 0.0001 },
+        },
+      ],
+      orders: [],
+      events: [
+        {
+          id: "1",
+          symbol: "ETHUSD",
+          at: now,
+          kind: "OPEN",
+          contracts: 1,
+          price: 4000,
+          pnl: 0,
+          fee: 1,
+          detail: "Long · taker · isolated",
+        },
+      ],
+    }),
+  );
+  assert.equal(saved.positions[0].symbol, "SOLUSD");
+  assert.equal(saved.events[0].symbol, "ETHUSD");
 });
 
 test("quotes cannot execute without finite liquidity, and stale contract rules fail closed", () => {

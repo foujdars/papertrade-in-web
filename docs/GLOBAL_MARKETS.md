@@ -1,11 +1,11 @@
 # Global markets practice
 
-Home → Bitcoin · Gold · Brent opens the workspace. Home search supports all three symbols; saved instruments appear among Home favourites. The NSE P&L screen links to the separate global history.
+Home search and the trade symbol picker include Bitcoin, Ethereum, Solana, Gold and Brent. Saved instruments appear among Home favourites. The NSE P&L screen stays separate from global history.
 
 ## Instruments and sources
 
-- BTCUSD and XAUTUSD use the public, read-only Delta Exchange India REST API. Gold is **tokenised Tether Gold**, not an XAU/USD spot or MCX contract.
-- Contract size, tick, margin scaling, position limits, fees and funding interval come from live product metadata. Current small-position maximum leverage is 200× BTC / 100× XAUT; larger positions have lower limits.
+- BTCUSD, ETHUSD, SOLUSD and XAUTUSD use the public, read-only Delta Exchange India REST API. Gold is **tokenised Tether Gold**, not an XAU/USD spot or MCX contract.
+- Contract size, tick, margin scaling, position limits, fees and funding interval come from live product metadata. Current small-position maximum leverage is typically 200× BTC / 100× ETH, SOL and XAUT; larger positions have lower limits.
 - Brent is watch-only via the official TradingView TVC:UKOIL widget, explicitly labelled a CFD reference. ICEEUR:BRN1! is not licensed for the free embedded widget. There are no Brent orders or alerts.
 - No exchange credentials or exchange order endpoints are used.
 

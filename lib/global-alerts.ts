@@ -1,6 +1,7 @@
 import { average, relativeStrength } from "./study-calculations.ts";
 import {
   freshPerpQuote,
+  isPerpSymbol,
   type PerpQuote,
   type PerpSymbol,
 } from "./global-markets.ts";
@@ -27,7 +28,7 @@ export type GlobalAlert = {
 };
 export function globalAlertError(rule: GlobalAlert): string | null {
   if (
-    !["BTCUSD", "XAUTUSD"].includes(rule.symbol) ||
+    !isPerpSymbol(rule.symbol) ||
     !GLOBAL_ALERT_KINDS.includes(rule.kind)
   )
     return "Unsupported alert.";

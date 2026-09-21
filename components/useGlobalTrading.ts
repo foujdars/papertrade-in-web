@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount } from "@/lib/global-order-engine";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
+import { PERP_SYMBOLS } from "@/lib/global-markets";
 
 export type GlobalSnapshot = { quote: PerpQuote; spec: PerpSpec };
 export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
@@ -66,7 +67,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
       running = true;
       try {
         const next: Partial<Record<PerpSymbol, GlobalSnapshot>> = {};
-        const results = await Promise.allSettled((["BTCUSD", "XAUTUSD"] as const).map(async symbol => {
+        const results = await Promise.allSettled(PERP_SYMBOLS.map(async symbol => {
           const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
           const data = await r.json();
           if (!r.ok || !data.ok || data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error(data.error ?? "Delta market data unavailable.");
@@ -76,9 +77,13 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
         if (results.every(r => r.status === "rejected")) return; // Existing timestamps expire and disable orders.
         snapshotsRef.current = { ...snapshotsRef.current, ...next };
         setSnapshots(snapshotsRef.current);
-        await transact(a => advanceGlobalAccount(a,
-          { BTCUSD: next.BTCUSD?.quote, XAUTUSD: next.XAUTUSD?.quote },
-          { BTCUSD: next.BTCUSD?.spec, XAUTUSD: next.XAUTUSD?.spec }, Date.now()), true);
+        const quotes: Partial<Record<PerpSymbol, PerpQuote>> = {};
+        const specs: Partial<Record<PerpSymbol, PerpSpec>> = {};
+        for (const s of PERP_SYMBOLS) {
+          quotes[s] = next[s]?.quote;
+          specs[s] = next[s]?.spec;
+        }
+        await transact(a => advanceGlobalAccount(a, quotes, specs, Date.now()), true);
       } finally { running = false; }
     };
     void poll();
