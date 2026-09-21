@@ -6,6 +6,7 @@ import {
   isDeltaPerpSymbol,
   type PerpSymbol,
 } from "@/lib/global-markets";
+import { isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const cache = new Map<string, { until: number; value: unknown }>();
@@ -20,7 +21,7 @@ async function getCatalogue() {
     let after = "";
     for (let page = 0; page < 10; page++) {
       const url = new URL("https://api.india.delta.exchange/v2/products");
-      url.searchParams.set("contract_types", "perpetual_futures");
+      url.searchParams.set("contract_types", "perpetual_futures,futures,call_options,put_options");
       url.searchParams.set("states", "live");
       url.searchParams.set("page_size", "1000");
       if (after) url.searchParams.set("after", after);
@@ -89,15 +90,15 @@ export async function GET(request: Request) {
       return Response.json({ ok: false, error: error instanceof Error ? error.message : "Catalogue unavailable." }, { status: 503 });
     }
   }
-  if (!isDeltaPerpSymbol(symbol))
+  if (!isSafeDeltaContractSymbol(symbol))
     return Response.json(
       { ok: false, error: "Unsupported Delta contract symbol." },
       { status: 400 },
     );
   try {
     const product = await delta(`products/${symbol}`, 300000);
-    const spec = normalizePerpSpec(product, symbol as PerpSymbol, Date.now());
-    if (!spec.operational) throw new Error("Contract is not currently available for trading.");
+    const kind = product.contract_type;
+    if (!["perpetual_futures", "futures", "call_options", "put_options"].includes(kind) || product.quoting_asset?.symbol !== "USD" || product.settling_asset?.symbol !== "USD") throw new Error("Unsupported Delta contract.");
     if (mode === "candles") {
       const timeframe = params.get("timeframe") ?? "5m",
         seconds = resolutions[timeframe];
@@ -133,10 +134,27 @@ export async function GET(request: Request) {
         { ok: false, error: "Unsupported request." },
         { status: 400 },
       );
+    if (kind === "call_options" || kind === "put_options") {
+      const settlement = normalizeDeltaSettlement(product, symbol);
+      if (settlement !== null) return Response.json({ ok: true, kind: "option", settlement }, { headers: { "Cache-Control": "no-store" } });
+      const spec = normalizeDeltaOptionSpec(product, symbol, Date.now());
+      if (!spec.operational) throw new Error("Option is not open for trading.");
+      const ticker = await delta(`tickers/${symbol}`, 2000);
+      return Response.json({ ok: true, kind: "option", spec, quote: normalizeDeltaOptionQuote(ticker, symbol) }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (kind === "futures") {
+      if (product.state !== "live" || product.trading_status !== "operational") throw new Error("Dated future is not live.");
+      const ticker = await delta(`tickers/${symbol}`, 2000);
+      return Response.json({ ok: true, kind: "dated-future", quote: normalizeDeltaOptionQuote(ticker, symbol) }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (!isDeltaPerpSymbol(symbol)) throw new Error("Unsupported perpetual symbol.");
+    const spec = normalizePerpSpec(product, symbol as PerpSymbol, Date.now());
+    if (!spec.operational) throw new Error("Contract is not currently available for trading.");
     const ticker = await delta(`tickers/${symbol}`, 2000);
     return Response.json(
       {
         ok: true,
+        kind: "perpetual",
         spec,
         quote: normalizePerpQuote(ticker, symbol as PerpSymbol),
       },

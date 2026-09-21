@@ -1,20 +1,22 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount } from "@/lib/global-order-engine";
+import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
 
 export type GlobalSnapshot = { quote: PerpQuote; spec: PerpSpec };
-export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
+export function useGlobalTrading(owner: string, selected: PerpSymbol | null, selectedOption: string | null = null) {
   const key = `papertrade-perpetual-wallet-v1:${owner}`;
   const [account, setAccount] = useState<PerpAccount | null>(null);
   const [snapshots, setSnapshots] = useState<Partial<Record<PerpSymbol, GlobalSnapshot>>>({});
+  const [optionSnapshots, setOptionSnapshots] = useState<Record<string, OptionSnapshot>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(0);
   const activeKey = useRef("");
   const snapshotsRef = useRef(snapshots);
+  const optionSnapshotsRef = useRef(optionSnapshots);
   const inFlight = useRef(false);
-  snapshotsRef.current = snapshots;
   useEffect(() => {
     activeKey.current = key;
     setAccount(null); setError(""); setBusy(false);
@@ -39,7 +41,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
     setClock(Date.now());
     return () => { activeKey.current = ""; window.clearInterval(timer); window.removeEventListener("storage", storage); };
   }, [key]);
-  const transact = useCallback(async (fn: (a: PerpAccount, data: Partial<Record<PerpSymbol, GlobalSnapshot>>) => PerpAccount, quiet = false) => {
+  const transact = useCallback(async (fn: (a: PerpAccount, data: Partial<Record<PerpSymbol, GlobalSnapshot>>, options: Record<string, OptionSnapshot>) => PerpAccount, quiet = false) => {
     if (!quiet && inFlight.current) return false;
     if (!quiet) { inFlight.current = true; setBusy(true); }
     try {
@@ -47,7 +49,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
       return await navigator.locks.request(key, () => {
         if (activeKey.current !== key) return false;
         const current = readGlobalAccount(localStorage.getItem(key));
-        const next = fn(current, snapshotsRef.current);
+        const next = fn(current, snapshotsRef.current, optionSnapshotsRef.current);
         localStorage.setItem(key, JSON.stringify(next));
         setAccount(next);
         if (!quiet) setError("");
@@ -58,9 +60,12 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
   }, [key]);
   const monitorSymbols = useMemo(() => [...new Set([
     selected,
+    selectedOption,
     ...(account?.positions.map(position => position.symbol) ?? []),
     ...(account?.orders.map(order => order.symbol) ?? []),
-  ].filter((symbol): symbol is PerpSymbol => !!symbol))].sort().join(","), [selected, account?.positions, account?.orders]);
+    ...(account?.optionPositions?.map(position => position.symbol) ?? []),
+    ...(account?.optionOrders?.map(order => order.symbol) ?? []),
+  ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
   useEffect(() => {
     if (!monitorSymbols) return;
     const controller = new AbortController();
@@ -70,22 +75,34 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
       running = true;
       try {
         const next: Partial<Record<PerpSymbol, GlobalSnapshot>> = {};
+        const nextOptions: Record<string, OptionSnapshot> = {};
+        const observedOptions: Record<string, OptionObservation> = {};
         const results = await Promise.allSettled(monitorSymbols.split(",").map(async symbol => {
           const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
           const data = await r.json();
-          if (!r.ok || !data.ok || data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error(data.error ?? "Delta market data unavailable.");
-          next[symbol] = { spec: data.spec, quote: data.quote };
+          if (!r.ok || !data.ok) throw new Error(data.error ?? "Delta market data unavailable.");
+          if (data.kind === "option") {
+            if (typeof data.settlement === "number") { observedOptions[symbol] = { settlement: data.settlement }; return; }
+            if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta option quote unavailable.");
+            nextOptions[symbol] = { spec: data.spec, quote: data.quote };
+            observedOptions[symbol] = { snapshot: nextOptions[symbol] };
+          } else {
+            if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta perpetual quote unavailable.");
+            next[symbol] = { spec: data.spec, quote: data.quote };
+          }
         }));
         if (controller.signal.aborted) return;
         if (results.every(r => r.status === "rejected")) return; // Existing timestamps expire and disable orders.
         snapshotsRef.current = { ...snapshotsRef.current, ...next };
         setSnapshots(snapshotsRef.current);
+        optionSnapshotsRef.current = { ...optionSnapshotsRef.current, ...nextOptions };
+        setOptionSnapshots(optionSnapshotsRef.current);
         const quotes: Partial<Record<PerpSymbol, PerpQuote>> = {};
         const specs: Partial<Record<PerpSymbol, PerpSpec>> = {};
         for (const [symbol, snapshot] of Object.entries(next)) {
           if (snapshot) { quotes[symbol] = snapshot.quote; specs[symbol] = snapshot.spec; }
         }
-        await transact(a => advanceGlobalAccount(a, quotes, specs, Date.now()), true);
+        await transact(a => advanceOptions(advanceGlobalAccount(a, quotes, specs, Date.now()), observedOptions, Date.now()), true);
       } finally { running = false; }
     };
     void poll();
@@ -93,6 +110,6 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
     document.addEventListener("visibilitychange", poll);
     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
   }, [monitorSymbols, transact]);
-  return { account, snapshots, clock, busy, error, transact };
+  return { account, snapshots, optionSnapshots, clock, busy, error, transact };
 }
 export type GlobalTrading = ReturnType<typeof useGlobalTrading>;

@@ -3,6 +3,7 @@ import {
   marginRate, newPerpAccount, openPerp, readPerpAccount, tradingFee, USD_INR,
   type PerpAccount, type PerpOrder, type PerpQuote, type PerpSpec, type PerpSymbol,
 } from "./global-markets.ts";
+import { validateOptionAccount } from "./global-option-orders.ts";
 
 export const GLOBAL_ORDER_TYPES = ["Market", "Limit", "Maker only", "Stop limit", "Stop market", "Trailing stop", "Take profit market", "Take profit limit"] as const;
 export type GlobalOrderType = typeof GLOBAL_ORDER_TYPES[number];
@@ -74,7 +75,7 @@ export function readGlobalAccount(text: string | null): PerpAccount {
     if (!o.protection && (o.stop || o.target)) o.protection = { source: "mark", stopLoss: o.stop ? { mode: "Market", trigger: o.stop } : undefined, takeProfit: o.target ? { mode: "Market", trigger: o.target } : undefined };
     if (o.reduceOnly !== undefined && typeof o.reduceOnly !== "boolean" || o.triggered !== undefined && typeof o.triggered !== "boolean") throw new Error("Invalid saved order flags.");
   }
-  return a;
+  return validateOptionAccount(a);
 }
 function validateProtection(plan: GlobalProtection, spec: PerpSpec | undefined, side: "BUY" | "SELL", entry: number, checkDirection = true) {
   if (!["mark", "last", "index"].includes(plan.source)) throw new Error("Choose a valid trigger source.");

@@ -1,6 +1,8 @@
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
 import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine";
+import { isDeltaOptionSymbol, normalizeDeltaOptionSpec } from "./global-contracts.ts";
+import type { OptionEvent, OptionOrder, OptionPosition } from "./global-option-orders.ts";
 
 export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
@@ -79,11 +81,42 @@ export const deltaSymbolFromInstrumentKey = (
 };
 export const isGlobalInstrumentKey = (value?: string) =>
   Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|"));
+export const deltaOptionSymbolFromInstrumentKey = (value?: string): string | null => {
+  const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
+  return isDeltaOptionSymbol(symbol) ? symbol : null;
+};
 export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument[] {
   const bySymbol = new Map<string, Instrument>();
   for (const row of rows) {
     const symbol = row?.symbol;
-    if (typeof symbol !== "string" || !isDeltaPerpSymbol(symbol)) continue;
+    if (typeof symbol !== "string") continue;
+    if (row.contract_type === "call_options" || row.contract_type === "put_options") {
+      try {
+        const spec = normalizeDeltaOptionSpec(row, symbol, Date.now());
+        if (!spec.operational) continue;
+        bySymbol.set(symbol, {
+          symbol,
+          name: `${spec.underlying} ${spec.contractType === "call_options" ? "Call" : "Put"} $${spec.strike.toLocaleString("en-US")} · ${new Date(spec.expiry).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
+          exchange: "DELTA", price: 0, change: 0,
+          instrumentKey: `DELTA|${symbol}`,
+          categories: ["GLOBAL", "OPTION", spec.underlying],
+          assetType: "OPTION",
+          optionType: spec.contractType === "call_options" ? "CE" : "PE",
+          strikePrice: spec.strike,
+          expiry: new Date(spec.expiry).toISOString(),
+          lotSize: 1,
+          underlyingSymbol: spec.underlying,
+        });
+      } catch { /* Never list an option without validated contract rules. */ }
+      continue;
+    }
+    if (row.contract_type === "futures") {
+      const expiry = Date.parse(row.settlement_time);
+      if (row.quoting_asset?.symbol !== "USD" || row.settling_asset?.symbol !== "USD" || row.notional_type !== "vanilla" || row.state !== "live" || row.trading_status !== "operational" || !Number.isFinite(expiry) || expiry <= Date.now()) continue;
+      bySymbol.set(symbol, { symbol, name: `${row.underlying_asset?.name ?? row.contract_unit_currency ?? symbol} dated future`, exchange: "DELTA", price: 0, change: 0, instrumentKey: `DELTA|${symbol}`, categories: ["GLOBAL", "DATED_FUTURE"], assetType: "FUTURE", expiry: new Date(expiry).toISOString(), underlyingSymbol: row.contract_unit_currency });
+      continue;
+    }
+    if (!isDeltaPerpSymbol(symbol)) continue;
     try {
       const spec = normalizePerpSpec(row, symbol, Date.now());
       if (!spec.operational) continue;
@@ -323,6 +356,9 @@ export type PerpAccount = {
   lastChecked: number;
   revision: number;
   fundingGap: boolean;
+  optionPositions?: OptionPosition[];
+  optionOrders?: OptionOrder[];
+  optionEvents?: OptionEvent[];
 };
 export const newPerpAccount = (): PerpAccount => ({
   version: 1,
@@ -333,6 +369,9 @@ export const newPerpAccount = (): PerpAccount => ({
   lastChecked: 0,
   revision: 0,
   fundingGap: false,
+  optionPositions: [],
+  optionOrders: [],
+  optionEvents: [],
 });
 export function readPerpAccount(text: string | null): PerpAccount {
   if (!text) return newPerpAccount();
@@ -425,7 +464,9 @@ export function readPerpAccount(text: string | null): PerpAccount {
 export const availablePerpCash = (a: PerpAccount) =>
   a.wallet -
   a.positions.reduce((n, p) => n + p.margin, 0) -
-  a.orders.reduce((n, o) => n + o.reserve, 0);
+  a.orders.reduce((n, o) => n + o.reserve, 0) -
+  (a.optionPositions ?? []).reduce((n, p) => n + p.margin, 0) -
+  (a.optionOrders ?? []).reduce((n, o) => n + o.reserve, 0);
 export const positionPnl = (p: PerpPosition, price: number) =>
   (price - p.entry) *
   p.contracts *
