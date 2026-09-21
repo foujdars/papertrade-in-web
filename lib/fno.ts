@@ -97,12 +97,12 @@ export function optionToInstrument(
 export function futureToInstrument(contract: FutureContract, underlying: FnoUnderlying): Instrument {
   return {
     symbol: contract.tradingSymbol,
-    name: `${underlying.symbol} Future`,
+    name: `${underlying.symbol} Future · ${new Date(`${contract.expiry}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
     exchange: "NSE",
     price: contract.lastPrice,
     change: 0,
     instrumentKey: contract.instrumentKey,
-    categories: [],
+    categories: ["F&O", "Futures"],
     assetType: "FUTURE",
     expiry: contract.expiry,
     lotSize: contract.lotSize,

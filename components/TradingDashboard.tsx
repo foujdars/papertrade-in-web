@@ -58,6 +58,7 @@ import { getNseMarketStatus, nseSquareOffMinute, type NseSession } from "@/lib/m
 import {
   calculatePosition,
   getDeliveryHoldingQuantity,
+  futureFillCashDelta,
   getProtectionExecutionPrice,
   getProtectionTrigger,
   paperOrderCapitalValue,
@@ -249,6 +250,7 @@ function orderTradeMarker(order: PaperOrder, role: "ENTRY" | "EXIT"): ChartTrade
 function paperOrderStatusLabel(order: PaperOrder) {
   if (order.exitReason === "TARGET") return "Target hit";
   if (order.exitReason === "STOP_LOSS") return "SL hit";
+  if (order.exitReason === "EXPIRY") return "Paper expiry";
   if (order.autoSquareOff || order.exitReason === "AUTO_SQUARE_OFF") return "Auto exit";
   return "Complete";
 }
@@ -539,6 +541,8 @@ export function TradingDashboard() {
   const pendingChartRestoreRef = useRef<{ symbol: string; timeframe: string } | null>({ symbol: "__PENDING__", timeframe: "5m" });
   const autoSquareOffInFlightRef = useRef(false);
   const autoSquareOffRetryAtRef = useRef(0);
+  const futureExpiryInFlightRef = useRef(false);
+  const futureExpiryRetryAtRef = useRef(0);
   const autoSquareOffRepairInFlightRef = useRef(false);
   const lastFnoWorkspaceRef = useRef<FnoWorkspaceSnapshot | null>(null);
   const instrumentUniverseLoadRef = useRef({ loaded: false, lastRefreshAt: 0, lastForcedAt: 0 });
@@ -965,14 +969,19 @@ export function TradingDashboard() {
     return () => controller.abort();
   }, []);
 
+  const futureTradingDate = indiaDateKey(clock ?? new Date());
+  const stockFutureInstruments = useMemo(() => fnoUnderlyings
+    .filter((underlying) => underlying.underlyingType === "EQUITY")
+    .flatMap((underlying) => (underlying.futures ?? []).filter((contract) => contract.expiry >= futureTradingDate).map((contract) => futureToInstrument(contract, underlying))), [fnoUnderlyings, futureTradingDate]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
     const standardList = watchlistTabs.find((tab) => tab === watchlist);
     const universe = customList
-      ? [...new Map([...stockUniverse, ...derivativeInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
+      ? [...new Map([...stockUniverse, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
       : term
-        ? [...stockUniverse, ...globalInstruments]
+        ? [...stockUniverse, ...stockFutureInstruments, ...globalInstruments]
         : stockUniverse;
     return universe.filter((item) => {
       const matchesList = Boolean(term)
@@ -981,7 +990,7 @@ export function TradingDashboard() {
         || (standardList !== undefined && item.categories.includes(standardList));
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
-  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockUniverse, watchlist]);
+  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockFutureInstruments, stockUniverse, watchlist]);
   useEffect(() => {
     const term = search.trim();
     if (term.length < 2 || filtered.length || watchlistLoading) return;
@@ -998,11 +1007,11 @@ export function TradingDashboard() {
   }, [filtered.length, loadInstrumentUniverse, search, watchlistLoading]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
-    return [...stockUniverse, ...globalInstruments]
+    return [...stockUniverse, ...stockFutureInstruments, ...globalInstruments]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
       .sort((a, b) => term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0)
       .slice(0, 120);
-  }, [globalInstruments, stockUniverse, tradeSymbolSearch]);
+  }, [globalInstruments, stockFutureInstruments, stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
     const lastFill = orders.find((order) => order.symbol === symbol);
     return calculatePosition(orders, symbol, lastFill?.price ?? 0, "INTRADAY").quantity > 0 || calculatePosition(orders, symbol, lastFill?.price ?? 0, "DELIVERY").quantity > 0;
@@ -1010,9 +1019,9 @@ export function TradingDashboard() {
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const tradingUniverse = useMemo(() => {
     const byKey = new Map<string, Instrument>();
-    for (const item of [...stockUniverse, ...derivativeInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
+    for (const item of [...stockUniverse, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
-  }, [derivativeInstruments, globalInstruments, stockUniverse]);
+  }, [derivativeInstruments, globalInstruments, stockFutureInstruments, stockUniverse]);
 
   useEffect(() => {
     if (!paperDataReady || !isAndroidApp) return;
@@ -1345,7 +1354,7 @@ export function TradingDashboard() {
         const closingSide = item.position.side === "LONG" ? "SELL" : "BUY";
         const charges = calculateInstrumentCharges(item.instrument, { side: closingSide, product: "INTRADAY", quantity: item.position.quantity, price: squareOffPrice });
         const exitTimestamp = squareOffTimestamp(item.sessionDate, item.cutoffMinute);
-        automaticOrders.push({
+        const automaticOrder: PaperOrder = {
           id: `${exitTimestamp + index}`,
           symbol: item.symbol,
           side: closingSide,
@@ -1360,9 +1369,22 @@ export function TradingDashboard() {
           squareOffPolicy: "NSE_SESSION_30_MIN_V1",
           exitReason: "AUTO_SQUARE_OFF",
           priceSource: item.resolvedPrice ? "UPSTOX_CANDLE" : "UPSTOX_QUOTE",
-        });
-        const releasedMargin = squareOffPrice * item.position.quantity * 0.2;
-        nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+          instrumentKey: item.instrument.instrumentKey,
+          instrumentName: item.instrument.name,
+          assetType: item.instrument.assetType,
+          expiry: item.instrument.expiry,
+          lotSize: item.instrument.lotSize,
+          underlyingKey: item.instrument.underlyingKey,
+          underlyingSymbol: item.instrument.underlyingSymbol,
+        };
+        if (item.instrument.assetType === "FUTURE") {
+          automaticOrder.cashDelta = futureFillCashDelta([...automaticOrders, ...orders], automaticOrder).cashDelta;
+          nextBalance += automaticOrder.cashDelta;
+        } else {
+          const releasedMargin = squareOffPrice * item.position.quantity * 0.2;
+          nextBalance = closingSide === "SELL" ? nextBalance + releasedMargin - charges.total : nextBalance - releasedMargin - charges.total;
+        }
+        automaticOrders.push(automaticOrder);
       });
       if (!automaticOrders.length) {
         autoSquareOffRetryAtRef.current = Date.now() + 60_000;
@@ -1384,6 +1406,60 @@ export function TradingDashboard() {
       autoSquareOffInFlightRef.current = false;
     });
   }, [balance, clock, exchangeSession, marketQuotes, orders, tradingUniverse]);
+
+  useEffect(() => {
+    if (!clock || !orders.length || futureExpiryInFlightRef.current || autoSquareOffInFlightRef.current || Date.now() < futureExpiryRetryAtRef.current) return;
+    const today = indiaDateKey(clock);
+    const afterClose = getNseMarketStatus(clock).minutesFromMidnight >= 15 * 60 + 30;
+    const candidates = [...new Set(orders.filter((order) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey).map((order) => order.symbol))]
+      .flatMap((symbol) => {
+        const contract = orders.find((order) => order.symbol === symbol && order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey);
+        if (!contract?.expiry || !contract.underlyingKey || !(contract.expiry < today || (contract.expiry === today && afterClose))) return [];
+        const position = calculatePosition(orders, symbol, contract.price, "DELIVERY");
+        return position.quantity > 0 ? [{ contract, position }] : [];
+      });
+    if (!candidates.length) return;
+    futureExpiryInFlightRef.current = true;
+    void Promise.all(candidates.map(async ({ contract }) => {
+      try {
+        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
+        const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
+        const candle = response.ok && payload.ok ? payload.candles?.find((item) => indiaDateKey(item.time * 1000) === contract.expiry) : undefined;
+        return { contract, price: candle?.close };
+      } catch { return { contract, price: undefined }; }
+    })).then((resolved) => {
+      let nextOrders = readPaperOrders();
+      const storedBalance = localStorage.getItem("papertrade-balance");
+      const parsedBalance = Number(storedBalance);
+      let nextBalance = storedBalance !== null && Number.isFinite(parsedBalance) ? parsedBalance : balance;
+      const settled: PaperOrder[] = [];
+      for (const { contract, price } of resolved) {
+        if (!price || !Number.isFinite(price) || price <= 0 || !contract.expiry) continue;
+        const position = calculatePosition(nextOrders, contract.symbol, price, "DELIVERY");
+        if (!position.quantity) continue;
+        const side = position.side === "LONG" ? "SELL" : "BUY";
+        const at = Date.parse(`${contract.expiry}T15:30:00+05:30`);
+        const charges = calculateUpstoxTradingCharges("FUTURE", { side, product: "DELIVERY", quantity: position.quantity, price });
+        const fill: PaperOrder = { ...contract, id: `future-expiry:${contract.instrumentKey}:${contract.expiry}`, side, quantity: position.quantity, price, time: squareOffTimeLabel(at), createdAt: at, charges, exitReason: "EXPIRY", priceSource: "UPSTOX_CANDLE" };
+        fill.cashDelta = futureFillCashDelta(nextOrders, fill).cashDelta;
+        nextBalance += fill.cashDelta;
+        nextOrders = [fill, ...nextOrders];
+        settled.push(fill);
+      }
+      if (!settled.length) { futureExpiryRetryAtRef.current = Date.now() + 60_000; return; }
+      writePaperOrders(nextOrders);
+      localStorage.setItem("papertrade-balance", String(nextBalance));
+      setOrders(nextOrders);
+      setBalance(nextBalance);
+      setProtections((current) => {
+        const symbols = new Set(settled.map((item) => item.symbol));
+        const remaining = current.filter((item) => !(item.product === "DELIVERY" && symbols.has(item.symbol)));
+        writePaperProtections(remaining);
+        return remaining;
+      });
+      setToast(`${settled.length} stock future${settled.length === 1 ? "" : "s"} paper-settled at the expiry-day stock close. No shares were delivered.`);
+    }).finally(() => { futureExpiryInFlightRef.current = false; });
+  }, [balance, clock, orders]);
 
   useEffect(() => {
     if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
@@ -1494,11 +1570,15 @@ export function TradingDashboard() {
         underlyingKey: instrument?.underlyingKey,
         underlyingSymbol: instrument?.underlyingSymbol,
       };
+      if (instrument?.assetType === "FUTURE") order.cashDelta = futureFillCashDelta([...triggeredOrders, ...orders], order).cashDelta;
       triggeredOrders.push(order);
       if (nativeTrigger) nativeTriggeredOrderIds.add(order.id);
       clearedProtectionIds.add(protection.id);
-      const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, executionPrice);
-      nextBalance = closingSide === "SELL" ? nextBalance + releasedCapital - charges.total : nextBalance - releasedCapital - charges.total;
+      if (order.cashDelta !== undefined) nextBalance += order.cashDelta;
+      else {
+        const releasedCapital = paperOrderCapitalValue(instrument?.assetType ?? "EQUITY", protection.product, position.quantity, executionPrice);
+        nextBalance = closingSide === "SELL" ? nextBalance + releasedCapital - charges.total : nextBalance - releasedCapital - charges.total;
+      }
     });
 
     if (consumedNativeTriggerIds.size) {
@@ -1580,8 +1660,8 @@ export function TradingDashboard() {
   const verifiedTopPrice = topQuoteIsFresh ? topQuote?.lastPrice ?? 0 : fnoTopInstrument?.price ?? 0;
   const verifiedTopChange = topQuoteIsFresh ? topQuote?.changePercent ?? 0 : 0;
   const orderValue = visibleLivePrice * quantity;
-  const quantityStep = selected.assetType === "OPTION" ? Math.max(1, selected.lotSize ?? 1) : 1;
-  const orderLots = selected.assetType === "OPTION" ? quantity / quantityStep : 0;
+  const quantityStep = selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(1, selected.lotSize ?? 1) : 1;
+  const orderLots = selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? quantity / quantityStep : 0;
   const margin = orderValue * 0.2;
   const isCashDeliveryOrder = product === "DELIVERY" && selected.assetType !== "OPTION" && selected.assetType !== "FUTURE";
   const estimatedFundsRequired = paperOrderCapitalValue(selected.assetType, product, quantity, visibleLivePrice);
@@ -1797,7 +1877,7 @@ export function TradingDashboard() {
   const activeIndicatorCount = Object.values(indicators).filter(Boolean).length;
   const requestedExitQuantity = Number.parseInt(exitQuantity, 10);
   const safeExitQuantity = selectedPosition.quantity > 0
-    ? Math.min(Math.max(1, Number.isFinite(requestedExitQuantity) ? requestedExitQuantity : 1), selectedPosition.quantity)
+    ? Math.min(Math.max(quantityStep, Math.floor((Number.isFinite(requestedExitQuantity) ? requestedExitQuantity : quantityStep) / quantityStep) * quantityStep), selectedPosition.quantity)
     : 1;
 
   function protectionValues() {
@@ -1955,8 +2035,12 @@ export function TradingDashboard() {
       setToast(tradingLimitStatus.reasons[0] || "A personal trading limit is active.");
       return;
     }
-    if (selected.assetType === "OPTION" && quantity % quantityStep !== 0) {
-      setToast(`Option quantity must be a multiple of the ${quantityStep}-unit lot size.`);
+    if ((selected.assetType === "OPTION" || selected.assetType === "FUTURE") && quantity % quantityStep !== 0) {
+      setToast(`F&O quantity must be a multiple of the ${quantityStep}-unit lot size.`);
+      return;
+    }
+    if (selected.assetType === "FUTURE" && (!selected.expiry || selected.expiry < indiaDateKey(new Date()))) {
+      setToast("This futures contract has expired. Choose an active expiry.");
       return;
     }
     const executionPrice = verifiedLivePrice;
@@ -1987,7 +2071,7 @@ export function TradingDashboard() {
     }
     const executionCharges = calculateInstrumentCharges(selected, { side, product, quantity, price: executionPrice });
     const executionCapital = paperOrderCapitalValue(selected.assetType, product, quantity, executionPrice);
-    if (side === "BUY" && executionCapital + executionCharges.total > balance) {
+    if (selected.assetType !== "FUTURE" && side === "BUY" && executionCapital + executionCharges.total > balance) {
       setToast(`Insufficient virtual cash. Required ${formatInr(executionCapital + executionCharges.total)}.`);
       return;
     }
@@ -2014,8 +2098,17 @@ export function TradingDashboard() {
       underlyingSymbol: selected.underlyingSymbol,
       journalPlan: { strategy: tradeStrategy, thesis: tradeThesis.trim(), confidence: tradeConfidence },
     };
+    const futureCash = selected.assetType === "FUTURE" ? futureFillCashDelta(orders, order) : null;
+    const currentFuturePosition = futureCash ? calculatePosition(orders, selected.symbol, executionPrice, product) : null;
+    const reducingFuture = !!currentFuturePosition && currentFuturePosition.quantity >= quantity &&
+      ((currentFuturePosition.side === "LONG" && side === "SELL") || (currentFuturePosition.side === "SHORT" && side === "BUY"));
+    if (futureCash && balance + futureCash.cashDelta < 0 && !reducingFuture) {
+      setToast(`Insufficient virtual cash for estimated futures margin. Required ${formatInr(-futureCash.cashDelta)}.`);
+      return;
+    }
+    if (futureCash) order.cashDelta = futureCash.cashDelta;
     const nextOrders = [order, ...orders];
-    const nextBalance = (side === "BUY" ? balance - executionCapital : balance + executionCapital) - executionCharges.total;
+    const nextBalance = futureCash ? balance + futureCash.cashDelta : (side === "BUY" ? balance - executionCapital : balance + executionCapital) - executionCharges.total;
     const nextPosition = calculatePosition(nextOrders, selected.symbol, executionPrice, product);
     const requestedProtection = protectionValues();
     const { target, stopLoss } = requestedProtection;
@@ -2071,7 +2164,8 @@ export function TradingDashboard() {
       setToast(intradayStatusMessage);
       return;
     }
-    const closingQuantity = Math.min(exitPositionQuantity, Math.max(1, Math.floor(requestedQuantity)));
+    const exitStep = exitInstrument.assetType === "FUTURE" || exitInstrument.assetType === "OPTION" ? Math.max(1, exitInstrument.lotSize ?? 1) : 1;
+    const closingQuantity = Math.min(exitPositionQuantity, Math.max(exitStep, Math.floor(requestedQuantity / exitStep) * exitStep));
     const closingSide = exitSide === "LONG" ? "SELL" : "BUY";
     const exitCharges = calculateInstrumentCharges(exitInstrument, { side: closingSide, product: exitProduct, quantity: closingQuantity, price: executionPrice });
     const order: PaperOrder = {
@@ -2097,12 +2191,14 @@ export function TradingDashboard() {
       underlyingKey: exitInstrument.underlyingKey,
       underlyingSymbol: exitInstrument.underlyingSymbol,
     };
+    const futureCash = exitInstrument.assetType === "FUTURE" ? futureFillCashDelta(orders, order) : null;
+    if (futureCash) order.cashDelta = futureCash.cashDelta;
     const nextOrders = [order, ...orders];
     const exitCapital = paperOrderCapitalValue(exitInstrument.assetType, exitProduct, closingQuantity, executionPrice);
-    const nextBalance = (closingSide === "BUY" ? balance - exitCapital : balance + exitCapital) - exitCharges.total;
+    const nextBalance = futureCash ? balance + futureCash.cashDelta : (closingSide === "BUY" ? balance - exitCapital : balance + exitCapital) - exitCharges.total;
     setOrders(nextOrders);
     setBalance(nextBalance);
-    setExitQuantity("1");
+    setExitQuantity(String(exitStep));
     writePaperOrders(nextOrders);
     localStorage.setItem("papertrade-balance", String(nextBalance));
     if (closingQuantity >= exitPositionQuantity) saveProtection(null, exitInstrument.symbol, exitProduct);
@@ -2119,7 +2215,8 @@ export function TradingDashboard() {
     const nextInstrument = { ...item, price: price > 0 ? price : 0 };
     setRecentStocks((current) => [item.symbol, ...current.filter((symbol) => symbol !== item.symbol)].slice(0, 6));
     setSelected(nextInstrument);
-    if (isGlobalInstrumentKey(item.instrumentKey)) setProduct("DELIVERY");
+    if (isGlobalInstrumentKey(item.instrumentKey) || item.assetType === "FUTURE") setProduct("DELIVERY");
+    if (item.assetType === "FUTURE") { setQuantityInput(String(Math.max(1, item.lotSize ?? 1))); setExitQuantity(String(Math.max(1, item.lotSize ?? 1))); }
     if (item.assetType !== "OPTION" || isGlobalInstrumentKey(item.instrumentKey)) {
       setWorkspaceMode("trade");
       setSpotInstrument(null);
@@ -2467,11 +2564,14 @@ export function TradingDashboard() {
     }
     const charges = calculateInstrumentCharges(instrument, { side: task.side, product: task.product, quantity: task.quantity, price: executionPrice });
     const capital = paperOrderCapitalValue(instrument.assetType, task.product, task.quantity, executionPrice);
-    if (!reduces && capital + charges.total > currentCash) return "Insufficient virtual cash at the trigger price.";
+    if (instrument.assetType !== "FUTURE" && !reduces && capital + charges.total > currentCash) return "Insufficient virtual cash at the trigger price.";
     const now = Date.now();
     const order: PaperOrder = { ...instrument, id: task.id, symbol: instrument.symbol, instrumentName: instrument.name, side: task.side, product: task.product, quantity: task.quantity, price: executionPrice, status: "COMPLETE", createdAt: now, time: new Date(now).toLocaleTimeString("en-IN"), charges, priceSource: "UPSTOX_QUOTE" };
+    const futureCash = instrument.assetType === "FUTURE" ? futureFillCashDelta(currentOrders, order) : null;
+    if (futureCash && currentCash + futureCash.cashDelta < 0 && !reduces) return "Insufficient virtual cash for estimated futures margin at the trigger price.";
+    if (futureCash) order.cashDelta = futureCash.cashDelta;
     const next = [order, ...currentOrders];
-    const nextBalance = currentCash + (task.side === "BUY" ? -capital : capital) - charges.total;
+    const nextBalance = futureCash ? currentCash + futureCash.cashDelta : currentCash + (task.side === "BUY" ? -capital : capital) - charges.total;
     setOrders(next); setBalance(nextBalance); writePaperOrders(next); localStorage.setItem("papertrade-balance", String(nextBalance));
     const nextPosition = calculatePosition(next, instrument.symbol, executionPrice, task.product);
     if (!nextPosition.quantity || nextPosition.side !== position.side) saveProtection(null, instrument.symbol, task.product);
@@ -2489,7 +2589,11 @@ export function TradingDashboard() {
     }
     const charges = calculateInstrumentCharges(task.instrument, { side: task.side, product: task.product, quantity: task.quantity, price: task.price });
     const capital = paperOrderCapitalValue(task.instrument.assetType, task.product, task.quantity, task.price);
-    if (!reduces && capital + charges.total > balance) return `Insufficient virtual cash. Estimated requirement: ${formatInr(capital + charges.total)}.`;
+    if (task.instrument.assetType === "FUTURE") {
+      const estimate: PaperOrder = { id: String(Date.now()), symbol: task.instrument.symbol, side: task.side, quantity: task.quantity, price: task.price, status: "COMPLETE", time: "", product: task.product, charges, instrumentKey: task.instrument.instrumentKey, assetType: "FUTURE" };
+      const cash = futureFillCashDelta(orders, estimate);
+      if (!reduces && balance + cash.cashDelta < 0) return `Insufficient virtual cash. Estimated futures margin: ${formatInr(-cash.cashDelta)}.`;
+    } else if (!reduces && capital + charges.total > balance) return `Insufficient virtual cash. Estimated requirement: ${formatInr(capital + charges.total)}.`;
     return null;
   }
 
@@ -2804,7 +2908,7 @@ export function TradingDashboard() {
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit" }); } }}>{type}</button>)}</div>
           <div className="input-grid">
-            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{selected.assetType === "OPTION" && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot</small>}</label>
+            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
@@ -2814,7 +2918,7 @@ export function TradingDashboard() {
           </div>
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
           {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
-          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
+          <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "FUTURE" ? "Paper cash settlement · no share delivery" : selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => { setCoachTab("limits"); setCoachOpen(true); }}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
@@ -2890,7 +2994,7 @@ export function TradingDashboard() {
         />
       )}
 
-      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onStar={openFnoWatchlistPicker} onClose={() => {
+      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={(underlying) => { const nearest = underlying.futures?.find((contract) => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } openNavigationSection("trade"); chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} onClose={() => {
         if (selected.assetType === "OPTION" && spotInstrument) setFnoListOpen(false);
         else closeFnoWorkspace();
       }} />}

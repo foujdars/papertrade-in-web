@@ -13,7 +13,7 @@ export type PaperOrder = {
   charges?: EquityChargeBreakdown;
   autoSquareOff?: boolean;
   squareOffPolicy?: string;
-  exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF";
+  exitReason?: "TARGET" | "STOP_LOSS" | "MANUAL" | "AUTO_SQUARE_OFF" | "EXPIRY";
   priceSource?: "UPSTOX_QUOTE" | "UPSTOX_CANDLE";
   instrumentKey?: string;
   instrumentName?: string;
@@ -24,6 +24,8 @@ export type PaperOrder = {
   lotSize?: number;
   underlyingKey?: string;
   underlyingSymbol?: string;
+  /** Actual change to the INR practice balance for a futures fill. */
+  cashDelta?: number;
   journalPlan?: {
     strategy: string;
     thesis: string;
@@ -89,6 +91,7 @@ function paperOrderTimestamp(order: PaperOrder) {
 }
 
 function orderCashEffect(order: PaperOrder) {
+  if (order.assetType === "FUTURE" && Number.isFinite(order.cashDelta)) return order.cashDelta!;
   const calculatedCharges = calculateUpstoxTradingCharges(order.assetType, {
     side: order.side,
     product: order.product ?? "INTRADAY",
@@ -99,6 +102,25 @@ function orderCashEffect(order: PaperOrder) {
     ? calculatedCharges
     : order.charges ?? calculatedCharges;
   return (order.side === "SELL" ? 1 : -1) * paperOrderCapitalValue(order.assetType, order.product ?? "INTRADAY", order.quantity, order.price) - charges.total;
+}
+
+export const FUTURE_PAPER_MARGIN_RATE = 0.2;
+
+/** Reserve estimated margin on entry; release it and realise full price P&L on exit. */
+export function futureFillCashDelta(orders: PaperOrder[], fill: PaperOrder) {
+  if (fill.assetType !== "FUTURE" || !fill.instrumentKey?.startsWith("NSE_FO|") ||
+    !Number.isFinite(fill.quantity) || fill.quantity <= 0 || !Number.isFinite(fill.price) || fill.price <= 0)
+    throw new Error("A valid NSE futures fill is required.");
+  const product = fill.product ?? "DELIVERY";
+  const before = calculatePosition(orders, fill.symbol, fill.price, product);
+  const after = calculatePosition([fill, ...orders], fill.symbol, fill.price, product);
+  const marginBefore = before.quantity * before.averagePrice * FUTURE_PAPER_MARGIN_RATE;
+  const marginAfter = after.quantity * after.averagePrice * FUTURE_PAPER_MARGIN_RATE;
+  const realisedPnl = after.realizedPnl - before.realizedPnl;
+  const charges = fill.charges?.total ?? calculateUpstoxTradingCharges("FUTURE", {
+    side: fill.side, product, quantity: fill.quantity, price: fill.price,
+  }).total;
+  return { cashDelta: marginBefore - marginAfter + realisedPnl - charges, marginBefore, marginAfter, realisedPnl, charges };
 }
 
 export function paperOrderCapitalValue(
@@ -204,7 +226,12 @@ export function calculatePosition(
       order.quantity > 0 &&
       Number.isFinite(order.price),
     )
-    .sort((a, b) => Number(a.id) - Number(b.id));
+    .sort((a, b) => {
+      const byTime = paperOrderTimestamp(a) - paperOrderTimestamp(b);
+      if (byTime) return byTime;
+      const aId = Number(a.id), bId = Number(b.id);
+      return Number.isFinite(aId) && Number.isFinite(bId) ? aId - bId : a.id.localeCompare(b.id);
+    });
 
   let signedQuantity = 0;
   let averagePrice = 0;

@@ -58,6 +58,7 @@ async function loadUnderlyings() {
   if (cache && cache.expiresAt > Date.now()) return cache.underlyings;
   const master = await loadNseMaster();
   const grouped = new Map<string, FnoUnderlying>();
+  const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   for (const item of master) {
     if (item.segment !== "NSE_FO" || !item.underlying_key || !item.underlying_symbol) continue;
@@ -76,9 +77,9 @@ async function loadUnderlyings() {
       futures: [],
     } satisfies FnoUnderlying;
     if (item.instrument_type === "FUT") {
-      current.futureContracts += 1;
       const expiry = normalizeExpiry(item.expiry);
-      if (item.instrument_key && item.trading_symbol && expiry) {
+      if (item.instrument_key && item.trading_symbol && expiry && expiry >= todayIst) {
+        current.futureContracts += 1;
         current.futures?.push({
           instrumentKey: item.instrument_key,
           tradingSymbol: item.trading_symbol.trim(),
@@ -93,7 +94,7 @@ async function loadUnderlyings() {
 
   const priority = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
   const underlyings = [...grouped.values()]
-    .filter((item) => item.optionContracts > 0)
+    .filter((item) => item.optionContracts > 0 || item.futureContracts > 0)
     .map((item) => ({ ...item, futures: (item.futures ?? []).sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))) }))
     .sort((a, b) => {
       const aPriority = priority.indexOf(a.symbol);

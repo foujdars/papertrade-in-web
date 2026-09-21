@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculatePosition, deletePaperTradeOrders, getDeliveryHoldingQuantity, getProtectionExecutionPrice, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
+import { calculatePosition, deletePaperTradeOrders, futureFillCashDelta, getDeliveryHoldingQuantity, getProtectionExecutionPrice, getProtectionTrigger, paperOrderCapitalValue, repairRatnaveerSimulationTrade, validateDeliverySell } from "../lib/paper-trading.ts";
 import { buildClosedTrades, filterClosedTradesByOutcome } from "../lib/trade-analytics.ts";
 import { prepareClosedTradeDeletion } from "../lib/closed-trade-deletion.ts";
 import { calculateUpstoxFutureCharges, calculateUpstoxOptionCharges, calculateUpstoxTradingCharges } from "../lib/trading-charges.ts";
@@ -126,6 +126,30 @@ test("deducts both futures legs from completed-trade P&L", () => {
   assert.equal(trade.grossPnl, 650);
   assert.equal(trade.charges, expectedCharges);
   assert.equal(trade.netPnl, 650 - expectedCharges);
+});
+
+test("stock futures reserve margin on either side and release it with full price P&L", () => {
+  const fill = (id, side, quantity, price) => ({ ...order(id, side, quantity, price), symbol: "RELIANCE FUT 29 SEP 26", instrumentKey: "NSE_FO|123", assetType: "FUTURE", product: "DELIVERY", charges: { total: 0 }, createdAt: Number(id) * 1000 });
+  const long = fill(1, "BUY", 50, 100);
+  const longOpen = futureFillCashDelta([], long);
+  assert.equal(longOpen.cashDelta, -1000);
+  const partial = fill(2, "SELL", 20, 110);
+  const partialClose = futureFillCashDelta([long], partial);
+  assert.equal(partialClose.realisedPnl, 200);
+  assert.equal(partialClose.cashDelta, 600);
+  const last = fill(3, "SELL", 30, 110);
+  assert.equal(futureFillCashDelta([partial, long], last).cashDelta, 900);
+  const short = fill(4, "SELL", 50, 100);
+  assert.equal(futureFillCashDelta([], short).cashDelta, -1000, "Selling a future must not credit short-sale proceeds");
+  assert.equal(futureFillCashDelta([short], fill(5, "BUY", 50, 90)).cashDelta, 1500);
+  assert.equal(futureFillCashDelta([short], fill(5, "BUY", 75, 90)).cashDelta, 1050, "A reversal releases old margin and reserves margin for the new side");
+});
+
+test("UUID price-order fills follow timestamps and futures cash can be reversed on deletion", () => {
+  const entry = { ...order("entry-uuid", "SELL", 50, 100), symbol: "RELIANCE FUT 29 SEP 26", instrumentKey: "NSE_FO|123", assetType: "FUTURE", product: "INTRADAY", createdAt: 1000, charges: { total: 0 }, cashDelta: -1000 };
+  const exit = { ...entry, id: "exit-uuid", side: "BUY", price: 90, createdAt: 2000, cashDelta: 1500 };
+  assert.equal(calculatePosition([exit, entry], entry.symbol, 90, "INTRADAY").realizedPnl, 500);
+  assert.equal(deletePaperTradeOrders([exit, entry], [entry.id, exit.id]).balanceAdjustment, -500);
 });
 
 test("calculates live unrealized P&L for a long position", () => {
