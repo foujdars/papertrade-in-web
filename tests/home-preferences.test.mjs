@@ -6,9 +6,13 @@ import {positionAttention,alertAttention} from '../lib/home-attention.ts';
 const now=1800000000000;
 const item={id:'test',title:'Review',detail:'Details',tone:'info',target:{kind:'alerts',tab:'list'}};
 test('Home preferences tolerate damaged storage and scope each account',()=>{
- assert.deepEqual(normalizeHomePreferences(null),{privateBalances:false,recentSearches:[],reminders:{}});
- assert.deepEqual(normalizeHomePreferences({privateBalances:'true',recentSearches:['A',null,'A','B','C','D'],reminders:{bad:{until:'later'}}},now),{privateBalances:false,recentSearches:['A','B','C'],reminders:{}});
+ assert.deepEqual(normalizeHomePreferences(null),{privateBalances:false,market:'india',recentSearches:[],reminders:{}});
+ assert.deepEqual(normalizeHomePreferences({privateBalances:'true',recentSearches:['A',null,'A','B','C','D'],reminders:{bad:{until:'later'}}},now),{privateBalances:false,market:'india',recentSearches:['A','B','C'],reminders:{}});
  assert.notEqual(homePreferenceKey('a'),homePreferenceKey('b'));
+});
+test('Home remembers only a valid market choice',()=>{
+ assert.equal(normalizeHomePreferences({market:'global'}).market,'global');
+ assert.equal(normalizeHomePreferences({market:'unknown'}).market,'india');
 });
 test('Home searches keep only three most recent unique selections',()=>{
  let prefs=normalizeHomePreferences(null);for(const symbol of ['A','B','C','D','B'])prefs=rememberHomeSearch(prefs,symbol);

@@ -282,6 +282,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/home-quotes": homeQuotes,
     "@/lib/home-preferences": homePreferences,
     "@/lib/global-markets": globalMarkets,
+    "@/lib/global-order-engine": { formatUsd: value => `$${Number(value).toFixed(2)}` },
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
     "@/lib/market": { formatInr: String, deriveNetChange: () => 0, formatSignedMarketMove: String },
     "@/lib/nimble-scanner": { NIMBLE_STRATEGIES: {
@@ -324,6 +325,28 @@ test("each Home market-pulse card opens its own index, not the last chart", asyn
   assert.equal(cards.length, 3);
   cards.forEach((card) => card.props.onClick());
   assert.deepEqual(selected, symbols);
+});
+
+test("Home separates Indian and global wallets, search, and add-cash target", async () => {
+  const harness = await componentHarness("components/HomeWorkspace.tsx", "HomeWorkspace");
+  const deposits = [];
+  const props = {
+    indices: [{symbol: 'NIFTY', label: 'NIFTY', price: 1, points: 0, changePercent: 0, live: false}],
+    stockOptions: [{symbol: 'RELIANCE', name: 'Reliance', instrumentKey: 'NSE_EQ|1', categories: []}, {symbol: 'BTCUSD', name: 'Bitcoin', instrumentKey: 'DELTA|BTCUSD', categories: []}],
+    cards: {market: true, portfolio: false}, balance: 1000, globalWallet: 500, globalWalletError: '', globalAvailable: 450,
+    globalPositions: [], globalOpenOrders: 0, globalOpenPnl: 0, globalPnlComplete: true,
+    onAddCash: currency => deposits.push(currency), onOpenStock() {},
+  };
+  let view = harness.render(props);
+  assert.equal(elements(view).filter(node => node.props?.className === 'home-index-card').length, 1);
+  const choices = elements(view).find(node => node.props?.className === 'home-market-chooser');
+  choices.props.children[1].props.onClick();
+  view = harness.render(props);
+  assert.equal(elements(view).filter(node => node.props?.className === 'home-index-card').length, 0);
+  assert.ok(elements(view).some(node => node.props?.className?.includes('home-global-account')));
+  assert.ok(elements(view).some(node => node.props?.placeholder?.startsWith('Search BTC, gold')));
+  elements(view).find(node => node.props?.className === 'home-market-caption').props.children[1].props.onClick();
+  assert.deepEqual(deposits, ['USD']);
 });
 
 test("index row keyboard navigation does not swallow the watchlist-star action", async () => {

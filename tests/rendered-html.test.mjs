@@ -33,7 +33,8 @@ test("server-renders only the full-screen disclaimer before the home dashboard",
   assert.match(dashboard, /Needs attention/);
   assert.match(dashboard, /Continue your chart/);
   assert.match(dashboard, /Market pulse/);
-  assert.match(dashboard, /Search stocks and indices/);
+  assert.match(dashboard, /Search Indian stocks and indices/);
+  assert.match(dashboard, /Search global markets/);
   assert.match(dashboard, /Your paper portfolio/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
@@ -210,7 +211,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /className="quantity-margin"/);
   assert.doesNotMatch(dashboard, /window\.confirm\(/);
   assert.match(dashboard, /Delete trade/);
-  assert.match(dashboard, /MAX_VIRTUAL_BALANCE = 100_000_000/);
+  assert.match(dashboard, /addPaperCash\(stored, requestedAmount\)/);
+  assert.match(dashboard, /globalTrading\.transact\(account =>/);
   assert.match(dashboard, /FnoChartWorkspace/);
   assert.match(fnoChartWorkspace, /fno-focus-workspace/);
   assert.match(fnoChartWorkspace, /fno-window-slider/);

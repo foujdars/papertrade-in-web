@@ -1,7 +1,7 @@
 import type { HomeAttention } from './home-attention';
 
 export type HomeReminder = { fingerprint: string; until: number; reviewed: boolean };
-export type HomePreferences = { privateBalances: boolean; recentSearches: string[]; reminders: Record<string, HomeReminder> };
+export type HomePreferences = { privateBalances: boolean; market: 'india' | 'global'; recentSearches: string[]; reminders: Record<string, HomeReminder> };
 export const HOME_REMIND_LATER_MS = 60 * 60 * 1000;
 export const homePreferenceKey = (owner: string) => `papertrade-home-v2:${owner}`;
 export const reminderFingerprint = (item: HomeAttention) => JSON.stringify([item.title, item.detail, item.tone, item.target, item.revision]);
@@ -16,7 +16,7 @@ export function normalizeHomePreferences(value: unknown, now = Date.now()): Home
       }
     }
   }
-  return { privateBalances: input.privateBalances === true, recentSearches: Array.isArray(input.recentSearches) ? [...new Set(input.recentSearches.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length < 100))].slice(0, 3) : [], reminders };
+  return { privateBalances: input.privateBalances === true, market: input.market === 'global' ? 'global' : 'india', recentSearches: Array.isArray(input.recentSearches) ? [...new Set(input.recentSearches.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length < 100))].slice(0, 3) : [], reminders };
 }
 
 export function rememberHomeSearch(prefs: HomePreferences, symbol: string): HomePreferences {

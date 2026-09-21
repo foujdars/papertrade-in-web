@@ -1,7 +1,8 @@
 "use client";
 import type { HomeAttention } from '@/lib/home-attention';
-import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3 } from 'lucide-react';
+import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
 import { isGlobalInstrumentKey } from '@/lib/global-markets';
+import { formatUsd } from '@/lib/global-order-engine';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
@@ -62,6 +63,14 @@ export function HomeWorkspace({
   indices,
   feedLive,
   balance,
+  globalWallet,
+  globalWalletError,
+  globalAvailable,
+  globalPositions,
+  globalOpenOrders,
+  globalOpenPnl,
+  globalPnlComplete,
+  onAddCash,
   todayPnl,
   holdingsCount,
   openPositionsCount,
@@ -86,6 +95,14 @@ export function HomeWorkspace({
   indices: HomeIndexQuote[];
   feedLive: boolean;
   balance: number;
+  globalWallet: number | null;
+  globalWalletError: string;
+  globalAvailable: number | null;
+  globalPositions: { symbol: string; side: string }[];
+  globalOpenOrders: number;
+  globalOpenPnl: number;
+  globalPnlComplete: boolean;
+  onAddCash: (currency: 'INR' | 'USD') => void;
   todayPnl: number;
   holdingsCount: number;
   openPositionsCount: number;
@@ -132,6 +149,8 @@ export function HomeWorkspace({
   };
   // Mask during initial storage read, preventing a flash of balances on reopen.
   const privateBalances = !preferencesReady || preferences.privateBalances;
+  const activeMarket = preferences.market;
+  const marketOptions = useMemo(() => stockOptions.filter(stock => isGlobalInstrumentKey(stock.instrumentKey) === (activeMarket === 'global')), [activeMarket, stockOptions]);
   const visibleAttention = attention.filter(item => !isHomeReminderHidden(preferences, item, now));
   const hiddenAttention = attention.filter(item => isHomeReminderHidden(preferences, item, now));
   const chooseSearch = (stock: HomeStockOption, chart = false) => {
@@ -147,17 +166,16 @@ export function HomeWorkspace({
     const reminders = { ...preferences.reminders }; delete reminders[id];
     updatePreferences({ ...preferences, reminders });
   };
-  const bySymbol = useMemo(() => new Map(stockOptions.map(stock => [stock.symbol, stock])), [stockOptions]);
+  const bySymbol = useMemo(() => new Map(marketOptions.map(stock => [stock.symbol, stock])), [marketOptions]);
   const recentSearches = preferences.recentSearches.map(symbol => bySymbol.get(symbol)).filter((stock): stock is HomeStockOption => !!stock);
   const favourites = [...new Set(favouriteSymbols)].map(symbol => bySymbol.get(symbol)).filter((stock): stock is HomeStockOption => !!stock).slice(0, 6);
   const matches = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return [];
-    return stockOptions
+    return marketOptions
       .filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
-      .sort((a, b) => Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)))
       .slice(0, 6);
-  }, [search, stockOptions]);
+  }, [search, marketOptions]);
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
     if (!quoteKeys) { setLoading(false); return; }
@@ -179,8 +197,8 @@ export function HomeWorkspace({
   }, [quoteKeys, retry]);
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
   const searchRow = (stock: HomeStockOption) => <div className="home-search-row" key={stock.symbol}>
-    <button className="home-search-preview" aria-label={`Preview ${stock.symbol}`} onClick={() => chooseSearch(stock)}>
-      <span className="stock-identity">{stock.assetType === 'INDEX' ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
+    <button className="home-search-preview" aria-label={isGlobalInstrumentKey(stock.instrumentKey) ? `Open ${stock.symbol} chart` : `Preview ${stock.symbol}`} onClick={() => chooseSearch(stock)}>
+      <span className="stock-identity">{isGlobalInstrumentKey(stock.instrumentKey) ? <Globe2 size={25} aria-hidden="true" /> : stock.assetType === 'INDEX' ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
     </button>
     <button className="home-search-chart" aria-label={`Open ${stock.symbol} chart`} title="Open chart" onClick={() => chooseSearch(stock, true)}><CandlestickChart size={18} /></button>
   </div>;
@@ -191,16 +209,16 @@ export function HomeWorkspace({
         <section className="home-hero">
           <div className="home-hero-copy">
             <span className="home-kicker"><Sparkles size={14} /> {greeting}{safeName ? `, ${safeName}` : ""}</span>
-            <h1>Your trading day</h1>
+            <h1>{activeMarket === 'global' ? 'Explore global markets' : 'Your trading day'}</h1>
             <div className="home-global-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setSearchFocused(false); setSearch(''); } }} onKeyDown={event => { if(event.key==='Escape'){setSearchFocused(false);setSearch('');} }}>
               <Search size={18} />
-              <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder="Search stocks and indices" aria-label="Search stocks and indices" autoComplete="off" />
+              <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search BTC, gold, global contracts…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
               {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
               {searchFocused && <div className="home-search-results" aria-label="Instrument search results">
-                {search.trim() ? matches.length ? matches.map(searchRow) : <div className="home-search-empty" role="status">No matching stocks or indices.</div> : <>
+                {search.trim() ? matches.length ? matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments in this market.</div> : <>
                   {!!recentSearches.length && <><div className="home-search-group"><b>Recent searches</b><button onClick={() => updatePreferences({...preferences, recentSearches: []})}>Clear recent</button></div>{recentSearches.map(searchRow)}</>}
                   {!!favourites.length && <><div className="home-search-group"><b>Favourites</b><small>From your watchlists</small></div>{favourites.map(searchRow)}</>}
-                  {!recentSearches.length && !favourites.length && <div className="home-search-empty">Search by name or symbol. Saved watchlist instruments appear here.</div>}
+                  {!recentSearches.length && !favourites.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
                   <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
                 </>}
               </div>}
@@ -208,7 +226,13 @@ export function HomeWorkspace({
           </div>
         </section>
 
-        {cards.market && <section className="home-section home-pulse-section">
+        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
+          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><span className="home-market-icon india"><Landmark size={20}/></span><span className="home-market-copy"><small>INDIAN MARKETS · INR</small><b>Stocks &amp; F&amp;O</b><strong>{privateBalances ? '••••' : formatInr(balance)}</strong></span><span className="home-market-indicator"/></button>
+          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><span className="home-market-icon global"><Globe2 size={20}/></span><span className="home-market-copy"><small>GLOBAL MARKETS · USD</small><b>Crypto &amp; global contracts</b><strong>{privateBalances ? '••••' : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong></span><span className="home-market-indicator"/></button>
+        </section>
+        <div className="home-market-caption"><span>Two independent practice wallets. No automatic currency conversion.</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={15}/> Add {activeMarket === 'india' ? 'rupees' : 'dollars'}</button></div>
+
+        {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section">
           <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
           <div className="home-index-grid">
             {indices.map((index) => {
@@ -225,7 +249,7 @@ export function HomeWorkspace({
         </section>}
 
         <div className="home-main-grid home-main-grid-clean">
-          {cards.portfolio && <section className="home-section home-portfolio-card">
+          {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<EyeOff size={18}/>:<Eye size={18}/>}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
             <div className="home-portfolio-value">
               <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today’s profit and loss — view P&L"><small>TODAY’S P&amp;L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
@@ -244,14 +268,24 @@ export function HomeWorkspace({
             </div>
           </section>}
 
+          {activeMarket === 'global' && <section className="home-section home-global-account">
+            <header><span><Globe2 size={17}/><b>Global practice portfolio</b></span><button onClick={() => onAddCash('USD')}><Plus size={15}/> Add dollars</button></header>
+            <div className="home-global-balance"><div><small>DOLLAR WALLET</small><strong>{privateBalances ? '••••' : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong><span>Available to trade: {privateBalances ? '••••' : globalAvailable === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalAvailable)}</span></div><div><small>OPEN P&amp;L</small><b className={!privateBalances && globalOpenPnl < 0 ? 'negative' : 'positive'}>{privateBalances ? '••••' : globalPnlComplete ? formatUsd(globalOpenPnl) : 'Waiting for quotes'}</b><span>USD · open contracts only</span></div></div>
+            {globalWalletError && <p className="home-global-wallet-error" role="alert">Dollar wallet unavailable: {globalWalletError}</p>}
+            <div className="home-global-stats"><span><b>{globalPositions.length}</b> open positions</span><span><b>{globalOpenOrders}</b> pending orders</span><span><b>USD</b> no rupee conversion</span></div>
+            {!!globalPositions.length && <div className="home-global-positions"><small>OPEN POSITIONS</small>{globalPositions.slice(0, 4).map((position, index) => <button key={`${position.symbol}:${index}`} onClick={() => onOpenStock(position.symbol)}><span><b>{position.symbol}</b><small>{position.side} · view chart</small></span><ChevronRight size={17}/></button>)}</div>}
+            {!globalPositions.length && <p className="home-global-empty">No global positions yet. Search an instrument above to practise in dollars.</p>}
+          </section>}
+
         </div>
-        {preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
+        {activeMarket === 'global' && <section className="home-section home-global-explore"><header><span><TrendingUp size={17}/><b>Start exploring</b></span><small>Charts open in your usual layout</small></header><div>{['BTCUSD', 'XAUTUSD', 'BRENT'].map(symbol => { const instrument = marketOptions.find(item => item.symbol === symbol); return instrument ? <button key={symbol} onClick={() => onOpenStock(symbol)}><span><b>{instrument.name}</b><small>{symbol}{symbol === 'BRENT' ? ' · watch only' : ' · USD paper trading'}</small></span><ArrowRight size={17}/></button> : null; })}</div></section>}
+        {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}
           {!!hiddenAttention.length && <><button className="home-hidden-toggle" aria-expanded={showHidden} onClick={()=>setShowHidden(!showHidden)}>{showHidden?'Hide':'Show'} reviewed / later ({hiddenAttention.length})</button>{showHidden && hiddenAttention.map(item => <div className="home-hidden-reminder" key={item.id}><span><b>{item.title}</b><small>{preferences.reminders[item.id].reviewed?'Reviewed · returns if details change':`Remind at ${new Date(preferences.reminders[item.id].until).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`}</small></span><button onClick={()=>restoreReminder(item.id)}>Restore</button></div>)}</>}
         </div></section>}
         {preferenceMessage && <p className="home-preference-message" role="status">{preferenceMessage}<button aria-label="Dismiss preference message" onClick={()=>setPreferenceMessage('')}><X size={14}/></button></p>}
-        {resumeChart&&<button className="home-resume-card" onClick={onResumeChart}><span className="home-resume-icon"><CandlestickChart size={23}/></span><span><small>Continue your chart</small><b>{resumeChart.symbol} <em>· {resumeChart.timeframe}</em></b><small>Your saved chart setup</small></span><span className="home-resume-action">Resume <Play size={14}/></span></button>}
+        {resumeChart && isGlobalInstrumentKey(stockOptions.find(stock => stock.symbol === resumeChart.symbol)?.instrumentKey) === (activeMarket === 'global') && <button className="home-resume-card" onClick={onResumeChart}><span className="home-resume-icon"><CandlestickChart size={23}/></span><span><small>Continue your chart</small><b>{resumeChart.symbol} <em>· {resumeChart.timeframe}</em></b><small>Your saved chart setup</small></span><span className="home-resume-action">Resume <Play size={14}/></span></button>}
       </div>
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>

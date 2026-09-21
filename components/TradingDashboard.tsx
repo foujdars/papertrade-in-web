@@ -38,9 +38,11 @@ import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { GLOBAL_CHART_INSTRUMENTS, deltaOptionSymbolFromInstrumentKey, deltaSymbolFromInstrumentKey, isGlobalInstrumentKey, type PerpQuote, type PerpSymbol } from '@/lib/global-markets';
 import { GlobalOptionTicket } from './GlobalOptionTicket';
-import { optionPnl } from '@/lib/global-option-orders';
+import { optionPnl, freshOptionQuote } from '@/lib/global-option-orders';
 import { positionPnl, freshPerpQuote } from '@/lib/global-markets';
 import { formatUsd } from '@/lib/global-order-engine';
+import { availablePerpCash } from '@/lib/global-markets';
+import { addPaperCash } from '@/lib/paper-wallets';
 import { useGlobalTrading } from './useGlobalTrading';
 import { GlobalOrderTicket, type GlobalTicketTab } from './GlobalOrderTicket';
 import { PriceActions } from "@/components/PriceActions";
@@ -106,7 +108,6 @@ const LAST_CASH_CHART_STORAGE_KEY = "papertrade-last-cash-chart";
 const UI_PREFERENCES_STORAGE_KEY = "papertrade-ui-preferences-v2";
 const HOME_EXPERIENCE_VERSION = 1;
 const RATNAVEER_REPAIR_STORAGE_KEY = "papertrade-repair-ratnaveer-demo-v1";
-const MAX_VIRTUAL_BALANCE = 100_000_000;
 const UPSTOX_AUTO_SQUARE_OFF_HOUR = 15;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTE = 0;
 const UPSTOX_AUTO_SQUARE_OFF_MINUTES = UPSTOX_AUTO_SQUARE_OFF_HOUR * 60 + UPSTOX_AUTO_SQUARE_OFF_MINUTE;
@@ -485,6 +486,7 @@ export function TradingDashboard() {
   const [pnlScope, setPnlScope] = useState<PnlScope>(readPnlScope);
   const [pnlDrill, setPnlDrill] = useState<{ ids: string[]; label: string } | null>(null);
   const [fundsOpen, setFundsOpen] = useState(false);
+  const [fundsCurrency, setFundsCurrency] = useState<"INR" | "USD">("INR");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -1936,21 +1938,29 @@ export function TradingDashboard() {
     setToast(`${label} copied for suggestions`);
   }
 
-  function addVirtualFunds() {
+  function openFunds(currency: "INR" | "USD") {
+    setFundsCurrency(currency);
+    setFundsInput("");
+    setFundsOpen(true);
+  }
+
+  async function addVirtualFunds() {
     const requestedAmount = Number(fundsInput);
-    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
-      setToast("Enter a valid virtual amount");
-      return;
-    }
-    const nextBalance = Math.min(MAX_VIRTUAL_BALANCE, balance + requestedAmount);
-    if (nextBalance <= balance) {
-      setToast("Maximum virtual balance of ₹10 crore already reached");
-      return;
-    }
-    setBalance(nextBalance);
-    localStorage.setItem("papertrade-balance", String(nextBalance));
-    setFundsOpen(false);
-    setToast(`${formatInr(nextBalance - balance)} virtual money added`);
+    try {
+      if (fundsCurrency === "USD") {
+        if (!globalTrading.account) throw new Error("Global wallet is still loading.");
+        const ok = await globalTrading.transact(account => ({ ...account, wallet: addPaperCash(account.wallet, requestedAmount), revision: account.revision + 1 }));
+        if (!ok) throw new Error("Dollar wallet could not be saved. Please try again.");
+        setToast(`${formatUsd(requestedAmount)} added to your global practice wallet`);
+      } else {
+        const stored = Number(localStorage.getItem("papertrade-balance") ?? balance);
+        const nextBalance = addPaperCash(stored, requestedAmount);
+        localStorage.setItem("papertrade-balance", String(nextBalance));
+        setBalance(nextBalance);
+        setToast(`${formatInr(requestedAmount)} added to your Indian practice wallet`);
+      }
+      setFundsOpen(false);
+    } catch (error) { setToast(error instanceof Error ? error.message : "Could not add practice cash."); }
   }
 
   function confirmClosedTradeDeletion() {
@@ -2639,7 +2649,7 @@ export function TradingDashboard() {
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
-          <button className="funds-button" onClick={() => selectedDeltaChartSymbol && activeNavigationSection === "trade" ? openChartPositions() : setFundsOpen(true)} title={selectedDeltaChartSymbol && activeNavigationSection === "trade" ? "Global USD wallet" : "Add virtual money"}><WalletCards size={16} /> {selectedDeltaChartSymbol && activeNavigationSection === "trade" ? formatUsd(globalTrading.account?.wallet ?? 0) : formatInr(balance)}</button>
+          <button className="funds-button" onClick={() => openFunds(selectedDeltaChartSymbol && activeNavigationSection === "trade" ? "USD" : "INR")} title="Add practice cash to the selected market wallet"><WalletCards size={16} /> {selectedDeltaChartSymbol && activeNavigationSection === "trade" ? globalTrading.account ? formatUsd(globalTrading.account.wallet) : "USD wallet" : formatInr(balance)}</button>
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
@@ -3014,6 +3024,14 @@ export function TradingDashboard() {
         })}
         feedLive={feedStatus.mode === "live"}
         balance={balance}
+        globalWallet={globalTrading.account?.wallet ?? null}
+        globalWalletError={globalTrading.error}
+        globalAvailable={globalTrading.account ? availablePerpCash(globalTrading.account) : null}
+        globalPositions={[...(globalTrading.account?.positions.map(position => ({ symbol: position.symbol, side: position.side === 'BUY' ? 'Long' : 'Short' })) ?? []), ...(globalTrading.account?.optionPositions?.map(position => ({ symbol: position.symbol, side: position.side === 'BUY' ? 'Long' : 'Short' })) ?? [])]}
+        globalOpenOrders={(globalTrading.account?.orders.length ?? 0) + (globalTrading.account?.optionOrders?.length ?? 0)}
+        globalOpenPnl={globalOpenPnl}
+        globalPnlComplete={!!globalTrading.account && globalTrading.account.positions.every(position => freshPerpQuote(globalTrading.snapshots[position.symbol]?.quote, globalTrading.clock)) && (globalTrading.account.optionPositions ?? []).every(position => freshOptionQuote(globalTrading.optionSnapshots[position.symbol]?.quote, globalTrading.clock))}
+        onAddCash={openFunds}
         todayPnl={todayClosedPnl+(homeOpenDayChange??0)}
         realisedToday={todayClosedPnl}
         openChangeToday={homeOpenDayChange}
@@ -3279,12 +3297,13 @@ export function TradingDashboard() {
       {fundsOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setFundsOpen(false)}>
           <section className="modal funds-modal" role="dialog" aria-modal="true" aria-label="Add virtual money" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Paper account</span><h2>Add virtual money</h2></div><button className="icon-button" onClick={() => setFundsOpen(false)} aria-label="Close virtual funds"><X size={20} /></button></div>
-            <div className="virtual-balance-card"><span>Current virtual cash</span><b>{formatInr(balance)}</b><small>Maximum total balance: ₹10,00,00,000</small></div>
-            <label className="funds-input-label">Amount to add (₹)<input type="number" min="1" max={Math.max(0, MAX_VIRTUAL_BALANCE - balance)} step="1000" value={fundsInput} onChange={(event) => setFundsInput(event.target.value)} /></label>
-            <div className="funds-shortcuts">{[[100_000, "₹1L"], [1_000_000, "₹10L"], [10_000_000, "₹1Cr"], [100_000_000, "₹10Cr"]].map(([amount, label]) => <button key={label} onClick={() => setFundsInput(String(amount))}>{label}</button>)}</div>
-            <button className="primary-button" disabled={balance >= MAX_VIRTUAL_BALANCE} onClick={addVirtualFunds}>{balance >= MAX_VIRTUAL_BALANCE ? "₹10 CRORE LIMIT REACHED" : "ADD VIRTUAL MONEY"}</button>
-            <p className="field-help">Simulation only. This does not deposit real money or connect to your broker balance.</p>
+            <div className="modal-head"><div><span className="eyebrow">{fundsCurrency === 'USD' ? 'Global markets · USD' : 'Indian markets · INR'}</span><h2>Add practice cash</h2></div><button className="icon-button" onClick={() => setFundsOpen(false)} aria-label="Close virtual funds"><X size={20} /></button></div>
+            <div className="funds-wallet-switch" role="group" aria-label="Choose practice wallet"><button className={fundsCurrency === 'INR' ? 'active' : ''} aria-pressed={fundsCurrency === 'INR'} onClick={() => { setFundsCurrency('INR'); setFundsInput(''); }}>🇮🇳 India · ₹</button><button className={fundsCurrency === 'USD' ? 'active' : ''} aria-pressed={fundsCurrency === 'USD'} onClick={() => { setFundsCurrency('USD'); setFundsInput(''); }}>🌐 Global · $</button></div>
+            <div className="virtual-balance-card"><span>{fundsCurrency === 'USD' ? 'Global dollar wallet' : 'Indian rupee wallet'}</span><b>{fundsCurrency === 'USD' ? globalTrading.account ? formatUsd(globalTrading.account.wallet) : 'Loading…' : formatInr(balance)}</b><small>Balances stay separate. Adding cash here never changes the other wallet.</small></div>
+            <label className="funds-input-label">Amount to add ({fundsCurrency === 'USD' ? '$' : '₹'})<input type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Enter any positive amount" value={fundsInput} onChange={(event) => setFundsInput(event.target.value)} /></label>
+            <div className="funds-shortcuts">{(fundsCurrency === 'USD' ? [[100, '$100'], [1000, '$1,000'], [10000, '$10,000']] : [[1000, '₹1,000'], [10000, '₹10,000'], [100000, '₹1 lakh']]).map(([amount, label]) => <button key={label} onClick={() => setFundsInput(String(amount))}>{label}</button>)}</div>
+            <button className="primary-button" disabled={globalTrading.busy || (fundsCurrency === 'USD' && !globalTrading.account)} onClick={() => void addVirtualFunds()}>{globalTrading.busy ? 'SAVING…' : `ADD ${fundsCurrency === 'USD' ? 'DOLLARS' : 'RUPEES'}`}</button>
+            <p className="field-help">Practice cash only. No real deposit, currency conversion or broker transfer takes place.</p>
           </section>
         </div>
       )}
