@@ -11,6 +11,8 @@ import {
   marginRate,
   readPerpAccount,
   normalizePerpSpec,
+  normalizeDeltaCatalogue,
+  deltaSymbolFromInstrumentKey,
   normalizePerpQuote,
   normalizeGlobalCandles,
   cancelPerpOrder,
@@ -230,6 +232,28 @@ test("bad stored data and malformed exchange data cannot silently reset a wallet
     ]),
     [],
   );
+});
+test("live USD Delta catalogue adds US tokens to the existing chart and rejects unsupported products", () => {
+  const product = {
+    symbol: "TSLAXUSD", contract_type: "perpetual_futures", is_quanto: false,
+    notional_type: "vanilla", quoting_asset: { symbol: "USD" },
+    contract_unit_currency: "TSLAX", underlying_asset: { name: "Tesla xStock Token" },
+    state: "live", trading_status: "operational", contract_value: "0.01",
+    tick_size: "0.01", initial_margin: "4", maintenance_margin: "2",
+    initial_margin_scaling_factor: "0", maintenance_margin_scaling_factor: "0",
+    max_leverage_notional: "20000", position_notional_limit: "125000",
+    maker_commission_rate: "0.0002", taker_commission_rate: "0.0002",
+    product_specs: { tags: ["xStock"], isolated_liq_penalty_factor: "0.005", rate_exchange_interval: 14400 },
+  };
+  const listed = normalizeDeltaCatalogue([product, { ...product, symbol: "TSLAX-OPTION", contract_type: "call_options" }, { ...product, symbol: "FAKEUSD", quoting_asset: { symbol: "INR" } }]);
+  assert.deepEqual(listed.map(item => item.symbol), ["TSLAXUSD"]);
+  assert.deepEqual(listed[0].categories, ["GLOBAL", "US_MARKET"]);
+  assert.equal(deltaSymbolFromInstrumentKey(listed[0].instrumentKey), "TSLAXUSD");
+  assert.equal(deltaSymbolFromInstrumentKey("DELTA|BUSD"), "BUSD");
+  assert.equal(deltaSymbolFromInstrumentKey("DELTA|TSLAX-OPTION"), null);
+  assert.equal(normalizePerpSpec(product, "TSLAXUSD", now).lot, 0.01);
+  const account = openPerp(newPerpAccount(), { ...spec, symbol: "TSLAXUSD" }, { ...quote, symbol: "TSLAXUSD" }, "BUY", 1, 10, now);
+  assert.equal(readPerpAccount(JSON.stringify(account)).positions[0].symbol, "TSLAXUSD");
 });
 test("global alerts run outside NSE hours, use post-arm prices and do not re-fire", () => {
   const rule = {

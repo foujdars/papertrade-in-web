@@ -1,13 +1,46 @@
 import {
   normalizeGlobalCandles,
+  normalizeDeltaCatalogue,
   normalizePerpQuote,
   normalizePerpSpec,
+  isDeltaPerpSymbol,
   type PerpSymbol,
 } from "@/lib/global-markets";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const cache = new Map<string, { until: number; value: unknown }>();
 const pending = new Map<string, Promise<any>>();
+let catalogue: { until: number; value: ReturnType<typeof normalizeDeltaCatalogue> } | null = null;
+let cataloguePending: Promise<ReturnType<typeof normalizeDeltaCatalogue>> | null = null;
+async function getCatalogue() {
+  if (catalogue && catalogue.until > Date.now()) return catalogue.value;
+  if (cataloguePending) return cataloguePending;
+  cataloguePending = (async () => {
+    const rows: Record<string, any>[] = [];
+    let after = "";
+    for (let page = 0; page < 10; page++) {
+      const url = new URL("https://api.india.delta.exchange/v2/products");
+      url.searchParams.set("contract_types", "perpetual_futures");
+      url.searchParams.set("states", "live");
+      url.searchParams.set("page_size", "1000");
+      if (after) url.searchParams.set("after", after);
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error("Delta catalogue temporarily unavailable.");
+      const body = await response.json();
+      if (!body.success || !Array.isArray(body.result)) throw new Error("Delta catalogue returned no data.");
+      rows.push(...body.result);
+      after = typeof body.meta?.after === "string" ? body.meta.after : "";
+      if (!after) break;
+      if (page === 9) throw new Error("Delta catalogue is incomplete. Try again later.");
+    }
+    const instruments = normalizeDeltaCatalogue(rows);
+    if (!instruments.length) throw new Error("No supported Delta contracts are available.");
+    catalogue = { until: Date.now() + 300000, value: instruments };
+    return instruments;
+  })();
+  try { return await cataloguePending; }
+  finally { cataloguePending = null; }
+}
 async function delta(path: string, ttl: number): Promise<any> {
   const hit = cache.get(path);
   if (hit && hit.until > Date.now()) return hit.value;
@@ -49,12 +82,22 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
     mode = params.get("mode") ?? "snapshot";
-  if (symbol !== "BTCUSD" && symbol !== "XAUTUSD")
+  if (mode === "catalog") {
+    try {
+      return Response.json({ ok: true, instruments: await getCatalogue() }, { headers: { "Cache-Control": "public, max-age=60" } });
+    } catch (error) {
+      return Response.json({ ok: false, error: error instanceof Error ? error.message : "Catalogue unavailable." }, { status: 503 });
+    }
+  }
+  if (!isDeltaPerpSymbol(symbol))
     return Response.json(
-      { ok: false, error: "Unsupported contract. Brent is watch-only." },
+      { ok: false, error: "Unsupported Delta contract symbol." },
       { status: 400 },
     );
   try {
+    const product = await delta(`products/${symbol}`, 300000);
+    const spec = normalizePerpSpec(product, symbol as PerpSymbol, Date.now());
+    if (!spec.operational) throw new Error("Contract is not currently available for trading.");
     if (mode === "candles") {
       const timeframe = params.get("timeframe") ?? "5m",
         seconds = resolutions[timeframe];
@@ -90,14 +133,11 @@ export async function GET(request: Request) {
         { ok: false, error: "Unsupported request." },
         { status: 400 },
       );
-    const [product, ticker] = await Promise.all([
-      delta(`products/${symbol}`, 300000),
-      delta(`tickers/${symbol}`, 2000),
-    ]);
+    const ticker = await delta(`tickers/${symbol}`, 2000);
     return Response.json(
       {
         ok: true,
-        spec: normalizePerpSpec(product, symbol as PerpSymbol, Date.now()),
+        spec,
         quote: normalizePerpQuote(ticker, symbol as PerpSymbol),
       },
       { headers: { "Cache-Control": "no-store" } },

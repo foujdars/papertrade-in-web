@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount } from "@/lib/global-order-engine";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
 
@@ -56,9 +56,13 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
     } catch (e) { if (activeKey.current === key) setError(e instanceof Error ? e.message : "Could not save this action."); return false; }
     finally { if (!quiet) { inFlight.current = false; if (activeKey.current === key) setBusy(false); } }
   }, [key]);
-  const monitor = !!selected || !!account?.positions.length || !!account?.orders.length;
+  const monitorSymbols = useMemo(() => [...new Set([
+    selected,
+    ...(account?.positions.map(position => position.symbol) ?? []),
+    ...(account?.orders.map(order => order.symbol) ?? []),
+  ].filter((symbol): symbol is PerpSymbol => !!symbol))].sort().join(","), [selected, account?.positions, account?.orders]);
   useEffect(() => {
-    if (!monitor) return;
+    if (!monitorSymbols) return;
     const controller = new AbortController();
     let running = false;
     const poll = async () => {
@@ -66,7 +70,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
       running = true;
       try {
         const next: Partial<Record<PerpSymbol, GlobalSnapshot>> = {};
-        const results = await Promise.allSettled((["BTCUSD", "XAUTUSD"] as const).map(async symbol => {
+        const results = await Promise.allSettled(monitorSymbols.split(",").map(async symbol => {
           const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
           const data = await r.json();
           if (!r.ok || !data.ok || data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error(data.error ?? "Delta market data unavailable.");
@@ -76,16 +80,19 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null) {
         if (results.every(r => r.status === "rejected")) return; // Existing timestamps expire and disable orders.
         snapshotsRef.current = { ...snapshotsRef.current, ...next };
         setSnapshots(snapshotsRef.current);
-        await transact(a => advanceGlobalAccount(a,
-          { BTCUSD: next.BTCUSD?.quote, XAUTUSD: next.XAUTUSD?.quote },
-          { BTCUSD: next.BTCUSD?.spec, XAUTUSD: next.XAUTUSD?.spec }, Date.now()), true);
+        const quotes: Partial<Record<PerpSymbol, PerpQuote>> = {};
+        const specs: Partial<Record<PerpSymbol, PerpSpec>> = {};
+        for (const [symbol, snapshot] of Object.entries(next)) {
+          if (snapshot) { quotes[symbol] = snapshot.quote; specs[symbol] = snapshot.spec; }
+        }
+        await transact(a => advanceGlobalAccount(a, quotes, specs, Date.now()), true);
       } finally { running = false; }
     };
     void poll();
     const interval = window.setInterval(() => void poll(), 5000);
     document.addEventListener("visibilitychange", poll);
     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
-  }, [monitor, transact]);
+  }, [monitorSymbols, transact]);
   return { account, snapshots, clock, busy, error, transact };
 }
 export type GlobalTrading = ReturnType<typeof useGlobalTrading>;

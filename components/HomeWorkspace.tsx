@@ -1,7 +1,7 @@
 "use client";
 import type { HomeAttention } from '@/lib/home-attention';
 import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3 } from 'lucide-react';
-import { isGlobalSymbol } from '@/lib/global-markets';
+import { isGlobalInstrumentKey } from '@/lib/global-markets';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
@@ -137,7 +137,7 @@ export function HomeWorkspace({
   const chooseSearch = (stock: HomeStockOption, chart = false) => {
     updatePreferences(rememberHomeSearch(preferences, stock.symbol));
     setSearch(''); setSearchFocused(false);
-    if (chart || isGlobalSymbol(stock.symbol)) onOpenStock(stock.symbol); else setPreview(stock);
+    if (chart || isGlobalInstrumentKey(stock.instrumentKey)) onOpenStock(stock.symbol); else setPreview(stock);
   };
   const deferReminder = (item: HomeAttention, reviewed: boolean) => {
     updatePreferences(deferHomeReminder(preferences, item, reviewed, Date.now()));
@@ -155,7 +155,7 @@ export function HomeWorkspace({
     if (!query) return [];
     return stockOptions
       .filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
-      .sort((a, b) => Number(isGlobalSymbol(b.symbol)) - Number(isGlobalSymbol(a.symbol)))
+      .sort((a, b) => Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)))
       .slice(0, 6);
   }, [search, stockOptions]);
   const quoteKeys = preview?.instrumentKey ?? '';

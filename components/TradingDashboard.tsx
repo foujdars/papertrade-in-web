@@ -381,6 +381,7 @@ export function TradingDashboard() {
   const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey));
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
+  const [globalInstruments, setGlobalInstruments] = useState<Instrument[]>(GLOBAL_CHART_INSTRUMENTS);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
   const [fnoUnderlying, setFnoUnderlying] = useState<FnoUnderlying | null>(null);
@@ -908,7 +909,7 @@ export function TradingDashboard() {
       instrumentUniverseLoadRef.current.loaded = true;
       instrumentUniverseLoadRef.current.lastRefreshAt = Date.now();
       setStockUniverse(merged);
-      setSelected((current) => [...merged, ...GLOBAL_CHART_INSTRUMENTS].find((item) => item.symbol === (requestedSymbol || current.symbol)) ?? current);
+      setSelected((current) => [...merged, ...globalInstruments].find((item) => item.symbol === (requestedSymbol || current.symbol)) ?? current);
     } catch {
       // Keep the built-in liquid-stock list available while the current master is unavailable.
     }
@@ -935,6 +936,24 @@ export function TradingDashboard() {
 
   useEffect(() => {
     const controller = new AbortController();
+    void fetch("/api/global-markets?mode=catalog", { signal: controller.signal })
+      .then(async response => {
+        const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
+        if (!response.ok || !payload.ok || !Array.isArray(payload.instruments)) return;
+        const merged = [...new Map([...GLOBAL_CHART_INSTRUMENTS, ...payload.instruments].map(item => [item.instrumentKey, item])).values()];
+        setGlobalInstruments(merged);
+        const pending = pendingChartRestoreRef.current;
+        if (pending) {
+          const target = merged.find(item => item.symbol === pending.symbol);
+          if (target) { setSelected(target); setWorkspaceMode("trade"); }
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     void fetch("/api/upstox/fno-underlyings", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[] };
@@ -949,9 +968,9 @@ export function TradingDashboard() {
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
     const standardList = watchlistTabs.find((tab) => tab === watchlist);
     const universe = customList
-      ? [...new Map([...stockUniverse, ...derivativeInstruments, ...GLOBAL_CHART_INSTRUMENTS].map((item) => [item.instrumentKey, item])).values()]
+      ? [...new Map([...stockUniverse, ...derivativeInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
       : term
-        ? [...stockUniverse, ...GLOBAL_CHART_INSTRUMENTS]
+        ? [...stockUniverse, ...globalInstruments]
         : stockUniverse;
     return universe.filter((item) => {
       const matchesList = Boolean(term)
@@ -960,7 +979,7 @@ export function TradingDashboard() {
         || (standardList !== undefined && item.categories.includes(standardList));
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
-  }, [customWatchlists, derivativeInstruments, search, stockUniverse, watchlist]);
+  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockUniverse, watchlist]);
   useEffect(() => {
     const term = search.trim();
     if (term.length < 2 || filtered.length || watchlistLoading) return;
@@ -977,11 +996,11 @@ export function TradingDashboard() {
   }, [filtered.length, loadInstrumentUniverse, search, watchlistLoading]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
-    return [...stockUniverse, ...GLOBAL_CHART_INSTRUMENTS]
+    return [...stockUniverse, ...globalInstruments]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
       .sort((a, b) => term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0)
       .slice(0, 120);
-  }, [stockUniverse, tradeSymbolSearch]);
+  }, [globalInstruments, stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
     const lastFill = orders.find((order) => order.symbol === symbol);
     return calculatePosition(orders, symbol, lastFill?.price ?? 0, "INTRADAY").quantity > 0 || calculatePosition(orders, symbol, lastFill?.price ?? 0, "DELIVERY").quantity > 0;
@@ -989,9 +1008,9 @@ export function TradingDashboard() {
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const tradingUniverse = useMemo(() => {
     const byKey = new Map<string, Instrument>();
-    for (const item of [...stockUniverse, ...derivativeInstruments, ...GLOBAL_CHART_INSTRUMENTS]) byKey.set(item.instrumentKey, item);
+    for (const item of [...stockUniverse, ...derivativeInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
-  }, [derivativeInstruments, stockUniverse]);
+  }, [derivativeInstruments, globalInstruments, stockUniverse]);
 
   useEffect(() => {
     if (!paperDataReady || !isAndroidApp) return;
@@ -1127,7 +1146,7 @@ export function TradingDashboard() {
     () => [...new Set([
       deltaSymbolFromInstrumentKey(selected.instrumentKey),
       deltaSymbolFromInstrumentKey(fnoTopInstrument?.instrumentKey),
-      ...visibleInstruments.map((item) => deltaSymbolFromInstrumentKey(item.instrumentKey)),
+      ...visibleInstruments.filter(item => deltaSymbolFromInstrumentKey(item.instrumentKey)).slice(0, 8).map((item) => deltaSymbolFromInstrumentKey(item.instrumentKey)),
       ...positionSymbols.map((symbol) => deltaSymbolFromInstrumentKey(tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey)),
     ].filter((value): value is PerpSymbol => Boolean(value)))],
     [fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
@@ -1704,7 +1723,7 @@ export function TradingDashboard() {
       instrumentKey: instrument.instrumentKey,
       assetType: "EQUITY" as const,
     };
-  }), ...GLOBAL_CHART_INSTRUMENTS.map((instrument) => {
+  }), ...globalInstruments.map((instrument) => {
     const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
     return {
       symbol: instrument.symbol,
@@ -1715,7 +1734,7 @@ export function TradingDashboard() {
       instrumentKey: instrument.instrumentKey,
       assetType: instrument.assetType,
     };
-  })], [marketQuotes, stockUniverse]);
+  })], [globalInstruments, marketQuotes, stockUniverse]);
   const homeRiskSummary = useMemo(() => {
     const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
     const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
@@ -2912,7 +2931,7 @@ export function TradingDashboard() {
         }}
         onOpenPnl={() => openNavigationSection("pnl")}
         onOpenStock={(symbol) => {
-          const globalInstrument = GLOBAL_CHART_INSTRUMENTS.find((item) => item.symbol === symbol);
+          const globalInstrument = globalInstruments.find((item) => item.symbol === symbol);
           if (globalInstrument) {
             openNavigationSection("trade");
             chooseTradeInstrument(globalInstrument);

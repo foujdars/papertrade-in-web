@@ -4,7 +4,9 @@ import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine"
 
 export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
-export type PerpSymbol = Exclude<GlobalSymbol, "BRENT">;
+export type PerpSymbol = string;
+export const isDeltaPerpSymbol = (value: string): value is PerpSymbol =>
+  /^[A-Z0-9]{1,24}USD$/.test(value);
 export const GLOBAL_INSTRUMENTS = [
   {
     symbol: "BTCUSD",
@@ -73,10 +75,37 @@ export const deltaSymbolFromInstrumentKey = (
   value?: string,
 ): PerpSymbol | null => {
   const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
-  return symbol === "BTCUSD" || symbol === "XAUTUSD" ? symbol : null;
+  return isDeltaPerpSymbol(symbol) ? symbol : null;
 };
 export const isGlobalInstrumentKey = (value?: string) =>
   Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|"));
+export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument[] {
+  const bySymbol = new Map<string, Instrument>();
+  for (const row of rows) {
+    const symbol = row?.symbol;
+    if (typeof symbol !== "string" || !isDeltaPerpSymbol(symbol)) continue;
+    try {
+      const spec = normalizePerpSpec(row, symbol, Date.now());
+      if (!spec.operational) continue;
+    } catch { continue; }
+    const tags = Array.isArray(row.product_specs?.tags) ? row.product_specs.tags : [];
+    const category = tags.includes("xStock") ? "US_MARKET" : tags.includes("metal") ? "METAL" : "CRYPTO";
+    const underlying = row.contract_unit_currency;
+    bySymbol.set(symbol, {
+      symbol,
+      name: typeof row.underlying_asset?.name === "string" ? `${row.underlying_asset.name} perpetual` : symbol,
+      exchange: "DELTA",
+      price: 0,
+      change: 0,
+      instrumentKey: `DELTA|${symbol}`,
+      categories: ["GLOBAL", category],
+      assetType: "FUTURE",
+      lotSize: 1,
+      underlyingSymbol: typeof underlying === "string" ? underlying : symbol.slice(0, -3),
+    });
+  }
+  return [...bySymbol.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
 export const USD_INR = 85;
 export const PERP_SEED_INR = 100000;
 export type PerpSpec = {
@@ -316,7 +345,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
     !Array.isArray(a.positions) ||
     !Array.isArray(a.orders) ||
     !Array.isArray(a.events) ||
-    a.positions.length > 2 ||
+    a.positions.length > 50 ||
     a.orders.length > 20
   )
     throw new Error(
@@ -324,7 +353,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
     );
   for (const p of a.positions)
     if (
-      !["BTCUSD", "XAUTUSD"].includes(p.symbol) ||
+      !isDeltaPerpSymbol(p.symbol) ||
       !["BUY", "SELL"].includes(p.side) ||
       !Number.isSafeInteger(p.contracts) ||
       p.contracts <= 0 ||
@@ -356,7 +385,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
       throw new Error("Practice position data is invalid.");
   for (const o of a.orders)
     if (
-    !["BTCUSD", "XAUTUSD"].includes(o.symbol) ||
+    !isDeltaPerpSymbol(o.symbol) ||
       !["BUY", "SELL"].includes(o.side) ||
       !Number.isSafeInteger(o.contracts) ||
       o.contracts <= 0 ||
@@ -377,7 +406,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
       (e) =>
         !e ||
         typeof e.id !== "string" ||
-        !["BTCUSD", "XAUTUSD"].includes(e.symbol) ||
+        !isDeltaPerpSymbol(e.symbol) ||
         !["OPEN", "CLOSE", "LIQUIDATION", "FUNDING", "CANCEL"].includes(
           e.kind,
         ) ||
