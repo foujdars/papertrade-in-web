@@ -1,0 +1,106 @@
+/* Loaded independently of Tailwind's base stylesheet by the production layout. */
+.terminal-shell .home-studio { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.terminal-shell .home-studio .home-dashboard-scroll { max-width: 980px; margin: 0 auto; padding: 24px 24px 90px; }
+.terminal-shell .home-studio .home-hero-copy { display: flex; flex-direction: column; align-items: stretch; }
+.terminal-shell .home-studio .home-kicker { font-size: 12px; margin-bottom: 8px; }
+.terminal-shell .home-studio .home-hero h1 { font-size: clamp(27px, 4vw, 34px); font-weight: 600; letter-spacing: -1.1px; margin-bottom: 18px; }
+.terminal-shell .home-studio .home-global-search { min-height: 49px; border-radius: 15px; padding: 0 15px; }
+.terminal-shell .home-studio .home-global-search input { font-size: 13px; }
+.home-studio .home-market-chooser { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 5px; margin: 18px 0 14px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
+.home-studio .home-market-chooser > button { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 62px; padding: 10px 13px; border: 1px solid transparent; border-radius: 12px; background: transparent; box-shadow: none; color: var(--muted); text-align: left; font: inherit; cursor: pointer; }
+.home-studio .home-market-chooser > button > svg { flex: 0 0 19px; }
+.home-studio .home-market-chooser > button > span { min-width: 0; display: grid; gap: 3px; }
+.home-studio .home-market-chooser b { font-size: 13px; font-weight: 650; line-height: 1.25; }
+.home-studio .home-market-chooser small { font-size: 10px; line-height: 1.3; }
+.home-studio .home-market-chooser em { display: grid; place-items: center; width: 23px; height: 23px; margin-left: auto; border-radius: 7px; color: var(--muted); background: var(--soft); font-size: 12px; font-style: normal; }
+.home-studio .home-market-chooser > button.active { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 16%, transparent); background: var(--purple-soft); }
+.home-studio .home-market-chooser > button.active em { color: var(--purple); background: var(--surface); }
+.home-studio .home-wallet-card { position: relative; isolation: isolate; overflow: hidden; border: 1px solid #8b72da; border-radius: 22px; padding: 19px 22px 0; color: #fff; background: radial-gradient(ellipse at 100% 0, #ab7fea65, transparent 60%), linear-gradient(120deg, #352062, #6741aa); box-shadow: 0 10px 25px #57398d20; }
+.home-studio[data-market="global"] .home-wallet-card { border-color: #54859a; background: radial-gradient(ellipse at 100% 0, #7bd3cd35, transparent 58%), linear-gradient(120deg, #183e53, #326a72); box-shadow: 0 10px 25px #244c5d20; }
+.home-studio .home-wallet-card::after { content: ''; z-index: -1; position: absolute; width: 190px; height: 190px; right: -62px; top: -85px; border: 1px solid #ffffff19; border-radius: 50%; box-shadow: 0 0 0 27px #ffffff04, 0 0 0 55px #ffffff04; pointer-events: none; }
+.home-studio .home-wallet-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.home-studio .home-wallet-heading > span { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.home-studio .home-wallet-heading em { margin-left: 3px; padding: 4px 6px; border: 1px solid #ffffff25; border-radius: 6px; color: #eee6ff; background: #ffffff0a; font-size: 9px; font-style: normal; letter-spacing: .06em; }
+.home-studio .home-wallet-heading > button { display: grid; place-items: center; width: 40px; height: 40px; margin: -7px -8px -7px 0; padding: 0; border: 0; border-radius: 50%; color: #f2eaff; background: transparent; cursor: pointer; }
+.home-studio .home-wallet-label { display: block; margin-top: 22px; color: #e2d5f4; font-size: 9px; letter-spacing: .13em; font-weight: 550; }
+.home-studio .home-wallet-amount { display: block; margin-top: 4px; color: #fff; font-size: clamp(26px, 5vw, 36px); font-weight: 600; line-height: 1.25; letter-spacing: -.8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.home-studio .home-wallet-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 19px; }
+.home-studio .home-wallet-actions > span { min-width: 0; color: #e0d5ef; font-size: 11px; line-height: 1.5; }
+.home-studio .home-wallet-actions > button { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 15px; border: 0; border-radius: 11px; color: #51318b; background: #fff; font-size: 12px; font-weight: 650; cursor: pointer; box-shadow: 0 3px 9px #0000000d; }
+.home-studio[data-market="global"] .home-wallet-actions > button { color: #215463; }
+.home-studio .home-wallet-other { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 -22px; padding: 12px 22px; border-top: 1px solid #ffffff16; background: #00000013; font-size: 11px; color: #e5dbee; }
+.home-studio .home-wallet-other b { color: #fff; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.home-studio .home-wallet-other small { margin-left: auto; font-size: 9px; opacity: .8; }
+.terminal-shell .home-studio .home-section { margin-top: 17px; border: 1px solid var(--line); box-shadow: 0 4px 16px #23114404; border-radius: 19px; }
+.terminal-shell .home-studio .home-section > header { min-height: 52px; padding: 0 16px; }
+.terminal-shell .home-studio .home-section > header b { font-weight: 600; }
+.terminal-shell .home-studio .home-session-label { max-width: 120px; font-size: 9px; padding: 5px 7px; }
+.terminal-shell .home-studio .home-index-grid { padding: 1px 6px 13px; }
+.terminal-shell .home-studio .home-index-card { min-height: 70px; padding: 5px 10px; }
+.terminal-shell .home-studio .home-index-card strong { font-size: 18px; }
+.terminal-shell .home-studio .home-index-card small { font-size: 9px; }
+.terminal-shell .home-studio .home-portfolio-value { display: block; min-height: 0; padding: 0 16px 13px; }
+.terminal-shell .home-studio .home-today-pnl { width: 100%; min-height: 64px; align-items: flex-start; }
+.terminal-shell .home-studio .home-portfolio-value strong { font-size: 29px; }
+.terminal-shell .home-studio .home-portfolio-stats button { display: grid; justify-content: start; align-content: center; padding: 12px 9px; gap: 8px; border-radius: 12px; }
+.terminal-shell .home-studio .home-portfolio-stats button span { font-size: 9px; }
+.terminal-shell .home-studio .home-portfolio-stats button b { font-size: 17px; font-weight: 600; }
+.home-studio .home-global-balance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 16px 16px; }
+.home-studio .home-global-balance > div { min-width: 0; display: grid; align-content: center; gap: 7px; padding: 15px 12px; border-radius: 12px; background: var(--soft); }
+.home-studio .home-global-balance small { color: var(--muted); font-size: 9px; letter-spacing: .06em; }
+.home-studio .home-global-balance strong { font-size: 23px; font-weight: 600; overflow-wrap: anywhere; }
+.home-studio .home-global-balance b { font-size: 19px; overflow-wrap: anywhere; }
+.home-studio .home-global-balance span { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.home-studio .home-global-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 16px 16px; }
+.home-studio .home-global-stats > span { display: flex; align-items: center; gap: 9px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); font-size: 11px; }
+.home-studio .home-global-stats b { color: var(--ink); font-size: 18px; }
+.home-studio .home-global-empty { margin: 0 16px 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.home-studio .home-global-wallet-error { margin: 0 16px 14px; padding: 12px; border-radius: 10px; color: var(--red); background: var(--soft); font-size: 12px; }
+.home-studio .home-global-positions { display: grid; gap: 6px; padding: 0 16px 16px; }
+.home-studio .home-global-positions > small { color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+.home-studio .home-global-positions > button { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); text-align: left; cursor: pointer; }
+.home-studio .home-global-positions span { display: grid; gap: 4px; min-width: 0; }
+.home-studio .home-global-positions b { font-size: 12px; overflow-wrap: anywhere; }
+.home-studio .home-global-positions small { color: var(--muted); font-size: 10px; }
+.home-studio .home-global-explore > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 13px 13px; }
+.home-studio .home-global-explore > div > button { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 81px; padding: 11px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--soft); text-align: left; cursor: pointer; }
+.home-studio .home-global-explore button span { display: grid; gap: 6px; min-width: 0; }
+.home-studio .home-global-explore button b { font-size: 12px; font-weight: 550; }
+.home-studio .home-global-explore button small { color: var(--muted); font-size: 9px; line-height: 1.5; }
+.home-studio .home-global-explore button svg { flex: 0 0 auto; color: var(--purple); }
+.home-studio button:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.home-studio .home-wallet-card button:focus-visible { outline-color: #fff; }
+.terminal-shell .funds-modal .funds-wallet-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 16px; padding: 4px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft); }
+.terminal-shell .funds-modal .funds-wallet-switch button { min-height: 42px; padding: 8px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-size: 12px; cursor: pointer; }
+.terminal-shell .funds-modal .funds-wallet-switch button.active { color: var(--purple); background: var(--surface); box-shadow: 0 2px 8px #2311440a; }
+.terminal-shell .funds-modal .funds-shortcuts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.terminal-shell .funds-modal .funds-shortcuts button { min-height: 42px; font-size: 12px; }
+.terminal-shell .funds-modal .funds-input-label { font-size: 12px; }
+.terminal-shell .funds-modal .funds-input-label input { min-height: 54px; font-size: 20px; border-radius: 12px; }
+.terminal-shell .funds-modal .virtual-balance-card { background: var(--soft); border-color: var(--line); padding: 16px; gap: 8px; }
+.terminal-shell .funds-modal .virtual-balance-card b { font-size: 27px; }
+.terminal-shell .funds-modal .virtual-balance-card small { font-size: 11px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .terminal-shell .home-studio .home-dashboard-scroll { padding: 20px 13px calc(90px + env(safe-area-inset-bottom)); }
+  .home-studio .home-market-chooser { margin-top: 15px; }
+  .home-studio .home-market-chooser > button { gap: 8px; padding: 9px; min-height: 60px; }
+  .home-studio .home-market-chooser b { font-size: 12px; }
+  .home-studio .home-market-chooser small { font-size: 9px; }
+  .home-studio .home-market-chooser em { width: 19px; height: 22px; font-size: 11px; }
+  .home-studio .home-wallet-card { padding: 18px 18px 0; border-radius: 20px; }
+  .home-studio .home-wallet-other { margin-inline: -18px; padding-inline: 18px; }
+  .home-studio .home-wallet-amount { font-size: 31px; }
+  .home-studio .home-wallet-label { margin-top: 19px; }
+  .home-studio .home-wallet-actions { gap: 8px; }
+  .home-studio .home-wallet-actions > span { font-size: 10px; }
+  .home-studio .home-global-explore > header > small { display: none; }
+  .home-studio .home-global-explore button svg { display: none; }
+  .home-studio .home-global-explore button b { font-size: 11px; }
+}
+@media (max-width: 360px) {
+  .home-studio .home-market-chooser > button > svg { display: none; }
+  .home-studio .home-wallet-amount { font-size: 28px; }
+  .home-studio .home-wallet-other small { display: none; }
+  .terminal-shell .home-studio .home-index-card { padding-inline: 7px; }
+  .terminal-shell .home-studio .home-index-card strong { font-size: 16px; }
+}

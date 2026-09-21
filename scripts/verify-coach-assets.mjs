@@ -11,6 +11,9 @@ async function cssFiles(directory) {
 }
 const files = await cssFiles(".next/static");
 const css = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
+for (const selector of [".home-market-chooser", ".home-wallet-card", ".home-wallet-amount", ".home-wallet-actions", ".home-global-balance", ".funds-wallet-switch"]) {
+  assert.ok(css.includes(selector), `Production Home stylesheet is missing ${selector}`);
+}
 for (const selector of [".welcome-candle-screen", ".welcome-candle-loader", ".pnl-inline-fills", ".ipo-gmp-amount", ".replay-future-shade", ".replay-drag-marker", ".replay-start-popover"]) {
   assert.ok(css.includes(selector), `Production stylesheet is missing compact layout ${selector}`);
 }

@@ -345,7 +345,7 @@ test("Home separates Indian and global wallets, search, and add-cash target", as
   assert.equal(elements(view).filter(node => node.props?.className === 'home-index-card').length, 0);
   assert.ok(elements(view).some(node => node.props?.className?.includes('home-global-account')));
   assert.ok(elements(view).some(node => node.props?.placeholder?.startsWith('Search BTC, gold')));
-  elements(view).find(node => node.props?.className === 'home-market-caption').props.children[1].props.onClick();
+  elements(view).find(node => node.props?.className === 'home-wallet-actions').props.children[1].props.onClick();
   assert.deepEqual(deposits, ['USD']);
 });
 

@@ -204,7 +204,7 @@ export function HomeWorkspace({
   </div>;
 
   return (
-    <section className="home-workspace home-hub" aria-label="PaperTrade home">
+    <section className="home-workspace home-hub home-studio" data-market={activeMarket} aria-label="PaperTrade home">
       <div className="home-dashboard-scroll">
         <section className="home-hero">
           <div className="home-hero-copy">
@@ -227,10 +227,16 @@ export function HomeWorkspace({
         </section>
 
         <section className="home-market-chooser" aria-label="Choose market and practice wallet">
-          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><span className="home-market-icon india"><Landmark size={20}/></span><span className="home-market-copy"><small>INDIAN MARKETS · INR</small><b>Stocks &amp; F&amp;O</b><strong>{privateBalances ? '••••' : formatInr(balance)}</strong></span><span className="home-market-indicator"/></button>
-          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><span className="home-market-icon global"><Globe2 size={20}/></span><span className="home-market-copy"><small>GLOBAL MARKETS · USD</small><b>Crypto &amp; global contracts</b><strong>{privateBalances ? '••••' : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong></span><span className="home-market-indicator"/></button>
+          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>Stocks &amp; F&amp;O</small></span><em>₹</em></button>
+          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>Crypto &amp; more</small></span><em>$</em></button>
         </section>
-        <div className="home-market-caption"><span>Two independent practice wallets. No automatic currency conversion.</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={15}/> Add {activeMarket === 'india' ? 'rupees' : 'dollars'}</button></div>
+        <section className="home-wallet-card" aria-label={activeMarket === 'india' ? 'Indian rupee practice wallet' : 'Global dollar practice wallet'}>
+          <div className="home-wallet-heading"><span><WalletCards size={18}/>{activeMarket === 'india' ? 'Indian wallet' : 'Global wallet'}<em>{activeMarket === 'india' ? 'INR' : 'USD'}</em></span><button disabled={!preferencesReady} aria-label={privateBalances ? 'Show wallet balances' : 'Hide wallet balances'} aria-pressed={privateBalances} onClick={() => updatePreferences({ ...preferences, privateBalances: !privateBalances })}>{privateBalances ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
+          <small className="home-wallet-label">PRACTICE BALANCE</small>
+          <strong className="home-wallet-amount">{privateBalances ? '••••••' : activeMarket === 'india' ? formatInr(balance) : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong>
+          <div className="home-wallet-actions"><span>{activeMarket === 'india' ? 'Available for Indian trading' : `Available: ${privateBalances ? '••••' : globalAvailable === null ? '—' : formatUsd(globalAvailable)}`}</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={17}/> Add cash</button></div>
+          <div className="home-wallet-other"><span>{activeMarket === 'india' ? 'Global wallet' : 'Indian wallet'}</span><b>{privateBalances ? '••••' : activeMarket === 'global' ? formatInr(balance) : globalWallet === null ? '—' : formatUsd(globalWallet)}</b><small>Separate balance</small></div>
+        </section>
 
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section">
           <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
@@ -253,7 +259,6 @@ export function HomeWorkspace({
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<EyeOff size={18}/>:<Eye size={18}/>}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
             <div className="home-portfolio-value">
               <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today’s profit and loss — view P&L"><small>TODAY’S P&amp;L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
-              <span><small>VIRTUAL CASH</small><b>{privateBalances?'••••':formatInr(balance)}</b></span>
             </div>
             <div className="home-pnl-split"><button onClick={onOpenRealised??onOpenPnl}><small>Realised today · net</small><b className={privateBalances?'':realisedToday>=0?'positive':'negative'}>{privateBalances?'••••':formatInr(realisedToday)}</b><ChevronRight size={13}/></button><button onClick={onOpenPositions}><small>Open · today’s change</small><b className={privateBalances||openChangeToday===null?'':openChangeToday>=0?'positive':'negative'}>{privateBalances?'••••':openChangeToday===null?'Quote unavailable':formatInr(openChangeToday)}</b><ChevronRight size={13}/></button></div>
             <div className="home-portfolio-stats">
@@ -269,10 +274,10 @@ export function HomeWorkspace({
           </section>}
 
           {activeMarket === 'global' && <section className="home-section home-global-account">
-            <header><span><Globe2 size={17}/><b>Global practice portfolio</b></span><button onClick={() => onAddCash('USD')}><Plus size={15}/> Add dollars</button></header>
-            <div className="home-global-balance"><div><small>DOLLAR WALLET</small><strong>{privateBalances ? '••••' : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong><span>Available to trade: {privateBalances ? '••••' : globalAvailable === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalAvailable)}</span></div><div><small>OPEN P&amp;L</small><b className={!privateBalances && globalOpenPnl < 0 ? 'negative' : 'positive'}>{privateBalances ? '••••' : globalPnlComplete ? formatUsd(globalOpenPnl) : 'Waiting for quotes'}</b><span>USD · open contracts only</span></div></div>
+            <header><span><Globe2 size={17}/><b>Global performance</b></span><small>USD</small></header>
+            <div className="home-global-balance"><div><small>OPEN P&amp;L</small><strong className={!privateBalances && globalOpenPnl < 0 ? 'negative' : 'positive'}>{privateBalances ? '••••' : globalPnlComplete ? formatUsd(globalOpenPnl) : 'Awaiting quotes'}</strong><span>Your open contracts</span></div><div><small>FUNDS IN USE</small><b>{privateBalances ? '••••' : globalWallet !== null && globalAvailable !== null ? formatUsd(globalWallet - globalAvailable) : '—'}</b><span>Positions &amp; pending orders</span></div></div>
             {globalWalletError && <p className="home-global-wallet-error" role="alert">Dollar wallet unavailable: {globalWalletError}</p>}
-            <div className="home-global-stats"><span><b>{globalPositions.length}</b> open positions</span><span><b>{globalOpenOrders}</b> pending orders</span><span><b>USD</b> no rupee conversion</span></div>
+            <div className="home-global-stats"><span><b>{globalPositions.length}</b> open positions</span><span><b>{globalOpenOrders}</b> pending orders</span></div>
             {!!globalPositions.length && <div className="home-global-positions"><small>OPEN POSITIONS</small>{globalPositions.slice(0, 4).map((position, index) => <button key={`${position.symbol}:${index}`} onClick={() => onOpenStock(position.symbol)}><span><b>{position.symbol}</b><small>{position.side} · view chart</small></span><ChevronRight size={17}/></button>)}</div>}
             {!globalPositions.length && <p className="home-global-empty">No global positions yet. Search an instrument above to practise in dollars.</p>}
           </section>}
