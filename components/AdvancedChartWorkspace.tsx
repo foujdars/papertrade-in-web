@@ -5,7 +5,9 @@ import { BarReplayDialog } from "@/components/BarReplay";
 import {
   Activity,
   ArrowLeft,
+  CandlestickChart,
   ChevronDown,
+  Diamond,
   Eye,
   EyeOff,
   Fullscreen,
@@ -30,8 +32,11 @@ import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { DRAWING_TOOL_CATALOG } from "@/components/MarketChart";
 import { DrawingToolIcon, QUICK_DRAWING_TOOLS } from "./DrawingToolIcons";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { ChartStyleMenu } from "@/components/ChartStyleMenu";
+import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
+import { useChartPreference } from "@/lib/chart-view-preferences";
 import { formatInr, instruments, mergeInstrumentUniverse, type Instrument } from "@/lib/market";
 import { getNseMarketStatus } from "@/lib/market-hours";
 import {
@@ -71,6 +76,8 @@ export function AdvancedChartWorkspace({
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
+  const [showChartStyleMenu, setShowChartStyleMenu] = useState(false);
+  const [showComparePicker, setShowComparePicker] = useState(false);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [toolSignal, setToolSignal] = useState(0);
   const [clearSignal, setClearSignal] = useState(0);
@@ -87,6 +94,8 @@ export function AdvancedChartWorkspace({
   const [showSymbols, setShowSymbols] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
   const [indicators, setIndicators] = usePersistentChartIndicators();
+  const [chartStyle] = useChartPreference("chartStyle");
+  const [comparedSymbols] = useChartPreference("comparedSymbols");
   const [orderSide, setOrderSide] = useState<"BUY" | "SELL" | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [exitQuantity, setExitQuantity] = useState(1);
@@ -329,6 +338,8 @@ export function AdvancedChartWorkspace({
 
       <nav className="advanced-commandbar" aria-label="Chart controls">
         <button type="button" onClick={() => setReplayOpen(true)} aria-label={`Bar replay for ${instrument.symbol}`}><History size={18} /> Replay</button>
+        <button type="button" className={chartStyle !== "candles" ? "active" : ""} onClick={() => setShowChartStyleMenu(true)} aria-label="Chart type"><CandlestickChart size={18} /> Type</button>
+        <button type="button" className={comparedSymbols.length ? "active" : ""} onClick={() => setShowComparePicker(true)} aria-label="Compare symbols"><Diamond size={18} /> Compare</button>
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
         <button className={`advanced-indicator-button ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={18} /> Functions <em>{activeIndicatorCount}</em></button>
@@ -354,6 +365,8 @@ export function AdvancedChartWorkspace({
         <div className="advanced-chart-canvas">
           {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={selectTool} onClose={() => setShowDrawingLibrary(false)} />}
           {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={selectTool} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+          {showChartStyleMenu && <ChartStyleMenu onClose={() => setShowChartStyleMenu(false)} />}
+          {showComparePicker && <CompareSymbolPicker instruments={availableInstruments} currentKey={instrument.instrumentKey} onClose={() => setShowComparePicker(false)} />}
           <MarketChart
             key={`${instrument.symbol}-${timeframe}`}
             instrument={instrument}

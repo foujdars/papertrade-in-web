@@ -6,7 +6,7 @@
 .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; min-width: 0; max-width: 160px; }
 .terminal-shell .trade-cockpit .desktop-symbol-trigger > small { display: none; }
 .terminal-shell .trade-cockpit .desktop-symbol-trigger > svg { width: 12px; flex-shrink: 0; }
-.terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link) { width: 30px; height: 36px; min-width: 30px; flex: 0 0 30px; padding: 0; border: 0; box-shadow: none; border-radius: 0; background: transparent; display: grid; place-items: center; }
+.terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link) { width: 30px; height: 36px; min-width: 30px; flex: 0 0 30px; padding: 0; border: 0; box-shadow: none; border-radius: 0; background: transparent; display: grid; place-items: center; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { width: 70px; min-width: 70px; height: 36px; flex: 0 0 70px; padding: 3px 6px; gap: 3px; box-shadow: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger small { font-size: 11px; line-height: 1.2; color: inherit; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger b { display: none; }
@@ -52,7 +52,7 @@
 @media (max-width: 360px) {
   .terminal-shell .trade-cockpit .chart-controls { gap: 3px; padding-inline: 5px; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol { gap: 1px; }
-  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link) { width: 27px; min-width: 27px; flex-basis: 27px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link) { width: 27px; min-width: 27px; flex-basis: 27px; }
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { width: 66px; min-width: 66px; flex-basis: 66px; }
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 42px; min-width: 42px; flex-basis: 42px; }
 }

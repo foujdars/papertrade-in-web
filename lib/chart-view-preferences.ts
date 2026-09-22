@@ -2,6 +2,8 @@
 
 import { useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { SMC_LESSONS, type SmcKind } from "./smc-learner";
+import { DEFAULT_CHART_STYLE, isChartStyle, type ChartStyleId } from "./chart-style";
+import { sanitizeComparedSymbols, type ComparedSymbol } from "./chart-compare";
 
 // Device preferences intentionally apply to every symbol, timeframe and workspace.
 const KEY = "papertrade-chart-view-v1";
@@ -15,8 +17,10 @@ type Preferences = {
   smcLesson: SmcKind;
   drawingFavorites: string[];
   showDrawingFavorites: boolean;
+  chartStyle: ChartStyleId;
+  comparedSymbols: ComparedSymbol[];
 };
-const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true };
+const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true, chartStyle: DEFAULT_CHART_STYLE, comparedSymbols: [] };
 let snapshot = DEFAULTS;
 let cachedRaw: string | null | undefined;
 
@@ -31,6 +35,8 @@ function normalize(value: unknown): Preferences {
     smcFilters: Array.isArray(v.smcFilters) ? GROUPS.filter(g => v.smcFilters!.includes(g)) : GROUPS,
     smcRange: v.smcRange === true,
     smcLesson: typeof v.smcLesson === "string" && Object.hasOwn(SMC_LESSONS, v.smcLesson) ? v.smcLesson : "FVG",
+    chartStyle: isChartStyle(v.chartStyle) ? v.chartStyle : DEFAULT_CHART_STYLE,
+    comparedSymbols: sanitizeComparedSymbols(v.comparedSymbols),
   };
 }
 

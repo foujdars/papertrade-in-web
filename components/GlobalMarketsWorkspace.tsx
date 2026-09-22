@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, PencilRuler, RefreshCw, Star, X } from "lucide-react";
+import { ArrowLeft, CandlestickChart, Diamond, PencilRuler, RefreshCw, Star, X } from "lucide-react";
 import {
   MarketChart,
   DEFAULT_CHART_INDICATORS,
@@ -9,6 +9,8 @@ import {
   type DrawingTool,
 } from "./MarketChart";
 import { ChartFunctionMenu } from "./ChartFunctionMenu";
+import { ChartStyleMenu } from "./ChartStyleMenu";
+import { CompareSymbolPicker } from "./CompareSymbolPicker";
 import { DrawingToolLibrary } from "./DrawingToolLibrary";
 import { GlobalAlerts } from "./GlobalAlerts";
 import { ModernSelect } from "./ModernSelect";
@@ -21,6 +23,7 @@ import {
   cancelPerpOrder,
   closePerp,
   freshPerpQuote,
+  GLOBAL_CHART_INSTRUMENTS,
   GLOBAL_INSTRUMENTS,
   liquidationPrice,
   marginRate,
@@ -136,6 +139,8 @@ export function GlobalMarketsWorkspace({
     [candleError, setCandleError] = useState("");
   const [functions, setFunctions] = useState(false),
     [drawings, setDrawings] = useState(false),
+    [styleMenu, setStyleMenu] = useState(false),
+    [compareMenu, setCompareMenu] = useState(false),
     [tool, setTool] = useState<DrawingTool>("cursor"),
     [indicators, setIndicators] = useState<ChartIndicators>({
       ...DEFAULT_CHART_INDICATORS,
@@ -585,6 +590,14 @@ export function GlobalMarketsWorkspace({
                         "1D",
                       ].map((value) => ({ value, label: value }))}
                     />
+                    <button onClick={() => setStyleMenu(true)}>
+                      <CandlestickChart size={17} />
+                      Type
+                    </button>
+                    <button onClick={() => setCompareMenu(true)}>
+                      <Diamond size={17} />
+                      Compare
+                    </button>
                     <button onClick={() => setDrawings(true)}>
                       <PencilRuler size={17} />
                       Tools
@@ -1048,6 +1061,8 @@ export function GlobalMarketsWorkspace({
               }}
             />
           )}
+          {styleMenu && <ChartStyleMenu onClose={() => setStyleMenu(false)} />}
+          {compareMenu && <CompareSymbolPicker instruments={GLOBAL_CHART_INSTRUMENTS} currentKey={instrument.instrumentKey} onClose={() => setCompareMenu(false)} />}
           {drawings && (
             <DrawingToolLibrary
               activeTool={tool}

@@ -55,7 +55,7 @@
   .terminal-shell .trade-identity-cluster .trade-symbol-trigger p { display: none; }
   .terminal-shell .trade-identity-cluster .trade-symbol-trigger .title-line h1 { font-size: 16px; max-width: min(29vw, 160px); }
   .terminal-shell .trade-cockpit .quote-block { padding: 0; min-width: 86px; flex-shrink: 0; }
-  .terminal-shell .trade-symbol-picker :is(.chart-watchlist-star, .chart-replay-link, .chart-derivatives-link) { width: 28px; height: 32px; min-width: 28px; }
+  .terminal-shell .trade-symbol-picker :is(.chart-watchlist-star, .chart-replay-link, .chart-derivatives-link, .chart-style-link, .chart-compare-link) { width: 28px; height: 32px; min-width: 28px; }
   .terminal-shell .trade-cockpit .chart-controls { height: 34px; flex-basis: 34px; padding-block: 1px 3px; }
   .terminal-shell .trade-cockpit .chart-controls .compact-selector-trigger { height: 30px; min-height: 30px; }
   .terminal-shell .chart-statusbar { min-height: 18px; }

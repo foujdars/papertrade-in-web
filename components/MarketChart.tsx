@@ -15,6 +15,10 @@ import { STUDIES, studyDefaults, studyTitle } from "@/lib/indicator-catalog";
 import { useIndicatorSettings, restoreHiddenStudies } from "@/lib/indicator-settings";
 import { IndicatorSettings } from "./IndicatorSettings";
 import { useComparisonCandles } from "@/lib/indicator-comparison-feed";
+import { useChartPreference } from "@/lib/chart-view-preferences";
+import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKind, toStyleSeriesPoint, type ChartStyleId } from "@/lib/chart-style";
+import { compareChangePercent, compareColor } from "@/lib/chart-compare";
+import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -24,6 +28,7 @@ import type {
   ISeriesApi,
   MouseEventParams,
   Logical,
+  SeriesType,
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
@@ -329,6 +334,18 @@ function toCandleData(candle: Candle, timeframe: string): CandlestickData<Time> 
   };
 }
 
+function styleSeriesData(candles: Candle[], style: ChartStyleId, timeframe: string) {
+  const source = prepareStyleCandles(candles, style);
+  return source.map((candle, index) => toStyleSeriesPoint(candle, source, index, style, chartTimeFromEpoch(Number(candle.time), timeframe)));
+}
+
+function styleLineData(candles: Candle[], timeframe: string) {
+  return candles.filter((candle) => Number.isFinite(candle.close)).map((candle) => ({
+    time: chartTimeFromEpoch(Number(candle.time), timeframe),
+    value: candle.close,
+  }));
+}
+
 function timeToTimestamp(time: Time) {
   if (typeof time === "number") return time;
   if (typeof time === "string") return Math.floor(new Date(time).getTime() / 1_000);
@@ -513,6 +530,10 @@ export function MarketChart({
     ? Object.fromEntries(Object.keys(suppliedIndicators).map(key => [key, false])) as ChartIndicators
     : suppliedIndicators, [candlesOnly, suppliedIndicators]);
   const { settings: studySettings, setStudy } = useIndicatorSettings();
+  const [chartStyle] = useChartPreference("chartStyle");
+  const [comparedSymbols, setComparedSymbols] = useChartPreference("comparedSymbols");
+  const chartStyleRef = useRef(chartStyle);
+  chartStyleRef.current = chartStyle;
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
   const [editingStudy, setEditingStudy] = useState<string | null>(null);
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
@@ -527,7 +548,14 @@ export function MarketChart({
   const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
   const isReplay = replayCandles !== undefined;
   const externalFeed = externalCandles !== undefined;
-  const comparisonData=useComparisonCandles(isReplay||externalFeed?[]:STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),timeframe);
+  const overlayCompared = useMemo(
+    () => (isReplay ? [] : comparedSymbols.filter((item) => item.instrumentKey !== instrument.instrumentKey)),
+    [comparedSymbols, instrument.instrumentKey, isReplay],
+  );
+  const comparisonData=useComparisonCandles(isReplay||externalFeed?[]:[
+    ...STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),
+    ...overlayCompared.map((item) => item.instrumentKey),
+  ],timeframe);
   const comparisonRef=useRef(comparisonData);comparisonRef.current=comparisonData;
   const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
@@ -538,7 +566,11 @@ export function MarketChart({
   const chartHost = useRef<HTMLDivElement>(null);
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
-  const candleSeries = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const candleSeries = useRef<ISeriesApi<SeriesType> | null>(null);
+  const hlcSeries = useRef<{ high: ISeriesApi<"Line">; low: ISeriesApi<"Line"> } | null>(null);
+  const compareSeries = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const profileOverlay = useRef<ChartProfileOverlay | null>(null);
+  const [chartGeneration, setChartGeneration] = useState(0);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
@@ -597,8 +629,9 @@ export function MarketChart({
   const orderToolEnabledRef = useRef(false);
   const [latestCandle, setLatestCandle] = useState<Candle | undefined>(() => initialData.at(-1));
   const [hoveredCandle, setHoveredCandle] = useState<{ scope: string; time: number | null } | null>(null);
-  const legendScope = `${instrument.instrumentKey}|${timeframe}`;
-  const legend = selectCandleLegend(dataRef.current, hoveredCandle?.scope === legendScope ? hoveredCandle.time : null);
+  const legendScope = `${instrument.instrumentKey}|${timeframe}|${chartStyle}`;
+  const legendSource = prepareStyleCandles(dataRef.current, chartStyle);
+  const legend = selectCandleLegend(legendSource, hoveredCandle?.scope === legendScope ? hoveredCandle.time : null);
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
@@ -627,7 +660,7 @@ export function MarketChart({
     const next = applyCandleTick(dataRef.current, tick, timeframe);
     if (next === dataRef.current) return;
     dataRef.current = next;
-    candleSeries.current?.update(toCandleData(next.at(-1)!, timeframe));
+    paintLastBar(next);
     setLatestCandle(next.at(-1));
     if (publish) onPriceRef.current?.(tick.price, tick.timestampMs);
     if (!liveIndicatorTimerRef.current) {
@@ -909,6 +942,36 @@ export function MarketChart({
   function syncIndicators(next: ChartIndicators) {
     indicatorsRef.current = next;
     syncIndicatorData();
+  }
+
+  function paintPriceSeries(candles = dataRef.current) {
+    const series = candleSeries.current;
+    if (!series) return;
+    const style = chartStyleRef.current;
+    const points = styleSeriesData(candles, style, timeframe);
+    series.setData(points as never);
+    const source = prepareStyleCandles(candles, style);
+    if (hlcSeries.current && style === "hlc-area") {
+      hlcSeries.current.high.setData(source.map((candle) => ({ time: chartTimeFromEpoch(Number(candle.time), timeframe), value: candle.high })));
+      hlcSeries.current.low.setData(source.map((candle) => ({ time: chartTimeFromEpoch(Number(candle.time), timeframe), value: candle.low })));
+    }
+    profileOverlay.current?.update(style, candles, timeframe);
+  }
+
+  function paintLastBar(candles = dataRef.current) {
+    const series = candleSeries.current;
+    const last = candles.at(-1);
+    if (!series || !last) return;
+    const style = chartStyleRef.current;
+    const source = prepareStyleCandles(candles, style);
+    const point = source.at(-1);
+    if (!point) return;
+    series.update(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)) as never);
+    if (hlcSeries.current && style === "hlc-area") {
+      hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
+      hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
+    }
+    profileOverlay.current?.update(style, candles, timeframe);
   }
 
   function persistDrawings(pushHistory = false) {
@@ -1316,19 +1379,15 @@ export function MarketChart({
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
-      const series = chart.addSeries(lwc.CandlestickSeries, {
+      const style = chartStyleRef.current;
+      const kind = styleSeriesKind(style);
+      const shared = {
         ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
-        upColor: "#00a67e",
-        downColor: "#f04458",
-        borderVisible: false,
-        wickUpColor: "#00a67e",
-        wickDownColor: "#f04458",
         priceLineVisible: true,
         priceLineColor: "#6657ee",
-        priceLineWidth: 1,
+        priceLineWidth: 1 as const,
         priceLineStyle: lwc.LineStyle.Dashed,
         lastValueVisible: true,
-        // Keep the symbol in the OHLC legend; the right-axis marker should contain only the price.
         title: "",
         autoscaleInfoProvider: (baseImplementation: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
           const base = baseImplementation();
@@ -1341,10 +1400,42 @@ export function MarketChart({
           const padding = Math.max((maxValue - minValue) * 0.08, tool.entryPrice * 0.002, tool.tickSize ?? 0.05);
           return { ...base, priceRange: { minValue: Math.max(0, minValue - padding), maxValue: maxValue + padding } };
         },
-      });
+      };
+      const series = kind === "bar"
+        ? chart.addSeries(lwc.BarSeries, { ...shared, upColor: "#00a67e", downColor: "#f04458", thinBars: style === "high-low" })
+        : kind === "line"
+          ? chart.addSeries(lwc.LineSeries, { ...shared, color: "#2962FF", lineWidth: 2, lineType: style === "step-line" ? lwc.LineType.WithSteps : lwc.LineType.Simple, pointMarkersVisible: style === "line-markers", pointMarkersRadius: 3 })
+          : kind === "area"
+            ? chart.addSeries(lwc.AreaSeries, { ...shared, lineColor: "#2962FF", topColor: "rgba(41,98,255,0.28)", bottomColor: "rgba(41,98,255,0.04)", lineWidth: 2 })
+            : kind === "baseline"
+              ? chart.addSeries(lwc.BaselineSeries, { ...shared, baseValue: { type: "price", price: styleBaselinePrice(dataRef.current) }, topLineColor: "#00a67e", topFillColor1: "rgba(0,166,126,0.28)", topFillColor2: "rgba(0,166,126,0.04)", bottomLineColor: "#f04458", bottomFillColor1: "rgba(240,68,88,0.28)", bottomFillColor2: "rgba(240,68,88,0.04)" })
+              : kind === "histogram"
+                ? chart.addSeries(lwc.HistogramSeries, { ...shared, color: "#2962FF" })
+                : chart.addSeries(lwc.CandlestickSeries, {
+                  ...shared,
+                  upColor: style === "hollow-candles" ? "rgba(0,166,126,0)" : "#00a67e",
+                  downColor: "#f04458",
+                  borderVisible: style === "hollow-candles",
+                  borderUpColor: "#00a67e",
+                  borderDownColor: "#f04458",
+                  wickUpColor: "#00a67e",
+                  wickDownColor: "#f04458",
+                });
       chartApi.current = chart;
       candleSeries.current = series;
-      series.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
+      if (style === "hlc-area") {
+        hlcSeries.current = {
+          high: chart.addSeries(lwc.LineSeries, { color: "rgba(0,166,126,.72)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+          low: chart.addSeries(lwc.LineSeries, { color: "rgba(240,68,88,.72)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+        };
+      } else hlcSeries.current = null;
+      if (isProfileStyle(style)) {
+        const overlay = new ChartProfileOverlay();
+        series.attachPrimitive(overlay);
+        profileOverlay.current = overlay;
+      } else profileOverlay.current = null;
+      paintPriceSeries();
+      setChartGeneration((value) => value + 1);
 
       crosshairMove = (event) => {
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
@@ -1355,8 +1446,9 @@ export function MarketChart({
         // Series data works in price and indicator panes, and for touch crosshairs.
         // Never feed a hovered historical price back into execution or live quotes.
         const bar = event.point ? event.seriesData.get(series) : undefined;
-        const time = bar && "close" in bar && typeof bar.time === "number"
-          ? bar.time - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0)
+        const stamp = bar && "time" in bar ? bar.time : event.time;
+        const time = typeof stamp === "number"
+          ? stamp - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0)
           : null;
         setHoveredCandle((previous) => previous?.scope === legendScope && previous.time === time
           ? previous : { scope: legendScope, time });
@@ -1776,11 +1868,52 @@ export function MarketChart({
       riskDragPriceRangeRef.current = null;
       orderToolEnabledRef.current = false;
       candleSeries.current = null;
+      hlcSeries.current = null;
+      compareSeries.current.clear();
+      profileOverlay.current = null;
       studyRenderer.current = null;
       drawingManager.current = null;
       drawingRegistry.current = null;
     };
-  }, [chartTheme, instrument.instrumentKey, instrument.symbol, preservePageScroll, timeframe]);
+  }, [chartTheme, instrument.instrumentKey, instrument.symbol, preservePageScroll, timeframe, chartStyle]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    if (!chart || !chartGeneration) return;
+    let cancelled = false;
+    const keys = overlayCompared.map((item) => item.instrumentKey);
+    void import("lightweight-charts").then(({ LineSeries, PriceScaleMode }) => {
+      if (cancelled || chartApi.current !== chart) return;
+      const keep = new Set(keys);
+      for (const [key, series] of compareSeries.current) {
+        if (keep.has(key)) continue;
+        try { chart.removeSeries(series); } catch { /* already gone with a rebuilt chart */ }
+        compareSeries.current.delete(key);
+      }
+      overlayCompared.forEach((item, index) => {
+        const candles = comparisonData[item.instrumentKey] ?? [];
+        let series = compareSeries.current.get(item.instrumentKey);
+        if (!series) {
+          series = chart.addSeries(LineSeries, {
+            color: compareColor(index),
+            lineWidth: 2,
+            priceLineVisible: true,
+            lastValueVisible: true,
+            title: item.symbol,
+            crosshairMarkerVisible: true,
+          });
+          compareSeries.current.set(item.instrumentKey, series);
+        } else {
+          series.applyOptions({ color: compareColor(index), title: item.symbol });
+        }
+        series.setData(styleLineData(candles, timeframe));
+      });
+      const scale = chart.priceScale("right");
+      if (keys.length) scale.applyOptions({ mode: PriceScaleMode.Percentage });
+      else if (scale.options().mode === PriceScaleMode.Percentage) scale.applyOptions({ mode: PriceScaleMode.Normal });
+    });
+    return () => { cancelled = true; };
+  }, [chartGeneration, comparisonData, overlayCompared, timeframe]);
 
   useEffect(() => {
     if (clearSignal === previousClear.current) return;
@@ -1811,7 +1944,7 @@ export function MarketChart({
   useEffect(() => {
     if (replayCandles === undefined) return;
     dataRef.current = replayCandles;
-    candleSeries.current?.setData(replayCandles.map((candle) => toCandleData(candle, timeframe)));
+    paintPriceSeries(replayCandles);
     setLatestCandle(replayCandles.at(-1));
     syncIndicatorData(replayCandles);
     // No quote callbacks, live subscriptions or portfolio execution in replay.
@@ -1826,7 +1959,7 @@ export function MarketChart({
     chartApi.current?.applyOptions({ localization: { priceFormatter: (price: number) => price.toLocaleString("en-US", { maximumFractionDigits: precision }) } });
     const initial = dataRef.current.length === 0;
     dataRef.current = externalCandles;
-    candleSeries.current?.setData(externalCandles.map(c => toCandleData(c,timeframe)));
+    paintPriceSeries(externalCandles);
     setLatestCandle(externalCandles.at(-1));
     syncIndicatorData(externalCandles);
     if(initial&&externalCandles.length)applyInitialVisibleRange(externalCandles);
@@ -1860,7 +1993,7 @@ export function MarketChart({
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
         const latest = dataRef.current.at(-1);
         setLatestCandle(latest);
-        candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
+        paintPriceSeries();
         restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
         syncIndicatorData();
         applyInitialVisibleRange(payload.candles);
@@ -1988,7 +2121,7 @@ export function MarketChart({
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
         if (requestController.signal.aborted) return;
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
-        candleSeries.current?.setData(dataRef.current.map((candle) => toCandleData(candle, timeframe)));
+        paintPriceSeries();
         syncIndicatorData();
         scheduleOverlayRefresh();
         const latest = dataRef.current.at(-1);
@@ -2146,6 +2279,20 @@ export function MarketChart({
                 {formatCandleChange(legend.changePercent)}
               </i>
             </span>
+          )}
+          {overlayCompared.length > 0 && (
+            <div className="compare-legend-row" aria-label="Compared symbols">
+              {overlayCompared.map((item, index) => {
+                const change = compareChangePercent(comparisonData[item.instrumentKey] ?? []);
+                return (
+                  <span key={item.instrumentKey} className="compare-legend-chip" style={{ color: compareColor(index) }}>
+                    <i /><b>{item.symbol}</b>
+                    <em className={change === null || change === 0 ? "neutral" : change > 0 ? "positive" : "negative"}>{change === null ? "—" : formatCandleChange(change)}</em>
+                    <button type="button" aria-label={`Remove ${item.symbol} from compare`} onClick={() => setComparedSymbols((current) => current.filter((row) => row.instrumentKey !== item.instrumentKey))}><X size={12} /></button>
+                  </span>
+                );
+              })}
+            </div>
           )}
         </div>
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}

@@ -36,7 +36,7 @@
 html, body { touch-action: pan-x pan-y; }
 .terminal-shell { touch-action: pan-x pan-y; }
 @media (max-width: 360px) {
-  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link) { width: 23px; min-width: 23px; flex-basis: 23px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link) { width: 23px; min-width: 23px; flex-basis: 23px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger .stock-logo { display: none; }
   .drawing-tile-grid { gap: 6px; }
   .drawing-tile-select span { font-size: 10px; }

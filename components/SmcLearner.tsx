@@ -15,7 +15,7 @@ const groups: Record<string, SmcKind[]> = {
 const dateText = (time: number) => new Date(time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function SmcLearner({ candles, chart, series, timeframe, replay, dark, refreshRef, triggerHost }: {
-  candles: Candle[]; chart: IChartApi | null; series: ISeriesApi<"Candlestick"> | null;
+  candles: Candle[]; chart: IChartApi | null; series: ISeriesApi<"Candlestick"> | ISeriesApi<any> | null;
   timeframe: string; replay: boolean; dark: boolean; refreshRef: MutableRefObject<(() => void) | null>;
   triggerHost?: HTMLElement | null;
 }) {

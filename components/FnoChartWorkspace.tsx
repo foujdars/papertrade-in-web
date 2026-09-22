@@ -1,9 +1,11 @@
 "use client";
 import { StockLogo } from "@/components/StockLogo";
 
-import { Activity, ChevronDown, ChevronsUpDown, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
+import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, Diamond, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { ChartStyleMenu } from "@/components/ChartStyleMenu";
+import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { MarketChart, type ChartAction, type ChartActionRequest, type ChartOrderTool, type ChartTradeMarker, type DrawingTool, type FeedStatus } from "@/components/MarketChart";
@@ -62,6 +64,7 @@ export function FnoChartWorkspace({
   tradeMarkers = [],
   chartTheme,
   onReplay,
+  compareInstruments,
 }: {
   priceActionsHostRef?: (element: HTMLDivElement | null) => void;
   priceTasks?: PriceTask[];
@@ -101,12 +104,17 @@ export function FnoChartWorkspace({
   tradeMarkers?: ChartTradeMarker[];
   chartTheme: "light" | "neon";
   onReplay: (instrument: Instrument) => void;
+  compareInstruments?: Instrument[];
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
   const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
+  const [styleMenuOpen, setStyleMenuOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [indicators, setIndicators] = usePersistentChartIndicators();
+  const [chartStyle] = useChartPreference("chartStyle");
+  const [comparedSymbols] = useChartPreference("comparedSymbols");
   const [activeTool, setActiveTool] = useState<DrawingTool>("cursor");
   const [toolSignal, setToolSignal] = useState(0);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
@@ -257,6 +265,8 @@ export function FnoChartWorkspace({
             <nav className="fno-chart-menu-tabs" aria-label="Chart menu sections">
               <button onClick={() => { setTimeMenuOpen(false); setIndicatorMenuOpen(true); }}><Activity size={16} /><span><b>Indicators</b><small>Studies</small></span></button>
               <button onClick={() => { setTimeMenuOpen(false); setDrawingMenuOpen(true); }}><PenTool size={16} /><span><b>Tools</b><small>Drawings</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setStyleMenuOpen(true); }}><CandlestickChart size={16} /><span><b>Chart type</b><small>{chartStyle}</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setCompareOpen(true); }}><Diamond size={16} /><span><b>Compare</b><small>{comparedSymbols.length || "Overlay"}</small></span></button>
             </nav>
             {FNO_TIMEFRAME_GROUPS.map((group) => (
               <div key={group.label}><span>{group.label}</span><nav>{group.values.map((value) => <button key={value} className={timeframe === value ? "active" : ""} onClick={() => { onTimeframeChange(value); setTimeMenuOpen(false); }}>{value}</button>)}</nav></div>
@@ -265,6 +275,8 @@ export function FnoChartWorkspace({
         </>
       )}
       {indicatorMenuOpen && <ChartFunctionMenu indicators={indicators} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setIndicatorMenuOpen(false)} />}
+      {styleMenuOpen && <ChartStyleMenu onClose={() => setStyleMenuOpen(false)} />}
+      {compareOpen && <CompareSymbolPicker instruments={compareInstruments?.length ? compareInstruments : [topInstrument, option]} currentKey={topInstrument.instrumentKey} onClose={() => setCompareOpen(false)} />}
       {drawingMenuOpen && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setDrawingMenuOpen(false)} />}
     </section>
   );

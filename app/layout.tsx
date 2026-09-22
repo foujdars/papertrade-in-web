@@ -22,6 +22,7 @@ import "./polish.css";
 import "./notifications.css";
 import "./launch-screen.css";
 import "./chart-focus.css";
+import "./chart-style.css";
 import "./pnl-analytics.css";
 import "./modern-select.css";
 import "./ipo-studio.css";

@@ -15,7 +15,7 @@ import {
   Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
-  TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, PencilRuler,
+  TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, PencilRuler, Diamond,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
@@ -26,6 +26,8 @@ import { MarketChart, type ChartAction, type ChartActionRequest, type ChartIndic
 import { DrawingToolLibrary } from "@/components/DrawingToolLibrary";
 import { ChartDrawingToolbar } from "@/components/ChartDrawingToolbar";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
+import { ChartStyleMenu } from "@/components/ChartStyleMenu";
+import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
@@ -417,6 +419,8 @@ export function TradingDashboard() {
   const [showDrawingLibrary, setShowDrawingLibrary] = useState(false);
   const [showChartFunctions, setShowChartFunctions] = useState(false);
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false);
+  const [showChartStyleMenu, setShowChartStyleMenu] = useState(false);
+  const [showComparePicker, setShowComparePicker] = useState(false);
   const [showWatchlistSelector, setShowWatchlistSelector] = useState(false);
   const [chartAction, setChartAction] = useState<ChartActionRequest>();
   const [drawingsLocked, setDrawingsLocked] = useState(false);
@@ -425,6 +429,8 @@ export function TradingDashboard() {
   const [toolSignal, setToolSignal] = useState(0);
   const [magnet, setMagnet] = useChartPreference("magnet");
   const [hiddenDrawings, setHiddenDrawings] = useChartPreference("hidden");
+  const [chartStyle] = useChartPreference("chartStyle");
+  const [comparedSymbols] = useChartPreference("comparedSymbols");
   const [priceActionsHost, setPriceActionsHost] = useState<HTMLDivElement | null>(null);
   const [chartIndicatorHost, setChartIndicatorHost] = useState<HTMLDivElement | null>(null);
   const [homeAlerts,setHomeAlerts]=useState<HomeAlertSnapshot>({ownerId:"",items:[]});
@@ -2810,6 +2816,8 @@ export function TradingDashboard() {
                 >
                   <Link2 size={19} />
                 </button>}
+                <button type="button" className={`chart-style-link ${chartStyle !== "candles" ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); }} aria-label="Chart type" title="Chart type"><CandlestickChart size={18} /></button>
+                <button type="button" className={`chart-compare-link ${comparedSymbols.length ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); }} aria-label="Compare symbols" title="Compare symbols"><Diamond size={18} /></button>
                 <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={18} /></button>
                 {showTradeSymbols && (
                   <div className="trade-symbol-menu">
@@ -2847,6 +2855,8 @@ export function TradingDashboard() {
               </button>
               {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
               {selectedFnoUnderlying && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
+              <button type="button" className={`chart-style-link ${chartStyle !== "candles" ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); }} aria-label="Chart type" title="Chart type"><CandlestickChart size={17} /></button>
+              <button type="button" className={`chart-compare-link ${comparedSymbols.length ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); }} aria-label="Compare symbols" title="Compare symbols"><Diamond size={17} /></button>
               <button type="button" className="chart-replay-link" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={17} /></button>
               {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
                 <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search stocks, BTC, gold or Brent" /></label>
@@ -2884,6 +2894,8 @@ export function TradingDashboard() {
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
             {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
             {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { chooseTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
+            {showChartStyleMenu && <ChartStyleMenu onClose={() => setShowChartStyleMenu(false)} />}
+            {showComparePicker && <CompareSymbolPicker instruments={tradingUniverse} currentKey={selected.instrumentKey} onClose={() => setShowComparePicker(false)} />}
             {selected.assetType === "OPTION" && spotInstrument ? (
               <div className="fno-chart-underlay" />
             ) : (
@@ -3005,6 +3017,7 @@ export function TradingDashboard() {
           priceTasks={priceTasks}
           onPriceAction={(instrument, price, mode) => setPriceRequest({ instrument, price, mode })}
           onReplay={setReplayInstrument}
+          compareInstruments={tradingUniverse}
           topInstrument={fnoTopInstrument}
           topMode={fnoTopMode}
           canToggleFuture={Boolean(fnoFutureInstrument)}

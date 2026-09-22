@@ -5,7 +5,7 @@ import type { PriceTask } from "@/lib/price-actions";
 
 /** Screen-space annotations never change the chart's autoscale or intercept gestures. */
 export function ChartAlertLevels({ chart, series, tasks, instrumentKey, dark }: {
-  chart: IChartApi | null; series: ISeriesApi<"Candlestick"> | null;
+  chart: IChartApi | null; series: ISeriesApi<"Candlestick"> | ISeriesApi<any> | null;
   tasks: PriceTask[]; instrumentKey: string; dark: boolean;
 }) {
   const [layout, setLayout] = useState({ width: 0, height: 0, levels: [] as { id: string; price: number; y: number }[] });
