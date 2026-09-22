@@ -19,6 +19,8 @@
 .home-studio .market-directory-monogram { display: grid; place-items: center; flex: 0 0 38px; height: 38px; border: 1px solid var(--line); border-radius: 12px; color: var(--purple); background: var(--purple-soft); font-size: 13px; font-weight: 650; }
 .home-studio .market-directory-monogram.crypto { color: #a7680a; background: #eaa93318; }
 .home-studio .market-directory-monogram.commodities { color: #8a720a; background: #b99c1618; }
+.home-studio .market-directory-row .stock-logo.has-company-logo { background: #fff; color: inherit; }
+.home-studio .market-directory-row .stock-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
 .home-studio .market-directory-identity { display: grid; flex: 1; min-width: 0; gap: 5px; }
 .home-studio .market-directory-identity b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 550; }
 .home-studio .market-directory-identity small { color: var(--muted); font-size: 10px; line-height: 1.5; }

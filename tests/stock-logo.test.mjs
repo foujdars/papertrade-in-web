@@ -22,6 +22,18 @@ test("renamed and newly supplied symbols resolve by ISIN; unknown stocks fall ba
   assert.equal(logos.resolveStockLogo({ symbol: "UNKNOWN" }, directory), null);
 });
 
+test("global tokens use allowlisted logo CDNs and sanitized tickers, never path injection", () => {
+  const empty = new Map();
+  assert.equal(logos.resolveStockLogo({ symbol: "BTCUSD", instrumentKey: "DELTA|BTCUSD", categories: ["GLOBAL", "CRYPTO"] }, empty), "https://assets.coincap.io/assets/icons/btc@2x.png");
+  assert.equal(logos.resolveStockLogo({ symbol: "AAPLXUSD", instrumentKey: "DELTA|AAPLXUSD", categories: ["GLOBAL", "US_MARKET"] }, empty), "https://assets.parqet.com/logos/symbol/AAPL?format=png");
+  assert.equal(logos.resolveStockLogo({ symbol: "XAUTUSD", instrumentKey: "DELTA|XAUTUSD", categories: ["GLOBAL", "METAL"] }, empty), "https://assets.coincap.io/assets/icons/xaut@2x.png");
+  assert.equal(logos.resolveStockLogo({ symbol: "SLVONUSD", instrumentKey: "DELTA|SLVONUSD", categories: ["GLOBAL", "METAL"] }, empty), "https://assets.parqet.com/logos/symbol/SLV?format=png");
+  assert.equal(logos.resolveStockLogo({ symbol: "BRENT", instrumentKey: "TVC|UKOIL", categories: ["GLOBAL", "ENERGY"] }, empty), "https://assets.parqet.com/logos/symbol/BZ?format=png");
+  assert.equal(logos.resolveStockLogo({ symbol: "C-BTC-100000-010127", instrumentKey: "DELTA|C-BTC-100000-010127", categories: ["GLOBAL", "OPTION"], assetType: "OPTION", underlyingSymbol: "BTC" }, empty), "https://assets.coincap.io/assets/icons/btc@2x.png");
+  assert.equal(logos.tokenLogoUrl({ symbol: "../xUSD", instrumentKey: "DELTA|../xUSD" }), null);
+  assert.equal(logos.tokenLogoUrl({ symbol: "RELIANCE", instrumentKey: "NSE_EQ|INE002A01018" }), null);
+});
+
 test("derivatives use their underlying company and indices do not get an unrelated logo", () => {
   const option = { symbol: "RELIANCE-CALL", instrumentKey: "NSE_FO|12345", underlyingSymbol: "RELIANCE" };
   const directory = logos.stockLogoDirectory([option, reliance]);
@@ -54,7 +66,7 @@ test("logo image is lazy and fixed-size, handles failure, and resets identity on
 });
 
 test("stock surfaces share company artwork while scanner rows omit repeated signal explanations", async () => {
-  for (const component of ["TradingDashboard", "HomeWorkspace", "MarketsWorkspace", "FnoListsWorkspace", "FnoChartWorkspace", "OptionChainSheet", "AdvancedChartWorkspace", "NotificationCenter"]) {
+  for (const component of ["TradingDashboard", "HomeWorkspace", "MarketsWorkspace", "FnoListsWorkspace", "FnoChartWorkspace", "OptionChainSheet", "AdvancedChartWorkspace", "NotificationCenter", "MarketDirectory"]) {
     assert.match(await source(`components/${component}.tsx`), /<StockLogo\b/, component);
   }
   const dashboard = await source("components/TradingDashboard.tsx");

@@ -200,7 +200,7 @@ export function HomeWorkspace({
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
   const searchRow = (stock: HomeStockOption) => <div className="home-search-row" key={stock.symbol}>
     <button className="home-search-preview" aria-label={isGlobalInstrumentKey(stock.instrumentKey) ? `Open ${stock.symbol} chart` : `Preview ${stock.symbol}`} onClick={() => chooseSearch(stock)}>
-      <span className="stock-identity">{isGlobalInstrumentKey(stock.instrumentKey) ? <Globe2 size={25} aria-hidden="true" /> : stock.assetType === 'INDEX' ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
+      <span className="stock-identity">{stock.assetType === 'INDEX' ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} categories={stock.categories} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
     </button>
     <button className="home-search-chart" aria-label={`Open ${stock.symbol} chart`} title="Open chart" onClick={() => chooseSearch(stock, true)}><CandlestickChart size={18} /></button>
   </div>;

@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, Bitcoin, Gem, Landmark, Search, X } from "lucide-react";
+import { StockLogo } from "@/components/StockLogo";
 import { compareMarketInstruments, marketDisplayName, marketGroup, marketProductLabel, marketTicker, type DirectoryInstrument, type MarketGroup } from "@/lib/market-directory";
 
 const globalTabs = [{ key: "us", label: "US markets", icon: Landmark }, { key: "crypto", label: "Crypto", icon: Bitcoin }, { key: "commodities", label: "Commodities", icon: Gem }] as const;
@@ -24,7 +25,7 @@ export function MarketDirectory({ market, instruments, onOpen }: { market: "indi
     {selected === "us" && <p className="market-directory-note">US-linked tokenised contracts, not direct stock ownership.</p>}
     <div className="market-directory-list">
       {matches.slice(0, limit).map(item => <button key={item.instrumentKey ?? item.symbol} onClick={() => onOpen(item.symbol)} className="market-directory-row">
-        <span className={`market-directory-monogram ${selected}`} aria-hidden="true">{selected === "crypto" && item.symbol === "BTCUSD" ? "₿" : marketTicker(item).slice(0, 2)}</span>
+        <StockLogo {...item} size={38} className={`market-directory-monogram ${selected}`} />
         <span className="market-directory-identity"><b>{marketDisplayName(item)}</b><small>{marketTicker(item)} <span>· {marketProductLabel(item)}</span></small></span>
         <span className="market-directory-open"><ArrowUpRight size={18}/><small>Chart</small></span>
       </button>)}

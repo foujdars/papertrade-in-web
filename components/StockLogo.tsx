@@ -10,9 +10,9 @@ export function StockLogoProvider({ instruments, children }: { instruments: read
   return <LogoDirectory.Provider value={directory}>{children}</LogoDirectory.Provider>;
 }
 
-function LogoImage({ src, symbol, size }: { src: string | null; symbol: string; size: number }) {
+function LogoImage({ src, symbol, size, className }: { src: string | null; symbol: string; size: number; className?: string }) {
   const [failed, setFailed] = useState(false);
-  return <span className={`symbol-avatar stock-logo${src && !failed ? " has-company-logo" : ""}`} style={{ "--stock-logo-size": `${size}px` } as CSSProperties} aria-hidden="true">
+  return <span className={`symbol-avatar stock-logo${src && !failed ? " has-company-logo" : ""}${className ? ` ${className}` : ""}`} style={{ "--stock-logo-size": `${size}px` } as CSSProperties} aria-hidden="true">
     {src && !failed
       // Native lazy images avoid downloading artwork for the entire NSE universe.
       // eslint-disable-next-line @next/next/no-img-element
@@ -21,9 +21,9 @@ function LogoImage({ src, symbol, size }: { src: string | null; symbol: string; 
   </span>;
 }
 
-export function StockLogo({ size = 38, ...instrument }: LogoInstrument & { size?: number }) {
+export function StockLogo({ size = 38, className, ...instrument }: LogoInstrument & { size?: number; className?: string }) {
   const directory = useContext(LogoDirectory);
   const src = resolveStockLogo(instrument, directory);
   // A new symbol/source must not inherit a previous image's failure state.
-  return <LogoImage key={`${instrument.symbol}:${src}`} src={src} symbol={instrument.symbol} size={size} />;
+  return <LogoImage key={`${instrument.symbol}:${src}`} src={src} symbol={instrument.symbol} size={size} className={className} />;
 }
