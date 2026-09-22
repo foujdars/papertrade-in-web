@@ -10,6 +10,9 @@ export type OptionPosition = {
   leverage: number;
   openedAt: number;
   spec: DeltaOptionSpec;
+  target?: number;
+  stopLoss?: number;
+  riskExit?: "target" | "stopLoss";
 };
 export type OptionOrder = {
   id: string;
@@ -67,6 +70,7 @@ export function validateOptionAccount(account: PerpAccount): PerpAccount {
   if (!Array.isArray(p) || !Array.isArray(o) || !Array.isArray(e) || p.length > 100 || o.length > 20 || e.length > 2000) throw new Error("Saved option paper account is invalid.");
   if (new Set(p.map(item => item.symbol)).size !== p.length || new Set(o.map(item => item.id)).size !== o.length) throw new Error("Duplicate option account record.");
   for (const item of p) {
+    if ([item.target, item.stopLoss].some(value => value !== undefined && (!positive(value) || Math.abs(value / item.spec?.tick - Math.round(value / item.spec?.tick)) > 1e-6)) || (item.riskExit !== undefined && !["target", "stopLoss"].includes(item.riskExit))) throw new Error("Saved option protection is invalid.");
     if (!item || !isDeltaOptionSymbol(item.symbol) || !["BUY", "SELL"].includes(item.side) || !Number.isSafeInteger(item.contracts) || item.contracts < 1 ||
       ![item.entry, item.leverage, item.openedAt, item.margin].every(positive) || item.leverage > 10 ||
       item.spec?.symbol !== item.symbol || !["call_options", "put_options"].includes(item.spec.contractType) ||
@@ -155,10 +159,20 @@ export function advanceOptions(account: PerpAccount, observed: Record<string, Op
     if (entry?.settlement !== undefined && now >= position.spec.expiry) { next = settleOption(next, position.symbol, entry.settlement, now); continue; }
     if (now >= position.spec.expiry) continue; // Wait for Delta's published settlement; never invent it.
     const quote = entry?.snapshot?.quote;
-    if (!freshOptionQuote(quote, now) || quote.at < position.openedAt || position.side !== "SELL") continue;
-    const maintenance = Math.max(position.margin * 0.5, optionMargin(position.spec, quote, "SELL", position.contracts, quote.mark, position.leverage) * 0.5);
-    if (position.margin + optionPnl(position, quote.mark) <= maintenance) {
-      try { next = closeOption(next, position.symbol, quote, position.contracts, now, "LIQUIDATION"); } catch { /* Wait for executable liquidity. */ }
+    if (!freshOptionQuote(quote, now) || quote.at < position.openedAt) continue;
+    if (position.side === "SELL") {
+      const maintenance = Math.max(position.margin * 0.5, optionMargin(position.spec, quote, "SELL", position.contracts, quote.mark, position.leverage) * 0.5);
+      if (position.margin + optionPnl(position, quote.mark) <= maintenance) {
+        try { next = closeOption(next, position.symbol, quote, position.contracts, now, "LIQUIDATION"); } catch { /* Wait for executable liquidity. */ }
+        continue;
+      }
+    }
+    const direction = position.side === "BUY" ? 1 : -1;
+    const exit = position.riskExit ?? (position.stopLoss && (quote.mark - position.stopLoss) * direction <= 0 ? "stopLoss" : position.target && (quote.mark - position.target) * direction >= 0 ? "target" : undefined);
+    if (exit) {
+      if (!position.riskExit) next = { ...next, revision: next.revision + 1, optionPositions: positions(next).map(p => p.symbol === position.symbol ? { ...p, riskExit: exit } : p) };
+      try { next = closeOption(next, position.symbol, quote, position.contracts, now); } catch { /* Keep the triggered exit until executable liquidity returns. */ }
+      continue;
     }
   }
   for (const order of [...orders(next)]) {
@@ -175,4 +189,18 @@ export function advanceOptions(account: PerpAccount, observed: Record<string, Op
     } catch { /* Leave the reserved order pending until executable. */ }
   }
   return next;
+}
+
+/** Chart protection is mark-triggered, with paper exits at the observed bid/ask. */
+export function moveOptionChartLevel(account: PerpAccount, symbol: string, level: "target" | "stopLoss", value: number | undefined, quote: PerpQuote, now: number): PerpAccount {
+  const p = positions(account).find(item => item.symbol === symbol);
+  if (!p || !freshOptionQuote(quote, now) || quote.symbol !== symbol || now >= p.spec.expiry) throw new Error("A live option position and fresh quote are required.");
+  if (p.riskExit) throw new Error("An exit has already triggered. Waiting for executable liquidity.");
+  const price = value === undefined ? undefined : Number((Math.round(value / p.spec.tick) * p.spec.tick).toFixed(10));
+  if (price !== undefined) {
+    if (!positive(price)) throw new Error("Choose a valid option premium.");
+    const above = p.side === "BUY" ? level === "target" : level === "stopLoss";
+    if (above ? price <= quote.mark : price >= quote.mark) throw new Error("That level is already crossed by the mark price.");
+  }
+  return { ...account, revision: account.revision + 1, optionPositions: positions(account).map(item => item.symbol === symbol ? { ...item, [level]: price } : item) };
 }

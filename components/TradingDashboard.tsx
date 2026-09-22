@@ -38,8 +38,11 @@ import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { GLOBAL_CHART_INSTRUMENTS, deltaOptionSymbolFromInstrumentKey, deltaSymbolFromInstrumentKey, isGlobalInstrumentKey, type PerpQuote, type PerpSymbol } from '@/lib/global-markets';
 import { GlobalOptionTicket } from './GlobalOptionTicket';
-import { optionPnl, freshOptionQuote } from '@/lib/global-option-orders';
-import { positionPnl, freshPerpQuote } from '@/lib/global-markets';
+import { optionPnl, freshOptionQuote, moveOptionChartLevel, closeOption } from '@/lib/global-option-orders';
+import { positionPnl, freshPerpQuote, closePerp } from '@/lib/global-markets';
+import { globalChartLevels, moveGlobalChartLevel } from '@/lib/global-chart-risk';
+import { compareMarketInstruments } from '@/lib/market-directory';
+import { triggerValue } from '@/lib/global-order-engine';
 import { formatUsd } from '@/lib/global-order-engine';
 import { availablePerpCash } from '@/lib/global-markets';
 import { addPaperCash } from '@/lib/paper-wallets';
@@ -1011,7 +1014,7 @@ export function TradingDashboard() {
     const term = tradeSymbolSearch.trim().toLowerCase();
     return [...stockUniverse, ...stockFutureInstruments, ...globalInstruments]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
-      .sort((a, b) => term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0)
+      .sort((a, b) => (term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0) || compareMarketInstruments(a, b))
       .slice(0, 120);
   }, [globalInstruments, stockFutureInstruments, stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
@@ -1897,6 +1900,19 @@ export function TradingDashboard() {
   }
 
   function updateChartRiskLevel(level: "target" | "stopLoss", value: number, committed: boolean) {
+    if (selectedDeltaChartSymbol) {
+      if (!committed) return;
+      const symbol = selectedDeltaChartSymbol;
+      let error = "Could not save protection. Please try again.";
+      void globalTrading.transact((account, perps, options) => {
+        try {
+          const quote = selectedDeltaOption ? options[symbol]?.quote : perps[symbol]?.quote;
+          if (!quote) throw new Error("Waiting for a fresh global quote.");
+          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now());
+        } catch (cause) { error = cause instanceof Error ? cause.message : error; throw cause; }
+      }).then(saved => setToast(saved ? `${level === "target" ? "Target" : "Stop loss"} saved · ${symbol} · USD` : error));
+      return;
+    }
     if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
     if (!verifiedLivePrice || !Number.isFinite(value) || value <= 0) {
       setToast("Live price unavailable. Protection was not placed.");
@@ -1942,6 +1958,24 @@ export function TradingDashboard() {
     setFundsCurrency(currency);
     setFundsInput("");
     setFundsOpen(true);
+  }
+
+  function closeGlobalChartPosition() {
+    const symbol = selectedDeltaChartSymbol;
+    if (!symbol) return;
+    let error = "Could not close this paper position. Please try again.";
+    void globalTrading.transact((account, perps, options) => {
+      try {
+        if (selectedDeltaOption) {
+          const p = account.optionPositions?.find(p => p.symbol === symbol), q = options[symbol]?.quote;
+          if (!p || !q) throw new Error("Position or live option quote is unavailable.");
+          return closeOption(account, symbol, q, p.contracts, Date.now());
+        }
+        const p = account.positions.find(p => p.symbol === symbol), q = perps[symbol]?.quote;
+        if (!p || !q) throw new Error("Position or live quote is unavailable.");
+        return closePerp(account, symbol, q, p.contracts, Date.now());
+      } catch (cause) { error = cause instanceof Error ? cause.message : error; throw cause; }
+    }).then(saved => setToast(saved ? `Paper position closed · ${symbol}` : error));
   }
 
   async function addVirtualFunds() {
@@ -2871,11 +2905,14 @@ export function TradingDashboard() {
                 chartAction={chartAction}
                 chartTheme={theme}
                 externalCandles={selectedDeltaChartSymbol ? globalCandles : undefined}
+                priceIncrement={selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.spec.tick : selectedDeltaOption ? globalTrading.optionSnapshots[selectedDeltaOption]?.spec.tick : undefined}
                 exchangeLabel={selectedVenueLabel}
                 tradeMarkers={selectedTradeMarkers}
-                orderTool={{ enabled: !selectedDeltaChartSymbol && activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
+                orderTool={selectedGlobalPosition ? { enabled: true, side: selectedGlobalPosition.side, entryPrice: selectedGlobalPosition.entry, ...globalChartLevels(selectedGlobalPosition), quantity: Number((selectedGlobalPosition.contracts * selectedGlobalPosition.spec.lot).toFixed(8)), currency: "USD", tickSize: selectedGlobalPosition.spec.tick, referencePrice: selectedGlobalQuote ? triggerValue(selectedGlobalQuote, selectedGlobalPosition.protection?.source) : undefined, positionKey: String(selectedGlobalPosition.openedAt) }
+                  : selectedOptionPosition ? { enabled: true, side: selectedOptionPosition.side, entryPrice: selectedOptionPosition.entry, targetPrice: selectedOptionPosition.target ?? 0, stopLossPrice: selectedOptionPosition.stopLoss ?? 0, quantity: Number((selectedOptionPosition.contracts * selectedOptionPosition.spec.lot).toFixed(8)), currency: "USD", tickSize: selectedOptionPosition.spec.tick, referencePrice: selectedOptionQuote?.mark, positionKey: String(selectedOptionPosition.openedAt) }
+                  : { enabled: !selectedDeltaChartSymbol && activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
-                onOrderToolExit={selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
+                onOrderToolExit={selectedGlobalPosition || selectedOptionPosition ? closeGlobalChartPosition : selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
                 liveTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
                 onPriceAction={(price, mode) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode }); }}

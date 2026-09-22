@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { moveOptionChartLevel } from '../lib/global-option-orders.ts';
 import { normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "../lib/global-contracts.ts";
 import { normalizeDeltaCatalogue, availablePerpCash } from "../lib/global-markets.ts";
 import { readGlobalAccount } from "../lib/global-order-engine.ts";
@@ -19,6 +20,40 @@ const spec = normalizeDeltaOptionSpec(raw, symbol, now);
 const rawQuote = { symbol, mark_price: "100", close: null, spot_price: "85000", quotes: { best_bid: "99", best_ask: "101", bid_size: "1000", ask_size: "1000" }, ltp_change_24h: null, timestamp: now * 1000, product_trading_status: "operational" };
 const quote = normalizeDeltaOptionQuote(rawQuote, symbol);
 const wallet = () => readGlobalAccount(null);
+
+test('global option chart protection survives reload and executes at bid/ask', () => {
+  const a = executeOption(wallet(), spec, quote, 'BUY', 10, 1, now);
+  const b = moveOptionChartLevel(a, symbol, 'target', 110.03, quote, now);
+  assert.equal(readGlobalAccount(JSON.stringify(b)).optionPositions[0].target, 110);
+  const q = { ...quote, at: now + 1000, mark: 112, bid: 111, ask: 113 };
+  const c = advanceOptions(b, { [symbol]: { snapshot: { spec, quote: q } } }, now + 1000);
+  assert.equal(c.optionPositions.length, 0);
+  assert.equal(c.optionEvents.at(-1).price, 111);
+});
+test('option short stop, stale quote rejection and removing protection', () => {
+  const a = executeOption(wallet(), spec, quote, 'SELL', 10, 1, now);
+  const b = moveOptionChartLevel(a, symbol, 'stopLoss', 110, quote, now);
+  assert.throws(() => moveOptionChartLevel(a, symbol, 'target', 110, quote, now), /crossed/);
+  assert.throws(() => moveOptionChartLevel(a, symbol, 'stopLoss', 110, quote, now + 40000), /fresh/);
+  assert.equal(moveOptionChartLevel(b, symbol, 'stopLoss', undefined, quote, now).optionPositions[0].stopLoss, undefined);
+  const q = { ...quote, at: now + 1000, mark: 111, bid: 110, ask: 112 };
+  assert.equal(advanceOptions(b, { [symbol]: { snapshot: { spec, quote: q } } }, q.at).optionPositions.length, 0);
+});
+test('triggered option protection waits for liquidity and does not vanish on recross', () => {
+  const a = moveOptionChartLevel(executeOption(wallet(), spec, quote, 'BUY', 10, 1, now), symbol, 'stopLoss', 90, quote, now);
+  const q = { ...quote, at: now + 1000, mark: 89, bid: 88, ask: 90, bidSize: 0 };
+  const b = advanceOptions(a, { [symbol]: { snapshot: { spec, quote: q } } }, q.at);
+  assert.equal(b.optionPositions[0].riskExit, 'stopLoss');
+  const recovered = { ...quote, at: now + 2000 };
+  assert.equal(advanceOptions(b, { [symbol]: { snapshot: { spec, quote: recovered } } }, recovered.at).optionPositions.length, 0);
+});
+
+test('option liquidation still takes priority over a chart stop after a severe gap', () => {
+  const a = moveOptionChartLevel(executeOption(wallet(), spec, quote, 'SELL', 10, 1, now), symbol, 'stopLoss', 110, quote, now);
+  const q = { ...quote, at: now + 1000, mark: 100000, bid: 99999, ask: 100001 };
+  const b = advanceOptions(a, { [symbol]: { snapshot: { spec, quote: q } } }, q.at);
+  assert.equal(b.optionEvents.at(-1).kind, 'LIQUIDATION');
+});
 
 test("Delta options are searchable in the existing chart with contract details", () => {
   const listed = normalizeDeltaCatalogue([raw]);

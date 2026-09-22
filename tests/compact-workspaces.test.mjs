@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import * as homeQuotes from "../lib/home-quotes.ts";
 import * as homePreferences from "../lib/home-preferences.ts";
 import * as globalMarkets from "../lib/global-markets.ts";
+import * as marketDirectory from "../lib/market-directory.ts";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -282,6 +283,8 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/home-quotes": homeQuotes,
     "@/lib/home-preferences": homePreferences,
     "@/lib/global-markets": globalMarkets,
+    "@/lib/market-directory": marketDirectory,
+    "./MarketDirectory": { MarketDirectory: () => null },
     "@/lib/global-order-engine": { formatUsd: value => `$${Number(value).toFixed(2)}` },
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
     "@/lib/market": { formatInr: String, deriveNetChange: () => 0, formatSignedMarketMove: String },
@@ -344,9 +347,29 @@ test("Home separates Indian and global wallets, search, and add-cash target", as
   view = harness.render(props);
   assert.equal(elements(view).filter(node => node.props?.className === 'home-index-card').length, 0);
   assert.ok(elements(view).some(node => node.props?.className?.includes('home-global-account')));
-  assert.ok(elements(view).some(node => node.props?.placeholder?.startsWith('Search BTC, gold')));
+  assert.ok(elements(view).some(node => node.props?.placeholder?.startsWith('Search US, crypto')));
   elements(view).find(node => node.props?.className === 'home-wallet-actions').props.children[1].props.onClick();
   assert.deepEqual(deposits, ['USD']);
+});
+
+test("market directory switches categories, searches and opens the original chart symbol", async () => {
+  const harness = await componentHarness("components/MarketDirectory.tsx", "MarketDirectory");
+  const opened = [];
+  const make = (symbol, name, tag) => ({ symbol, name, categories: ['GLOBAL', tag], instrumentKey: `DELTA|${symbol}`, assetType: 'FUTURE' });
+  const props = {market: 'global', instruments: [make('AAPLXUSD','Apple','US_MARKET'), make('NVDAXUSD','NVIDIA','US_MARKET'), make('BTCUSD','Bitcoin','CRYPTO'), make('XAUTUSD','Gold','METAL')], onOpen: symbol => opened.push(symbol)};
+  let view = harness.render(props);
+  const rows = () => elements(view).filter(node => node.props?.className === 'market-directory-row');
+  assert.match(viewText(rows()[0]), /NVIDIA/);
+  rows()[0].props.onClick();
+  assert.deepEqual(opened, ['NVDAXUSD']);
+  const tabs = elements(view).find(node => node.props?.className === 'market-directory-tabs');
+  tabs.props.children[1].props.onClick(); view = harness.render(props);
+  assert.equal(rows().length, 1); assert.match(viewText(rows()[0]), /Bitcoin/);
+  tabs.props.children[2].props.onClick(); view = harness.render(props);
+  assert.match(viewText(rows()[0]), /Gold/);
+  elements(view).find(node => node.props?.className === 'market-directory-search-toggle').props.onClick(); view = harness.render(props);
+  elements(view).find(node => node.type === 'input').props.onChange({target:{value:'not-a-match'}}); view = harness.render(props);
+  assert.equal(rows().length, 0); assert.match(viewText(view), /No matches/);
 });
 
 test("index row keyboard navigation does not swallow the watchlist-star action", async () => {

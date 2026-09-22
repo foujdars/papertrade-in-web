@@ -7,7 +7,7 @@ import type { GlobalTrading } from "./useGlobalTrading";
 import type { GlobalTicketTab } from "./GlobalOrderTicket";
 import { availablePerpCash } from "@/lib/global-markets";
 import { formatUsd } from "@/lib/global-order-engine";
-import { cancelOptionLimit, closeOption, executeOption, freshOptionQuote, optionFee, optionMargin, optionPnl, placeOptionLimit } from "@/lib/global-option-orders";
+import { cancelOptionLimit, closeOption, executeOption, freshOptionQuote, optionFee, optionMargin, optionPnl, placeOptionLimit, moveOptionChartLevel } from "@/lib/global-option-orders";
 
 const number = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 8 });
 export function GlobalOptionTicket({ symbol, side, onSide, trading, tab, onTab }: {
@@ -65,6 +65,7 @@ export function GlobalOptionTicket({ symbol, side, onSide, trading, tab, onTab }
     <div className="ticket-heading"><div><span className="eyebrow">Global · USD · option paper trade</span><h2>{symbol}</h2></div><span className="paper-badge">Paper trading</span></div>
     <nav className="global-ticket-tabs" aria-label="Global option trading">{(["Order", "Positions", "Open orders", "History"] as const).map(next => <button key={next} type="button" aria-pressed={tab === next} onClick={() => onTab(next)}>{next}{next === "Positions" ? ` ${account?.optionPositions?.length ?? 0}` : next === "Open orders" ? ` ${account?.optionOrders?.length ?? 0}` : ""}</button>)}</nav>
     <div className="global-wallet-line"><span>Available USD</span><b>{account ? formatUsd(available) : "Loading…"}</b></div>
+    {position && <div className="global-protection"><p>Chart TP: {position.target ? formatUsd(position.target) : "Not set"} · SL: {position.stopLoss ? formatUsd(position.stopLoss) : "Not set"}{position.riskExit ? " · Exit triggered" : ""}</p><small>Tap the position line on your chart to reveal the TP/SL handles. Drag to set mark-triggered market exits. Paper exits are monitored while the app is open.</small>{(position.target || position.stopLoss) && <button className="global-text-button" disabled={busy || !fresh || !!position.riskExit} onClick={() => void transact((a, _data, options) => { const q = options[symbol]?.quote; if (!q) throw new Error("Fresh option quote required."); return moveOptionChartLevel(moveOptionChartLevel(a, symbol, "target", undefined, q, Date.now()), symbol, "stopLoss", undefined, q, Date.now()); })}>Remove chart TP/SL</button>}</div>}
     {tab === "Order" && <>
       <div className="global-quote-strip"><span>Bid <b>{quote ? formatUsd(quote.bid) : "—"}</b></span><span>Ask <b>{quote ? formatUsd(quote.ask) : "—"}</b></span><span>Mark <b>{quote ? formatUsd(quote.mark) : "—"}</b></span></div>
       {spec && <div className="global-funding"><span>{spec.underlying} {name} · Strike {formatUsd(spec.strike)}</span><span>Expires {new Date(spec.expiry).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST</span></div>}

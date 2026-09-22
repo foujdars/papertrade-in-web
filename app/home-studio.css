@@ -1,4 +1,34 @@
 /* Loaded independently of Tailwind's base stylesheet by the production layout. */
+.home-studio .market-directory { overflow: hidden; }
+.home-studio .market-directory .market-directory-search-toggle { display: grid; place-items: center; width: 40px; min-height: 40px; padding: 0; border: 0; border-radius: 10px; color: var(--purple); background: transparent; cursor: pointer; }
+.home-studio .market-directory > header > small { color: var(--purple); background: var(--purple-soft); padding: 5px 8px; border-radius: 7px; font-size: 10px; }
+.home-studio .market-directory-tabs { display: flex; gap: 4px; margin: 0 14px 16px; padding: 4px; border-radius: 13px; background: var(--soft); }
+.home-studio .market-directory-tabs > button { flex: 1; min-width: 0; display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 8px 5px; border: 1px solid transparent; border-radius: 10px; font-size: 12px; font-weight: 550; color: var(--muted); background: transparent; cursor: pointer; }
+.home-studio .market-directory-tabs > button[aria-pressed="true"] { color: var(--purple); border-color: var(--line); background: var(--surface); box-shadow: 0 2px 6px #24183a09; }
+.home-studio .market-directory-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 17px 11px; font-size: 12px; font-weight: 550; }
+.home-studio .market-directory-caption small { font-size: 10px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.home-studio .market-directory-search { display: flex; align-items: center; gap: 9px; margin: 0 14px 8px; padding: 0 12px; min-height: 44px; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: var(--surface); }
+.home-studio .market-directory-search input { flex: 1; width: 0; min-width: 0; padding: 10px 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 12px; }
+.home-studio .market-directory-search:focus-within { outline: 2px solid var(--purple); outline-offset: 1px; }
+.home-studio .market-directory-search button { display: grid; place-items: center; border: 0; width: 32px; min-height: 36px; padding: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.home-studio .market-directory-note { margin: 10px 17px 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.home-studio .market-directory-list { padding: 0 14px; }
+.home-studio .market-directory-row { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 74px; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; box-shadow: none; }
+.home-studio .market-directory-row:hover { background: var(--soft); }
+.home-studio .market-directory-row:last-child { border-bottom: 0; }
+.home-studio .market-directory-monogram { display: grid; place-items: center; flex: 0 0 38px; height: 38px; border: 1px solid var(--line); border-radius: 12px; color: var(--purple); background: var(--purple-soft); font-size: 13px; font-weight: 650; }
+.home-studio .market-directory-monogram.crypto { color: #a7680a; background: #eaa93318; }
+.home-studio .market-directory-monogram.commodities { color: #8a720a; background: #b99c1618; }
+.home-studio .market-directory-identity { display: grid; flex: 1; min-width: 0; gap: 5px; }
+.home-studio .market-directory-identity b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 550; }
+.home-studio .market-directory-identity small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.home-studio .market-directory-open { display: grid; flex: 0 0 28px; justify-items: center; gap: 3px; color: var(--purple); }
+.home-studio .market-directory-open small { font-size: 8px; }
+.home-studio .market-directory-more { display: block; width: calc(100% - 28px); min-height: 42px; margin: 4px 14px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--purple); background: var(--soft); font-size: 12px; cursor: pointer; }
+.home-studio .market-directory-more span { color: var(--muted); }
+.home-studio .market-directory > footer { padding: 11px 16px; border-top: 1px solid var(--line); background: var(--soft); color: var(--muted); text-align: center; font-size: 10px; }
+.home-studio .market-directory-empty { padding: 20px 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media (max-width: 400px) { .home-studio .market-directory-tabs > button { font-size: 10px; gap: 4px; } .home-studio .market-directory-tabs svg { width: 14px; } }
 .terminal-shell .home-studio { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .terminal-shell .home-studio .home-dashboard-scroll { max-width: 980px; margin: 0 auto; padding: 24px 24px 90px; }
 .terminal-shell .home-studio .home-hero-copy { display: flex; flex-direction: column; align-items: stretch; }
@@ -90,8 +120,8 @@
   .home-studio .home-wallet-card { padding: 18px 18px 0; border-radius: 20px; }
   .home-studio .home-wallet-other { margin-inline: -18px; padding-inline: 18px; }
   .home-studio .home-wallet-amount { font-size: 31px; }
-  .home-studio .home-wallet-label { margin-top: 19px; }
-  .home-studio .home-wallet-actions { gap: 8px; }
+  .home-studio .home-wallet-label { margin-top: 12px; }
+  .home-studio .home-wallet-actions { gap: 8px; margin-block: 8px 13px; }
   .home-studio .home-wallet-actions > span { font-size: 10px; }
   .home-studio .home-global-explore > header > small { display: none; }
   .home-studio .home-global-explore button svg { display: none; }

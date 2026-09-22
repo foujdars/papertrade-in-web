@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { moveGlobalChartLevel, globalChartLevels } from '../lib/global-chart-risk.ts';
 import { readGlobalAccount, sizeToContracts, affordableContracts, submitGlobalOrder, advanceGlobalAccount, setGlobalProtection } from "../lib/global-order-engine.ts";
 import { openPerp, newPerpAccount, closePerp, positionPnl, availablePerpCash, cancelPerpOrder } from "../lib/global-markets.ts";
 const now = 1800000000000;
@@ -9,6 +10,42 @@ const draft = { type: "Market", side: "BUY", contracts: 10, leverage: 10 };
 const fresh = (price, elapsed = 1000, overrides = {}) => ({ ...quote, at: now + elapsed, bid: price - .5, ask: price, last: price, mark: price, index: price, ...overrides });
 const submit = (d = {}, a = readGlobalAccount(null)) => submitGlobalOrder(a, spec, quote, { ...draft, ...d }, now);
 const advance = (a, q) => advanceGlobalAccount(a, { BTCUSD: q }, { BTCUSD: spec }, q.at);
+
+test('chart drag rounds to contract tick, persists and triggers an actual USD exit', () => {
+  const a = submit();
+  const b = moveGlobalChartLevel(a, 'BTCUSD', 'target', 101000.24, quote, now);
+  assert.equal(globalChartLevels(b.positions[0]).targetPrice, 101000);
+  assert.equal(a.positions[0].protection, undefined);
+  assert.equal(readGlobalAccount(JSON.stringify(b)).positions[0].protection.takeProfit.trigger, 101000);
+  const c = advance(b, fresh(101100));
+  assert.equal(c.positions.length, 0);
+  assert.ok(c.wallet > b.wallet);
+});
+test('chart drag supports short positions, profit-locking stops and rejects stale data', () => {
+  const a = submit();
+  const b = moveGlobalChartLevel(a, 'BTCUSD', 'stopLoss', 100500, fresh(101000), now + 1000);
+  assert.equal(b.positions[0].protection.stopLoss.trigger, 100500);
+  assert.throws(() => moveGlobalChartLevel(a, 'BTCUSD', 'target', 99900, quote, now), /crossed/);
+  assert.throws(() => moveGlobalChartLevel(a, 'BTCUSD', 'target', 101000, quote, now + 31000), /fresh/);
+  const short = moveGlobalChartLevel(submit({ side: 'SELL' }), 'BTCUSD', 'target', 99000, quote, now);
+  assert.equal(advance(short, fresh(98900)).positions.length, 0);
+});
+test('moving a global limit target preserves source, limit offset and opposite trail', () => {
+  const a = setGlobalProtection(submit(), 'BTCUSD', { source: 'index', takeProfit: { mode: 'Limit', trigger: 102000, limit: 101990 }, stopLoss: { mode: 'Trail', trail: 500 } }, quote, now);
+  const oldStop = a.positions[0].protection.stopLoss;
+  const b = moveGlobalChartLevel(a, 'BTCUSD', 'target', 103000, quote, now);
+  assert.equal(b.positions[0].protection.source, 'index');
+  assert.equal(b.positions[0].protection.takeProfit.limit, 102990);
+  assert.deepEqual(b.positions[0].protection.stopLoss, oldStop);
+  assert.throws(() => moveGlobalChartLevel({ ...b, positions: [{ ...b.positions[0], protection: { ...b.positions[0].protection, activeExit: 'takeProfit' } }] }, 'BTCUSD', 'target', 104000, quote, now), /already triggered/);
+});
+test('moving a trailing stop retains its mode and saved anchor', () => {
+  const a = setGlobalProtection(submit(), 'BTCUSD', { source: 'mark', stopLoss: { mode: 'Trail', trail: 500 } }, quote, now);
+  const b = moveGlobalChartLevel(a, 'BTCUSD', 'stopLoss', 99750, quote, now);
+  assert.equal(b.positions[0].protection.stopLoss.mode, 'Trail');
+  assert.equal(b.positions[0].protection.stopLoss.trail, 250);
+  assert.equal(globalChartLevels(b.positions[0]).stopLossPrice, 99750);
+});
 
 test("new global accounts, margin, fees and P&L are all USD", () => {
   const a = submit();

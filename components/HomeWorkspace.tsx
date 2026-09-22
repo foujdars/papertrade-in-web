@@ -2,6 +2,8 @@
 import type { HomeAttention } from '@/lib/home-attention';
 import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
 import { isGlobalInstrumentKey } from '@/lib/global-markets';
+import { compareMarketInstruments } from '@/lib/market-directory';
+import { MarketDirectory } from './MarketDirectory';
 import { formatUsd } from '@/lib/global-order-engine';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
@@ -150,7 +152,7 @@ export function HomeWorkspace({
   // Mask during initial storage read, preventing a flash of balances on reopen.
   const privateBalances = !preferencesReady || preferences.privateBalances;
   const activeMarket = preferences.market;
-  const marketOptions = useMemo(() => stockOptions.filter(stock => isGlobalInstrumentKey(stock.instrumentKey) === (activeMarket === 'global')), [activeMarket, stockOptions]);
+  const marketOptions = useMemo(() => stockOptions.filter(stock => isGlobalInstrumentKey(stock.instrumentKey) === (activeMarket === 'global')).sort(compareMarketInstruments), [activeMarket, stockOptions]);
   const visibleAttention = attention.filter(item => !isHomeReminderHidden(preferences, item, now));
   const hiddenAttention = attention.filter(item => isHomeReminderHidden(preferences, item, now));
   const chooseSearch = (stock: HomeStockOption, chart = false) => {
@@ -212,7 +214,7 @@ export function HomeWorkspace({
             <h1>{activeMarket === 'global' ? 'Explore global markets' : 'Your trading day'}</h1>
             <div className="home-global-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setSearchFocused(false); setSearch(''); } }} onKeyDown={event => { if(event.key==='Escape'){setSearchFocused(false);setSearch('');} }}>
               <Search size={18} />
-              <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search BTC, gold, global contracts…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
+              <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
               {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
               {searchFocused && <div className="home-search-results" aria-label="Instrument search results">
                 {search.trim() ? matches.length ? matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments in this market.</div> : <>
@@ -228,7 +230,7 @@ export function HomeWorkspace({
 
         <section className="home-market-chooser" aria-label="Choose market and practice wallet">
           <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>Stocks &amp; F&amp;O</small></span><em>₹</em></button>
-          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>Crypto &amp; more</small></span><em>$</em></button>
+          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
         </section>
         <section className="home-wallet-card" aria-label={activeMarket === 'india' ? 'Indian rupee practice wallet' : 'Global dollar practice wallet'}>
           <div className="home-wallet-heading"><span><WalletCards size={18}/>{activeMarket === 'india' ? 'Indian wallet' : 'Global wallet'}<em>{activeMarket === 'india' ? 'INR' : 'USD'}</em></span><button disabled={!preferencesReady} aria-label={privateBalances ? 'Show wallet balances' : 'Hide wallet balances'} aria-pressed={privateBalances} onClick={() => updatePreferences({ ...preferences, privateBalances: !privateBalances })}>{privateBalances ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
@@ -238,6 +240,7 @@ export function HomeWorkspace({
           <div className="home-wallet-other"><span>{activeMarket === 'india' ? 'Global wallet' : 'Indian wallet'}</span><b>{privateBalances ? '••••' : activeMarket === 'global' ? formatInr(balance) : globalWallet === null ? '—' : formatUsd(globalWallet)}</b><small>Separate balance</small></div>
         </section>
 
+        <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section">
           <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
           <div className="home-index-grid">
@@ -283,7 +286,6 @@ export function HomeWorkspace({
           </section>}
 
         </div>
-        {activeMarket === 'global' && <section className="home-section home-global-explore"><header><span><TrendingUp size={17}/><b>Start exploring</b></span><small>Charts open in your usual layout</small></header><div>{['BTCUSD', 'XAUTUSD', 'BRENT'].map(symbol => { const instrument = marketOptions.find(item => item.symbol === symbol); return instrument ? <button key={symbol} onClick={() => onOpenStock(symbol)}><span><b>{instrument.name}</b><small>{symbol}{symbol === 'BRENT' ? ' · watch only' : ' · USD paper trading'}</small></span><ArrowRight size={17}/></button> : null; })}</div></section>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}

@@ -188,6 +188,10 @@ export type ChartOrderTool = {
   stopLossPrice: number;
   quantity: number;
   livePnl?: number;
+  currency?: "INR" | "USD";
+  tickSize?: number;
+  referencePrice?: number;
+  positionKey?: string;
 };
 
 export type ChartTradeMarker = {
@@ -440,6 +444,7 @@ export function MarketChart({
   preservePageScroll = false,
   replayCandles,
   externalCandles,
+  priceIncrement,
   exchangeLabel = 'NSE',
   replaySelecting = false,
   replayStartTime = null,
@@ -482,6 +487,7 @@ export function MarketChart({
   preservePageScroll?: boolean;
   replayCandles?: Candle[];
   externalCandles?: Candle[];
+  priceIncrement?: number;
   exchangeLabel?: string;
   replaySelecting?: boolean;
   replayStartTime?: number | null;
@@ -561,12 +567,15 @@ export function MarketChart({
   const crosshairVisibleRef = useRef(true);
   const [expandedEntry, setExpandedEntry] = useState("");
   const [draftRisk, setDraftRisk] = useState<{ key: string; level: "target" | "stopLoss"; price: number } | null>(null);
-  const entryKey = `${instrument.instrumentKey}:${suppliedOrderTool?.enabled}:${suppliedOrderTool?.side}:${suppliedOrderTool?.entryPrice}`;
+  const entryKey = `${instrument.instrumentKey}:${suppliedOrderTool?.enabled}:${suppliedOrderTool?.side}:${suppliedOrderTool?.entryPrice}:${suppliedOrderTool?.positionKey ?? ""}`;
   const orderTool = suppliedOrderTool && draftRisk?.key === entryKey
     ? { ...suppliedOrderTool, [draftRisk.level === "target" ? "targetPrice" : "stopLossPrice"]: draftRisk.price }
     : suppliedOrderTool;
   const branchesOpen = expandedEntry === entryKey;
   const orderToolRef = useRef(orderTool);
+  const globalPriceFormatRef = useRef({ type: "price" as const, precision: 2, minMove: .01 });
+  const externalTick = priceIncrement && priceIncrement > 0 ? priceIncrement : .01;
+  globalPriceFormatRef.current = { type: "price", precision: Math.max(2, externalTick.toFixed(10).replace(/0+$/, "").split(".")[1]?.length ?? 0), minMove: externalTick };
   const riskPointerStartRef = useRef(0);
   const riskGestureKeyRef = useRef("");
   const tradeMarkersRef = useRef(tradeMarkers);
@@ -740,7 +749,12 @@ export function MarketChart({
 
   function formatRiskPnl(value: number) {
     const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-    return `${sign}₹${Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    const usd = orderTool?.currency === "USD";
+    return `${sign}${usd ? "$" : "₹"}${Math.abs(value).toLocaleString(usd ? "en-US" : "en-IN", { maximumFractionDigits: 2 })}`;
+  }
+
+  function compactRiskPnl(value: number) {
+    return orderTool?.currency === "USD" ? formatRiskPnl(value) : compactPnl(value);
   }
 
   function riskPriceFromPointer(event: ReactPointerEvent<HTMLDivElement>, level: "target" | "stopLoss") {
@@ -751,6 +765,14 @@ export function MarketChart({
     const bounds = host.getBoundingClientRect();
     const rawPrice = series.coordinateToPrice(Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)));
     if (rawPrice === null || !Number.isFinite(rawPrice)) return null;
+    if (tool.tickSize) {
+      // Global stops may lock in profit: validate against the current trigger, not entry.
+      const reference = tool.referencePrice ?? tool.entryPrice;
+      const above = tool.side === "BUY" ? level === "target" : level === "stopLoss";
+      const boundary = above ? (Math.floor(reference / tool.tickSize) + 1) * tool.tickSize : (Math.ceil(reference / tool.tickSize) - 1) * tool.tickSize;
+      const rounded = Math.round(rawPrice / tool.tickSize) * tool.tickSize;
+      return Number(Math.max(tool.tickSize, above ? Math.max(boundary, rounded) : Math.min(boundary, rounded)).toFixed(10));
+    }
     const tick = Math.max(.05, tool.entryPrice * .0001);
     if (tool.side === "BUY") {
       return level === "target" ? Math.max(tool.entryPrice + tick, rawPrice) : Math.max(tick, Math.min(tool.entryPrice - tick, rawPrice));
@@ -1074,7 +1096,7 @@ export function MarketChart({
       refreshTradeMarkerCoordinates();
     }, 120);
     return () => window.clearInterval(interval);
-  }, [orderTool?.enabled, orderTool?.entryPrice, orderTool?.quantity, orderTool?.side, orderTool?.stopLossPrice, orderTool?.targetPrice]);
+  }, [orderTool?.enabled, orderTool?.entryPrice, orderTool?.quantity, orderTool?.side, orderTool?.stopLossPrice, orderTool?.targetPrice, orderTool?.referencePrice, orderTool?.tickSize]);
 
   const tradeMarkerKey = tradeMarkers
     .map((marker) => `${marker.id}:${marker.time}:${marker.side}:${marker.price}`)
@@ -1290,11 +1312,12 @@ export function MarketChart({
         kineticScroll: { mouse: true, touch: true },
         localization: {
           locale: instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN",
-          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 0, maximumFractionDigits: externalFeed ? globalPriceFormatRef.current.precision : 2 }),
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
       const series = chart.addSeries(lwc.CandlestickSeries, {
+        ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
         upColor: "#00a67e",
         downColor: "#f04458",
         borderVisible: false,
@@ -1315,7 +1338,7 @@ export function MarketChart({
           if (!levels.length) return base;
           const minValue = Math.min(base.priceRange.minValue, ...levels);
           const maxValue = Math.max(base.priceRange.maxValue, ...levels);
-          const padding = Math.max((maxValue - minValue) * 0.08, tool.entryPrice * 0.002, 0.05);
+          const padding = Math.max((maxValue - minValue) * 0.08, tool.entryPrice * 0.002, tool.tickSize ?? 0.05);
           return { ...base, priceRange: { minValue: Math.max(0, minValue - padding), maxValue: maxValue + padding } };
         },
       });
@@ -1798,6 +1821,9 @@ export function MarketChart({
 
   useEffect(() => {
     if (externalCandles === undefined) return;
+    const { precision } = globalPriceFormatRef.current;
+    candleSeries.current?.applyOptions({ priceFormat: globalPriceFormatRef.current });
+    chartApi.current?.applyOptions({ localization: { priceFormatter: (price: number) => price.toLocaleString("en-US", { maximumFractionDigits: precision }) } });
     const initial = dataRef.current.length === 0;
     dataRef.current = externalCandles;
     candleSeries.current?.setData(externalCandles.map(c => toCandleData(c,timeframe)));
@@ -1806,7 +1832,7 @@ export function MarketChart({
     if(initial&&externalCandles.length)applyInitialVisibleRange(externalCandles);
     setFeedMode(externalCandles.length?'live':'loading');
     scheduleOverlayRefresh();
-  }, [externalCandles,timeframe]);
+  }, [externalCandles,timeframe,priceIncrement]);
 
   useEffect(() => {
     if (isReplay || externalFeed) return;
@@ -2150,7 +2176,7 @@ export function MarketChart({
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
-                <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{compactPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</span>
+                <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</span>
               </button>
             </div>}
             {(["target", "stopLoss"] as const).map((level) => {
@@ -2168,17 +2194,18 @@ export function MarketChart({
                 onPointerMove={(event) => moveRiskDrag(level, event)}
                 onPointerUp={(event) => endRiskDrag(level, event)}
                 onPointerCancel={(event) => endRiskDrag(level, event)}>
-                <div className="bracket-level-chip" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : price.toFixed(2)}
+                <div className="bracket-level-chip" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : `${orderTool.currency ?? "INR"} ${Number(price.toFixed(10))}`}
                   onKeyDown={(event) => {
                     if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
                     event.preventDefault();
                     const tool = suppliedOrderTool;
                     if (!tool) return;
-                    const step = Math.max(.05, Math.round(tool.entryPrice * .001 * 100) / 100);
-                    const next = Math.round(((price || tool.entryPrice) + (event.key === "ArrowUp" ? step : -step)) * 100) / 100;
+                    const step = tool.tickSize ?? Math.max(.05, Math.round(tool.entryPrice * .001 * 100) / 100);
+                    const raw = (price || tool.referencePrice || tool.entryPrice) + (event.key === "ArrowUp" ? step : -step);
+                    const next = tool.tickSize ? Number((Math.round(raw / step) * step).toFixed(10)) : Math.round(raw * 100) / 100;
                     if (next > 0) onOrderToolChange?.(level, next, true);
                   }}>
-                  <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : compactPnl(orderToolPnl(orderTool, price))}</span>
+                  <span>{orderTool.currency === "USD" ? level === "target" ? "TP" : "SL" : orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span>
                 </div>
               </div>;
             })}
