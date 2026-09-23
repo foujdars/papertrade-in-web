@@ -554,7 +554,7 @@ export function MarketChart({
   useEffect(() => {setSelectedStudy(null);lastStudyTap.current=null;}, [instrument.instrumentKey,timeframe,candlesOnly]);
   useEffect(() => { setEditingLine(null); }, [instrument.instrumentKey]);
   useEffect(() => {if(selectedStudy&&!indicators[selectedStudy])setSelectedStudy(null);}, [indicators,selectedStudy]);
-  const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
+  const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number;extra?:number}>>([]);
   const isReplay = replayCandles !== undefined;
   const externalFeed = externalCandles !== undefined || instrument.instrumentKey.startsWith("DELTA|");
   const historyRequestRef = useRef(historyRequest); historyRequestRef.current = historyRequest;
@@ -564,7 +564,7 @@ export function MarketChart({
   const [markerSize, setMarkerSize] = useState(14);
   const [compareLabels, setCompareLabels] = useState<Array<{ key: string; y: number; text: string; color: string; side: "left" | "right" }>>([]);
   const [comparePaneTops, setComparePaneTops] = useState<Record<string,number>>({});
-  const [volumeOverlay, setVolumeOverlay] = useState<{ y: number; headingTop: number; value: number; color: string } | null>(null);
+  const [volumeOverlay, setVolumeOverlay] = useState<{ headingTop: number; value: number; color: string } | null>(null);
   const overlayFrameRef = useRef(0);
   const historyWasActiveRef = useRef(false);
   const overlayCompared = useMemo(
@@ -800,8 +800,8 @@ export function MarketChart({
       const hostRect = chartHost.current?.getBoundingClientRect();
       const volume = studyRenderer.current?.volumeLabel();
       const pricePaneHeight = chartApi.current?.panes()[0]?.getHeight() ?? 0;
-      const nextVolume = volume?.y != null && pricePaneHeight > 0 && volume.y >= 0 && volume.y <= pricePaneHeight
-        ? { y: volume.y, headingTop: pricePaneHeight * .79, value: volume.value, color: volume.color } : null;
+      const nextVolume = volume && pricePaneHeight > 0
+        ? { headingTop: Math.max(8, pricePaneHeight * .79), value: volume.value, color: volume.color } : null;
       setVolumeOverlay((current) => JSON.stringify(current) === JSON.stringify(nextVolume) ? current : nextVolume);
       // Axis tags carry percent and pane values. A second price axis is not used.
       setCompareLabels((current) => current.length ? [] : current);
@@ -2400,9 +2400,9 @@ export function MarketChart({
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
-        {volumeOverlay && <><button type="button" className="volume-overlay-heading" style={{top:volumeOverlay.headingTop}} onClick={e=>activateStudyRef.current('volume',e.clientX,e.clientY)}>{studyTitle('volume',studySettings.volume??studyDefaults('volume'))}</button><div className="volume-axis-label" style={{top:volumeOverlay.y,backgroundColor:volumeOverlay.color}}>{new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(volumeOverlay.value)}</div></>}
+        {volumeOverlay && <button type="button" className="volume-overlay-heading" style={{top:volumeOverlay.headingTop}} onClick={e=>activateStudyRef.current('volume',e.clientX,e.clientY)}><span>{studyTitle('volume',studySettings.volume??studyDefaults('volume'))}</span><b className="volume-overlay-value" style={{color:volumeOverlay.color}}>{new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(volumeOverlay.value)}</b></button>}
         {compareMode === "pane" && overlayCompared.map((item,index)=>comparePaneTops[item.instrumentKey] === undefined ? null : <div key={item.instrumentKey} className="compare-pane-heading" style={{top:comparePaneTops[item.instrumentKey]+5}}><span style={{color:item.color??compareColor(index)}}><button type="button" onClick={()=>setEditingLine(item.instrumentKey)} aria-label={`Change ${item.symbol} line color`}><i style={{background:item.color??compareColor(index)}}/>{item.symbol}</button><button type="button" onClick={()=>setComparedSymbols((current)=>current.filter((row)=>row.instrumentKey!==item.instrumentKey))} aria-label={`Remove ${item.symbol} from compare`}><X size={12}/></button></span></div>)}
-        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
+        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);const zone=s.id==='rsi'&&s.value!=null?(s.value>=(c.inputs.upper??70)?'overbought':s.value<=(c.inputs.lower??30)?'oversold':'mid'):'';return <div className={`study-pane-heading${zone?` is-${zone}`:''}`} key={s.id} style={{top:s.top+4}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button>{s.id==='rsi'&&s.value!=null&&<b className="study-pane-value">{s.value.toFixed(2)}</b>}{s.id==='rsi'&&s.extra!=null&&<b className="study-pane-value is-smooth">{s.extra.toFixed(2)}</b>}<button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
           <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
           <button aria-label="Indicator settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={15}/></button>

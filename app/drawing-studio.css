@@ -36,9 +36,61 @@
 html, body { touch-action: pan-x pan-y; }
 .terminal-shell { touch-action: pan-x pan-y; }
 @media (max-width: 360px) {
-  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link) { width: 23px; min-width: 23px; flex-basis: 23px; }
-  .terminal-shell .trade-cockpit .desktop-symbol-trigger .stock-logo { display: none; }
   .drawing-tile-grid { gap: 6px; }
   .drawing-tile-select span { font-size: 10px; }
 }
 @media (min-width: 761px) { .terminal-shell .drawing-studio-backdrop { align-items: center; padding: 20px; } .terminal-shell .drawing-studio { border-radius: 24px; height: min(820px,92dvh); } }
+
+/* Phone chart toolbar: keep the symbol readable and the actions evenly grouped. */
+@media (max-width: 860px) {
+  .terminal-shell .trade-cockpit .chart-controls {
+    align-items: center;
+    gap: 4px;
+    height: 44px;
+    min-height: 44px;
+    flex-basis: 44px;
+    padding: 4px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .terminal-shell .trade-cockpit .chart-controls::-webkit-scrollbar { display: none; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol { flex: 1 1 auto; min-width: 0; gap: 0; height: 36px; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger {
+    flex: 0 1 auto;
+    min-width: 86px;
+    height: 32px;
+    margin-right: 4px;
+    padding: 0 6px 0 3px;
+    gap: 5px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
+  }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { flex: 1 1 auto; min-width: 40px; max-width: 96px; font-size: 12px; font-weight: 750; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger .stock-logo { display: grid; width: 22px; height: 22px; flex: 0 0 22px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link),
+  .terminal-shell .trade-cockpit .chart-controls > .chart-tools-trigger {
+    width: 30px;
+    min-width: 30px;
+    height: 32px;
+    flex: 0 0 30px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #5d6780;
+    box-shadow: none;
+  }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol .chart-watchlist-star.saved { color: var(--purple, #753bce); background: var(--purple-soft, #f3eaff); }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-style-link, .chart-compare-link).active { color: #fff; background: var(--purple, #753bce); }
+  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger,
+  .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger {
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
+  }
+  .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { min-width: 46px; justify-content: center; }
+}
