@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {STUDIES,studyDefaults,normalizeStudy} from '../lib/indicator-catalog.ts';
+import {STUDIES,studyDefaults,normalizeStudy,studyTitle} from '../lib/indicator-catalog.ts';
 import {computeStudy,relativeStrength,average} from '../lib/study-calculations.ts';
 const candles=Array.from({length:650},(_,i)=>{const close=100+i*.03+5*Math.sin(i/11)+2*Math.cos(i/3);return {time:1720000000+i*300,open:close+Math.sin(i),high:close+2,low:close-2,close,volume:1000+i%33*50};});
 const near=(a,b,e=1e-6)=>assert.ok(Math.abs(a-b)<e,`${a} != ${b}`);
+test('volume defaults to a nine-candle average with independently configurable bar colours',()=>{
+ const config=studyDefaults('volume');assert.equal(config.inputs.length,9);assert.equal(studyTitle('volume',config),'Volume SMA 9');assert.notEqual(config.colors[0],config.colors[1]);assert.notEqual(config.colors[1],config.colors[2]);
+});
 test('every selectable candle study has a real calculation and finite plots',()=>{
  assert.equal(new Set(STUDIES.map(s=>s.id)).size,STUDIES.length);
  for(const s of STUDIES){if(s.unavailable||['smc','vpvr'].includes(s.id))continue;const config=studyDefaults(s.id);config.comparisonKey='NSE_EQ|TEST';const result=computeStudy(s.id,candles,config,candles);assert.ok(result.plots.length,s.id);assert.equal(result.message,undefined,s.id);for(const p of result.plots){assert.equal(p.values.length,candles.length,s.id+':'+p.name);assert.ok(p.values.some(Number.isFinite),s.id+':'+p.name);assert.ok(!p.values.some(v=>v===Infinity||v===-Infinity),s.id);}}

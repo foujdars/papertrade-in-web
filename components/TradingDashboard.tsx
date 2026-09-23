@@ -1685,17 +1685,18 @@ export function TradingDashboard() {
   const topQuoteIsFresh = Boolean(topQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[topQuoteKey] ?? 0) <= 45_000);
   const verifiedTopPrice = topQuoteIsFresh ? topQuote?.lastPrice ?? 0 : fnoTopInstrument?.price ?? 0;
   const verifiedTopChange = topQuoteIsFresh ? topQuote?.changePercent ?? 0 : 0;
-  const orderValue = visibleLivePrice * quantity;
+  const orderEstimatePrice = verifiedLivePrice ?? selectedQuote?.lastPrice ?? selected.price;
+  const orderValue = orderEstimatePrice * quantity;
   const quantityStep = selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(1, selected.lotSize ?? 1) : 1;
   const orderLots = selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? quantity / quantityStep : 0;
   const margin = orderValue * 0.2;
   const isCashDeliveryOrder = product === "DELIVERY" && selected.assetType !== "OPTION" && selected.assetType !== "FUTURE";
-  const estimatedFundsRequired = paperOrderCapitalValue(selected.assetType, product, quantity, visibleLivePrice);
+  const estimatedFundsRequired = paperOrderCapitalValue(selected.assetType, product, quantity, orderEstimatePrice);
   const deliveryHoldingQuantity = getDeliveryHoldingQuantity(orders, selected.symbol);
   const deliverySellError = isCashDeliveryOrder && side === "SELL"
     ? validateDeliverySell(orders, selected.symbol, quantity)
     : null;
-  const estimatedOrderCharges = calculateInstrumentCharges(selected, { side, product, quantity, price: visibleLivePrice });
+  const estimatedOrderCharges = calculateInstrumentCharges(selected, { side, product, quantity, price: orderEstimatePrice });
   const selectedPositions = useMemo(
     () => ({
       intraday: calculatePosition(orders, selected.symbol, verifiedLivePrice ?? Number.NaN, "INTRADAY"),
@@ -1784,6 +1785,10 @@ export function TradingDashboard() {
   );
   const marketOrdersAllowed = Boolean(clock && marketStatus.isOpen);
   const selectedMarketOrdersAllowed = selectedIsWatchOnly ? false : selectedDeltaChartSymbol ? selectedQuoteIsFresh : marketOrdersAllowed;
+  const selectedOrderTicketAvailable = !selectedIsWatchOnly && selected.assetType !== "INDEX" && (selectedDeltaChartSymbol ? selectedQuoteIsFresh : true);
+  const afterHoursDeliveryEstimate = orderEstimatePrice;
+  const afterHoursDeliveryCanQueue = !selectedDeltaChartSymbol && !marketOrdersAllowed && product === "DELIVERY" && (selected.assetType === "EQUITY" || !selected.assetType) && Number.isFinite(afterHoursDeliveryEstimate) && afterHoursDeliveryEstimate > 0;
+  const orderButtonPriceLabel = verifiedLivePrice?.toFixed(2) ?? (afterHoursDeliveryEstimate > 0 ? `${afterHoursDeliveryEstimate.toFixed(2)} est.` : "—");
   const selectedGlobalPosition = globalTrading.account?.positions.find(p => p.symbol === selectedDeltaSymbol);
   const selectedGlobalQuote = selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.quote : undefined;
   const selectedOptionPosition = globalTrading.account?.optionPositions?.find(p => p.symbol === selectedDeltaOption);
@@ -2090,10 +2095,16 @@ export function TradingDashboard() {
     if (isGlobalInstrumentKey(selected.instrumentKey)) { setOrderSheetOpen(true); setGlobalTicketTab("Order"); return; }
     if (orderType !== "Market") {
       setOrderSheetOpen(false);
-      setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit" });
+      setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit", quantity, product });
       return;
     }
     const currentSession = getNseMarketStatus(new Date(), exchangeSession);
+    if (!selectedDeltaChartSymbol && !currentSession.isOpen && afterHoursDeliveryCanQueue) {
+      if (!Number.isSafeInteger(quantity) || quantity < 1) { setToast("Enter a valid delivery quantity."); return; }
+      setOrderSheetOpen(false);
+      setPriceRequest({ instrument: selected, price: afterHoursDeliveryEstimate, mode: "order", side, orderType: "Market", quantity, product: "DELIVERY" });
+      return;
+    }
     if (!selectedDeltaSymbol && !currentSession.isOpen) { setToast(currentSession.message); return; }
     if (!Number.isFinite(quantity) || quantity < 1) return;
     if (tradingLimitStatus.blocked && !orderReducesOpenPosition) {
@@ -2414,7 +2425,8 @@ export function TradingDashboard() {
 
   function openOrderSheet(nextSide: "BUY" | "SELL") {
     if (selectedIsWatchOnly) { setToast("This global reference has no live paper order contract."); return; }
-    if (!selectedDeltaChartSymbol && !getNseMarketStatus(new Date(), exchangeSession).isOpen) { setToast(marketStatus.message); return; }
+    if (selected.assetType === "INDEX") { setToast("Indices cannot be traded directly. Choose a stock or F&O contract."); return; }
+    if (!selectedDeltaChartSymbol && !getNseMarketStatus(new Date(), exchangeSession).isOpen) setProduct("DELIVERY");
     if (selectedDeltaSymbol || selectedDeltaOption) { setSide(nextSide); setGlobalTicketTab("Order"); setDesktopOrderPanelOpen(true); }
     else activateRiskTool(nextSide);
     setOrderSheetOpen(true);
@@ -2860,7 +2872,7 @@ export function TradingDashboard() {
               <span className={selectedPosition.quantity > 0 ? "complete" : "active"}><i>2</i><b>Place</b></span>
               <span className={selectedPosition.quantity > 0 ? "active" : ""}><i>3</i><b>Review</b></span>
             </div>
-            <div className="header-order-buttons"><button disabled={!selectedMarketOrdersAllowed} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button disabled={!selectedMarketOrdersAllowed} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
+            <div className="header-order-buttons"><button disabled={!selectedOrderTicketAvailable} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{orderButtonPriceLabel}</b></button><button disabled={!selectedOrderTicketAvailable} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{orderButtonPriceLabel}</b></button></div>
           </div>
 
           <div className="chart-controls">
@@ -2884,7 +2896,7 @@ export function TradingDashboard() {
             <button type="button" className={`desktop-live-pnl ${chartPnlVisible ? "visible" : ""}`} onClick={openChartPositions}>
               <span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b>
             </button>
-            <div className="chart-control-orders"><button disabled={!selectedMarketOrdersAllowed} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button><button disabled={!selectedMarketOrdersAllowed} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button></div>
+            <div className="chart-control-orders"><button disabled={!selectedOrderTicketAvailable} className="compact-sell" onClick={() => openOrderSheet("SELL")}>Sell <b>{orderButtonPriceLabel}</b></button><button disabled={!selectedOrderTicketAvailable} className="compact-buy" onClick={() => openOrderSheet("BUY")}>Buy <b>{orderButtonPriceLabel}</b></button></div>
           </div>
           </section>
 
@@ -2963,8 +2975,8 @@ export function TradingDashboard() {
           </div>
           {activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">
-              <button disabled={!selectedMarketOrdersAllowed} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
-              <button disabled={!selectedMarketOrdersAllowed} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{verifiedLivePrice?.toFixed(2) ?? "—"}</b></button>
+              <button disabled={!selectedOrderTicketAvailable} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{orderButtonPriceLabel}</b></button>
+              <button disabled={!selectedOrderTicketAvailable} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{orderButtonPriceLabel}</b></button>
             </div>
             <div className="chart-trade-meta">
             <button className={`chart-footer-pnl ${(selectedDeltaChartSymbol ? globalOpenPnl : totalOpenPnl) >= 0 ? "positive" : "negative"}`} aria-label="Open positions profit and loss" onClick={openChartPositions}>{selectedDeltaChartSymbol ? formatUsd(globalOpenPnl) : `${totalOpenPnl >= 0 ? "+" : ""}${formatInr(totalOpenPnl)}`}</button>
@@ -2983,7 +2995,7 @@ export function TradingDashboard() {
           {selectedDeltaSymbol ? <GlobalOrderTicket key={`${user?.id ?? "guest"}:${selectedDeltaSymbol}`} owner={user?.id ?? "guest"} symbol={selectedDeltaSymbol} side={side} onSide={setSide} trading={globalTrading} tab={globalTicketTab} onTab={setGlobalTicketTab} /> : selectedDeltaOption ? <GlobalOptionTicket key={`${user?.id ?? "guest"}:${selectedDeltaOption}`} symbol={selectedDeltaOption} side={side} onSide={setSide} trading={globalTrading} tab={globalTicketTab} onTab={setGlobalTicketTab} /> : <>
           <div className="ticket-heading"><div><span className="eyebrow">{selected.assetType === "OPTION" ? `Paper option · ${selected.optionType}` : "Paper order"}</span><h2 className="stock-identity"><StockLogo {...selected} size={26} />{selected.symbol}</h2>{selected.assetType === "OPTION" && <small className="contract-summary">Expiry {selected.expiry} · lot size {selected.lotSize}</small>}</div><span className="paper-badge">No real money</span></div>
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
-          <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit" }); } }}>{type}</button>)}</div>
+          <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: orderEstimatePrice, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit", quantity, product }); } }}>{type}</button>)}</div>
           <div className="input-grid">
             <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
             {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
@@ -2996,6 +3008,7 @@ export function TradingDashboard() {
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
           {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "FUTURE" ? "Paper cash settlement · no share delivery" : selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
+          {afterHoursDeliveryCanQueue && <p className="after-hours-order-note">NSE is closed. Delivery can be queued now and will use a fresh quote when the app is open during the next trading session. The displayed price is only an estimate.</p>}
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
           {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => { setCoachTab("limits"); setCoachOpen(true); }}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
@@ -3018,7 +3031,7 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={!verifiedLivePrice || !selectedMarketOrdersAllowed || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{!verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={(!verifiedLivePrice && !afterHoursDeliveryCanQueue) || (!selectedMarketOrdersAllowed && !afterHoursDeliveryCanQueue) || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : afterHoursDeliveryCanQueue ? `QUEUE ${side} ${quantity} ${selected.symbol}` : !verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>

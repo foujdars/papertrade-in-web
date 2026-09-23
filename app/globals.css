@@ -725,6 +725,7 @@ h1, h2, p { margin: 0; }
 .margin-card div { display: flex; justify-content: space-between; color: #788196; font-size: 9px; }
 .margin-card b { color: #424b61; }
 .ticket-live-position { display: flex; flex-direction: column; gap: 6px; margin: -2px 0 12px; padding: 10px 11px; border: 1px solid #dcd7ff; border-radius: 9px; background: linear-gradient(135deg, #faf9ff, #f2efff); }
+.after-hours-order-note { margin: 0 0 12px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--purple) 23%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--purple) 7%, var(--surface, white)); color: var(--ink); font-size: 11px; line-height: 1.45; }
 .ticket-live-position > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ticket-live-position > .active-protection { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 5px; padding: 6px; border: 1px solid #d8d2ff; border-radius: 7px; background: #fff; }
 .active-protection span { color: var(--purple); }

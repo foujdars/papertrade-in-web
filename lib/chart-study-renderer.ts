@@ -30,15 +30,16 @@ export class ChartStudyRenderer {
    for(const b of [...this.bundles].reverse())for(const s of [...b.series].reverse())this.chart.removeSeries(s);
    this.bundles=[];this.signature=signature;let pane=0;
    for(const {definition:d,config:c,result} of selected){
-    const index=d.overlay?0:++pane,series:Bundle['series']=[];
+    const index=d.overlay||d.id==='volume'?0:++pane,series:Bundle['series']=[];
     // Preserve an empty pane/series when history is unavailable so later live data can fill it.
     const plots=result.plots.length?result.plots:[{name:d.name,values:[]}];
     for(let i=0;i<plots.length;i++){
-     const plot=plots[i],color=c.colors[i%c.colors.length]+Math.round(c.opacity/100*255).toString(16).padStart(2,'0');
-     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceLineVisible:false,lastValueVisible:c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,lineWidth:c.width as LineWidth,lineStyle:c.dash as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:c.showValue,crosshairMarkerVisible:false,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
+     const plot=plots[i],isVolume=d.id==='volume',color=(isVolume&&i===1?c.colors[2]:c.colors[i%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
+     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:c.width as LineWidth,lineStyle:c.dash as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,crosshairMarkerVisible:false,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
      if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:'#8c849b80',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});series.push(s);
     }
     const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
+    if(d.id==='volume')this.chart.priceScale('volume',0).applyOptions({visible:false,autoScale:true,scaleMargins:{top:.79,bottom:0}});
     if(d.id==='vpvr'){series[0].applyOptions({visible:true,lastValueVisible:false,color:'transparent',autoscaleInfoProvider:()=>null});const primitive=new VisibleProfile(c);(series[0] as ISeriesApi<'Line'>).attachPrimitive(primitive);bundle.primitive=primitive;}
     this.bundles.push(bundle);
    }
@@ -54,7 +55,7 @@ export class ChartStudyRenderer {
    const points=(plot?.values??data.map(()=>Number.NaN)).flatMap((value,i)=>{
     const at=i+offset;if(at<0||at>=data.length)return [];
     if(!Number.isFinite(value))return b.id==='zigzag'?[]:[{time:this.time(data[at].time)}];
-    const alpha=Math.round(b.config.opacity/100*255).toString(16).padStart(2,'0');
+    const alpha=Math.round(b.config.opacity/100*(b.id==='volume'&&k===0?145:255)).toString(16).padStart(2,'0');
     let color=plot?.colors?.[i];
     if(b.id==='volume'&&k===0)color=b.config.colors[data[i].close>=data[i].open?0:1];
     else if(b.id==='supertrend')color=b.config.colors[data[i].close>=value?0:1];
@@ -97,4 +98,5 @@ export class ChartStudyRenderer {
   return hit;
  }
  summaries(){return this.bundles.map(b=>({id:b.id,pane:b.pane,message:b.result.message,value:b.result.plots[0]?.values.filter(Number.isFinite).at(-1)}));}
+ volumeLabel(){const b=this.bundles.find(bundle=>bundle.id==='volume');if(!b||!b.config.showValue)return null;const value=b.result.plots[0]?.values.filter(Number.isFinite).at(-1);if(value===undefined)return null;return {value,y:b.series[0]?.priceToCoordinate(value),color:b.config.colors[0]};}
 }

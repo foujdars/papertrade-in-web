@@ -69,6 +69,13 @@
 .compare-legend-chip .compare-color-trigger { width: 10px; height: 10px; flex: 0 0 10px; padding: 0; border: 0; border-radius: 50%; background: currentColor; cursor: pointer; }
 .compare-axis-label { position: absolute; right: 5px; z-index: 10; transform: translateY(-50%); padding: 0 1px; max-width: 135px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--purple); background: transparent; font-size: 10px; font-weight: 700; line-height: 1.3; text-shadow: 0 1px 1px var(--surface, white); pointer-events: none; }
 .compare-axis-label.left { right: auto; left: 5px; }
+.volume-overlay-heading { position: absolute; left: 49px; z-index: 5; padding: 2px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 10px; cursor: pointer; }
+.volume-axis-label { position: absolute; right: 3px; z-index: 6; transform: translateY(-50%); min-width: 43px; padding: 2px 3px; border-radius: 2px; color: white; text-align: center; font-size: 10px; line-height: 1.2; pointer-events: none; }
+.compare-pane-heading { position: absolute; left: 45px; right: 62px; z-index: 6; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; pointer-events: none; }
+.compare-pane-heading span { display: inline-flex; align-items: center; min-width: 0; pointer-events: auto; }
+.compare-pane-heading button { display: inline-flex; align-items: center; gap: 5px; max-width: 105px; padding: 2px; overflow: hidden; text-overflow: ellipsis; border: 0; background: transparent; font: inherit; font-size: 10px; font-weight: 650; cursor: pointer; pointer-events: auto; }
+.compare-pane-heading button:last-child { color: var(--muted); }
+.compare-pane-heading i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
 .compare-legend-chip b { font-weight: 600; }
 .compare-legend-chip em { font-style: normal; color: var(--muted); }
 .compare-legend-chip button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; background: transparent; color: var(--muted); }

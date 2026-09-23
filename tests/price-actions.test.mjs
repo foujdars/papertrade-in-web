@@ -13,6 +13,12 @@ test('limit and stop triggers use correct side and never fill beyond a limit', (
   assert.equal(priceTaskMatches({...task,orderType:'SL',side:'SELL'},99),true);
   assert.equal(priceTaskMatches({...task,status:'filled'},99),false);
 });
+test('queued market delivery waits for a positive fresh open-session quote', () => {
+  assert.equal(priceTaskMatches({...task,orderType:'Market'},99),true);
+  assert.equal(priceTaskMatches({...task,orderType:'Market'},101),true);
+  assert.equal(priceTaskMatches({...task,orderType:'Market'},0),false);
+  assert.equal(priceTaskMatches({...task,orderType:'Market',status:'cancelled'},99),false);
+});
 test('alert levels trigger independently of order side', () => {
   assert.equal(priceTaskMatches({...task,kind:'alert',condition:'above'},101),true);
   assert.equal(priceTaskMatches({...task,kind:'alert',condition:'below'},101),false);

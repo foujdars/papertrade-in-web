@@ -563,6 +563,8 @@ export function MarketChart({
   const [dateArrow, setDateArrow] = useState<{ x: number; y: number; size: number } | null>(null);
   const [markerSize, setMarkerSize] = useState(14);
   const [compareLabels, setCompareLabels] = useState<Array<{ key: string; y: number; text: string; color: string; side: "left" | "right" }>>([]);
+  const [comparePaneTops, setComparePaneTops] = useState<Record<string,number>>({});
+  const [volumeOverlay, setVolumeOverlay] = useState<{ y: number; headingTop: number; value: number; color: string } | null>(null);
   const overlayFrameRef = useRef(0);
   const historyWasActiveRef = useRef(false);
   const overlayCompared = useMemo(
@@ -795,6 +797,11 @@ export function MarketChart({
       const arrowY = arrow ? candleSeries.current?.priceToCoordinate(arrow.high) : null;
       setDateArrow(arrowX != null && arrowY != null ? { x: arrowX, y: arrowY, size: symbolSize } : null);
       const hostRect = chartHost.current?.getBoundingClientRect();
+      const volume = studyRenderer.current?.volumeLabel();
+      const pricePaneHeight = chartApi.current?.panes()[0]?.getHeight() ?? 0;
+      const nextVolume = volume?.y != null && pricePaneHeight > 0 && volume.y >= 0 && volume.y <= pricePaneHeight
+        ? { y: volume.y, headingTop: pricePaneHeight * .79, value: volume.value, color: volume.color } : null;
+      setVolumeOverlay((current) => JSON.stringify(current) === JSON.stringify(nextVolume) ? current : nextVolume);
       const labels = hostRect ? overlayComparedRef.current.flatMap((item, index) => {
         const series = compareSeries.current.get(item.instrumentKey);
         const candles = comparisonRef.current[item.instrumentKey] ?? [];
@@ -804,10 +811,15 @@ export function MarketChart({
         if (!last || !paneRect || coordinate == null || coordinate < 0 || coordinate > paneRect.height) return [];
         const mode = compareModeRef.current;
         const change = compareChangePercent(candles);
-        const text = mode === "price" ? last.close.toLocaleString("en-US", { maximumFractionDigits: 2 }) : change === null ? "—" : `${change.toFixed(2)}%`;
+        const text = mode !== "percent" ? last.close.toLocaleString("en-US", { maximumFractionDigits: 2 }) : change === null ? "—" : `${change.toFixed(2)}%`;
         return [{ key: item.instrumentKey, y: paneRect.top - hostRect.top + coordinate, text: `${item.symbol} ${text}`, color: item.color ?? compareColor(index), side: mode === "price" ? "left" as const : "right" as const }];
       }) : [];
       setCompareLabels((current) => JSON.stringify(current) === JSON.stringify(labels) ? current : labels);
+      const paneTops = hostRect && compareModeRef.current === "pane" ? Object.fromEntries(overlayComparedRef.current.flatMap((item) => {
+        const paneRect = compareSeries.current.get(item.instrumentKey)?.getPane().getHTMLElement()?.getBoundingClientRect();
+        return paneRect ? [[item.instrumentKey,paneRect.top-hostRect.top]] : [];
+      })) : {};
+      setComparePaneTops((current) => JSON.stringify(current) === JSON.stringify(paneTops) ? current : paneTops);
       refreshDrawingCrosshair();
       smcRefreshRef.current?.();
       const start = replayRef.current.start;
@@ -1004,7 +1016,19 @@ export function MarketChart({
   }
   function fitStudyPanes() {
     const chart = chartApi.current;
-    window.requestAnimationFrame(() => { if (chart && chartApi.current === chart) { studyRenderer.current?.fit(Math.max(280, chartHost.current?.clientHeight ?? 280)); window.requestAnimationFrame(()=>{if(chartApi.current===chart){refreshStudyHeaders();scheduleOverlayRefresh();}}); } });
+    window.requestAnimationFrame(() => { if (chart && chartApi.current === chart) {
+      const height = Math.max(280, chartHost.current?.clientHeight ?? 280);
+      studyRenderer.current?.fit(height);
+      if (compareModeRef.current === "pane" && compareSeries.current.size) {
+        const comparePanes = [...new Set([...compareSeries.current.values()].map((series) => series.getPane()))];
+        const others = chart.panes().filter((item) => item !== chart.panes()[0] && !comparePanes.includes(item)).reduce((sum, item) => sum + item.getHeight(), 0);
+        const compareTotal = Math.max(0, Math.min(Math.floor(height * Math.min(.62,.38+(comparePanes.length-1)*.12)),height-others-150));
+        const compareHeight = Math.max(80,Math.floor(compareTotal/comparePanes.length));
+        for (const pane of comparePanes) pane.setHeight(compareHeight);
+        chart.panes()[0]?.setHeight(Math.max(150,height-others-compareHeight*comparePanes.length));
+      }
+      window.requestAnimationFrame(()=>{if(chartApi.current===chart){refreshStudyHeaders();scheduleOverlayRefresh();}});
+    } });
   }
   function syncIndicatorData(data = dataRef.current) {
     const chart = chartApi.current;
@@ -1015,7 +1039,7 @@ export function MarketChart({
     studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data);
     if (compareModeRef.current === "pane" && compareSeries.current.size) {
       const comparePane = Math.max(1, ...studyRenderer.current.bundles.map((bundle) => bundle.pane + 1));
-      for (const series of compareSeries.current.values()) series.moveToPane(comparePane);
+      overlayComparedRef.current.forEach((item,index) => compareSeries.current.get(item.instrumentKey)?.moveToPane(comparePane+index));
     }
     if (old !== studyRenderer.current.signature) fitStudyPanes();
     refreshStudyHeaders();
@@ -1987,6 +2011,7 @@ export function MarketChart({
       const comparePane = Math.max(1, ...((studyRenderer.current?.bundles ?? []).map((bundle) => bundle.pane + 1)));
       overlayCompared.forEach((item, index) => {
         const candles = comparisonData[item.instrumentKey] ?? [];
+        const targetPane = mode === "pane" ? comparePane + index : 0;
         let series = compareSeries.current.get(item.instrumentKey);
         if (!series) {
           series = chart.addSeries(LineSeries, {
@@ -1997,17 +2022,17 @@ export function MarketChart({
             lastValueVisible: false,
             title: "",
             crosshairMarkerVisible: true,
-          }, mode === "pane" ? comparePane : 0);
+          }, targetPane);
           compareSeries.current.set(item.instrumentKey, series);
         } else {
-          series.moveToPane(mode === "pane" ? comparePane : 0);
+          series.moveToPane(targetPane);
           series.applyOptions({ color: item.color ?? compareColor(index), priceScaleId: mode === "price" ? "left" : "right", title: "", lastValueVisible: false, priceLineVisible: false });
         }
         series.setData(styleLineData(candles, timeframe));
       });
       chart.priceScale("right", 0).applyOptions({ mode: keys.length && mode === "percent" ? PriceScaleMode.Percentage : PriceScaleMode.Normal });
       chart.priceScale("left", 0).applyOptions({ visible: keys.length > 0 && mode === "price", autoScale: true, mode: PriceScaleMode.Normal });
-      if (keys.length && mode === "pane") chart.priceScale("right", comparePane).applyOptions({ mode: PriceScaleMode.Percentage, autoScale: true });
+      if (keys.length && mode === "pane") overlayCompared.forEach((_,index)=>chart.priceScale("right", comparePane+index).applyOptions({ mode: PriceScaleMode.Normal, autoScale: true }));
       fitStudyPanes();
       scheduleOverlayRefresh();
     });
@@ -2368,6 +2393,8 @@ export function MarketChart({
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
+        {volumeOverlay && <><button type="button" className="volume-overlay-heading" style={{top:volumeOverlay.headingTop}} onClick={e=>activateStudyRef.current('volume',e.clientX,e.clientY)}>{studyTitle('volume',studySettings.volume??studyDefaults('volume'))}</button><div className="volume-axis-label" style={{top:volumeOverlay.y,backgroundColor:volumeOverlay.color}}>{new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(volumeOverlay.value)}</div></>}
+        {compareMode === "pane" && overlayCompared.map((item,index)=>comparePaneTops[item.instrumentKey] === undefined ? null : <div key={item.instrumentKey} className="compare-pane-heading" style={{top:comparePaneTops[item.instrumentKey]+5}}><span style={{color:item.color??compareColor(index)}}><button type="button" onClick={()=>setEditingLine(item.instrumentKey)} aria-label={`Change ${item.symbol} line color`}><i style={{background:item.color??compareColor(index)}}/>{item.symbol}</button><button type="button" onClick={()=>setComparedSymbols((current)=>current.filter((row)=>row.instrumentKey!==item.instrumentKey))} aria-label={`Remove ${item.symbol} from compare`}><X size={12}/></button></span></div>)}
         {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
           <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
@@ -2453,7 +2480,7 @@ export function MarketChart({
               </i>
             </span>
           )}
-          {overlayCompared.length > 0 && (
+          {overlayCompared.length > 0 && compareMode !== "pane" && (
             <div className="compare-legend-row" aria-label="Compared symbols">
               {overlayCompared.map((item, index) => {
                 const change = compareChangePercent(comparisonData[item.instrumentKey] ?? []);

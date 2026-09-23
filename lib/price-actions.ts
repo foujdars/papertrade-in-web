@@ -1,8 +1,8 @@
 import type { Instrument } from "./market";
-export type PriceRequest = { instrument: Instrument; price: number; mode?: "alert" | "order"; side?: "BUY" | "SELL"; orderType?: "Limit" | "SL" };
+export type PriceRequest = { instrument: Instrument; price: number; mode?: "alert" | "order"; side?: "BUY" | "SELL"; orderType?: "Market" | "Limit" | "SL"; quantity?: number; product?: "DELIVERY" | "INTRADAY" };
 export type PriceTask = {
   id: string; instrument: Instrument; kind: "alert" | "order"; price: number;
-  condition: "above" | "below"; side: "BUY" | "SELL"; orderType: "Limit" | "SL";
+  condition: "above" | "below"; side: "BUY" | "SELL"; orderType: "Market" | "Limit" | "SL";
   quantity: number; product: "DELIVERY" | "INTRADAY"; createdAt: number; expiresAt: number;
   status: "pending" | "triggered" | "filled" | "cancelled" | "expired" | "rejected"; message?: string;
   completedAt?: number; triggeredPrice?: number;
@@ -17,6 +17,7 @@ export function priceTaskError(task: Pick<PriceTask, "instrument" | "price" | "q
 }
 export function priceTaskMatches(task: PriceTask, price: number) {
   if (!Number.isFinite(price) || price <= 0 || task.status !== "pending") return false;
+  if (task.kind === "order" && task.orderType === "Market") return true;
   const above = task.kind === "alert" ? task.condition === "above" : task.orderType === "Limit" ? task.side === "SELL" : task.side === "BUY";
   return above ? price >= task.price : price <= task.price;
 }
