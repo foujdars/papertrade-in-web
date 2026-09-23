@@ -18,7 +18,7 @@ import { ChartLineColorSettings } from "./ChartLineColorSettings";
 import { useComparisonCandles } from "@/lib/indicator-comparison-feed";
 import { useChartPreference } from "@/lib/chart-view-preferences";
 import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKind, toStyleSeriesPoint, type ChartStyleId } from "@/lib/chart-style";
-import { compareColor, compareQuote, formatCompareDelta, formatComparePrice, windowChangePercent } from "@/lib/chart-compare";
+import { compareColor, compareQuote, formatCompareDelta, formatComparePrice } from "@/lib/chart-compare";
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
 import { candleBucket, candlesEqual, nearestCandleIndex, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
 import { comparisonRequest } from "@/lib/chart-compare";
@@ -574,7 +574,6 @@ export function MarketChart({
   const overlayComparedRef = useRef(overlayCompared); overlayComparedRef.current = overlayCompared;
   const compareModeRef = useRef(compareMode); compareModeRef.current = compareMode;
   const compareForcedPercentRef = useRef(false);
-  const [visibleWindow, setVisibleWindow] = useState<{ from: number; to: number } | null>(null);
   const comparisonData=useComparisonCandles(isReplay?[]:[
     ...STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),
     ...overlayCompared.map((item) => item.instrumentKey),
@@ -804,15 +803,6 @@ export function MarketChart({
       const nextVolume = volume?.y != null && pricePaneHeight > 0 && volume.y >= 0 && volume.y <= pricePaneHeight
         ? { y: volume.y, headingTop: pricePaneHeight * .79, value: volume.value, color: volume.color } : null;
       setVolumeOverlay((current) => JSON.stringify(current) === JSON.stringify(nextVolume) ? current : nextVolume);
-      const range = chartApi.current?.timeScale().getVisibleLogicalRange();
-      const visibleCandles = dataRef.current;
-      if (range && visibleCandles.length) {
-        const fromIndex = Math.max(0, Math.min(visibleCandles.length - 1, Math.floor(range.from)));
-        const toIndex = Math.max(fromIndex, Math.min(visibleCandles.length - 1, Math.ceil(range.to) - 1));
-        const from = Number(visibleCandles[fromIndex].time);
-        const to = Number(visibleCandles[toIndex].time);
-        setVisibleWindow((prev) => prev && prev.from === from && prev.to === to ? prev : { from, to });
-      }
       // Axis tags carry percent and pane values. A second price axis is not used.
       setCompareLabels((current) => current.length ? [] : current);
       const paneTops = hostRect && compareModeRef.current === "pane" ? Object.fromEntries(overlayComparedRef.current.flatMap((item) => {
@@ -2501,27 +2491,18 @@ export function MarketChart({
             <div className={`compare-legend-row${compareMode === "percent" ? " is-percent" : ""}`} aria-label="Compared symbols">
               {compareMode === "percent" && (
                 <span className="compare-legend-chip is-percent" style={{ color: primaryLineColor }}>
+                  <button type="button" className="compare-color-trigger" style={{ background: primaryLineColor }} aria-label={`Change ${instrument.symbol} line color`} onClick={() => setEditingLine("primary")} />
                   <b>{instrument.name}</b>
-                  <em title="Change from the left edge of the chart">{formatCandleChange(windowChangePercent(dataRef.current, visibleWindow?.from ?? null, visibleWindow?.to ?? null))}</em>
                 </span>
               )}
               {overlayCompared.map((item, index) => {
-                const candles = comparisonData[item.instrumentKey] ?? [];
-                const percent = windowChangePercent(candles, visibleWindow?.from ?? null, visibleWindow?.to ?? null);
-                const quote = compareQuote(candles);
-                const tone = compareMode === "price"
-                  ? (quote === null || quote.percent === 0 ? "neutral" : quote.percent > 0 ? "positive" : "negative")
-                  : (percent === null || percent === 0 ? "neutral" : percent > 0 ? "positive" : "negative");
+                const quote = compareMode === "price" ? compareQuote(comparisonData[item.instrumentKey] ?? []) : null;
+                const tone = !quote || quote.percent === 0 ? "neutral" : quote.percent > 0 ? "positive" : "negative";
                 return (
                   <span key={item.instrumentKey} className={`compare-legend-chip${compareMode === "percent" ? " is-percent" : " is-quote"}`} style={{ color: item.color ?? compareColor(index) }}>
                     <button type="button" className="compare-color-trigger" style={{ background: item.color ?? compareColor(index) }} aria-label={`Change ${item.symbol} line color`} onClick={() => setEditingLine(item.instrumentKey)} />
                     <b>{compareMode === "percent" ? item.name : item.symbol}</b>
-                    {compareMode === "price" ? (
-                      quote ? <><strong>{formatComparePrice(quote.price)}</strong><em className={tone}>{formatCompareDelta(quote.delta)} ({formatCandleChange(quote.percent)})</em></> : <em>—</em>
-                    ) : (
-                      <em className={tone} title="Change from the left edge of the chart">{formatCandleChange(percent)}</em>
-                    )}
-                    <button type="button" aria-label={`Remove ${item.symbol} from compare`} onClick={() => setComparedSymbols((current) => current.filter((row) => row.instrumentKey !== item.instrumentKey))}><X size={12} /></button>
+                    {compareMode === "price" && (quote ? <><strong>{formatComparePrice(quote.price)}</strong><em className={tone}>{formatCompareDelta(quote.delta)} ({formatCandleChange(quote.percent)})</em></> : <em>—</em>)}
                   </span>
                 );
               })}

@@ -71,7 +71,7 @@
 .compare-legend-row.is-percent { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 4px; }
 .compare-legend-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 22px; max-width: 100%; padding: 0 6px 0 0; border: 0; background: transparent; color: inherit; font-size: 11px; }
 .compare-legend-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.compare-legend-chip .compare-color-trigger { width: 10px; height: 10px; flex: 0 0 10px; padding: 0; border: 0; border-radius: 50%; background: currentColor; cursor: pointer; }
+.compare-legend-chip .compare-color-trigger { width: 10px; height: 10px; flex: 0 0 10px; padding: 0; border: 0; border-radius: 50%; background: currentColor; cursor: pointer; pointer-events: auto; }
 .compare-legend-chip b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
 .compare-legend-chip em { font-style: normal; color: var(--muted); }
 .compare-legend-chip strong { font-weight: 700; }
@@ -95,3 +95,34 @@
 @media (max-width: 360px) {
   .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-style-link, .chart-compare-link) { width: 27px; min-width: 27px; flex-basis: 27px; }
 }
+.terminal-shell .trade-cockpit .desktop-chart-symbol .chart-compare-link.active,
+.terminal-shell .instrument-title .chart-compare-link.active {
+  color: #fff;
+  background: var(--purple, #753bce);
+  border-radius: 8px;
+}
+.terminal-shell .chart-body > .drawing-toolbar.collapsed {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  flex: 0 0 0px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  z-index: 12;
+}
+.terminal-shell .chart-body > .drawing-toolbar.collapsed .drawing-toolbar-toggle {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 16px;
+  height: 36px;
+  border-radius: 0 8px 8px 0;
+  border-left: 0;
+}
+.terminal-shell .chart-body > .drawing-toolbar.collapsed ~ .chart-stack .chart-symbol-legend { left: 22px; }
+.terminal-shell .fno-focus-workspace.toolbar-collapsed > .fno-focus-charts { margin-left: 0; }
+.terminal-shell .fno-drawing-toolbar.collapsed { width: 0; padding: 0; border: 0; background: transparent; overflow: visible; }
