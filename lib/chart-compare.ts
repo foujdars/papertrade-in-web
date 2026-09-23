@@ -51,6 +51,61 @@ export function compareChangePercent(candles: Candle[]) {
   return ((last.close / first.close) - 1) * 100;
 }
 
+/** Percent change from the first candle in the visible window. Null bounds use the whole series. */
+export function windowChangePercent(candles: Candle[], startTime: number | null, endTime: number | null) {
+  const usable = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
+  if (!usable.length) return null;
+  let from = 0;
+  let to = usable.length - 1;
+  if (startTime !== null && Number.isFinite(startTime)) {
+    const index = usable.findIndex((candle) => candle.time >= startTime);
+    if (index >= 0) from = index;
+  }
+  if (endTime !== null && Number.isFinite(endTime)) {
+    let index = -1;
+    for (let i = from; i < usable.length; i++) {
+      if (usable[i].time <= endTime) index = i;
+      else break;
+    }
+    if (index >= from) to = index;
+  }
+  const base = usable[from]?.close;
+  const last = usable[to]?.close;
+  if (!(base > 0) || !Number.isFinite(last)) return null;
+  return ((last / base) - 1) * 100;
+}
+
+export function compareQuote(candles: Candle[], atTime: number | null = null) {
+  const usable = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
+  if (!usable.length) return null;
+  let index = usable.length - 1;
+  if (atTime !== null && Number.isFinite(atTime)) {
+    let found = -1;
+    for (let i = 0; i < usable.length; i++) {
+      if (usable[i].time <= atTime) found = i;
+      else break;
+    }
+    if (found >= 0) index = found;
+  }
+  const price = usable[index].close;
+  const previous = usable[index - 1]?.close;
+  if (!(previous > 0)) return { price, delta: 0, percent: 0 };
+  const delta = price - previous;
+  return { price, delta, percent: (delta / previous) * 100 };
+}
+
+export function formatComparePrice(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatCompareDelta(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  const safe = Object.is(rounded, -0) ? 0 : rounded;
+  return `${safe > 0 ? "+" : ""}${safe.toFixed(2)}`;
+}
+
 export function comparisonRequest(instrumentKey: string, timeframe: string) {
   if (instrumentKey.startsWith("DELTA|")) {
     return `/api/global-markets?${new URLSearchParams({ symbol: instrumentKey.slice(6), mode: "candles", timeframe })}`;

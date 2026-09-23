@@ -17,8 +17,10 @@ import {
   COMPARE_KEY_PATTERN,
   MAX_COMPARED_SYMBOLS,
   compareChangePercent,
+  compareQuote,
   comparisonRequest,
   sanitizeComparedSymbols,
+  windowChangePercent,
 } from "../lib/chart-compare.ts";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -90,12 +92,21 @@ test("compare overlays sanitize keys and route global symbols to Delta candles",
   assert.equal(COMPARE_COLORS.length, 6);
   assert.equal(sanitizeComparedSymbols([{ instrumentKey: "NSE_EQ|INE002A01018", symbol: "RELIANCE", color: "#e91e63" }])[0].color, "#e91e63");
   assert.equal(sanitizeComparedSymbols([{ instrumentKey: "NSE_EQ|INE002A01018", symbol: "RELIANCE", color: "red;evil" }])[0].color, undefined);
+  const series = [
+    { time: 1, open: 100, high: 100, low: 100, close: 100, volume: 1 },
+    { time: 2, open: 80, high: 80, low: 80, close: 80, volume: 1 },
+    { time: 3, open: 120, high: 120, low: 120, close: 120, volume: 1 },
+  ];
+  assert.equal(Math.round(windowChangePercent(series, null, null) ?? 0), 20);
+  assert.equal(windowChangePercent(series, 2, 3), 50);
+  assert.deepEqual(compareQuote(series, 3), { price: 120, delta: 40, percent: 50 });
 });
 
 test("chart workspaces expose type and compare menus without restyling the shell", async () => {
-  const [dashboard, chart, advanced, fno, global, layout] = await Promise.all([
+  const [dashboard, chart, picker, advanced, fno, global, layout] = await Promise.all([
     source("components/TradingDashboard.tsx"),
     source("components/MarketChart.tsx"),
+    source("components/CompareSymbolPicker.tsx"),
     source("components/AdvancedChartWorkspace.tsx"),
     source("components/FnoChartWorkspace.tsx"),
     source("components/GlobalMarketsWorkspace.tsx"),
@@ -107,6 +118,10 @@ test("chart workspaces expose type and compare menus without restyling the shell
   assert.match(dashboard, /Compare symbols/);
   assert.match(chart, /overlayCompared/);
   assert.match(chart, /PriceScaleMode.Percentage/);
+  assert.match(chart, /priceScaleId = mode === "price" \? `compare-\$\{index\}`/);
+  assert.match(picker, /Same % scale/);
+  assert.match(picker, /New pane/);
+  assert.match(picker, /New price scale/);
   assert.match(chart, /heikin-ashi|prepareStyleCandles/);
   assert.match(chart, /ChartProfileOverlay/);
   assert.match(advanced, /CompareSymbolPicker/);

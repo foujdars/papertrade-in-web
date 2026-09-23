@@ -67,6 +67,14 @@ export function CompareSymbolPicker({
           <div><GitCompareArrows size={18} /><span><b>Compare symbols</b><small>Choose how symbols share the chart</small></span></div>
           <button type="button" onClick={onClose} aria-label="Close compare symbols"><X size={18} /></button>
         </header>
+        <div className="compare-mode-switch" role="group" aria-label="Comparison display mode">
+          {([
+            ["percent", "Same % scale"],
+            ["pane", "New pane"],
+            ["price", "New price scale"],
+          ] as const).map(([mode, label]) => <button key={mode} type="button" className={compareMode === mode ? "active" : ""} aria-pressed={compareMode === mode} onClick={() => setCompareMode(mode)}>{label}</button>)}
+        </div>
+        <p className="compare-layout-hint">{compareMode === "pane" ? "Each symbol opens in its own pane, with its own price scale." : compareMode === "price" ? "Same pane. Your prices stay on the right. The other symbol fills the height on its own scale." : "One pane. Both symbols share a percent axis measured from the left edge."}</p>
         <label className="indicator-search">
           <Search size={18} />
           <input aria-label="Search symbols to compare" placeholder="Search Nifty, S&P, BTC…" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -95,14 +103,7 @@ export function CompareSymbolPicker({
           {!available.length && <p className="indicator-empty">No matching symbols to overlay.</p>}
         </div>
         <footer className="compare-mode-footer">
-          <small>{compared.length}/{MAX_COMPARED_SYMBOLS} comparisons · Display on</small>
-          <div role="group" aria-label="Comparison display mode">
-            {([
-              ["percent", "Same % scale"],
-              ["price", "New price scale"],
-              ["pane", "New pane"],
-            ] as const).map(([mode, label]) => <button key={mode} type="button" className={compareMode === mode ? "active" : ""} aria-pressed={compareMode === mode} onClick={() => setCompareMode(mode)}>{label}</button>)}
-          </div>
+          <small>{compared.length}/{MAX_COMPARED_SYMBOLS} comparisons · {compareMode === "pane" ? "New pane" : compareMode === "price" ? "New price scale" : "Same % scale"}</small>
           <small>Double-tap a line, or tap its color dot on the chart, to change its color.</small>
         </footer>
       </section>

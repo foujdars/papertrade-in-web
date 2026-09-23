@@ -123,9 +123,9 @@ test("original chart powers replay, hides future bars and never feeds replay pri
   assert.match(replay, /candles\.slice\(0, cursor \+ 1\)/);
   assert.match(replay, /instrumentKey: instrument\.instrumentKey, timeframe, scope: "combined"/);
   assert.doesNotMatch(replay, /writePaperOrders|localStorage|onPrice=|onOrderSide=/);
-  assert.match(chart, /if \(isReplay \|\| externalFeed\) return;[\s\S]*?async function loadUpstoxCandles/);
-  assert.match(chart, /if \(isReplay \|\| externalFeed \|\| !LIVE_TIMEFRAME_SECONDS/);
-  assert.match(chart, /if \(isReplay \|\| externalFeed \|\| !LIVE_TIMEFRAME_SECONDS\[timeframe\]\) return;[\s\S]*?async function refreshIntradayCandles/);
+  assert.match(chart, /if \(isReplay \|\| externalFeed \|\| historyRequest\) return;[\s\S]*?async function loadUpstoxCandles/);
+  assert.match(chart, /if \(isReplay \|\| externalFeed \|\| historyRequest \|\| !LIVE_TIMEFRAME_SECONDS/);
+  assert.match(chart, /if \(isReplay \|\| externalFeed \|\| historyRequest \|\| !LIVE_TIMEFRAME_SECONDS\[timeframe\]\) return;[\s\S]*?async function refreshIntradayCandles/);
   assert.doesNotMatch(chart, /\[feedMode, instrument\.instrumentKey/);
   assert.match(chart, /const stored = isReplay \? \(replayDrawingsRef\.current\?\.scope === drawingScope/);
 });

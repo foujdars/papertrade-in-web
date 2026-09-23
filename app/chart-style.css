@@ -49,6 +49,10 @@
 .compare-picker-list > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; text-align: left; }
 .compare-picker-list > button.added { background: color-mix(in srgb, var(--purple) 8%, transparent); }
 .compare-picker-list .stock-identity { flex: 1; min-width: 0; }
+.compare-mode-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 0 16px 8px; }
+.compare-mode-switch button { min-height: 42px; padding: 6px 4px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); font: inherit; font-size: 11px; line-height: 1.2; cursor: pointer; }
+.compare-mode-switch button.active { border-color: var(--purple); background: var(--purple-soft); color: var(--purple); font-weight: 650; }
+.compare-layout-hint { margin: 0 16px 10px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .compare-mode-footer { display: grid; gap: 7px; padding: 10px 14px max(10px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .compare-mode-footer > small { color: var(--muted); font-size: 11px; }
 .compare-mode-footer > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
@@ -64,9 +68,16 @@
 .chart-line-color-menu footer { padding: 0 20px 18px; }
 .chart-line-color-menu footer button { width: 100%; min-height: 40px; border: 0; border-radius: 10px; background: var(--purple); color: white; font: inherit; cursor: pointer; }
 .compare-legend-row { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 2px; }
-.compare-legend-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 22px; padding: 0 6px 0 0; border: 0; background: transparent; color: inherit; font-size: 11px; }
+.compare-legend-row.is-percent { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 4px; }
+.compare-legend-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 22px; max-width: 100%; padding: 0 6px 0 0; border: 0; background: transparent; color: inherit; font-size: 11px; }
 .compare-legend-chip i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .compare-legend-chip .compare-color-trigger { width: 10px; height: 10px; flex: 0 0 10px; padding: 0; border: 0; border-radius: 50%; background: currentColor; cursor: pointer; }
+.compare-legend-chip b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+.compare-legend-chip em { font-style: normal; color: var(--muted); }
+.compare-legend-chip strong { font-weight: 700; }
+.compare-legend-chip.is-percent em { font-size: 18px; font-weight: 750; letter-spacing: -0.03em; color: inherit; line-height: 1.1; }
+.compare-legend-chip.is-quote em.positive { color: var(--green, #089981); }
+.compare-legend-chip.is-quote em.negative { color: var(--red, #f04458); }
 .compare-axis-label { position: absolute; right: 5px; z-index: 10; transform: translateY(-50%); padding: 0 1px; max-width: 135px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--purple); background: transparent; font-size: 10px; font-weight: 700; line-height: 1.3; text-shadow: 0 1px 1px var(--surface, white); pointer-events: none; }
 .compare-axis-label.left { right: auto; left: 5px; }
 .volume-overlay-heading { position: absolute; left: 49px; z-index: 5; padding: 2px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 10px; cursor: pointer; }
