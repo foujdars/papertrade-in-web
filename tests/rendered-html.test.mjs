@@ -160,7 +160,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /Upstox market data/);
   assert.match(chart, /import\("lightweight-charts"\)/);
   assert.match(chart, /attributionLogo: true/);
-  assert.match(chart, /right-axis marker should contain only the price/);
+  assert.match(chart, /lastValueVisible: false/);
+  assert.match(chart, /className=\{`compare-axis-label/);
   assert.match(chart, /title: ""/);
   assert.doesNotMatch(chart, /Charts by TradingView/);
   assert.match(chart, /lightweight-charts-drawing/);
@@ -289,7 +290,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(chart, /legendSafeTop/);
   assert.doesNotMatch(chart, /clampToChart/);
   assert.match(chart, /minimumWidth: 58/);
-  assert.match(chart, /minimumFractionDigits: 0, maximumFractionDigits: 2/);
+  assert.match(chart, /maximumFractionDigits: externalFeed \? globalPriceFormatRef\.current\.precision : 2/);
   assert.match(chart, /ChartStudyRenderer/);
   assert.match(styles, /height: calc\(100svh - var\(--mobile-header-height\) - 56px/);
   assert.match(styles, /@media \(max-width: 760px\)[\s\S]*?\.fno-focus-workspace \{ inset: var\(--mobile-header-height\)/);

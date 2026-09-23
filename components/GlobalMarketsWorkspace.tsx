@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CandlestickChart, Diamond, PencilRuler, RefreshCw, Star, X } from "lucide-react";
+import { ArrowLeft, CandlestickChart, GitCompareArrows, PencilRuler, RefreshCw, Star, X } from "lucide-react";
 import {
   MarketChart,
   DEFAULT_CHART_INDICATORS,
@@ -595,7 +595,7 @@ export function GlobalMarketsWorkspace({
                       Type
                     </button>
                     <button onClick={() => setCompareMenu(true)}>
-                      <Diamond size={17} />
+                      <GitCompareArrows size={17} />
                       Compare
                     </button>
                     <button onClick={() => setDrawings(true)}>

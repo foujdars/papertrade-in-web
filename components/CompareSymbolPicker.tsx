@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Diamond, Search, X } from "lucide-react";
+import { Check, GitCompareArrows, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { COMPARE_SUGGESTIONS, MAX_COMPARED_SYMBOLS, type ComparedSymbol } from "@/lib/chart-compare";
 import { useChartPreference } from "@/lib/chart-view-preferences";
@@ -29,6 +29,7 @@ export function CompareSymbolPicker({
   onClose: () => void;
 }) {
   const [compared, setCompared] = useChartPreference("comparedSymbols");
+  const [compareMode, setCompareMode] = useChartPreference("compareMode");
   const [query, setQuery] = useState("");
   useTransientBack(true, onClose);
   useEffect(() => {
@@ -63,7 +64,7 @@ export function CompareSymbolPicker({
     <ChartDialogPortal><div className="chart-function-backdrop compare-picker-backdrop" role="presentation" onPointerDown={onClose}>
       <section className="chart-function-menu compare-picker-menu" role="dialog" aria-modal="true" aria-label="Compare symbols" onPointerDown={(event) => event.stopPropagation()}>
         <header>
-          <div><Diamond size={18} /><span><b>Compare symbols</b><small>Overlay other series on this chart</small></span></div>
+          <div><GitCompareArrows size={18} /><span><b>Compare symbols</b><small>Choose how symbols share the chart</small></span></div>
           <button type="button" onClick={onClose} aria-label="Close compare symbols"><X size={18} /></button>
         </header>
         <label className="indicator-search">
@@ -93,7 +94,17 @@ export function CompareSymbolPicker({
           })}
           {!available.length && <p className="indicator-empty">No matching symbols to overlay.</p>}
         </div>
-        <footer><small>{compared.length}/{MAX_COMPARED_SYMBOLS} overlays · percentage scale turns on automatically</small></footer>
+        <footer className="compare-mode-footer">
+          <small>{compared.length}/{MAX_COMPARED_SYMBOLS} comparisons · Display on</small>
+          <div role="group" aria-label="Comparison display mode">
+            {([
+              ["percent", "Same % scale"],
+              ["price", "New price scale"],
+              ["pane", "New pane"],
+            ] as const).map(([mode, label]) => <button key={mode} type="button" className={compareMode === mode ? "active" : ""} aria-pressed={compareMode === mode} onClick={() => setCompareMode(mode)}>{label}</button>)}
+          </div>
+          <small>Double-tap a line, or tap its color dot on the chart, to change its color.</small>
+        </footer>
       </section>
     </div></ChartDialogPortal>
   );

@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { SMC_LESSONS, type SmcKind } from "./smc-learner";
 import { DEFAULT_CHART_STYLE, isChartStyle, type ChartStyleId } from "./chart-style";
-import { sanitizeComparedSymbols, type ComparedSymbol } from "./chart-compare";
+import { isCompareColor, isCompareMode, sanitizeComparedSymbols, type ComparedSymbol, type CompareMode } from "./chart-compare";
 
 // Device preferences intentionally apply to every symbol, timeframe and workspace.
 const KEY = "papertrade-chart-view-v1";
@@ -19,8 +19,10 @@ type Preferences = {
   showDrawingFavorites: boolean;
   chartStyle: ChartStyleId;
   comparedSymbols: ComparedSymbol[];
+  compareMode: CompareMode;
+  primaryLineColor: string;
 };
-const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true, chartStyle: DEFAULT_CHART_STYLE, comparedSymbols: [] };
+const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true, chartStyle: DEFAULT_CHART_STYLE, comparedSymbols: [], compareMode: "percent", primaryLineColor: "#2962FF" };
 let snapshot = DEFAULTS;
 let cachedRaw: string | null | undefined;
 
@@ -37,6 +39,8 @@ function normalize(value: unknown): Preferences {
     smcLesson: typeof v.smcLesson === "string" && Object.hasOwn(SMC_LESSONS, v.smcLesson) ? v.smcLesson : "FVG",
     chartStyle: isChartStyle(v.chartStyle) ? v.chartStyle : DEFAULT_CHART_STYLE,
     comparedSymbols: sanitizeComparedSymbols(v.comparedSymbols),
+    compareMode: isCompareMode(v.compareMode) ? v.compareMode : "percent",
+    primaryLineColor: isCompareColor(v.primaryLineColor) ? v.primaryLineColor : "#2962FF",
   };
 }
 

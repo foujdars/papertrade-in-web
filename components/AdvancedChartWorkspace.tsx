@@ -7,7 +7,7 @@ import {
   ArrowLeft,
   CandlestickChart,
   ChevronDown,
-  Diamond,
+  GitCompareArrows,
   Eye,
   EyeOff,
   Fullscreen,
@@ -339,7 +339,7 @@ export function AdvancedChartWorkspace({
       <nav className="advanced-commandbar" aria-label="Chart controls">
         <button type="button" onClick={() => setReplayOpen(true)} aria-label={`Bar replay for ${instrument.symbol}`}><History size={18} /> Replay</button>
         <button type="button" className={chartStyle !== "candles" ? "active" : ""} onClick={() => setShowChartStyleMenu(true)} aria-label="Chart type"><CandlestickChart size={18} /> Type</button>
-        <button type="button" className={comparedSymbols.length ? "active" : ""} onClick={() => setShowComparePicker(true)} aria-label="Compare symbols"><Diamond size={18} /> Compare</button>
+        <button type="button" className={comparedSymbols.length ? "active" : ""} onClick={() => setShowComparePicker(true)} aria-label="Compare symbols"><GitCompareArrows size={18} /> Compare</button>
         <div className="advanced-timeframes">{timeframes.map((period) => <button key={period} className={timeframe === period ? "active" : ""} onClick={() => chooseTimeframe(period)}>{period}</button>)}</div>
         <span />
         <button className={`advanced-indicator-button ${showChartFunctions ? "active" : ""}`} onClick={() => setShowChartFunctions(true)}><Activity size={18} /> Functions <em>{activeIndicatorCount}</em></button>

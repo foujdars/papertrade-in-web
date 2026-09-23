@@ -20,7 +20,7 @@
 .terminal-shell .chart-bracket-tool .bracket-entry-chip small { font-size: 11px; padding-left: 6px; border-left: 1px solid var(--line); }
 .terminal-shell .chart-bracket-tool .bracket-level-chip { cursor: ns-resize; touch-action: none; color: inherit; }
 .terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip)::after { content: ""; position: absolute; inset: -9px 0; }
-.terminal-shell .chart-trade-marker.stacked-marker { transform: translateX(-50%); width: 22px; height: 22px; }
+.terminal-shell .chart-trade-marker.stacked-marker { transform: translateX(-50%); width: auto; height: auto; }
 .terminal-shell .chart-trade-marker.stacked-marker svg { display: block; flex: none; }
 .terminal-shell .chart-bracket-tool .risk-target-line { color: var(--green); border-color: var(--green); box-shadow: none; }
 .terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--red); border-color: var(--red); box-shadow: none; }

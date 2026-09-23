@@ -88,6 +88,8 @@ test("compare overlays sanitize keys and route global symbols to Delta candles",
   assert.match(comparisonRequest("TVC|UKOIL", "1H"), /symbol=BRENT/);
   assert.equal(Math.round(compareChangePercent([{ time: 1, open: 100, high: 100, low: 100, close: 100, volume: 1 }, { time: 2, open: 110, high: 110, low: 110, close: 110, volume: 1 }])), 10);
   assert.equal(COMPARE_COLORS.length, 6);
+  assert.equal(sanitizeComparedSymbols([{ instrumentKey: "NSE_EQ|INE002A01018", symbol: "RELIANCE", color: "#e91e63" }])[0].color, "#e91e63");
+  assert.equal(sanitizeComparedSymbols([{ instrumentKey: "NSE_EQ|INE002A01018", symbol: "RELIANCE", color: "red;evil" }])[0].color, undefined);
 });
 
 test("chart workspaces expose type and compare menus without restyling the shell", async () => {

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { SMC_LESSONS } from "../lib/smc-learner.ts";
 import { DEFAULT_CHART_STYLE, isChartStyle } from "../lib/chart-style.ts";
-import { sanitizeComparedSymbols } from "../lib/chart-compare.ts";
+import { isCompareColor, isCompareMode, sanitizeComparedSymbols } from "../lib/chart-compare.ts";
 
 const code = ts.transpileModule(await readFile(new URL("../lib/chart-view-preferences.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 const KEY = "papertrade-chart-view-v1";
@@ -22,7 +22,7 @@ function device(initial = null) {
       };
       if (id === "./smc-learner") return { SMC_LESSONS };
       if (id === "./chart-style") return { DEFAULT_CHART_STYLE, isChartStyle };
-      if (id === "./chart-compare") return { sanitizeComparedSymbols };
+      if (id === "./chart-compare") return { sanitizeComparedSymbols, isCompareColor, isCompareMode };
       return {};
     }, exports, window, storage);
     return exports.useChartPreference;
@@ -41,6 +41,8 @@ test("chart view choices survive fresh modules/restarts, including no SMC filter
   use("showDrawingFavorites")[1](false);
   use("chartStyle")[1]("heikin-ashi");
   use("comparedSymbols")[1]([{ instrumentKey: "DELTA|SPYXUSD", symbol: "SPYXUSD", name: "S&P 500", exchange: "DELTA" }]);
+  use("compareMode")[1]("pane");
+  use("primaryLineColor")[1]("#e91e63");
   const restarted = d.load();
   assert.equal(restarted("magnet")[0], true);
   assert.equal(restarted("hidden")[0], true);
@@ -51,6 +53,8 @@ test("chart view choices survive fresh modules/restarts, including no SMC filter
   assert.equal(restarted("showDrawingFavorites")[0], false);
   assert.equal(restarted("chartStyle")[0], "heikin-ashi");
   assert.equal(restarted("comparedSymbols")[0][0].symbol, "SPYXUSD");
+  assert.equal(restarted("compareMode")[0], "pane");
+  assert.equal(restarted("primaryLineColor")[0], "#e91e63");
   restarted("drawingFavorites")[1]([]);
   assert.deepEqual(d.load()("drawingFavorites")[0], []);
   restarted("magnet")[1](v => !v);
@@ -67,6 +71,8 @@ test("partial and invalid preferences are sanitized; defaults only fill missing 
   assert.equal(use("smcLesson")[0], "FVG");
   assert.equal(use("chartStyle")[0], "candles");
   assert.deepEqual(use("comparedSymbols")[0], []);
+  assert.equal(use("compareMode")[0], "percent");
+  assert.equal(use("primaryLineColor")[0], "#2962FF");
   d.external("bad json");
   assert.equal(use("hidden")[0], false);
   assert.equal(use("smcFilters")[0].length, 5);

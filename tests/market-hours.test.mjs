@@ -54,6 +54,14 @@ test("offscreen arrows are hidden rather than clamped into the price scale or ac
   assert.ok(stackTradeMarkers(many, 600, 300).every(m => m.y >= 0 && m.y + 22 < 150));
 });
 
+test("execution arrows follow compact chart bar spacing", () => {
+  const marker = { id: "sell", time: 1, candleTime: 1, x: 200, y: 150, direction: "down" };
+  const normal = stackTradeMarkers([marker], 300, 300)[0];
+  const compact = stackTradeMarkers([marker], 300, 300, 10)[0];
+  assert.ok(compact.y > normal.y);
+  assert.equal(compact.y + 10, marker.y - 4);
+});
+
 test("fixed entry boxes display current-price P&L for long and short positions", () => {
   assert.equal(compactPnl(positionPnl("BUY", 10, 100, 105)), "+50");
   assert.equal(compactPnl(positionPnl("BUY", 10, 100, 95)), "-50");

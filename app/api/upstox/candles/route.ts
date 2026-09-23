@@ -89,10 +89,11 @@ function mergeCandles(groups: ChartCandle[][]) {
 function aggregateAnnualCandles(candles: ChartCandle[]) {
   const byYear = new Map<number, ChartCandle>();
   for (const candle of candles.sort((a, b) => a.time - b.time)) {
-    const year = new Date(candle.time * 1_000).getUTCFullYear();
+    // Upstox month bars begin at 00:00 IST, still the previous UTC date.
+    const year = new Date(candle.time * 1_000 + 19_800_000).getUTCFullYear();
     const existing = byYear.get(year);
     if (!existing) {
-      byYear.set(year, { ...candle });
+      byYear.set(year, { ...candle, time: Date.UTC(year, 0, 1) / 1_000 });
     } else {
       existing.high = Math.max(existing.high, candle.high);
       existing.low = Math.min(existing.low, candle.low);
@@ -144,6 +145,11 @@ export async function GET(request: Request) {
     const rangeStart = new Date(`${toDate}T00:00:00Z`);
     if (years) rangeStart.setUTCFullYear(rangeStart.getUTCFullYear() - years);
     else rangeStart.setUTCDate(rangeStart.getUTCDate() - config.lookbackDays);
+    // Upstox only publishes daily-or-longer history from January 2000. A
+    // 30-year annual request before that date is rejected rather than clipped.
+    if (["days", "weeks", "months"].includes(config.unit) && rangeStart < new Date("2000-01-01T00:00:00Z")) {
+      rangeStart.setTime(Date.parse("2000-01-01T00:00:00Z"));
+    }
     const fromDate = dateOnly(rangeStart.getTime());
     const encodedKey = encodeURIComponent(instrumentKey);
     const historicalPath = `/v3/historical-candle/${encodedKey}/${config.unit}/${config.interval}/${toDate}/${fromDate}`;

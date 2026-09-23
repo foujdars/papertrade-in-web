@@ -2,6 +2,14 @@ import type { Candle } from "./market";
 
 export const COMPARE_COLORS = ["#2962FF", "#FF6D00", "#089981", "#E91E63", "#9C27B0", "#00BCD4"] as const;
 export const MAX_COMPARED_SYMBOLS = 6;
+export const COMPARE_MODES = ["percent", "price", "pane"] as const;
+export type CompareMode = (typeof COMPARE_MODES)[number];
+export function isCompareMode(value: unknown): value is CompareMode {
+  return typeof value === "string" && COMPARE_MODES.some((mode) => mode === value);
+}
+export function isCompareColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
 export const COMPARE_KEY_PATTERN = /^(NSE_EQ|NSE_INDEX|BSE_INDEX|DELTA|TVC)\|[\w .|&-]{1,80}$/;
 
 export type ComparedSymbol = {
@@ -9,6 +17,7 @@ export type ComparedSymbol = {
   symbol: string;
   name: string;
   exchange: string;
+  color?: string;
 };
 
 export function isComparedKey(value: unknown): value is string {
@@ -29,7 +38,7 @@ export function sanitizeComparedSymbols(value: unknown): ComparedSymbol[] {
     const name = typeof row.name === "string" ? row.name.trim().slice(0, 80) : symbol;
     const exchange = typeof row.exchange === "string" ? row.exchange.trim().slice(0, 16) : "";
     seen.add(row.instrumentKey);
-    next.push({ instrumentKey: row.instrumentKey, symbol, name: name || symbol, exchange: exchange || "NSE" });
+    next.push({ instrumentKey: row.instrumentKey, symbol, name: name || symbol, exchange: exchange || "NSE", ...(isCompareColor(row.color) ? { color: row.color } : {}) });
     if (next.length >= MAX_COMPARED_SYMBOLS) break;
   }
   return next;

@@ -1,7 +1,7 @@
 type MarkerPosition = { id: string; time: number; candleTime: number; x: number; y: number; direction: "up" | "down" };
 
 /** Keep sell arrows above the high and buy arrows below the low, never across the candle. */
-export function stackTradeMarkers<T extends MarkerPosition>(markers: T[], height: number, width = Infinity): T[] {
+export function stackTradeMarkers<T extends MarkerPosition>(markers: T[], height: number, width = Infinity, size = 22): T[] {
   const groups = new Map<string, T[]>();
   for (const marker of markers) {
     const key = `${marker.candleTime}:${marker.direction}`;
@@ -9,9 +9,9 @@ export function stackTradeMarkers<T extends MarkerPosition>(markers: T[], height
   }
   return [...groups.values()].flatMap(group => {
     return [...group].sort((a, b) => a.time - b.time || a.id.localeCompare(b.id))
-      .map((marker, index) => ({ ...marker, y: marker.direction === "down" ? marker.y - 26 - index * 24 : marker.y + 4 + index * 24 }))
+      .map((marker, index) => ({ ...marker, y: marker.direction === "down" ? marker.y - size - 4 - index * (size + 2) : marker.y + 4 + index * (size + 2) }))
       // Clip instead of moving an offscreen execution onto another price or onto an axis.
-      .filter(marker => marker.x >= 11 && marker.x <= width - 11 && marker.y >= 0 && marker.y + 22 <= height);
+      .filter(marker => marker.x >= size / 2 && marker.x <= width - size / 2 && marker.y >= 0 && marker.y + size <= height);
   });
 }
 

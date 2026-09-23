@@ -1,7 +1,7 @@
 "use client";
 import { StockLogo } from "@/components/StockLogo";
 
-import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, Diamond, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
+import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, GitCompareArrows, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
 import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartStyleMenu } from "@/components/ChartStyleMenu";
@@ -266,7 +266,7 @@ export function FnoChartWorkspace({
               <button onClick={() => { setTimeMenuOpen(false); setIndicatorMenuOpen(true); }}><Activity size={16} /><span><b>Indicators</b><small>Studies</small></span></button>
               <button onClick={() => { setTimeMenuOpen(false); setDrawingMenuOpen(true); }}><PenTool size={16} /><span><b>Tools</b><small>Drawings</small></span></button>
               <button onClick={() => { setTimeMenuOpen(false); setStyleMenuOpen(true); }}><CandlestickChart size={16} /><span><b>Chart type</b><small>{chartStyle}</small></span></button>
-              <button onClick={() => { setTimeMenuOpen(false); setCompareOpen(true); }}><Diamond size={16} /><span><b>Compare</b><small>{comparedSymbols.length || "Overlay"}</small></span></button>
+              <button onClick={() => { setTimeMenuOpen(false); setCompareOpen(true); }}><GitCompareArrows size={16} /><span><b>Compare</b><small>{comparedSymbols.length || "Overlay"}</small></span></button>
             </nav>
             {FNO_TIMEFRAME_GROUPS.map((group) => (
               <div key={group.label}><span>{group.label}</span><nav>{group.values.map((value) => <button key={value} className={timeframe === value ? "active" : ""} onClick={() => { onTimeframeChange(value); setTimeMenuOpen(false); }}>{value}</button>)}</nav></div>
