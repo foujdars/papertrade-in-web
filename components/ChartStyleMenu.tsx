@@ -6,6 +6,7 @@ import { CHART_STYLE_GROUPS, CHART_STYLES, chartStyleLabel, type ChartStyleId } 
 import { useChartPreference } from "@/lib/chart-view-preferences";
 import { useTransientBack } from "./useTransientBack";
 import { ChartStyleGlyph } from "./ChartStyleGlyph";
+import { ChartDialogPortal } from "./ChartDialogPortal";
 
 export function ChartStyleMenu({ onClose }: { onClose: () => void }) {
   const [chartStyle, setChartStyle] = useChartPreference("chartStyle");
@@ -22,10 +23,10 @@ export function ChartStyleMenu({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="chart-function-backdrop chart-style-backdrop" role="presentation" onPointerDown={onClose}>
+    <ChartDialogPortal><div className="chart-function-backdrop chart-style-backdrop" role="presentation" onPointerDown={onClose}>
       <section className="chart-function-menu chart-style-menu" role="dialog" aria-modal="true" aria-label="Chart type" onPointerDown={(event) => event.stopPropagation()}>
         <header>
-          <div><span><b>Chart type</b><small>Same series as TradingView, in this theme</small></span></div>
+          <div><span><b>Chart type</b><small>Choose how prices are displayed</small></span></div>
           <button type="button" onClick={onClose} aria-label="Close chart type menu"><X size={18} /></button>
         </header>
         <div className="chart-style-groups">
@@ -48,6 +49,6 @@ export function ChartStyleMenu({ onClose }: { onClose: () => void }) {
         </div>
         <footer><small>Showing {chartStyleLabel(chartStyle)}. Saved on this device.</small></footer>
       </section>
-    </div>
+    </div></ChartDialogPortal>
   );
 }

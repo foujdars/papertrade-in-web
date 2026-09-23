@@ -83,7 +83,7 @@ function mergeCandles(groups: ChartCandle[][]) {
   }
   return [...candlesByTime.values()]
     .sort((a, b) => Number(a.time) - Number(b.time))
-    .slice(-1_600);
+    .slice(-5_000);
 }
 
 function aggregateAnnualCandles(candles: ChartCandle[]) {
@@ -131,8 +131,20 @@ export async function GET(request: Request) {
       );
     }
 
-    const toDate = indiaDate();
-    const fromDate = indiaDate(-config.lookbackDays);
+    const years = Number(url.searchParams.get("years") ?? 0);
+    const targetDate = url.searchParams.get("date");
+    const target = targetDate ? Date.parse(targetDate) : null;
+    if ((years && (![3, 5, 10].includes(years) || timeframe !== "1D")) ||
+      (target !== null && (!Number.isFinite(target) || target < 0 || target > Date.now()))) {
+      return Response.json({ ok: false, error: { message: "Choose a valid past date or a daily history range." } }, { status: 400 });
+    }
+    const requestedHistory = years > 0 || target !== null;
+    const dateOnly = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    const toDate = target !== null ? dateOnly(Math.min(Date.now(), target + config.lookbackDays * 43200000)) : indiaDate();
+    const rangeStart = new Date(`${toDate}T00:00:00Z`);
+    if (years) rangeStart.setUTCFullYear(rangeStart.getUTCFullYear() - years);
+    else rangeStart.setUTCDate(rangeStart.getUTCDate() - config.lookbackDays);
+    const fromDate = dateOnly(rangeStart.getTime());
     const encodedKey = encodeURIComponent(instrumentKey);
     const historicalPath = `/v3/historical-candle/${encodedKey}/${config.unit}/${config.interval}/${toDate}/${fromDate}`;
     const intradayPath = `/v3/historical-candle/intraday/${encodedKey}/${config.unit}/${config.interval}`;
@@ -146,7 +158,7 @@ export async function GET(request: Request) {
       );
     }
 
-    if (config.historicalOnly) {
+    if (config.historicalOnly || requestedHistory) {
       const historical = await readCandles<UpstoxCandlePayload>(historicalPath);
       candles = mergeCandles([normalizeCandles(historical)]);
       if (config.aggregateYears) candles = aggregateAnnualCandles(candles);

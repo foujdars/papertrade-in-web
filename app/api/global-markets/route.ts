@@ -7,6 +7,7 @@ import {
   type PerpSymbol,
 } from "@/lib/global-markets";
 import { isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
+import { aggregateChartCandles, deltaHistoryPlan } from "@/lib/chart-history";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const cache = new Map<string, { until: number; value: unknown }>();
@@ -65,20 +66,6 @@ async function delta(path: string, ttl: number): Promise<any> {
     pending.delete(path);
   }
 }
-const resolutions: Record<string, number> = {
-  "1m": 60,
-  "2m": 120,
-  "3m": 180,
-  "5m": 300,
-  "10m": 600,
-  "15m": 900,
-  "30m": 1800,
-  "1H": 3600,
-  "2H": 7200,
-  "3H": 10800,
-  "4H": 14400,
-  "1D": 86400,
-};
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
@@ -100,25 +87,19 @@ export async function GET(request: Request) {
     const kind = product.contract_type;
     if (!["perpetual_futures", "futures", "call_options", "put_options"].includes(kind) || product.quoting_asset?.symbol !== "USD" || product.settling_asset?.symbol !== "USD") throw new Error("Unsupported Delta contract.");
     if (mode === "candles") {
-      const timeframe = params.get("timeframe") ?? "5m",
-        seconds = resolutions[timeframe];
-      if (!seconds)
-        return Response.json(
-          { ok: false, error: "Unsupported timeframe." },
-          { status: 400 },
-        );
-      const end = Math.floor(Date.now() / 1000 / seconds) * seconds + seconds,
-        start = end - 600 * seconds;
-      const rows = await delta(
-        `history/candles?symbol=${symbol}&resolution=${timeframe.toLowerCase()}&start=${start}&end=${end}`,
-        8000,
-      );
-      if (!Array.isArray(rows))
-        throw new Error("Candle history is unavailable.");
-      const candles = normalizeGlobalCandles(rows).filter(
-        (c) => c.time <= Date.now() / 1000,
-      );
-      if (!candles.length) throw new Error("No valid candles.");
+      const timeframe = params.get("timeframe") ?? "5m";
+      let plan;
+      try { plan = deltaHistoryPlan(timeframe, params); }
+      catch (error) { return Response.json({ ok: false, error: (error as Error).message }, { status: 400 }); }
+      const pages = await Promise.all(plan.windows.map(async ({ start, end }) => {
+        const rows = await delta(`history/candles?symbol=${encodeURIComponent(symbol)}&resolution=${plan.resolution}&start=${start}&end=${end}`, end < Date.now() / 1000 - 86400 ? 300000 : 8000);
+        if (!Array.isArray(rows)) throw new Error("Candle history is unavailable.");
+        return normalizeGlobalCandles(rows);
+      }));
+      const unique = new Map(pages.flat().filter(c => c.time >= plan.start && c.time <= Math.min(plan.end, Date.now() / 1000)).map(c => [c.time, c]));
+      const raw = [...unique.values()].sort((a, b) => a.time - b.time);
+      const candles = plan.aggregate ? aggregateChartCandles(raw, timeframe) : raw;
+      if (!candles.length) throw new Error("No history is available for this contract on the selected date.");
       return Response.json(
         {
           ok: true,

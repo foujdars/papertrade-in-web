@@ -8,6 +8,7 @@ import { compareMarketInstruments, marketDisplayName } from "@/lib/market-direct
 import type { Instrument } from "@/lib/market";
 import { StockLogo } from "./StockLogo";
 import { useTransientBack } from "./useTransientBack";
+import { ChartDialogPortal } from "./ChartDialogPortal";
 
 function asCompared(item: Instrument): ComparedSymbol {
   return {
@@ -59,7 +60,7 @@ export function CompareSymbolPicker({
   }
 
   return (
-    <div className="chart-function-backdrop compare-picker-backdrop" role="presentation" onPointerDown={onClose}>
+    <ChartDialogPortal><div className="chart-function-backdrop compare-picker-backdrop" role="presentation" onPointerDown={onClose}>
       <section className="chart-function-menu compare-picker-menu" role="dialog" aria-modal="true" aria-label="Compare symbols" onPointerDown={(event) => event.stopPropagation()}>
         <header>
           <div><Diamond size={18} /><span><b>Compare symbols</b><small>Overlay other series on this chart</small></span></div>
@@ -94,6 +95,6 @@ export function CompareSymbolPicker({
         </div>
         <footer><small>{compared.length}/{MAX_COMPARED_SYMBOLS} overlays · percentage scale turns on automatically</small></footer>
       </section>
-    </div>
+    </div></ChartDialogPortal>
   );
 }

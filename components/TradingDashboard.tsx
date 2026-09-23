@@ -10,6 +10,8 @@ import { LongPressTradeRow } from "@/components/LongPressTradeRow";
 import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransientBack";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
+import { ChartHistoryControls } from "./ChartHistoryControls";
+import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
 
 import {
   Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
@@ -408,9 +410,12 @@ export function TradingDashboard() {
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
+  const [chartHistory, setChartHistory] = useState<ChartHistoryRequest>();
+  useEffect(() => setChartHistory(undefined), [selected.instrumentKey]);
   const [chartPreferencesReady, setChartPreferencesReady] = useState(false);
   const chooseTimeframe = (period: string) => {
     if (!periods.includes(period)) return;
+    setChartHistory(current => current?.years ? undefined : current);
     saveChartTimeframe(localStorage, user?.id ?? "guest", period);
     setTimeframe(period);
   };
@@ -532,6 +537,7 @@ export function TradingDashboard() {
   const [marketQuotes, setMarketQuotes] = useState<Record<string, NormalizedQuote>>({});
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const [globalCandles, setGlobalCandles] = useState<Candle[] | undefined>();
+  const globalCandleScopeRef = useRef("");
   const activeNavigationSection: NavigationSection = homeOpen
     ? "home"
     : sidebarOpen
@@ -1170,7 +1176,7 @@ export function TradingDashboard() {
       deltaSymbolFromInstrumentKey(fnoTopInstrument?.instrumentKey),
       ...visibleInstruments.filter(item => deltaSymbolFromInstrumentKey(item.instrumentKey) || deltaOptionSymbolFromInstrumentKey(item.instrumentKey)).slice(0, 8).map((item) => deltaSymbolFromInstrumentKey(item.instrumentKey) ?? deltaOptionSymbolFromInstrumentKey(item.instrumentKey)),
       ...positionSymbols.map((symbol) => deltaSymbolFromInstrumentKey(tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey)),
-    ].filter((value): value is PerpSymbol => Boolean(value)))],
+    ].filter((value): value is PerpSymbol => Boolean(value)))].sort().join(","),
     [fnoTopInstrument?.instrumentKey, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
   );
 
@@ -1184,7 +1190,7 @@ export function TradingDashboard() {
       if (requestInFlight || document.visibilityState === "hidden") return;
       requestInFlight = true;
       try {
-        const entries = await Promise.all(deltaQuoteSymbols.map(async (symbol) => {
+        const entries = await Promise.all(deltaQuoteSymbols.split(",").map(async (symbol) => {
           const response = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
           const payload = await response.json() as { ok?: boolean; quote?: PerpQuote };
           if (!response.ok || !payload.ok || !payload.quote) return null;
@@ -1627,28 +1633,37 @@ export function TradingDashboard() {
     }
     const controller = new AbortController();
     let retryTimer = 0;
+    let running = false;
+    setGlobalCandles([]);
     setFeedStatus({ mode: "loading", message: "Connecting to Delta..." });
     async function loadGlobalCandles() {
+      if (running || document.hidden || controller.signal.aborted) return;
+      running = true;
       try {
         const params = new URLSearchParams({ mode: "candles", symbol: selectedDeltaChartSymbol!, timeframe });
         const response = await fetch(`/api/global-markets?${params}`, { cache: "no-store", signal: controller.signal });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[]; fetchedAt?: number; error?: string };
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error || "Delta candles are unavailable.");
         if (controller.signal.aborted) return;
-        setGlobalCandles(payload.candles);
+        const nextCandles = payload.candles;
+        globalCandleScopeRef.current = `${selectedDeltaChartSymbol}:${timeframe}`;
+        setGlobalCandles(previous => previous?.length === nextCandles.length && previous.every((c, i) => candlesEqual(c, nextCandles[i])) ? previous : nextCandles);
         setFeedStatus({ mode: "live", message: "Delta Exchange India candles", updatedAt: payload.fetchedAt ? new Date(payload.fetchedAt).toISOString() : undefined });
       } catch (error) {
         if (controller.signal.aborted) return;
         setFeedStatus({ mode: "error", message: `${error instanceof Error ? error.message : "Delta candles are unavailable."} Chart paused` });
-        retryTimer = window.setTimeout(() => void loadGlobalCandles(), 30_000);
+      } finally {
+        running = false;
+        if (!controller.signal.aborted) retryTimer = window.setTimeout(() => void loadGlobalCandles(), 15_000);
       }
     }
     void loadGlobalCandles();
-    const interval = window.setInterval(() => void loadGlobalCandles(), 15_000);
+    const resume = () => { if (!document.hidden) { window.clearTimeout(retryTimer); void loadGlobalCandles(); } };
+    document.addEventListener("visibilitychange", resume);
     return () => {
       controller.abort();
       window.clearTimeout(retryTimer);
-      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", resume);
     };
   }, [selectedDeltaChartSymbol, timeframe]);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
@@ -2903,6 +2918,7 @@ export function TradingDashboard() {
                 key={`${selected.symbol}-${timeframe}`}
                 instrument={selected}
                 timeframe={timeframe}
+                historyRequest={chartHistory}
                 activeTool={activeTool}
                 toolSignal={toolSignal}
                 magnet={magnet}
@@ -2916,7 +2932,7 @@ export function TradingDashboard() {
                 indicatorHost={chartIndicatorHost}
                 chartAction={chartAction}
                 chartTheme={theme}
-                externalCandles={selectedDeltaChartSymbol ? globalCandles : undefined}
+                externalCandles={selectedDeltaChartSymbol ? (globalCandleScopeRef.current === `${selectedDeltaChartSymbol}:${timeframe}` ? globalCandles : []) : undefined}
                 priceIncrement={selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.spec.tick : selectedDeltaOption ? globalTrading.optionSnapshots[selectedDeltaOption]?.spec.tick : undefined}
                 exchangeLabel={selectedVenueLabel}
                 tradeMarkers={selectedTradeMarkers}
@@ -2926,7 +2942,8 @@ export function TradingDashboard() {
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedGlobalPosition || selectedOptionPosition ? closeGlobalChartPosition : selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
-                liveTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
+                liveTick={selectedGlobalQuote ? { instrumentKey: selected.instrumentKey, price: selectedGlobalQuote.last, timestampMs: selectedGlobalQuote.at }
+                  : selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
                 onPriceAction={(price, mode) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode }); }}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
@@ -2936,6 +2953,7 @@ export function TradingDashboard() {
             )}
           </div>
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
+            <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} />
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
             <div className={`chart-status-live-pnl ${chartPnlVisible ? "visible" : ""}`}>
               {chartPnlVisible ? <><Radio size={12} /><span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b></> : null}

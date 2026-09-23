@@ -19,6 +19,8 @@ import { useChartPreference } from "@/lib/chart-view-preferences";
 import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKind, toStyleSeriesPoint, type ChartStyleId } from "@/lib/chart-style";
 import { compareChangePercent, compareColor } from "@/lib/chart-compare";
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
+import { candleBucket, candlesEqual, nearestCandleIndex, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
+import { comparisonRequest } from "@/lib/chart-compare";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
@@ -461,6 +463,7 @@ export function MarketChart({
   preservePageScroll = false,
   replayCandles,
   externalCandles,
+  historyRequest,
   priceIncrement,
   exchangeLabel = 'NSE',
   replaySelecting = false,
@@ -504,6 +507,7 @@ export function MarketChart({
   preservePageScroll?: boolean;
   replayCandles?: Candle[];
   externalCandles?: Candle[];
+  historyRequest?: ChartHistoryRequest;
   priceIncrement?: number;
   exchangeLabel?: string;
   replaySelecting?: boolean;
@@ -547,15 +551,21 @@ export function MarketChart({
   useEffect(() => {if(selectedStudy&&!indicators[selectedStudy])setSelectedStudy(null);}, [indicators,selectedStudy]);
   const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number}>>([]);
   const isReplay = replayCandles !== undefined;
-  const externalFeed = externalCandles !== undefined;
+  const externalFeed = externalCandles !== undefined || instrument.instrumentKey.startsWith("DELTA|");
+  const historyRequestRef = useRef(historyRequest); historyRequestRef.current = historyRequest;
+  const [historyMessage, setHistoryMessage] = useState("");
+  const dateArrowRef = useRef<Candle | null>(null);
+  const [dateArrow, setDateArrow] = useState<{ x: number; y: number } | null>(null);
+  const overlayFrameRef = useRef(0);
+  const historyWasActiveRef = useRef(false);
   const overlayCompared = useMemo(
     () => (isReplay ? [] : comparedSymbols.filter((item) => item.instrumentKey !== instrument.instrumentKey)),
     [comparedSymbols, instrument.instrumentKey, isReplay],
   );
-  const comparisonData=useComparisonCandles(isReplay||externalFeed?[]:[
+  const comparisonData=useComparisonCandles(isReplay?[]:[
     ...STUDIES.filter(s=>s.comparison&&indicators[s.id]&&!studySettings[s.id]?.hidden).map(s=>studySettings[s.id]?.comparisonKey).filter((key):key is string=>!!key),
     ...overlayCompared.map((item) => item.instrumentKey),
-  ],timeframe);
+  ],timeframe, historyRequest);
   const comparisonRef=useRef(comparisonData);comparisonRef.current=comparisonData;
   const [priceCursor, setPriceCursor] = useState<{ price: number; y: number } | null>(null);
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
@@ -655,9 +665,18 @@ export function MarketChart({
   }, [onPrice]);
 
   function acceptLiveTick(tick: CandleTick, publish: boolean) {
-    if (isReplay || externalFeed || !validCandleTick(tick, instrument.instrumentKey, lastLiveTickRef.current)) return;
+    if (isReplay || historyRequestRef.current || !validCandleTick(tick, instrument.instrumentKey, lastLiveTickRef.current)) return;
     lastLiveTickRef.current = tick;
-    const next = applyCandleTick(dataRef.current, tick, timeframe);
+    let next: Candle[];
+    if (externalFeed) {
+      const previous = dataRef.current.at(-1);
+      if (!previous) return;
+      const time = candleBucket(tick.timestampMs / 1000, timeframe);
+      if (time < previous.time) return;
+      next = time === previous.time
+        ? [...dataRef.current.slice(0, -1), { ...previous, close: tick.price, high: Math.max(previous.high, tick.price), low: Math.min(previous.low, tick.price) }]
+        : [...dataRef.current, { time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: 0 }];
+    } else next = applyCandleTick(dataRef.current, tick, timeframe);
     if (next === dataRef.current) return;
     dataRef.current = next;
     paintLastBar(next);
@@ -754,8 +773,13 @@ export function MarketChart({
   }
 
   function scheduleOverlayRefresh() {
-    if (typeof window === "undefined") return;
-    window.requestAnimationFrame(() => {
+    if (typeof window === "undefined" || overlayFrameRef.current) return;
+    overlayFrameRef.current = window.requestAnimationFrame(() => {
+      overlayFrameRef.current = 0;
+      const arrow = dateArrowRef.current;
+      const arrowX = arrow ? chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(arrow.time, timeframe)) : null;
+      const arrowY = arrow ? candleSeries.current?.priceToCoordinate(arrow.high) : null;
+      setDateArrow(arrowX != null && arrowY != null ? { x: arrowX, y: arrowY } : null);
       refreshDrawingCrosshair();
       smcRefreshRef.current?.();
       const start = replayRef.current.start;
@@ -763,11 +787,6 @@ export function MarketChart({
       setReplayMarkerX(x);
       refreshRiskCoordinates();
       refreshTradeMarkerCoordinates();
-      window.requestAnimationFrame(() => {
-        refreshRiskCoordinates();
-        refreshTradeMarkerCoordinates();
-        smcRefreshRef.current?.();
-      });
     });
   }
 
@@ -1863,6 +1882,8 @@ export function MarketChart({
       editRef.current = null;
       manager?.detach();
       chartApi.current?.remove();
+      window.cancelAnimationFrame(overlayFrameRef.current);
+      overlayFrameRef.current = 0;
       chartApi.current = null;
       riskDragRef.current = null;
       riskDragPriceRangeRef.current = null;
@@ -1953,22 +1974,89 @@ export function MarketChart({
   }, [replayCandles, replaySelecting, timeframe]);
 
   useEffect(() => {
-    if (externalCandles === undefined) return;
+    if (historyRequest) { historyWasActiveRef.current = true; return; }
+    if (historyWasActiveRef.current) {
+      historyWasActiveRef.current = false;
+      viewportInteractedRef.current = false;
+      dataRef.current = [];
+      lastLiveTickRef.current = null;
+      chartApi.current?.timeScale().applyOptions({ minBarSpacing: 2 });
+    }
+  }, [historyRequest]);
+
+  useEffect(() => {
+    if (externalCandles === undefined || historyRequest) return;
     const { precision } = globalPriceFormatRef.current;
     candleSeries.current?.applyOptions({ priceFormat: globalPriceFormatRef.current });
     chartApi.current?.applyOptions({ localization: { priceFormatter: (price: number) => price.toLocaleString("en-US", { maximumFractionDigits: precision }) } });
     const initial = dataRef.current.length === 0;
+    const previous = dataRef.current;
+    if (previous.length === externalCandles.length && previous.every((c, i) => candlesEqual(c, externalCandles[i]))) return;
     dataRef.current = externalCandles;
-    paintPriceSeries(externalCandles);
+    if (trailingCandleUpdate(previous, externalCandles)) {
+      // Refresh the former last bar as well when a new candle has opened.
+      if (externalCandles.length > previous.length) paintLastBar(externalCandles.slice(0, -1));
+      paintLastBar(externalCandles);
+    } else paintPriceSeries(externalCandles);
     setLatestCandle(externalCandles.at(-1));
     syncIndicatorData(externalCandles);
     if(initial&&externalCandles.length)applyInitialVisibleRange(externalCandles);
     setFeedMode(externalCandles.length?'live':'loading');
     scheduleOverlayRefresh();
-  }, [externalCandles,timeframe,priceIncrement]);
+  }, [externalCandles,timeframe,priceIncrement,historyRequest]);
 
   useEffect(() => {
-    if (isReplay || externalFeed) return;
+    dateArrowRef.current = null;
+    setDateArrow(null);
+    setHistoryMessage("");
+    if (!historyRequest || isReplay) return;
+    const controller = new AbortController();
+    let arrowTimer = 0, readyTimer = 0;
+    setHistoryMessage("Loading history…");
+    async function load() {
+      try {
+        const params = new URLSearchParams();
+        if (historyRequest?.years) params.set("years", String(historyRequest.years));
+        if (historyRequest?.date) params.set("date", historyRequest.date);
+        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&${params}`, { signal: controller.signal });
+        const body = await response.json();
+        if (!response.ok || !body.ok || !body.candles?.length) throw new Error(typeof body.error === "string" ? body.error : body.error?.message || "No history is available for this date.");
+        if (controller.signal.aborted) return;
+        const candles: Candle[] = body.candles;
+        const display = () => {
+          if (controller.signal.aborted) return;
+          const chart = chartApi.current;
+          if (!chart || !candleSeries.current) { readyTimer = window.setTimeout(display, 50); return; }
+          dataRef.current = candles;
+          paintPriceSeries(candles);
+          syncIndicatorData(candles);
+          setLatestCandle(candles.at(-1));
+          setFeedMode("live");
+          chart.priceScale("right").applyOptions({ autoScale: true });
+          if (historyRequest?.date) {
+            const index = nearestCandleIndex(candles, Date.parse(historyRequest.date) / 1000, timeframe, externalFeed ? 0 : IST_OFFSET_SECONDS);
+            chart.timeScale().setVisibleLogicalRange({ from: index - 18, to: index + 18 });
+            dateArrowRef.current = candles[index];
+            setHistoryMessage(`Candle: ${new Date(candles[index].time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", ...(!CALENDAR_TIMEFRAMES.has(timeframe) ? { timeStyle: "short" } : {}) })} · IST`);
+            arrowTimer = window.setTimeout(() => { dateArrowRef.current = null; setDateArrow(null); }, 8000);
+          } else {
+            chart.timeScale().applyOptions({ minBarSpacing: 0.01 });
+            chart.timeScale().fitContent();
+            setHistoryMessage(`Available history from ${new Date(candles[0].time * 1000).toLocaleDateString("en-IN")}`);
+          }
+          scheduleOverlayRefresh();
+        };
+        display();
+      } catch (error) {
+        if (!controller.signal.aborted) setHistoryMessage(error instanceof Error ? error.message : "History unavailable. Try another date.");
+      }
+    }
+    void load();
+    return () => { controller.abort(); window.clearTimeout(arrowTimer); window.clearTimeout(readyTimer); };
+  }, [historyRequest, instrument.instrumentKey, timeframe, chartTheme, chartStyle, isReplay]);
+
+  useEffect(() => {
+    if (isReplay || externalFeed || historyRequest) return;
     const controller = new AbortController();
     let retryTimer = 0;
     onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
@@ -2024,10 +2112,10 @@ export function MarketChart({
       controller.abort();
       window.clearTimeout(retryTimer);
     };
-  }, [instrument.instrumentKey, timeframe, isReplay]);
+  }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
   useEffect(() => {
-    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || historyRequest || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     const controller = new AbortController();
     let stopped = false;
     let reconnectTimer = 0;
@@ -2102,15 +2190,15 @@ export function MarketChart({
       window.clearTimeout(liveIndicatorTimerRef.current);
       liveIndicatorTimerRef.current = 0;
     };
-  }, [instrument.instrumentKey, timeframe, isReplay]);
+  }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
   useEffect(() => {
     // Reconciliation has its own lifetime. Stream status changes must not keep
     // restarting its timer and postponing recovery indefinitely.
-    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || historyRequest || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     let controller: AbortController | null = null;
     async function refreshIntradayCandles() {
-      if (controller || !dataRef.current.length) return;
+      if (controller || !dataRef.current.length || historyRequestRef.current || document.hidden) return;
       const requestController = new AbortController();
       controller = requestController;
       const deadline = window.setTimeout(() => requestController.abort(), 15000);
@@ -2119,7 +2207,7 @@ export function MarketChart({
         const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: requestController.signal });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[]; fetchedAt?: string; error?: { message?: string } };
         if (!response.ok || !payload.ok || !payload.candles?.length) throw new Error(payload.error?.message ?? "Upstox intraday candles are unavailable.");
-        if (requestController.signal.aborted) return;
+        if (requestController.signal.aborted || historyRequestRef.current) return;
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
         paintPriceSeries();
         syncIndicatorData();
@@ -2149,10 +2237,10 @@ export function MarketChart({
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [instrument.instrumentKey, timeframe, isReplay]);
+  }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
   useEffect(() => {
-    if (isReplay || externalFeed || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
+    if (isReplay || externalFeed || historyRequest || !LIVE_TIMEFRAME_SECONDS[timeframe]) return;
     let disposed = false;
     let request: AbortController | null = null;
     let retryAt = 0;
@@ -2189,7 +2277,7 @@ export function MarketChart({
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
     return () => { disposed = true; request?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
-  }, [instrument.instrumentKey, timeframe, isReplay]);
+  }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && indicators[s.id]);
   const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
@@ -2199,6 +2287,8 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(32, dateArrow.y - 30) }} aria-label="Selected date candle">↓</div>}
+        {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+3}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
           <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
