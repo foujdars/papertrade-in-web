@@ -159,7 +159,27 @@
 .terminal-shell .home-studio .home-risk-meter { margin: 0 10px 8px; padding: 7px 8px; }
 .terminal-shell .home-studio .home-global-balance { min-height: 0; }
 .terminal-shell .home-studio .home-resume-card { min-height: 64px; padding: 10px 12px; margin-top: 10px; }
-.header-wallet-button { display: none; }
-@media (max-width: 940px) {
-  .terminal-shell .top-actions > .header-wallet-button { display: grid !important; width: 40px; height: 40px; min-width: 40px; place-items: center; padding: 0; border-radius: 11px; }
-}
+.terminal-shell .top-actions > .header-wallet-button { display: grid !important; width: 40px; height: 40px; min-width: 40px; place-items: center; padding: 0; border-radius: 11px; flex: 0 0 40px; }
+.terminal-shell .home-hub.home-studio .home-global-search { min-height: 42px; }
+.terminal-shell .home-hub.home-studio .home-section { margin-top: 8px; }
+.terminal-shell .home-hub.home-studio .home-section > header { min-height: 34px; padding: 0 12px; }
+.terminal-shell .home-hub.home-studio .home-section > header button { min-height: 32px; }
+.terminal-shell .home-hub.home-studio .home-pulse-first { margin-top: 8px; }
+.terminal-shell .home-hub.home-studio .home-index-grid { padding: 0 4px 6px; }
+.terminal-shell .home-hub.home-studio .home-index-card { min-height: 0; padding: 4px 8px 6px; gap: 1px; }
+.terminal-shell .home-hub.home-studio .home-index-card strong { font-size: 15px; line-height: 1.15; }
+.terminal-shell .home-hub.home-studio .home-index-card small { font-size: 9px; line-height: 1.2; white-space: nowrap; }
+.terminal-shell .home-hub.home-studio .home-session-board span,
+.terminal-shell .home-hub.home-studio .home-session-board > button { min-height: 30px; height: auto; }
+.terminal-shell .home-hub.home-studio .home-pulse-section .home-session-board { padding: 0 8px 8px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser { margin: 8px 0; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button { min-height: 42px; padding: 6px 10px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-value { min-height: 0; padding: 0 12px 4px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-value strong { font-size: 22px; }
+.terminal-shell .home-hub.home-studio .home-today-pnl { min-height: 0; }
+.terminal-shell .home-hub.home-studio .home-pnl-split { gap: 6px; margin: 0 10px 6px; }
+.terminal-shell .home-hub.home-studio .home-pnl-split button { min-height: 36px; padding: 5px 16px 5px 8px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-stats { padding: 0 10px 6px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-stats button { min-height: 34px; padding: 4px 8px; gap: 2px; }
+.terminal-shell .home-hub.home-studio .home-risk-meter { margin: 0 10px 8px; padding: 6px 8px; }
+.terminal-shell .home-hub.home-studio .home-risk-meter small { display: none; }

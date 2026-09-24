@@ -229,7 +229,7 @@ export function HomeWorkspace({
                 <button key={index.symbol} className="home-index-card" onClick={() => onOpenStock(index.symbol)}>
                   <span><b>{index.label}</b><i className={index.live ? "live" : ""}>{index.price===null?"—":index.live ? "LIVE" : "LAST"}</i></span>
                   <strong>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
-                  <small className={index.points===null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "Quote unavailable" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>{index.price!==null&&!index.live&&<time>{index.asOf&&Number.isFinite(Date.parse(index.asOf))?new Date(index.asOf).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" IST":"Time unavailable"}</time>}
+                  <small className={index.points===null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "Quote unavailable" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>
                 </button>
               );
             })}
