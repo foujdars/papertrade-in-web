@@ -46,6 +46,8 @@ test("the board marks overlapping sessions open and counts down to the next one"
   const london = board.find((item) => item.id === "london");
   assert.equal(london.open, false);
   assert.equal(london.label, "in 3h");
+  assert.equal(london.period, "12:30–21:30");
+  assert.equal(board.find((item) => item.id === "india").period, "9:15–15:30");
   assert.match(sessionChipLabel(now), /Sydney, Tokyo \+1 open · London in 3h/);
   const shaded = sessionIntervals(now, now + 60_000).map((item) => item.id);
   assert.ok(shaded.includes("india"));

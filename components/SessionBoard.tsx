@@ -42,10 +42,10 @@ export function SessionBoard({ variant = "home", shadesOn = true, onToggleShades
     <section className="home-session-board" aria-label="Market sessions">
       <div>
         {board.map((item) => (
-          <span key={item.id} className={item.open ? "is-open" : ""} title={`${item.name} · ${item.label}`}>
-            <i style={{ background: item.color }} />
+          <span key={item.id} className={item.open ? "is-open" : ""} title={`${item.name} · ${item.period} IST${item.open ? " · live" : ""}`}>
+            <i style={{ background: item.open ? "#12b886" : item.color }} />
             <b>{shortName[item.id] ?? item.name}</b>
-            <small>{item.label}</small>
+            <small>{item.period}</small>
           </span>
         ))}
       </div>

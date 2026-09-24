@@ -72,7 +72,19 @@ export type SessionSnapshot = {
   opensAt: number;
   closesAt: number;
   label: string;
+  period: string;
 };
+
+function istClock(ms: number) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hour}:${minute}`;
+}
+
+function sessionPeriod(start: number, end: number) {
+  return `${istClock(start)}–${istClock(end)}`;
+}
 
 function lead(now: number, at: number) {
   const minutes = Math.max(0, Math.round((at - now) / 60_000));
@@ -107,6 +119,7 @@ export function sessionBoard(now: number): SessionSnapshot[] {
       opensAt: next.start,
       closesAt: next.end,
       label: next.open ? "Open" : lead(now, next.start),
+      period: sessionPeriod(next.start, next.end),
     }];
   }).sort((a, b) => Number(b.open) - Number(a.open) || a.opensAt - b.opensAt);
 }
