@@ -2805,26 +2805,6 @@ export function TradingDashboard() {
         </aside>
 
         <section className="chart-area">
-          {activeNavigationSection === "trade" && <section className="live-index-strip chart-index-strip" aria-label="Live Indian market indices">
-            {LIVE_INDEX_TICKERS.map((item) => {
-              const quote = marketQuotes[item.instrumentKey];
-              const isFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[item.instrumentKey] ?? 0) <= 45_000);
-              const isLive = isFresh && marketStatus.isOpen && feedStatus.mode === "live";
-              const change = quote?.changePercent ?? 0;
-              const points = quote?.netChange ?? 0;
-              return (
-                <button type="button" className={isLive ? "live" : "stale"} key={item.instrumentKey} title={isLive ? `Open ${item.label} live chart` : `Open ${item.label} chart`} onClick={() => {
-                  openNavigationSection("trade");
-                  chooseTradeInstrument({ symbol: item.symbol, name: item.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change, instrumentKey: item.instrumentKey, categories: [], assetType: "INDEX" });
-                }}>
-                  <span>{item.label}</span>
-                  <b>{quote ? quote.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}</b>
-                  <small className={points >= 0 ? "positive" : "negative"}>{quote ? `${points >= 0 ? "+" : ""}${points.toFixed(2)}` : "—"}</small>
-                  <em className={change >= 0 ? "positive" : "negative"}>{quote ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%` : "Live"}</em>
-                </button>
-              );
-            })}
-          </section>}
           <section className="trade-cockpit" aria-label="Trade workspace controls">
           <div className="instrument-header">
             <div className="trade-identity-cluster">

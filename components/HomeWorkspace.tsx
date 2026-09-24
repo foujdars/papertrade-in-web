@@ -84,7 +84,7 @@ export function HomeWorkspace({
   onOpenPnl,
   onOpenStock,
   preferenceOwner='guest', favouriteSymbols=[],
-  realisedToday=0, openChangeToday=0, sessionLabel="Checking session", sessionMessage="", attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
+  realisedToday=0, openChangeToday=0, attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
@@ -226,15 +226,16 @@ export function HomeWorkspace({
         </section>
 
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
-          <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
-          <div className="home-index-grid">
+          <div className="home-index-grid" aria-label="Indian market indices">
             {indices.map((index) => {
               const positive = (index.points ?? 0) >= 0;
+              const up = (index.changePercent ?? 0) >= 0;
               return (
-                <button key={index.symbol} className="home-index-card" onClick={() => onOpenStock(index.symbol)}>
-                  <span><b>{index.label}</b><i className={index.live ? "live" : ""}>{index.price===null?"—":index.live ? "LIVE" : "LAST"}</i></span>
-                  <strong>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong>
-                  <small className={index.points===null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "Quote unavailable" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${(index.changePercent ?? 0) >= 0 ? "+" : ""}${(index.changePercent ?? 0).toFixed(2)}%`}</small>
+                <button key={index.symbol} className="home-index-card" data-live={index.live ? "true" : "false"} onClick={() => onOpenStock(index.symbol)}>
+                  <span>{index.label}</span>
+                  <b>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
+                  <small className={index.points === null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "—" : `${positive ? "+" : ""}${index.points.toFixed(2)}`}</small>
+                  <em className={index.changePercent === null ? "" : up ? "positive" : "negative"}>{index.changePercent === null ? "" : `${up ? "+" : ""}${index.changePercent.toFixed(2)}%`}</em>
                 </button>
               );
             })}

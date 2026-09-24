@@ -29,7 +29,7 @@ test("server-renders only the full-screen disclaimer before the home dashboard",
   assert.doesNotMatch(html, /home-hero-actions|home-market-orbit|Check the market pulse, practise a setup/);
   assert.doesNotMatch(html, /IPO RADAR|Continue where you left off|No activity yet/);
   const dashboard = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
-  assert.match(dashboard, /Market pulse/);
+  assert.match(dashboard, /Indian market indices/);
   assert.match(dashboard, /Needs attention/);
   assert.match(dashboard, /Continue your chart/);
   assert.match(dashboard, /Search Indian stocks and indices/);
@@ -178,7 +178,7 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(dashboard, /NSE_INDEX\|Nifty 50/);
   assert.match(dashboard, /NSE_INDEX\|Nifty Bank/);
   assert.match(dashboard, /BSE_INDEX\|SENSEX/);
-  assert.match(dashboard, /live-index-strip/);
+  assert.doesNotMatch(dashboard, /live-index-strip/);
   assert.match(dashboard, /quote\?\.netChange/);
   assert.match(dashboard, /assetType: "INDEX"/);
   assert.match(dashboard, /DEFAULT_RISK_AMOUNT = 2_000/);
