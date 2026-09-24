@@ -94,3 +94,33 @@ html, body { touch-action: pan-x pan-y; }
   }
   .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger small { font-size: 15px; font-weight: 750; letter-spacing: -.04em; }
 }
+
+/* Symbol actions stay with the name. Chart actions sit apart on the right. */
+.terminal-shell .trade-cockpit .desktop-symbol-trigger { flex: 0 1 auto; margin-right: 6px; }
+.terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star, .chart-compare-link, .chart-derivatives-link) {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  margin: 0 2px;
+  border: 1px solid color-mix(in srgb, var(--line, #d7dce8) 85%, transparent);
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  color: #5d6780;
+  box-shadow: none;
+}
+.terminal-shell .trade-cockpit .desktop-chart-symbol .chart-watchlist-star.saved { color: var(--purple, #753bce); background: var(--purple-soft, #f3eaff); border-color: transparent; }
+.terminal-shell .trade-cockpit .desktop-chart-symbol .chart-compare-link.active { border-radius: 50%; }
+.terminal-shell .trade-cockpit .desktop-chart-symbol .chart-style-link { margin-left: auto; }
+
+/* Selected timeframe row stays one purple bar, including the star. */
+.terminal-shell .timeframe-menu .timeframe-groups .timeframe-line > button,
+.terminal-shell .timeframe-menu .timeframe-groups button.timeframe-star {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  min-height: 0;
+}
+.terminal-shell .timeframe-menu .timeframe-line.active { background: var(--purple, #753bce); color: #fff; }
+.terminal-shell .timeframe-menu .timeframe-line.active > button.timeframe-star { background: transparent; color: #fff; }
