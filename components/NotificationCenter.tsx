@@ -83,7 +83,7 @@ export function NotificationCenter() {
                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
               </div>
             </article>)}
-            {!items.length && <div className="notification-empty"><Bell size={28} /><b>No alerts yet</b><span>Stop-loss, target, portfolio and IPO alerts will appear here.</span></div>}
+            {!items.length && <div className="notification-empty"><Bell size={28} /><b>No alerts yet</b><span>Stop-loss, target, portfolio, IPO and market-session alerts will appear here.</span></div>}
           </div>
         </section>
       </>}

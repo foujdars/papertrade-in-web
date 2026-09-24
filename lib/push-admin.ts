@@ -23,7 +23,7 @@ export async function removeUserPushDevices(userId: string) {
   const { db, messaging } = await pushServices();
   const devices = await db.collection("notificationDevices").where("userId", "==", userId).get();
   for (const device of devices.docs) {
-    for (const topic of ["papertrade-ipo-v3", "papertrade-allotment-v3"]) {
+    for (const topic of ["papertrade-ipo-v3", "papertrade-allotment-v3", "papertrade-sessions-v1"]) {
       const result = await messaging.unsubscribeFromTopic(device.data().token, topic);
       if (result.failureCount) throw new Error("Notification removal failed");
     }

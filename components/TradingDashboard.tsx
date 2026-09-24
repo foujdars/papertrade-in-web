@@ -35,6 +35,7 @@ import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspa
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { IpoWorkspace } from "@/components/IpoWorkspace";
 import { PushNotificationBridge } from "./PushNotificationBridge";
+import { SessionOpenAlerts } from "./SessionOpenAlerts";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
@@ -2705,6 +2706,7 @@ export function TradingDashboard() {
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
+      <SessionOpenAlerts />
       <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />

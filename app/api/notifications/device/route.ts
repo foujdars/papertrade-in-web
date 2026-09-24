@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const existing = await ref.get();
     if (existing.exists && existing.data()?.userId !== data.user.id) return Response.json({error:"This device registration belongs to another session. Sign out and reconnect."},{status:403});
     const preferences = notificationPreferences(body.preferences), paused = preferences.pausedUntil > Date.now();
-    for (const [topic, on] of [["papertrade-ipo-v3", preferences.ipo], ["papertrade-allotment-v3", preferences.allotment]] as const) {
+    for (const [topic, on] of [["papertrade-ipo-v3", preferences.ipo], ["papertrade-allotment-v3", preferences.allotment], ["papertrade-sessions-v1", preferences.sessions]] as const) {
       const result = !body.remove && on && !paused
         ? await messaging.subscribeToTopic(body.token, topic)
         : await messaging.unsubscribeFromTopic(body.token, topic);

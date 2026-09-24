@@ -129,6 +129,16 @@ test("closed-app technical notifications require trade consent, hide amounts and
   assert.equal(worker.shown[1].data.url, '/');
 });
 
+test("session opens require the sessions preference and stay audible overnight", async () => {
+  const off = await workerHarness({ ipo: true });
+  await off.push(push({ kind: "session", id: "session-london-2026-01-06", title: "London session is open" }));
+  assert.equal(off.shown.length, 0);
+  const on = await workerHarness({ sessions: true });
+  await on.push(push({ kind: "session", id: "session-london-2026-01-06", title: "London session is open" }));
+  assert.equal(on.shown.length, 1);
+  assert.equal(on.shown[0].silent, false);
+});
+
 test("browser push configuration rejects placeholders and requires Firebase-shaped public IDs", async () => {
   const route=await readFile(new URL("../app/api/notifications/config/route.ts",import.meta.url),"utf8");
   assert.match(route,/\^AIza/);

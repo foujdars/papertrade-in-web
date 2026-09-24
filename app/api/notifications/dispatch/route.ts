@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { pushConfigured, pushServices, sendPush } from "@/lib/push-admin";
 import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, type PushNotice } from "@/lib/notification-policy";
+import { sessionOpenNotice } from "@/lib/market-sessions";
 import { loadAllotments } from "@/lib/ipo-allotment-server";
 import { GET as getIpos } from "@/app/api/upstox/ipos/route";
 import type { IpoListResponse } from "@/lib/ipo";
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
     const previous = saved.data()?.allotments || {}, day = indiaClock(now).day;
     const ipos = response.ipos || [], events: PushNotice[] = [];
     const digest = ipoDigest(ipos, now); if (digest) events.push(digest);
+    const opened = sessionOpenNotice(now); if (opened) events.push(opened);
     // First deployment records a baseline: it must not broadcast old results.
     const newResults = saved.exists ? allotments.allotments.filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
     const released = allotmentNotice(newResults, now); if (released) events.push(released);
@@ -47,7 +49,7 @@ export async function GET(request: Request) {
       // An ambiguous network outcome is not blindly resent. Device IDs also dedupe.
       await doc.ref.update({ status: "sending", attemptedAt: Date.now() });
       try {
-        await sendPush(notice, { topic: notice.kind === "allotment" ? "papertrade-allotment-v3" : "papertrade-ipo-v3" });
+        await sendPush(notice, { topic: notice.kind === "allotment" ? "papertrade-allotment-v3" : notice.kind === "session" ? "papertrade-sessions-v1" : "papertrade-ipo-v3" });
         await doc.ref.update({ status:"sent" }); sent++;
         if (notice.id.startsWith("ipo-")) await db.doc(`notificationCalendar/${day}`).set({ count: FieldValue.increment(1) }, { merge:true });
       } catch { await doc.ref.update({status:"needs-review"}); }
@@ -61,7 +63,7 @@ export async function GET(request: Request) {
     for (const device of devices.docs) {
       const data = device.data(), preferences = notificationPreferences(data.preferences);
       if (now - data.lastActive > 90 * 86400000) {
-        for (const topic of ["papertrade-ipo-v3","papertrade-allotment-v3"]) {
+        for (const topic of ["papertrade-ipo-v3","papertrade-allotment-v3","papertrade-sessions-v1"]) {
           const result = await messaging.unsubscribeFromTopic(data.token,topic);
           if (result.failureCount) throw new Error("Device cleanup failed");
         }
@@ -69,7 +71,7 @@ export async function GET(request: Request) {
       }
       if (preferences.pausedUntil > now) continue;
       if (data.preferences?.pausedUntil > 0 && data.preferences.pausedUntil <= now) {
-        for (const [topic,on] of [["papertrade-ipo-v3",preferences.ipo],["papertrade-allotment-v3",preferences.allotment]] as const) if(on) {
+        for (const [topic,on] of [["papertrade-ipo-v3",preferences.ipo],["papertrade-allotment-v3",preferences.allotment],["papertrade-sessions-v1",preferences.sessions]] as const) if(on) {
           const result = await messaging.subscribeToTopic(data.token,topic);
           if (result.failureCount) throw new Error("Could not resume notifications");
         }

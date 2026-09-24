@@ -1,9 +1,9 @@
 import type { IpoSummary } from "./ipo";
 import type { IpoAllotment } from "./ipo-allotment";
 
-export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; hideAmounts: boolean; pausedUntil: number };
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: false, practice: false, hideAmounts: true, pausedUntil: 0 };
-export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade"; expiresAt: number; silent: boolean };
+export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; hideAmounts: boolean; pausedUntil: number };
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: false, practice: false, sessions: true, hideAmounts: true, pausedUntil: 0 };
+export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
 export function notificationPreferences(value: unknown): NotificationPreferences {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
   return Object.fromEntries(Object.entries(DEFAULT_NOTIFICATION_PREFERENCES).map(([key, fallback]) => [key, key === "pausedUntil" ? typeof input[key] === "number" && Number.isFinite(input[key]) ? Math.max(0, Math.min(input[key] as number, Date.now() + 7 * 86400000)) : 0 : typeof input[key] === "boolean" ? input[key] : fallback])) as NotificationPreferences;
