@@ -141,5 +141,6 @@
 .timeframe-menu .timeframe-line.active .timeframe-star.saved { color: #fff; }
 .chart-session-shade { position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; }
 .chart-session-chip { position: absolute; z-index: 3; top: 52px; left: 12px; max-width: calc(100% - 86px); padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--line, #e4e7ef) 80%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 86%, transparent); color: var(--muted, #65708a); font: inherit; font-size: 10px; font-weight: 700; line-height: 1.4; text-align: left; cursor: pointer; pointer-events: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-symbol-legend > .chart-session-chip { position: static; z-index: auto; top: auto; left: auto; display: inline-block; max-width: min(100%, 220px); margin-top: 2px; }
 .chart-session-chip.is-open { color: var(--purple, #753bce); }
 .chart-session-chip.shades-off { border-style: dashed; opacity: 0.72; }

@@ -2447,7 +2447,6 @@ export function MarketChart({
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
-        {!isReplay && <SessionBoard variant="chip" shadesOn={sessionShadesOn} onToggleShades={() => setSessionShadesOn((on) => !on)} />}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
@@ -2559,6 +2558,7 @@ export function MarketChart({
               })}
             </div>
           )}
+          {!isReplay && <SessionBoard variant="chip" shadesOn={sessionShadesOn} onToggleShades={() => setSessionShadesOn((on) => !on)} />}
         </div>
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
