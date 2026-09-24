@@ -63,7 +63,6 @@ export type HomeRiskSummary = {
 export function HomeWorkspace({
   indices,
   feedLive,
-  balance,
   globalWallet,
   globalWalletError,
   globalAvailable,
@@ -71,7 +70,6 @@ export function HomeWorkspace({
   globalOpenOrders,
   globalOpenPnl,
   globalPnlComplete,
-  onAddCash,
   todayPnl,
   holdingsCount,
   openPositionsCount,
@@ -246,16 +244,6 @@ export function HomeWorkspace({
 
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
-        <section className="home-wallet-card" aria-label={activeMarket === 'india' ? 'Indian rupee practice wallet' : 'Global dollar practice wallet'}>
-          <div className="home-wallet-heading"><span><WalletCards size={18}/>{activeMarket === 'india' ? 'Indian wallet' : 'Global wallet'}<em>{activeMarket === 'india' ? 'INR' : 'USD'}</em></span><button disabled={!preferencesReady} aria-label={privateBalances ? 'Show wallet balances' : 'Hide wallet balances'} aria-pressed={privateBalances} onClick={() => updatePreferences({ ...preferences, privateBalances: !privateBalances })}>{privateBalances ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
-          <small className="home-wallet-label">PRACTICE BALANCE</small>
-          <strong className="home-wallet-amount">{privateBalances ? '••••••' : activeMarket === 'india' ? formatInr(balance) : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong>
-          <div className="home-wallet-actions"><span>{activeMarket === 'india' ? 'Available for Indian trading' : `Available: ${privateBalances ? '••••' : globalAvailable === null ? '—' : formatUsd(globalAvailable)}`}</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={17}/> Add cash</button></div>
-          <div className="home-wallet-other"><span>{activeMarket === 'india' ? 'Global wallet' : 'Indian wallet'}</span><b>{privateBalances ? '••••' : activeMarket === 'global' ? formatInr(balance) : globalWallet === null ? '—' : formatUsd(globalWallet)}</b><small>Separate balance</small></div>
-        </section>
-
-        <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>
-
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<EyeOff size={18}/>:<Eye size={18}/>}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
@@ -285,6 +273,7 @@ export function HomeWorkspace({
           </section>}
 
         </div>
+        <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}

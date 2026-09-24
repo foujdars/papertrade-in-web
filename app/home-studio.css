@@ -136,3 +136,30 @@
   .terminal-shell .home-studio .home-index-card { padding-inline: 7px; }
   .terminal-shell .home-studio .home-index-card strong { font-size: 16px; }
 }
+.terminal-shell .home-studio .home-pulse-first { margin-top: 8px; }
+.terminal-shell .home-studio .home-pulse-first > header,
+.terminal-shell .home-studio .home-portfolio-card > header { min-height: 32px; }
+.terminal-shell .home-studio .home-index-grid { padding: 0 2px 4px; }
+.terminal-shell .home-studio .home-index-card { min-height: 0; padding: 2px 8px 4px; gap: 1px; }
+.terminal-shell .home-studio .home-index-card time { display: none; }
+.terminal-shell .home-studio .home-index-card strong { font-size: 15px; line-height: 1.15; }
+.terminal-shell .home-studio .home-index-card small { font-size: 8px; line-height: 1.2; }
+.terminal-shell .home-studio .home-session-board span,
+.terminal-shell .home-studio .home-session-board > button { min-height: 26px; height: 26px; }
+.terminal-shell .home-studio .home-pulse-section .home-session-board { padding-bottom: 6px; }
+.terminal-shell .home-studio .home-market-chooser { margin: 8px 0; }
+.terminal-shell .home-studio .home-market-chooser > button { min-height: 44px; padding: 6px 10px; }
+.terminal-shell .home-studio .home-portfolio-value { min-height: 0; padding: 0 12px 6px; }
+.terminal-shell .home-studio .home-portfolio-value strong { font-size: 22px; }
+.terminal-shell .home-studio .home-today-pnl { min-height: 0; }
+.terminal-shell .home-studio .home-pnl-split { gap: 6px; margin: 0 10px 8px; }
+.terminal-shell .home-studio .home-pnl-split button { min-height: 42px; padding: 6px 16px 6px 8px; }
+.terminal-shell .home-studio .home-portfolio-stats { padding: 0 10px 8px; }
+.terminal-shell .home-studio .home-portfolio-stats button { min-height: 38px; }
+.terminal-shell .home-studio .home-risk-meter { margin: 0 10px 8px; padding: 7px 8px; }
+.terminal-shell .home-studio .home-global-balance { min-height: 0; }
+.terminal-shell .home-studio .home-resume-card { min-height: 64px; padding: 10px 12px; margin-top: 10px; }
+.header-wallet-button { display: none; }
+@media (max-width: 940px) {
+  .terminal-shell .top-actions > .header-wallet-button { display: grid !important; width: 40px; height: 40px; min-width: 40px; place-items: center; padding: 0; border-radius: 11px; }
+}

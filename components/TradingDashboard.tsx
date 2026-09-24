@@ -39,6 +39,7 @@ import { SessionOpenAlerts } from "./SessionOpenAlerts";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
+import { homePreferenceKey } from '@/lib/home-preferences';
 import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { GLOBAL_CHART_INSTRUMENTS, deltaOptionSymbolFromInstrumentKey, deltaSymbolFromInstrumentKey, isGlobalInstrumentKey, type PerpQuote, type PerpSymbol } from '@/lib/global-markets';
@@ -1986,6 +1987,14 @@ export function TradingDashboard() {
     setFundsOpen(true);
   }
 
+  function openHeaderWallet() {
+    if (selectedDeltaChartSymbol && activeNavigationSection === "trade") { openFunds("USD"); return; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(homePreferenceKey(user?.id ?? "guest")) ?? "null") as { market?: string } | null;
+      openFunds(saved?.market === "global" ? "USD" : "INR");
+    } catch { openFunds("INR"); }
+  }
+
   function closeGlobalChartPosition() {
     const symbol = selectedDeltaChartSymbol;
     if (!symbol) return;
@@ -2745,6 +2754,7 @@ export function TradingDashboard() {
               </section>
             </>}
           </div>
+          <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
