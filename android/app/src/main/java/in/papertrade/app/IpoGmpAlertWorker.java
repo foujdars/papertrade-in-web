@@ -169,7 +169,6 @@ public class IpoGmpAlertWorker extends Worker {
         );
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_papertrade_current)
-            .setLargeIcon(NotificationDelivery.logo(context))
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))

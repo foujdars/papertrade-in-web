@@ -75,23 +75,19 @@ test("PWA icon assets and cache versions are current", async () => {
   assert.match(layout, /apple-touch-icon-v120\.png/);
 });
 
-test("native notifications include the updated launcher image", async () => {
-  for (const name of ["IpoGmpAlertWorker", "IpoOpeningAlertWorker"]) {
+test("native notifications keep only the left status icon", async () => {
+  for (const name of ["IpoGmpAlertWorker", "IpoOpeningAlertWorker", "PriceAlertMonitorService", "NotificationDelivery"]) {
     const notificationSource = await source(`android/app/src/main/java/in/papertrade/app/${name}.java`);
-    assert.match(notificationSource, /setLargeIcon\(NotificationDelivery.logo\(context\)\)/);
+    assert.doesNotMatch(notificationSource, /setLargeIcon/);
     assert.match(notificationSource, /setSmallIcon\(R.drawable.ic_stat_papertrade_current\)/);
   }
   const delivery = await source("android/app/src/main/java/in/papertrade/app/NotificationDelivery.java");
-  assert.match(delivery, /setSmallIcon\(R.drawable.ic_stat_papertrade_current\)/);
-  assert.match(delivery, /setLargeIcon\(logo\(context\)\)/);
-  assert.match(delivery, /R.mipmap.ic_papertrade_current/);
+  assert.match(delivery, /notification_brand_revision", 0\) >= 124/);
   assert.match(delivery, /getActiveNotifications/);
   assert.match(delivery, /new NotificationCompat.Builder\(context, active.getNotification\(\)\)/);
   assert.match(delivery, /setOnlyAlertOnce\(true\).setSilent\(true\)/);
   assert.match(await source("android/app/src/main/java/in/papertrade/app/BrandUpdateReceiver.java"), /ACTION_MY_PACKAGE_REPLACED/);
-  assert.match(delivery, /drawable.draw\(new Canvas\(bitmap\)\)/);
   assert.match(await source("android/app/src/main/java/in/papertrade/app/TradeAlertPlugin.java"), /NotificationDelivery.show/);
-  assert.match(await source("android/app/src/main/java/in/papertrade/app/PriceAlertMonitorService.java"), /NotificationDelivery.logo/);
   const ipoWorker = await source("android/app/src/main/java/in/papertrade/app/IpoGmpAlertWorker.java");
   assert.match(ipoWorker, /last_closing_alert_date_/);
   assert.match(ipoWorker, /last day to apply/);

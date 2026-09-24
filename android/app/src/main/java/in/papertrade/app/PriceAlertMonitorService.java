@@ -208,7 +208,6 @@ public class PriceAlertMonitorService extends Service {
     private Notification buildMonitorNotification() {
         return new NotificationCompat.Builder(this, MONITOR_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_papertrade_current)
-            .setLargeIcon(NotificationDelivery.logo(this))
             .setContentTitle("PaperTrade protection is active")
             .setContentText("Targets and stop losses are being monitored in the background.")
             .setPriority(NotificationCompat.PRIORITY_LOW)
