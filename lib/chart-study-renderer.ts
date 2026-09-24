@@ -27,11 +27,11 @@ class OscillatorBands implements ISeriesPrimitive<Time>{
  update(){this.request?.();}
  paneViews():IPrimitivePaneView[]{return [{zOrder:()=>'bottom',renderer:()=>({draw:target=>target.useMediaCoordinateSpace(({context:ctx,mediaSize})=>{
   const series=this.series;if(!series)return;
-  const yTop=series.priceToCoordinate(this.ceiling),yUpper=series.priceToCoordinate(this.upper),yLower=series.priceToCoordinate(this.lower),yBot=series.priceToCoordinate(this.floor);
+  const yUpper=series.priceToCoordinate(this.upper),yLower=series.priceToCoordinate(this.lower);
   if(yUpper===null||yLower===null)return;
   ctx.save();
-  if(yTop!==null){ctx.fillStyle='rgba(240,68,88,.12)';ctx.fillRect(0,Math.min(yTop,yUpper),mediaSize.width,Math.abs(yUpper-yTop));}
-  if(yBot!==null){ctx.fillStyle='rgba(8,153,129,.13)';ctx.fillRect(0,Math.min(yLower,yBot),mediaSize.width,Math.abs(yBot-yLower));}
+  ctx.fillStyle='rgba(128,84,218,.16)';
+  ctx.fillRect(0,Math.min(yUpper,yLower),mediaSize.width,Math.abs(yLower-yUpper));
   ctx.restore();
  })})}];}
 }
@@ -53,7 +53,7 @@ export class ChartStudyRenderer {
      const plot=plots[i],isVolume=d.id==='volume',color=(isVolume&&i===1?c.colors[2]:c.colors[i%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
      const oscillator=d.id==='rsi';
      const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:(oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:(oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0),crosshairMarkerVisible:oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
-     if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:oscillator&&level!==50?'#7d8aa466':'#8c849b80',lineWidth:1,lineStyle:level===50?2:3,axisLabelVisible:oscillator&&level!==50,title:''});series.push(s);
+     if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:oscillator?'#8054da66':'#8c849b80',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});series.push(s);
     }
     const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
     if(d.id==='volume')this.chart.priceScale('volume',0).applyOptions({visible:false,autoScale:true,scaleMargins:{top:.79,bottom:0}});

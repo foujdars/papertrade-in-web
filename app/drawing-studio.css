@@ -56,16 +56,16 @@ html, body { touch-action: pan-x pan-y; }
   .terminal-shell .trade-cockpit .chart-controls::-webkit-scrollbar { display: none; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol { flex: 1 1 auto; min-width: 0; gap: 0; height: 36px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger {
-    flex: 0 1 auto;
-    min-width: 86px;
+    flex: 1 1 auto;
+    min-width: 0;
     height: 32px;
-    margin-right: 4px;
-    padding: 0 6px 0 3px;
+    margin-right: 2px;
+    padding: 0 4px 0 3px;
     gap: 5px;
     border-radius: 10px;
     background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
   }
-  .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { flex: 1 1 auto; min-width: 40px; max-width: 96px; font-size: 12px; font-weight: 750; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { flex: 1 1 auto; min-width: 0; max-width: none; font-size: 12px; font-weight: 750; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger .stock-logo { display: grid; width: 22px; height: 22px; flex: 0 0 22px; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link),
   .terminal-shell .trade-cockpit .chart-controls > .chart-tools-trigger {
@@ -92,5 +92,5 @@ html, body { touch-action: pan-x pan-y; }
     border-radius: 10px;
     background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
   }
-  .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { min-width: 46px; justify-content: center; }
+  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger small { font-size: 15px; font-weight: 750; letter-spacing: -.04em; }
 }

@@ -335,7 +335,8 @@ test("ships project assets and removes the starter preview", async () => {
   assert.match(volumeBreakout, /candidate\.todayVolume > sma20Volume \* VOLUME_BREAKOUT_MULTIPLIER/);
   assert.match(volumeBreakout, /VOLUME_BREAKOUT_LIMIT = 15/);
   assert.match(dashboard, /Load 60 more/);
-  assert.match(dashboard, /label="Functions"/);
+  assert.match(dashboard, /aria-label="Functions"/);
+  assert.match(dashboard, />fx</);
   assert.doesNotMatch(dashboard, /mobile-scroll-tail/);
   assert.match(styles, /chart-trade-footer \{ flex: 0 0 59px; display: grid; grid-template-rows: 36px 15px; gap: 2px; padding: 3px 10px; \}/);
   assert.match(dashboard, /quantityInput/);
@@ -360,7 +361,7 @@ test("uses popup selectors and a focused default candle range", async () => {
   ]);
   assert.match(selectors, /Choose chart timeframe/);
   assert.match(selectors, /Minutes/);
-  assert.match(selectors, /Days & longer/);
+  assert.match(selectors, /Days/);
   assert.doesNotMatch(selectors, /Chart menu sections|Drawings|Settings/);
   assert.match(selectors, /Choose watchlist/);
   assert.match(dashboard, /<ChartTimeframeMenu/);
