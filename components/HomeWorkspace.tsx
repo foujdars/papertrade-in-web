@@ -19,7 +19,6 @@ import {
   Layers3,
   Search,
   ShieldCheck,
-  Sparkles,
   TrendingUp,
   WalletCards,
   X,
@@ -62,7 +61,6 @@ export type HomeRiskSummary = {
 };
 
 export function HomeWorkspace({
-  firstName,
   indices,
   feedLive,
   balance,
@@ -120,9 +118,6 @@ export function HomeWorkspace({
   onOpenPnl: () => void;
   onOpenStock: (symbol: string) => void;
 }) {
-  const hour = Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const safeName = firstName?.trim().split(/\s+/)[0];
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<HomeStockOption | null>(null);
   const [quotes, setQuotes] = useState<Record<string, HomeQuote | null>>({});
@@ -211,8 +206,6 @@ export function HomeWorkspace({
       <div className="home-dashboard-scroll">
         <section className="home-hero">
           <div className="home-hero-copy">
-            <span className="home-kicker"><Sparkles size={14} /> {greeting}{safeName ? `, ${safeName}` : ""}</span>
-            <h1>{activeMarket === 'global' ? 'Explore global markets' : 'Your trading day'}</h1>
             <div className="home-global-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setSearchFocused(false); setSearch(''); } }} onKeyDown={event => { if(event.key==='Escape'){setSearchFocused(false);setSearch('');} }}>
               <Search size={18} />
               <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
@@ -229,23 +222,7 @@ export function HomeWorkspace({
           </div>
         </section>
 
-        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
-          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>Stocks &amp; F&amp;O</small></span><em>₹</em></button>
-          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
-        </section>
-
-        <SessionBoard />
-
-        <section className="home-wallet-card" aria-label={activeMarket === 'india' ? 'Indian rupee practice wallet' : 'Global dollar practice wallet'}>
-          <div className="home-wallet-heading"><span><WalletCards size={18}/>{activeMarket === 'india' ? 'Indian wallet' : 'Global wallet'}<em>{activeMarket === 'india' ? 'INR' : 'USD'}</em></span><button disabled={!preferencesReady} aria-label={privateBalances ? 'Show wallet balances' : 'Hide wallet balances'} aria-pressed={privateBalances} onClick={() => updatePreferences({ ...preferences, privateBalances: !privateBalances })}>{privateBalances ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
-          <small className="home-wallet-label">PRACTICE BALANCE</small>
-          <strong className="home-wallet-amount">{privateBalances ? '••••••' : activeMarket === 'india' ? formatInr(balance) : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong>
-          <div className="home-wallet-actions"><span>{activeMarket === 'india' ? 'Available for Indian trading' : `Available: ${privateBalances ? '••••' : globalAvailable === null ? '—' : formatUsd(globalAvailable)}`}</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={17}/> Add cash</button></div>
-          <div className="home-wallet-other"><span>{activeMarket === 'india' ? 'Global wallet' : 'Indian wallet'}</span><b>{privateBalances ? '••••' : activeMarket === 'global' ? formatInr(balance) : globalWallet === null ? '—' : formatUsd(globalWallet)}</b><small>Separate balance</small></div>
-        </section>
-
-        <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>
-        {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section">
+        {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
           <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
           <div className="home-index-grid">
             {indices.map((index) => {
@@ -259,7 +236,25 @@ export function HomeWorkspace({
               );
             })}
           </div>
+          <SessionBoard />
         </section>}
+
+        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
+          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>Stocks &amp; F&amp;O</small></span><em>₹</em></button>
+          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
+        </section>
+
+        {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
+
+        <section className="home-wallet-card" aria-label={activeMarket === 'india' ? 'Indian rupee practice wallet' : 'Global dollar practice wallet'}>
+          <div className="home-wallet-heading"><span><WalletCards size={18}/>{activeMarket === 'india' ? 'Indian wallet' : 'Global wallet'}<em>{activeMarket === 'india' ? 'INR' : 'USD'}</em></span><button disabled={!preferencesReady} aria-label={privateBalances ? 'Show wallet balances' : 'Hide wallet balances'} aria-pressed={privateBalances} onClick={() => updatePreferences({ ...preferences, privateBalances: !privateBalances })}>{privateBalances ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
+          <small className="home-wallet-label">PRACTICE BALANCE</small>
+          <strong className="home-wallet-amount">{privateBalances ? '••••••' : activeMarket === 'india' ? formatInr(balance) : globalWallet === null ? globalWalletError ? 'Unavailable' : 'Loading…' : formatUsd(globalWallet)}</strong>
+          <div className="home-wallet-actions"><span>{activeMarket === 'india' ? 'Available for Indian trading' : `Available: ${privateBalances ? '••••' : globalAvailable === null ? '—' : formatUsd(globalAvailable)}`}</span><button onClick={() => onAddCash(activeMarket === 'india' ? 'INR' : 'USD')}><Plus size={17}/> Add cash</button></div>
+          <div className="home-wallet-other"><span>{activeMarket === 'india' ? 'Global wallet' : 'Indian wallet'}</span><b>{privateBalances ? '••••' : activeMarket === 'global' ? formatInr(balance) : globalWallet === null ? '—' : formatUsd(globalWallet)}</b><small>Separate balance</small></div>
+        </section>
+
+        <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>
 
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">

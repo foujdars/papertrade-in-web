@@ -26,13 +26,14 @@ export function SessionBoard({ variant = "home" }: { variant?: "home" | "chip" }
     return <div className={`chart-session-chip${open ? " is-open" : ""}`} aria-label={label}>{label}</div>;
   }
   const board = sessionBoard(now);
+  const shortName: Record<string, string> = { sydney: "Sydney", tokyo: "Tokyo", india: "India", london: "London", newyork: "NY" };
   return (
     <section className="home-session-board" aria-label="Market sessions">
       <div>
         {board.map((item) => (
-          <span key={item.id} className={item.open ? "is-open" : ""}>
+          <span key={item.id} className={item.open ? "is-open" : ""} title={`${item.name} · ${item.label}`}>
             <i style={{ background: item.color }} />
-            <b>{item.name}</b>
+            <b>{shortName[item.id] ?? item.name}</b>
             <small>{item.label}</small>
           </span>
         ))}

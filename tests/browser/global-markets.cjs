@@ -81,7 +81,7 @@ const { chromium } = require(
     );
     await page.goto(process.env.GLOBAL_APP_URL || "http://localhost:3231");
     await page
-      .getByRole("heading", { name: "Your trading day" })
+      .getByRole("button", { name: /Indian markets/ })
       .waitFor({ timeout: 30000 });
     const initial = await page.evaluate(() => [
       localStorage.getItem("papertrade-orders"),

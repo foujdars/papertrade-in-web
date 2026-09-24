@@ -1,11 +1,10 @@
 /* Home is a compact starting point, not a second analytics dashboard. */
 .terminal-shell .home-hub { background:var(--soft); }
-.terminal-shell .home-hub .home-dashboard-scroll { padding-top:20px; }
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding-top: 10px; }
 .terminal-shell .home-hub .home-hero { display:block;overflow:visible;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--ink); }
 .terminal-shell .home-hub .home-hero::after { display:none; }
 .terminal-shell .home-hub .home-hero-copy { max-width:none; }
-.terminal-shell .home-hub .home-kicker { color:var(--muted);font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;margin:0 0 6px; }
-.terminal-shell .home-hub .home-hero h1 { font-size:25px;line-height:1.2;letter-spacing:-.7px;margin:0 0 16px;color:var(--ink); }
+.terminal-shell .home-hub .home-hero h1 { display:none; }
 .terminal-shell .home-hub .home-global-search { width:100%;min-height:48px;margin:0;box-shadow:none;background:var(--surface);border:1px solid var(--line);border-radius:14px;color:var(--ink); }
 .terminal-shell .home-hub .home-global-search input { font-size:16px;color:var(--ink); }
 .terminal-shell .home-hub .home-global-search>button { min-width:44px;min-height:44px; }
@@ -16,15 +15,18 @@
 .terminal-shell .home-hub .home-section>header b { font-size:13px; }
 .terminal-shell .home-hub .home-section>header button { min-height:48px;font-size:11px; }
 .terminal-shell .home-hub .home-session-label { font-size:10px;color:var(--muted);padding:5px 8px;background:var(--soft);border-radius:8px; }
-.terminal-shell .home-hub .home-session-board { display:flex; align-items:center; gap:8px; margin:14px 0 0; }
-.terminal-shell .home-hub .home-session-board > div { display:flex; gap:6px; min-width:0; overflow-x:auto; scrollbar-width:none; }
-.terminal-shell .home-hub .home-session-board > div::-webkit-scrollbar { display:none; }
-.terminal-shell .home-hub .home-session-board span { display:flex; align-items:center; gap:5px; flex:0 0 auto; min-height:32px; padding:0 9px; border-radius:999px; background:var(--surface); border:1px solid var(--line); color:var(--muted); }
-.terminal-shell .home-hub .home-session-board span.is-open { color:var(--ink); border-color:color-mix(in srgb, var(--purple, #753bce) 35%, var(--line)); }
-.terminal-shell .home-hub .home-session-board i { width:7px; height:7px; border-radius:50%; }
-.terminal-shell .home-hub .home-session-board b { color:var(--ink); font-size:11px; font-weight:750; }
-.terminal-shell .home-hub .home-session-board small { font-size:10px; }
-.terminal-shell .home-hub .home-session-board > button { display:grid; place-items:center; width:32px; height:32px; flex:0 0 32px; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--purple, #753bce); }
+.terminal-shell .home-hub .home-pulse-first { margin-top:12px; }
+.terminal-shell .home-hub .home-pulse-first > header { min-height:36px; }
+.terminal-shell .home-hub .home-session-board { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) 28px; gap:4px; align-items:stretch; margin:10px 0 0; }
+.terminal-shell .home-hub .home-session-board > div { display:contents; }
+.terminal-shell .home-hub .home-pulse-section .home-session-board { margin:0; padding:0 8px 10px; }
+.terminal-shell .home-hub .home-session-board span { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-width:0; min-height:34px; padding:3px 2px; border-radius:10px; background:var(--soft); border:1px solid transparent; color:var(--muted); }
+.terminal-shell .home-hub .home-session-board span.is-open { color:var(--ink); background:color-mix(in srgb, var(--purple, #753bce) 8%, var(--surface)); border-color:color-mix(in srgb, var(--purple, #753bce) 28%, var(--line)); }
+.terminal-shell .home-hub .home-session-board i { width:6px; height:6px; border-radius:50%; }
+.terminal-shell .home-hub .home-session-board b,
+.terminal-shell .home-hub .home-session-board small { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px; line-height:1.2; }
+.terminal-shell .home-hub .home-session-board b { color:var(--ink); font-weight:750; }
+.terminal-shell .home-hub .home-session-board > button { display:grid; place-items:center; width:28px; height:34px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--purple, #753bce); }
 .terminal-shell .home-hub .home-index-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0 4px 12px;overflow:visible; }
 .terminal-shell .home-hub .home-index-card { min-width:0;min-height:79px;border:0;border-right:1px solid var(--line);border-radius:0;background:none;padding:5px 10px;gap:5px; }
 .terminal-shell .home-hub .home-index-card:last-child { border-right:0; }
