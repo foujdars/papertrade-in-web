@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sessionOpenNotice } from "../lib/market-sessions.ts";
+import { sessionOpenNotice, sessionBoard, sessionChipLabel, sessionIntervals, zonedInstant } from "../lib/market-sessions.ts";
 import { notificationPreferences } from "../lib/notification-policy.ts";
 
 const at = (iso) => Date.parse(iso);
@@ -35,4 +35,19 @@ test("weekends and NSE holidays do not open the India session", () => {
 test("session alerts are on unless the user turns them off", () => {
   assert.equal(notificationPreferences(null).sessions, true);
   assert.equal(notificationPreferences({ sessions: false }).sessions, false);
+});
+
+test("the board marks overlapping sessions open and counts down to the next one", () => {
+  const now = at("2026-09-15T04:00:00Z");
+  assert.equal(zonedInstant("2026-09-15", 9, 15, "Asia/Kolkata"), at("2026-09-15T03:45:00Z"));
+  const board = sessionBoard(now);
+  const open = board.filter((item) => item.open).map((item) => item.id);
+  assert.deepEqual(open, ["sydney", "tokyo", "india"]);
+  const london = board.find((item) => item.id === "london");
+  assert.equal(london.open, false);
+  assert.equal(london.label, "in 3h");
+  assert.match(sessionChipLabel(now), /Sydney, Tokyo \+1 open · London in 3h/);
+  const shaded = sessionIntervals(now, now + 60_000).map((item) => item.id);
+  assert.ok(shaded.includes("india"));
+  assert.equal(shaded.includes("london"), false);
 });

@@ -46,6 +46,8 @@ import type {
 import type { Candle, Instrument } from "@/lib/market";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { ChartAlertLevels } from "@/components/ChartAlertLevels";
+import { SessionBoard } from "./SessionBoard";
+import { sessionIntervals } from "@/lib/market-sessions";
 import type { PriceTask } from "@/lib/price-actions";
 import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
 import { applyCandleTick, reconcileLiveCandles, validCandleTick, liveCandleBucket, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
@@ -593,6 +595,7 @@ export function MarketChart({
   const compareSeries = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const profileOverlay = useRef<ChartProfileOverlay | null>(null);
   const [chartGeneration, setChartGeneration] = useState(0);
+  const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string }>>([]);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
@@ -1986,6 +1989,51 @@ export function MarketChart({
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
+    if (!usesIntradayAxisShift(timeframe) || !chartGeneration) {
+      setSessionShades([]);
+      return;
+    }
+    let frame = 0;
+    const draw = () => {
+      const chart = chartApi.current;
+      const scale = chart?.timeScale();
+      const visible = scale?.getVisibleRange();
+      const width = chartHost.current?.clientWidth ?? 0;
+      if (!chart || !scale || !visible || width < 2) return;
+      const from = timeToTimestamp(visible.from);
+      const to = timeToTimestamp(visible.to);
+      const x1 = scale.timeToCoordinate(visible.from);
+      const x2 = scale.timeToCoordinate(visible.to);
+      if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || x1 == null || x2 == null) return;
+      const plotRight = chart.priceScale("right").width();
+      const at = (epochSeconds: number) => {
+        const shifted = epochSeconds + IST_OFFSET_SECONDS;
+        return x1 + ((shifted - from) / (to - from)) * (x2 - x1);
+      };
+      const next = sessionIntervals((from - IST_OFFSET_SECONDS) * 1000, (to - IST_OFFSET_SECONDS) * 1000).flatMap((interval) => {
+        const left = Math.max(0, Math.min(at(interval.start / 1000), at(interval.end / 1000)));
+        const right = Math.min(Math.max(0, width - plotRight), Math.max(at(interval.start / 1000), at(interval.end / 1000)));
+        if (right - left < 2) return [];
+        return [{ key: `${interval.id}-${interval.start}`, left, width: right - left, color: interval.color }];
+      });
+      setSessionShades(next);
+    };
+    const schedule = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(draw);
+    };
+    const scale = chartApi.current?.timeScale();
+    scale?.subscribeVisibleLogicalRangeChange(schedule);
+    const timer = window.setInterval(schedule, 60_000);
+    schedule();
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(timer);
+      scale?.unsubscribeVisibleLogicalRangeChange(schedule);
+    };
+  }, [chartGeneration, timeframe]);
+
+  useEffect(() => {
     const chart = chartApi.current;
     if (!chart || !chartGeneration) return;
     let cancelled = false;
@@ -2397,6 +2445,8 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
+        {!isReplay && <SessionBoard variant="chip" />}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}

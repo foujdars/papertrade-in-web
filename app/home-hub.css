@@ -16,6 +16,15 @@
 .terminal-shell .home-hub .home-section>header b { font-size:13px; }
 .terminal-shell .home-hub .home-section>header button { min-height:48px;font-size:11px; }
 .terminal-shell .home-hub .home-session-label { font-size:10px;color:var(--muted);padding:5px 8px;background:var(--soft);border-radius:8px; }
+.terminal-shell .home-hub .home-session-board { display:flex; align-items:center; gap:8px; margin:14px 0 0; }
+.terminal-shell .home-hub .home-session-board > div { display:flex; gap:6px; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.terminal-shell .home-hub .home-session-board > div::-webkit-scrollbar { display:none; }
+.terminal-shell .home-hub .home-session-board span { display:flex; align-items:center; gap:5px; flex:0 0 auto; min-height:32px; padding:0 9px; border-radius:999px; background:var(--surface); border:1px solid var(--line); color:var(--muted); }
+.terminal-shell .home-hub .home-session-board span.is-open { color:var(--ink); border-color:color-mix(in srgb, var(--purple, #753bce) 35%, var(--line)); }
+.terminal-shell .home-hub .home-session-board i { width:7px; height:7px; border-radius:50%; }
+.terminal-shell .home-hub .home-session-board b { color:var(--ink); font-size:11px; font-weight:750; }
+.terminal-shell .home-hub .home-session-board small { font-size:10px; }
+.terminal-shell .home-hub .home-session-board > button { display:grid; place-items:center; width:32px; height:32px; flex:0 0 32px; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--purple, #753bce); }
 .terminal-shell .home-hub .home-index-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0 4px 12px;overflow:visible; }
 .terminal-shell .home-hub .home-index-card { min-width:0;min-height:79px;border:0;border-right:1px solid var(--line);border-radius:0;background:none;padding:5px 10px;gap:5px; }
 .terminal-shell .home-hub .home-index-card:last-child { border-right:0; }
