@@ -234,8 +234,7 @@ export function HomeWorkspace({
                 <button key={index.symbol} className="home-index-card" data-live={index.live ? "true" : "false"} onClick={() => onOpenStock(index.symbol)}>
                   <span>{index.label}</span>
                   <b>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
-                  <small className={index.points === null ? "" : positive ? "positive" : "negative"}>{index.points === null ? "—" : `${positive ? "+" : ""}${index.points.toFixed(2)}`}</small>
-                  <em className={index.changePercent === null ? "" : up ? "positive" : "negative"}>{index.changePercent === null ? "" : `${up ? "+" : ""}${index.changePercent.toFixed(2)}%`}</em>
+                  <small className={index.points === null ? "" : positive ? "positive" : "negative"}>{index.points === null || index.changePercent === null ? "—" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${up ? "+" : ""}${index.changePercent.toFixed(2)}%`}</small>
                 </button>
               );
             })}
