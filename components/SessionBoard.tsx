@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { sessionBoard, sessionChipLabel } from "@/lib/market-sessions";
 import { NOTIFICATION_SETTINGS_EVENT, readNotificationPreferences, saveNotificationPreferences } from "@/lib/notification-preferences";
 
-export function SessionBoard({ variant = "home" }: { variant?: "home" | "chip" }) {
+export function SessionBoard({ variant = "home", shadesOn = true, onToggleShades }: { variant?: "home" | "chip"; shadesOn?: boolean; onToggleShades?: () => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [alerts, setAlerts] = useState(true);
   useEffect(() => {
@@ -23,7 +23,18 @@ export function SessionBoard({ variant = "home" }: { variant?: "home" | "chip" }
   if (variant === "chip") {
     const label = sessionChipLabel(now);
     const open = sessionBoard(now).some((item) => item.open);
-    return <div className={`chart-session-chip${open ? " is-open" : ""}`} aria-label={label}>{label}</div>;
+    return (
+      <button
+        type="button"
+        className={`chart-session-chip${open ? " is-open" : ""}${shadesOn ? "" : " shades-off"}`}
+        aria-pressed={shadesOn}
+        aria-label={`${label}. ${shadesOn ? "Hide session shading" : "Show session shading"}`}
+        title={shadesOn ? "Hide session shading" : "Show session shading"}
+        onClick={onToggleShades}
+      >
+        {label}
+      </button>
+    );
   }
   const board = sessionBoard(now);
   const shortName: Record<string, string> = { sydney: "Sydney", tokyo: "Tokyo", india: "India", london: "London", newyork: "NY" };

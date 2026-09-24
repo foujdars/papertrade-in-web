@@ -21,8 +21,9 @@ type Preferences = {
   comparedSymbols: ComparedSymbol[];
   compareMode: CompareMode;
   primaryLineColor: string;
+  sessionShades: boolean;
 };
-const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true, chartStyle: DEFAULT_CHART_STYLE, comparedSymbols: [], compareMode: "percent", primaryLineColor: "#2962FF" };
+const DEFAULTS: Preferences = { magnet: false, hidden: false, smcFilters: GROUPS, smcRange: false, smcLesson: "FVG", drawingFavorites: ["trend-line", "parallel-channel", "horizontal-ray", "rectangle", "vertical-line", "horizontal-line", "volume-profile", "anchored-volume-profile", "session-volume-profile", "price-range", "fib-retracement"], showDrawingFavorites: true, chartStyle: DEFAULT_CHART_STYLE, comparedSymbols: [], compareMode: "percent", primaryLineColor: "#2962FF", sessionShades: true };
 let snapshot = DEFAULTS;
 let cachedRaw: string | null | undefined;
 
@@ -41,6 +42,7 @@ function normalize(value: unknown): Preferences {
     comparedSymbols: sanitizeComparedSymbols(v.comparedSymbols),
     compareMode: isCompareMode(v.compareMode) ? v.compareMode : "percent",
     primaryLineColor: isCompareColor(v.primaryLineColor) ? v.primaryLineColor : "#2962FF",
+    sessionShades: v.sessionShades !== false,
   };
 }
 

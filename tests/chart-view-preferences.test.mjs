@@ -73,6 +73,9 @@ test("partial and invalid preferences are sanitized; defaults only fill missing 
   assert.deepEqual(use("comparedSymbols")[0], []);
   assert.equal(use("compareMode")[0], "percent");
   assert.equal(use("primaryLineColor")[0], "#2962FF");
+  assert.equal(use("sessionShades")[0], true);
+  use("sessionShades")[1](false);
+  assert.equal(d.load()("sessionShades")[0], false);
   d.external("bad json");
   assert.equal(use("hidden")[0], false);
   assert.equal(use("smcFilters")[0].length, 5);

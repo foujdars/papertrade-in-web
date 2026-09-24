@@ -541,6 +541,7 @@ export function MarketChart({
   const [primaryLineColor, setPrimaryLineColor] = useChartPreference("primaryLineColor");
   const [comparedSymbols, setComparedSymbols] = useChartPreference("comparedSymbols");
   const [compareMode] = useChartPreference("compareMode");
+  const [sessionShadesOn, setSessionShadesOn] = useChartPreference("sessionShades");
   const chartStyleRef = useRef(chartStyle);
   chartStyleRef.current = chartStyle;
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
@@ -1989,7 +1990,7 @@ export function MarketChart({
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
-    if (!usesIntradayAxisShift(timeframe) || !chartGeneration) {
+    if (!usesIntradayAxisShift(timeframe) || !chartGeneration || !sessionShadesOn) {
       setSessionShades([]);
       return;
     }
@@ -2031,7 +2032,7 @@ export function MarketChart({
       window.clearInterval(timer);
       scale?.unsubscribeVisibleLogicalRangeChange(schedule);
     };
-  }, [chartGeneration, timeframe]);
+  }, [chartGeneration, timeframe, sessionShadesOn]);
 
   useEffect(() => {
     const chart = chartApi.current;
@@ -2446,7 +2447,7 @@ export function MarketChart({
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
-        {!isReplay && <SessionBoard variant="chip" />}
+        {!isReplay && <SessionBoard variant="chip" shadesOn={sessionShadesOn} onToggleShades={() => setSessionShadesOn((on) => !on)} />}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
