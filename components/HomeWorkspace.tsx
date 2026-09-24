@@ -220,6 +220,11 @@ export function HomeWorkspace({
           </div>
         </section>
 
+        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
+          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>{'Stocks & F&O'}</small></span><em>₹</em></button>
+          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
+        </section>
+
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
           <header><span><TrendingUp size={17} /><b>Market pulse</b></span><span className="home-session-label" title={sessionMessage}>{sessionLabel}</span></header>
           <div className="home-index-grid">
@@ -236,11 +241,6 @@ export function HomeWorkspace({
           </div>
           <SessionBoard />
         </section>}
-
-        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
-          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>Stocks &amp; F&amp;O</small></span><em>₹</em></button>
-          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
-        </section>
 
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
