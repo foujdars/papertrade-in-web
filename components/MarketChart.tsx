@@ -2191,7 +2191,17 @@ export function MarketChart({
       const previousIndex = dataRef.current.findIndex((candle) => candle.time === previous.time);
       const nextIndex = dataRef.current.findIndex((candle) => candle.time === replayStartTime);
       replayFocusRef.current = { time: replayStartTime, mode };
-      if (nextIndex >= 0 && previousIndex >= 0 && nextIndex === previousIndex + 1) return;
+      if (nextIndex >= 0 && previousIndex >= 0 && nextIndex === previousIndex + 1) {
+        const playingChart = chartApi.current;
+        const range = playingChart?.timeScale().getVisibleLogicalRange();
+        if (!playingChart || !range) return;
+        const width = Math.max(12, range.to - range.from);
+        if (nextIndex <= range.from + width * 0.78) return;
+        const from = Math.max(-0.5, nextIndex - width * 0.62);
+        playingChart.timeScale().setVisibleLogicalRange({ from, to: from + width });
+        scheduleOverlayRefresh();
+        return;
+      }
     } else if (mode === "pick" && previous.time === replayStartTime) return;
     replayFocusRef.current = { time: replayStartTime, mode };
     const index = dataRef.current.findIndex((candle) => candle.time === replayStartTime);
@@ -2556,7 +2566,7 @@ export function MarketChart({
         </section></div>}
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replayMarkerX !== null && <>
-          <div className="replay-future-shade" style={{ left: replayMarkerX }} />
+          {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
           <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX }} aria-label="Drag to a starting candle; Enter to select" onPointerDown={event => {
             if (!replaySelecting) return;
             event.stopPropagation(); event.preventDefault();

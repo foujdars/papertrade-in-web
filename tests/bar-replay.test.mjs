@@ -44,7 +44,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
   assert.equal(chartProps().replaySelecting, true);
   assert.equal(chartProps().replayCandles.length, 4, "Choosing a candle keeps the later bars visible");
   chartProps().onReplayPlay();
-  assert.equal(chartProps().replayCandles.length, 4, "Play fades later candles instead of deleting them");
+  assert.deepEqual(chartProps().replayCandles.map((bar) => bar.time), [100, 200, 300], "Play removes the faded future candles");
   assert.equal(chartProps().replayStartTime, 300);
   assert.equal(chartProps().replayPrompt, false);
   assert.equal(states[4], true, "Playback starts");
@@ -120,7 +120,7 @@ test("original chart powers replay, hides future bars and never feeds replay pri
   const replay = await readFile(new URL("../components/BarReplay.tsx", import.meta.url), "utf8");
   const chart = await readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8");
   assert.match(replay, /<MarketChart/);
-  assert.match(replay, /const visible = candles/);
+  assert.match(replay, /selecting \? candles : candles\.slice\(0, cursor \+ 1\)/);
   assert.match(replay, /instrumentKey: key, timeframe, scope: "combined"/);
   assert.doesNotMatch(replay, /writePaperOrders|localStorage|onPrice=|onOrderSide=/);
   assert.match(chart, /if \(isReplay \|\| externalFeed \|\| historyRequest\) return;[\s\S]*?async function loadUpstoxCandles/);

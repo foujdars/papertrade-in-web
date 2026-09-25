@@ -1,7 +1,7 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, SlidersHorizontal } from "lucide-react";
 import { MarketChart, DEFAULT_CHART_INDICATORS, type ChartActionRequest, type DrawingTool } from "@/components/MarketChart";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
@@ -78,7 +78,7 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
     return () => window.clearTimeout(timer);
   }, [playing, selecting, cursor, candles.length, speed]);
 
-  const visible = candles;
+  const visible = useMemo(() => selecting ? candles : candles.slice(0, cursor + 1), [candles, selecting, cursor]);
   const current = candles[cursor];
   const ended = !selecting && candles.length > 0 && cursor >= candles.length - 1;
 
