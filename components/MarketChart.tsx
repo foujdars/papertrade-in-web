@@ -590,6 +590,7 @@ export function MarketChart({
   useTransientBack(priceMenu !== null, () => setPriceMenu(null));
   const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect, onPreview: onReplayPreview });
   const replayFocusRef = useRef<{ time: number | null; mode: "pick" | "play" | null }>({ time: null, mode: null });
+  const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
   const chartHost = useRef<HTMLDivElement>(null);
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
