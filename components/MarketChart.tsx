@@ -544,7 +544,7 @@ export function MarketChart({
   const [primaryLineColor, setPrimaryLineColor] = useChartPreference("primaryLineColor");
   const [comparedSymbols, setComparedSymbols] = useChartPreference("comparedSymbols");
   const [compareMode] = useChartPreference("compareMode");
-  const [sessionShadesOn, setSessionShadesOn] = useChartPreference("sessionShades");
+  const [hiddenSessionShades, setHiddenSessionShades] = useChartPreference("hiddenSessionShades");
   const chartStyleRef = useRef(chartStyle);
   chartStyleRef.current = chartStyle;
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
@@ -1996,7 +1996,7 @@ export function MarketChart({
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
-    if (!usesIntradayAxisShift(timeframe) || !chartGeneration || !sessionShadesOn) {
+    if (!usesIntradayAxisShift(timeframe) || !chartGeneration) {
       setSessionShades([]);
       return;
     }
@@ -2017,7 +2017,9 @@ export function MarketChart({
         const shifted = epochSeconds + IST_OFFSET_SECONDS;
         return x1 + ((shifted - from) / (to - from)) * (x2 - x1);
       };
+      const hidden = new Set(hiddenSessionShades);
       const next = sessionIntervals((from - IST_OFFSET_SECONDS) * 1000, (to - IST_OFFSET_SECONDS) * 1000).flatMap((interval) => {
+        if (hidden.has(interval.id)) return [];
         const left = Math.max(0, Math.min(at(interval.start / 1000), at(interval.end / 1000)));
         const right = Math.min(Math.max(0, width - plotRight), Math.max(at(interval.start / 1000), at(interval.end / 1000)));
         if (right - left < 2) return [];
@@ -2038,7 +2040,7 @@ export function MarketChart({
       window.clearInterval(timer);
       scale?.unsubscribeVisibleLogicalRangeChange(schedule);
     };
-  }, [chartGeneration, timeframe, sessionShadesOn]);
+  }, [chartGeneration, timeframe, hiddenSessionShades]);
 
   useEffect(() => {
     const chart = chartApi.current;
@@ -2565,8 +2567,8 @@ export function MarketChart({
               })}
             </div>
           )}
-          {!isReplay && <SessionBoard variant="chip" shadesOn={sessionShadesOn} onToggleShades={() => setSessionShadesOn((on) => !on)} />}
         </div>
+        {usesIntradayAxisShift(timeframe) && !isReplay && <SessionBoard variant="chip" hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">

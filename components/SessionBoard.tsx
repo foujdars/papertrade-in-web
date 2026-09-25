@@ -1,10 +1,10 @@
 "use client";
 import { Bell, BellOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { sessionBoard, sessionChipLabel } from "@/lib/market-sessions";
+import { sessionBoard } from "@/lib/market-sessions";
 import { NOTIFICATION_SETTINGS_EVENT, readNotificationPreferences, saveNotificationPreferences } from "@/lib/notification-preferences";
 
-export function SessionBoard({ variant = "home", shadesOn = true, onToggleShades }: { variant?: "home" | "chip"; shadesOn?: boolean; onToggleShades?: () => void }) {
+export function SessionBoard({ variant = "home", hiddenShades = [], onToggleShade }: { variant?: "home" | "chip"; hiddenShades?: string[]; onToggleShade?: (id: string) => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [alerts, setAlerts] = useState(true);
   useEffect(() => {
@@ -21,19 +21,27 @@ export function SessionBoard({ variant = "home", shadesOn = true, onToggleShades
     };
   }, []);
   if (variant === "chip") {
-    const label = sessionChipLabel(now);
-    const open = sessionBoard(now).some((item) => item.open);
+    const board = sessionBoard(now);
+    const shortName: Record<string, string> = { sydney: "Sydney", tokyo: "Tokyo", india: "India", london: "London", newyork: "NY" };
     return (
-      <button
-        type="button"
-        className={`chart-session-chip${open ? " is-open" : ""}${shadesOn ? "" : " shades-off"}`}
-        aria-pressed={shadesOn}
-        aria-label={`${label}. ${shadesOn ? "Hide session shading" : "Show session shading"}`}
-        title={shadesOn ? "Hide session shading" : "Show session shading"}
-        onClick={onToggleShades}
-      >
-        {label}
-      </button>
+      <div className="chart-session-row" role="group" aria-label="Session shading">
+        {board.map((item) => {
+          const shown = !hiddenShades.includes(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={`chart-session-chip${item.open ? " is-open" : ""}${shown ? "" : " shades-off"}`}
+              aria-pressed={shown}
+              aria-label={`${shown ? "Hide" : "Show"} ${item.name} session shade, ${item.period} IST${item.open ? ", live" : ""}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); onToggleShade?.(item.id); }}
+            >
+              {shortName[item.id] ?? item.name} {item.period}
+            </button>
+          );
+        })}
+      </div>
     );
   }
   const board = sessionBoard(now);
