@@ -13,8 +13,9 @@
   --bracket-stop: var(--red, #e23b4a);
 }
 .terminal-shell .chart-bracket-tool .risk-entry-line { border-top: 1px solid var(--bracket-entry); background: none; color: var(--bracket-entry); }
-.terminal-shell .chart-bracket-tool :is(.risk-target-line, .risk-stop-line) { height: 1px; border: 0; pointer-events: auto; cursor: ns-resize; touch-action: none; background: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 4px) left center / 5px 1px repeat-x; }
-.terminal-shell .chart-bracket-tool :is(.risk-target-line, .risk-stop-line)::before { content: ""; position: absolute; left: 0; right: 0; top: -14px; bottom: -14px; }
+.terminal-shell .chart-bracket-tool :is(.risk-target-line, .risk-stop-line) { height: 1px; border: 0; pointer-events: none; background: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 4px) left center / 5px 1px repeat-x; }
+.terminal-shell .chart-bracket-tool :is(.risk-target-line, .risk-stop-line) .bracket-pill { cursor: ns-resize; touch-action: none; }
+.terminal-shell .chart-bracket-tool :is(.risk-target-line, .risk-stop-line) .bracket-pill > :not(button) { cursor: ns-resize; }
 .terminal-shell .chart-bracket-tool .risk-target-line { color: var(--bracket-target); }
 .terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--bracket-stop); }
 .terminal-shell .chart-bracket-tool .bracket-pill { position: absolute; top: 50%; left: 0; width: max-content; max-width: calc(100% - 8px); transform: translateY(-50%); display: flex; height: 18px; border: 1px solid currentColor; border-radius: 0; background: color-mix(in srgb, var(--surface, #fff) 82%, transparent); color: inherit; overflow: hidden; pointer-events: auto; z-index: 2; }

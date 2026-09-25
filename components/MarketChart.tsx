@@ -2769,12 +2769,12 @@ export function MarketChart({
               const direction = (orderTool.side === "BUY" ? -1 : 1) * (level === "target" ? 1 : -1);
               const top = coordinate ?? (unset && riskCoordinates.entry !== null ? Math.max(64, Math.min((chartHost.current?.clientHeight ?? 400) - 52, riskCoordinates.entry + direction * 48)) : null);
               if (top === null) return null;
-              return <div key={level} className={`risk-line ${level === "target" ? "risk-target-line" : "risk-stop-line"} ${unset ? "bracket-unset" : ""}`} style={{ top }}
-                onPointerDown={(event) => beginRiskDrag(level, event)}
-                onPointerMove={(event) => moveRiskDrag(level, event)}
-                onPointerUp={(event) => endRiskDrag(level, event)}
-                onPointerCancel={(event) => endRiskDrag(level, event)}>
+              return <div key={level} className={`risk-line ${level === "target" ? "risk-target-line" : "risk-stop-line"} ${unset ? "bracket-unset" : ""}`} style={{ top }}>
                 <div className="bracket-pill" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : `${orderTool.currency ?? "INR"} ${Number(price.toFixed(10))}`}
+                  onPointerDown={(event) => beginRiskDrag(level, event)}
+                  onPointerMove={(event) => moveRiskDrag(level, event)}
+                  onPointerUp={(event) => endRiskDrag(level, event)}
+                  onPointerCancel={(event) => endRiskDrag(level, event)}
                   onKeyDown={(event) => {
                     if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
                     event.preventDefault();
