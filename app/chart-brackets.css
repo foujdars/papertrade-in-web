@@ -7,13 +7,15 @@
 .chart-selected-drawing { position: absolute; z-index: 24; top: 54px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface, white); box-shadow: 0 3px 12px #0001; }
 .chart-selected-drawing button { min-height: 32px; white-space: nowrap; padding: 4px 9px; border: 0; border-radius: 6px; color: var(--purple); background: transparent; font-size: 12px; cursor: pointer; }
 .chart-selected-drawing button:first-child { color: var(--red); }
-.terminal-shell .chart-bracket-tool .risk-entry-line { pointer-events: none; border-top: 1.5px solid var(--purple, #5b4bdb); color: var(--purple, #5b4bdb); }
-.terminal-shell .chart-bracket-tool .risk-target-line { pointer-events: none; border-top: 1.5px dotted var(--green, #0b9f7a); color: var(--green, #0b9f7a); }
-.terminal-shell .chart-bracket-tool .risk-stop-line { pointer-events: none; border-top: 1.5px dotted var(--red, #e23b4a); color: var(--red, #e23b4a); }
-.terminal-shell .chart-bracket-tool .bracket-pill { position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: flex; align-items: stretch; height: 28px; border: 1.5px solid currentColor; border-radius: 7px; background: var(--surface, #fff); color: inherit; overflow: hidden; pointer-events: auto; z-index: 2; }
-.terminal-shell .chart-bracket-tool .bracket-pill > * { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 0 8px; border: 0; border-right: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .risk-entry-line { pointer-events: none; height: 0; border-top: 1.5px solid var(--purple, #5b4bdb); background: none; color: var(--purple, #5b4bdb); }
+.terminal-shell .chart-bracket-tool .risk-target-line,
+.terminal-shell .chart-bracket-tool .risk-stop-line { pointer-events: none; height: 0; border-top: 0; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 6px) left center / 8px 1.5px repeat-x; }
+.terminal-shell .chart-bracket-tool .risk-target-line { color: var(--green, #0b9f7a); }
+.terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--red, #e23b4a); }
+.terminal-shell .chart-bracket-tool .bracket-pill { position: absolute; top: 50%; left: 0; right: auto; width: max-content; max-width: calc(100% - 92px); transform: translateY(-50%); display: flex; align-items: stretch; height: 26px; border: 1.5px solid currentColor; border-radius: 6px; background: var(--surface, #fff); color: inherit; overflow: hidden; pointer-events: auto; z-index: 2; }
+.terminal-shell .chart-bracket-tool .bracket-pill > * { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 26px; padding: 0 7px; border: 0; border-right: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
 .terminal-shell .chart-bracket-tool .bracket-pill > *:last-child { border-right: 0; }
-.terminal-shell .chart-bracket-tool .bracket-price { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; min-height: 24px; padding: 0 6px; border: 1.5px solid currentColor; border-radius: 4px; background: var(--surface, #fff); font-size: 11px; font-weight: 700; pointer-events: none; }
+.terminal-shell .chart-bracket-tool .bracket-price { position: absolute; left: auto; right: 0; top: 50%; width: max-content; transform: translateY(-50%); display: flex; align-items: center; min-height: 22px; padding: 0 6px; border: 1.5px solid currentColor; border-radius: 4px; background: var(--surface, #fff); font-size: 11px; font-weight: 700; font-style: normal; pointer-events: none; }
 .terminal-shell .chart-bracket-tool.bracket-hidden .risk-entry-line { border-color: transparent; }
 .terminal-shell .chart-bracket-tool .bracket-pill button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .terminal-shell .chart-trade-marker.stacked-marker { transform: translateX(-50%); width: auto; height: auto; }
