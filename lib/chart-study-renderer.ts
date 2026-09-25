@@ -39,7 +39,7 @@ export class ChartStudyRenderer {
  chart:IChartApi;bundles:Bundle[]=[];data:Candle[]=[];time:(epoch:number)=>Time;signature='';comparisons:Record<string,Candle[]>={};
  constructor(chart:IChartApi,time:(epoch:number)=>Time){this.chart=chart;this.time=time;}
  sync(enabled:Record<string,boolean>,settings:Record<string,StudyConfig>,timeframe:string,data:Candle[]){
-  const selected=STUDIES.filter(s=>s.id!=='smc'&&s.id!=='patterns'&&enabled[s.id]&&!s.unavailable).map(s=>({definition:s,config:settings[s.id]??studyDefaults(s.id)})).filter(s=>!s.config.hidden&&(!s.config.timeframes.length||s.config.timeframes.includes(timeframe))).map(s=>({...s,result:computeStudy(s.definition.id,data,s.config,this.comparisons[s.config.comparisonKey??''])}));
+  const selected=STUDIES.filter(s=>s.id!=='smc'&&s.id!=='patterns'&&s.id!=='opening-range'&&enabled[s.id]&&!s.unavailable).map(s=>({definition:s,config:settings[s.id]??studyDefaults(s.id)})).filter(s=>!s.config.hidden&&(!s.config.timeframes.length||s.config.timeframes.includes(timeframe))).map(s=>({...s,result:computeStudy(s.definition.id,data,s.config,this.comparisons[s.config.comparisonKey??''])}));
   const signature=JSON.stringify(selected.map(s=>[s.definition.id,s.config,s.result.plots.map(p=>[p.name,p.histogram,p.points]),s.result.range,s.result.levels]));
   if(signature!==this.signature){
    const range=this.chart.timeScale().getVisibleLogicalRange(),price=this.chart.priceScale('right'),auto=price.options().autoScale,priceRange=price.getVisibleRange();

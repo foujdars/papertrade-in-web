@@ -71,6 +71,7 @@ export const STUDIES:StudyDefinition[]=[
  make('obv','On Balance Volume','Volume',false,[],{volume:true}),
  make('sar','Parabolic SAR','Trend',true,[num('start','Start',.02,.001,1,.01),num('increment','Increment',.02,.001,1,.01),num('maximum','Maximum',.2,.01,1,.01)]),
  make('pivots','Pivot Points Standard','Price',true,[length(3,'Support/resistance levels','levels')],{note:'Classic pivots from the previous complete IST session. Daily charts use the previous daily candle.'}),
+ make('opening-range','Opening Range','Price',true,[],{note:'9:15–9:30 IST high and low, extended to 15:30. Needs a 15-minute chart or lower.'}),
  make('price-channel','Price Channel','Trend',true,[length(20)]),
  make('price-oscillator','Price Oscillator','Momentum',false,[length(12,'Fast length','fast'),length(26,'Slow length','slow')]),
  make('pvt','Price Volume Trend','Volume',false,[],{volume:true}),

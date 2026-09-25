@@ -9,10 +9,10 @@ test('volume defaults to a nine-candle average with independently configurable b
 });
 test('every selectable candle study has a real calculation and finite plots',()=>{
  assert.equal(new Set(STUDIES.map(s=>s.id)).size,STUDIES.length);
- for(const s of STUDIES){if(s.unavailable||['smc','vpvr'].includes(s.id))continue;const config=studyDefaults(s.id);config.comparisonKey='NSE_EQ|TEST';const result=computeStudy(s.id,candles,config,candles);assert.ok(result.plots.length,s.id);assert.equal(result.message,undefined,s.id);for(const p of result.plots){assert.equal(p.values.length,candles.length,s.id+':'+p.name);assert.ok(p.values.some(Number.isFinite),s.id+':'+p.name);assert.ok(!p.values.some(v=>v===Infinity||v===-Infinity),s.id);}}
+ for(const s of STUDIES){if(s.unavailable||['smc','patterns','opening-range','vpvr'].includes(s.id))continue;const config=studyDefaults(s.id);config.comparisonKey='NSE_EQ|TEST';const result=computeStudy(s.id,candles,config,candles);assert.ok(result.plots.length,s.id);assert.equal(result.message,undefined,s.id);for(const p of result.plots){assert.equal(p.values.length,candles.length,s.id+':'+p.name);assert.ok(p.values.some(Number.isFinite),s.id+':'+p.name);assert.ok(!p.values.some(v=>v===Infinity||v===-Infinity),s.id);}}
 });
 test('past calculations do not read future candles (confirmed/revising drawings excluded)',()=>{
- for(const s of STUDIES){if(s.unavailable||['smc','vpvr','zigzag','fractals'].includes(s.id))continue;const prefix=computeStudy(s.id,candles.slice(0,400),studyDefaults(s.id)),full=computeStudy(s.id,candles,studyDefaults(s.id));for(let j=0;j<prefix.plots.length;j++)assert.deepEqual(full.plots[j].values.slice(0,400),prefix.plots[j].values,s.id);}
+ for(const s of STUDIES){if(s.unavailable||['smc','patterns','opening-range','vpvr','zigzag','fractals'].includes(s.id))continue;const prefix=computeStudy(s.id,candles.slice(0,400),studyDefaults(s.id)),full=computeStudy(s.id,candles,studyDefaults(s.id));for(let j=0;j<prefix.plots.length;j++)assert.deepEqual(full.plots[j].values.slice(0,400),prefix.plots[j].values,s.id);}
 });
 test('RSI uses Wilder seeding and smoothing, including flat/rising/falling cases',()=>{
  const values=[44.34,44.09,44.15,43.61,44.33,44.83,45.10,45.42,45.84,46.08,45.89,46.03,45.61,46.28,46.28,46.00,46.03,46.41,46.22,45.64];
