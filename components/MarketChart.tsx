@@ -1305,7 +1305,7 @@ export function MarketChart({
       layout: {
         background: { type: ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
         textColor: neon ? "#a4adc7" : "#65708a",
-        attributionLogo: true,
+        attributionLogo: false,
         panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
       },
       grid: {
@@ -1457,7 +1457,7 @@ export function MarketChart({
           background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
           textColor: neon ? "#a4adc7" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
-          attributionLogo: true,
+          attributionLogo: false,
           panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
         grid: {
@@ -2613,7 +2613,7 @@ export function MarketChart({
         }} onClose={() => setEditingLine(null)} />}
         {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} triggerHost={indicatorHost} />}
-        {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} triggerHost={indicatorHost} onRemove={onRemoveIndicator ? () => onRemoveIndicator("patterns") : undefined} />}
+        {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} triggerHost={indicatorHost} onActivate={(x, y) => activateStudyRef.current("patterns", x, y)} />}
         {indicators["opening-range"] && !studySettings["opening-range"]?.hidden && <OpeningRange key={`${instrument.instrumentKey}:${timeframe}:opening-range`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} refreshRef={openingRangeRefreshRef} />}
         {indicators["previous-day"] && !studySettings["previous-day"]?.hidden && <PreviousDayLevels key={`${instrument.instrumentKey}:${timeframe}:previous-day`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={previousDayRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
@@ -2737,11 +2737,10 @@ export function MarketChart({
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <div className="bracket-entry-cluster">
-                {hiddenBracket !== entryKey && <button type="button" className="bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Set take profit and stop loss for this position" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>
-                  <span>{orderTool.quantity}</span><span aria-hidden="true">|</span><span>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</span>
-                </button>}
-                <button type="button" className="bracket-hide-trade" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                {onOrderToolExit && <button type="button" className="bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
+                <button type="button" className="bracket-box bracket-hide-trade" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                {hiddenBracket !== entryKey && <button type="button" className="bracket-box bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Position quantity" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{orderTool.quantity}</button>}
+                {hiddenBracket !== entryKey && <button type="button" className="bracket-box bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Position profit and loss" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</button>}
+                {onOrderToolExit && <button type="button" className="bracket-box bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
               </div>
             </div>}
             {hiddenBracket !== entryKey && (["target", "stopLoss"] as const).map((level) => {
@@ -2770,11 +2769,10 @@ export function MarketChart({
                     const next = tool.tickSize ? Number((Math.round(raw / step) * step).toFixed(10)) : Math.round(raw * 100) / 100;
                     if (next > 0) onOrderToolChange?.(level, next, true);
                   }}>
-                  <span>{orderTool.currency === "USD" ? level === "target" ? "TP" : "SL" : orderTool.quantity}</span><span aria-hidden="true">|</span><span>{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span>
+                  <span className="bracket-box">{orderTool.quantity}</span><span className="bracket-box">{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span>
                 </div>
               </div>;
             })}
-            {hiddenBracket !== entryKey && branchesOpen && <div className="bracket-help"><span>Drag the TP or SL box, not the dotted line</span></div>}
           </div>
         )}
       </div>

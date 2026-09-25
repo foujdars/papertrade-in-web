@@ -79,11 +79,9 @@
 .chart-indicator-strip b { display: none; }
 .terminal-shell .chart-smc-learn { position: static; display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; padding: 0; min-height: 22px; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--purple); font: inherit; font-size: 9px; white-space: nowrap; cursor: pointer; }
 .chart-smc-learn:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
-.chart-pattern-controls { display: inline-flex; align-items: center; gap: 1px; flex: 0 0 auto; }
-.chart-pattern-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 2px; border: 0; background: transparent; color: var(--purple); font: inherit; font-size: 9px; font-weight: 800; cursor: pointer; }
-.chart-pattern-chip span { color: var(--muted); font-weight: 700; }
-.chart-pattern-remove { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
-.chart-pattern-float { position: absolute; z-index: 6; top: 8px; right: 8px; }
+.chart-pattern-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 9px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.chart-pattern-chip i { width: 5px; height: 5px; border-radius: 50%; background: var(--purple, #8054d9); flex-shrink: 0; }
+.price-chart :is(a[href*="tradingview.com"], #tv-attr-logo) { display: none !important; }
 .candle-pattern-tag { position: absolute; z-index: 5; max-width: 92px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--ink); font: inherit; font-size: 8px; font-weight: 800; line-height: 1.4; white-space: nowrap; cursor: pointer; }
 .candle-pattern-tag.above { transform: translate(-50%, -120%); }
 .candle-pattern-tag.below { transform: translate(-50%, 6px); }
