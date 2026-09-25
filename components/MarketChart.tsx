@@ -1999,7 +1999,7 @@ export function MarketChart({
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
-    if (!usesIntradayAxisShift(timeframe) || !chartGeneration) {
+    if (!chartGeneration || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") {
       setSessionShades([]);
       return;
     }
@@ -2018,7 +2018,8 @@ export function MarketChart({
       const plotRight = chart.priceScale("right").width();
       const plotWidth = Math.max(0, width - plotRight);
       const step = /^(\d+)(m|h)$/.exec(timeframe);
-      const barSeconds = step ? Number(step[1]) * (step[2] === "h" ? 3600 : 60) : 300;
+      const barSeconds = step ? Number(step[1]) * (step[2] === "h" ? 3600 : 60) : 86_400;
+      const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
       const bars = dataRef.current;
       const edgeLabel = (ms: number) => {
         const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
@@ -2054,19 +2055,20 @@ export function MarketChart({
         return x + ((epochSeconds - anchor.time) / barSeconds) * spacing;
       };
       const hidden = new Set(hiddenSessionShades);
-      const next = sessionIntervals((from - IST_OFFSET_SECONDS) * 1000, (to - IST_OFFSET_SECONDS) * 1000).flatMap((interval) => {
+      const next = sessionIntervals((from - shift) * 1000, (to - shift) * 1000).flatMap((interval) => {
         if (hidden.has(interval.id)) return [];
         const startX = at(interval.start / 1000);
         const endX = at(interval.end / 1000);
         if (startX == null || endX == null) return [];
         const left = Math.max(0, Math.min(startX, endX));
         const right = Math.min(plotWidth, Math.max(startX, endX));
-        if (right - left < 2) return [];
-        const edges = [
+        const band = right - left;
+        if (band < 2) return [];
+        const edges = band >= 48 ? [
           startX >= 4 && startX <= plotWidth - 4 ? { x: startX, label: edgeLabel(interval.start) } : null,
           endX >= 4 && endX <= plotWidth - 4 ? { x: endX, label: edgeLabel(interval.end) } : null,
-        ].filter((edge): edge is { x: number; label: string } => edge !== null);
-        return [{ key: `${interval.id}-${interval.start}`, left, width: right - left, color: interval.color, edges }];
+        ].filter((edge): edge is { x: number; label: string } => edge !== null) : [];
+        return [{ key: `${interval.id}-${interval.start}`, left, width: band, color: interval.color, edges }];
       });
       setSessionShades(next);
     };
