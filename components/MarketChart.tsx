@@ -2604,7 +2604,7 @@ export function MarketChart({
           }}><span>↔</span></button>
           {replayPrompt && <div className="replay-start-popover" style={{ left: `clamp(90px, ${replayMarkerX}px, calc(100% - 90px))` }}>
             <small>{replayStartTime !== null ? new Date(replayStartTime * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} IST</small>
-            <button type="button" onClick={onReplayPlay}>Start from here</button>
+            <button type="button" onClick={onReplayPlay}>Play</button>
           </div>}
         </>}
         <div className="chart-symbol-legend lightweight-symbol-legend">
