@@ -54,6 +54,13 @@ function realBody(c: Bar) {
   return height > 0 && body(c) / height >= 0.45;
 }
 
+export const PATTERN_NAMES = Object.keys(NOTES);
+
+export function filterCandlePatterns(hits: CandlePatternHit[], bias: "all" | PatternBias, hidden: readonly string[]) {
+  const skip = new Set(hidden);
+  return hits.filter((hit) => (bias === "all" || hit.bias === bias) && !skip.has(hit.name));
+}
+
 export function findCandlePatterns(candles: Bar[]): CandlePatternHit[] {
   const hits: CandlePatternHit[] = [];
   const used = new Set<number>();

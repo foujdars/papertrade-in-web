@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findCandlePatterns } from "../lib/candle-patterns.ts";
+import { filterCandlePatterns, findCandlePatterns } from "../lib/candle-patterns.ts";
 
 const bar = (time, open, high, low, close) => ({ time, open, high, low, close });
 
@@ -29,6 +29,16 @@ test("names a bearish engulfing after a rise and keeps one label on that candle"
   const last = hits.filter((hit) => hit.time === 7);
   assert.deepEqual(last.map((hit) => hit.name), ["Bearish engulfing"]);
   assert.equal(last[0].bias, "bearish");
+});
+
+test("filter keeps the chosen direction and hides named patterns", () => {
+  const hits = [
+    { id: "a", name: "Hammer", bias: "bullish", time: 1, index: 0, note: "" },
+    { id: "b", name: "Doji", bias: "neutral", time: 2, index: 1, note: "" },
+    { id: "c", name: "Shooting star", bias: "bearish", time: 3, index: 2, note: "" },
+  ];
+  assert.deepEqual(filterCandlePatterns(hits, "bearish", []).map((hit) => hit.name), ["Shooting star"]);
+  assert.deepEqual(filterCandlePatterns(hits, "all", ["Doji"]).map((hit) => hit.name), ["Hammer", "Shooting star"]);
 });
 
 test("names a morning star and explains it", () => {
