@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import type { IChartApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import { findCandlePatterns, type CandlePatternHit } from "@/lib/candle-patterns";
 
@@ -11,7 +11,7 @@ const dateText = (time: number) => new Date(time * 1000).toLocaleString("en-IN",
 export function CandlePatterns({ candles, chart, series, timeframe, replay, refreshRef, triggerHost }: {
   candles: Candle[];
   chart: IChartApi | null;
-  series: ISeriesApi<"Candlestick"> | ISeriesApi<unknown> | null;
+  series: { priceToCoordinate: (price: number) => number | null } | null;
   timeframe: string;
   replay: boolean;
   refreshRef: MutableRefObject<(() => void) | null>;
