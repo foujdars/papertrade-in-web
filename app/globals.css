@@ -2678,3 +2678,9 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .market-discovery-panel .trend-stock-row > span:nth-child(3) { min-width: 78px; }
   .scanner-open-chart { width: 24px; height: 24px; border-radius: 8px; }
 }
+
+@media (max-width: 940px) {
+  .terminal-shell:not([data-section="home"]),
+  .terminal-shell[data-platform="android"]:not([data-section="home"]) { --mobile-header-height: env(safe-area-inset-top, 0px); }
+  .terminal-shell:not([data-section="home"]) > .topbar { flex-basis: var(--mobile-header-height); height: var(--mobile-header-height); min-height: 0; padding: 0; overflow: hidden; border: 0; visibility: hidden; pointer-events: none; }
+}
