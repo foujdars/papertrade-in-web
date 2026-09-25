@@ -21,6 +21,7 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
   style: ChartStyleId = "candles";
   data: Candle[] = [];
   timeframe = "5m";
+  dark = false;
 
   attached(params: SeriesAttachedParameter<Time>) {
     this.chart = params.chart;
@@ -34,10 +35,11 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
     this.request = undefined;
   }
 
-  update(style: ChartStyleId, data: Candle[], timeframe: string) {
+  update(style: ChartStyleId, data: Candle[], timeframe: string, dark = false) {
     this.style = style;
     this.data = data;
     this.timeframe = timeframe;
+    this.dark = dark;
     this.request?.();
   }
 
@@ -84,9 +86,10 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
       const ladder = footprintLadder(candle, rows);
       if (!ladder.length) continue;
       const area = volumeValueArea(ladder);
-      const max = Math.max(...ladder.map((row) => row.volume));
-      const cell = Math.min(62, Math.max(28, (spacing - 10) / 2));
+      const gap = 10;
+      const cell = Math.min(56, Math.max(26, (spacing - gap * 2 - 6) / 2));
       const font = Math.max(8, Math.min(12, Math.floor(pixel / rows * 0.42)));
+      const ink = "#1b2433";
       ctx.font = `700 ${font}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -100,19 +103,22 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
         const h = Math.max(8, Math.abs(rowBottom - rowTop) - 2);
         const poc = rowIndex === area.poc;
         const inValue = area.low >= 0 && rowIndex >= area.low && rowIndex <= area.high;
-        const strength = 0.28 + 0.62 * (row.volume / max);
-        this.paintFootprintCell(ctx, x - cell - 1, y, cell, h, poc ? "#1c1c1c" : inValue ? `rgba(190, 42, 62, ${strength})` : `rgba(240, 98, 112, ${strength * 0.72})`, compactVolume(row.sell), font);
-        this.paintFootprintCell(ctx, x + 1, y, cell, h, poc ? "#1c1c1c" : inValue ? `rgba(8, 122, 96, ${strength})` : `rgba(18, 168, 128, ${strength * 0.72})`, compactVolume(row.buy), font);
+        const sellFill = poc ? "#1c1c1c" : inValue ? "#f3a3ad" : "#f8d0d6";
+        const buyFill = poc ? "#1c1c1c" : inValue ? "#8fd9c2" : "#d5f3e8";
+        this.paintFootprintCell(ctx, x - gap - cell, y, cell, h, sellFill, compactVolume(row.sell), font, poc ? "#ffffff" : ink);
+        this.paintFootprintCell(ctx, x + gap, y, cell, h, buyFill, compactVolume(row.buy), font, poc ? "#ffffff" : ink);
         sellTotal += row.sell;
         buyTotal += row.buy;
         if (rowIndex === area.high || rowIndex === area.low) {
           const line = rowIndex === area.high ? Math.min(rowTop, rowBottom) : Math.max(rowTop, rowBottom);
           ctx.save();
-          ctx.strokeStyle = "rgba(36, 48, 73, .55)";
+          ctx.strokeStyle = this.dark ? "rgba(232, 236, 244, .55)" : "rgba(36, 48, 73, .45)";
           ctx.setLineDash([3, 3]);
           ctx.beginPath();
-          ctx.moveTo(x - cell - 1, line);
-          ctx.lineTo(x + cell + 1, line);
+          ctx.moveTo(x - gap - cell, line);
+          ctx.lineTo(x - gap, line);
+          ctx.moveTo(x + gap, line);
+          ctx.lineTo(x + gap + cell, line);
           ctx.stroke();
           ctx.restore();
         }
@@ -123,22 +129,22 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
         ctx.textBaseline = "top";
         ctx.textAlign = "right";
         ctx.fillStyle = "#d23b52";
-        ctx.fillText(compactVolume(sellTotal), x - 3, bottom + 4);
+        ctx.fillText(compactVolume(sellTotal), x - gap, bottom + 4);
         ctx.textAlign = "left";
         ctx.fillStyle = "#0c9a72";
-        ctx.fillText(compactVolume(buyTotal), x + 3, bottom + 4);
+        ctx.fillText(compactVolume(buyTotal), x + gap, bottom + 4);
       }
     }
   }
 
-  private paintFootprintCell(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, fill: string, label: string, font: number) {
+  private paintFootprintCell(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, fill: string, label: string, font: number, ink: string) {
     ctx.fillStyle = fill;
     ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = "rgba(255,255,255,.9)";
+    ctx.strokeStyle = this.dark ? "rgba(18, 16, 32, .45)" : "rgba(255,255,255,.92)";
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
     if (height >= font + 2 && width >= 24) {
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = ink;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, x + width / 2, y + height / 2);
@@ -151,16 +157,20 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
     const yOpen = this.series!.priceToCoordinate(open);
     const yClose = this.series!.priceToCoordinate(candle.close);
     if (yOpen === null || yClose === null) return;
-    ctx.strokeStyle = up ? "#00a67e" : "#f04458";
-    ctx.fillStyle = ctx.strokeStyle;
-    ctx.lineWidth = 1.5;
+    const color = up ? "#00a67e" : "#f04458";
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x, Math.min(yHigh, yLow));
     ctx.lineTo(x, Math.max(yHigh, yLow));
     ctx.stroke();
     const bodyTop = Math.min(yOpen, yClose);
-    const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
-    ctx.fillRect(x - 2.5, bodyTop, 5, bodyHeight);
+    const bodyHeight = Math.max(3, Math.abs(yClose - yOpen));
+    ctx.fillRect(x - 5, bodyTop, 10, bodyHeight);
+    ctx.strokeStyle = this.dark ? "rgba(255,255,255,.72)" : "rgba(20, 24, 36, .35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 5, bodyTop, 10, bodyHeight);
   }
 
 

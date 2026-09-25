@@ -1068,7 +1068,7 @@ export function MarketChart({
       hlcSeries.current.high.setData(source.map((candle) => ({ time: chartTimeFromEpoch(Number(candle.time), timeframe), value: candle.high })));
       hlcSeries.current.low.setData(source.map((candle) => ({ time: chartTimeFromEpoch(Number(candle.time), timeframe), value: candle.low })));
     }
-    profileOverlay.current?.update(style, candles, timeframe);
+    profileOverlay.current?.update(style, candles, timeframe, chartTheme === "neon");
   }
 
   function paintLastBar(candles = dataRef.current) {
@@ -1084,7 +1084,7 @@ export function MarketChart({
       hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
       hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
     }
-    profileOverlay.current?.update(style, candles, timeframe);
+    profileOverlay.current?.update(style, candles, timeframe, chartTheme === "neon");
   }
 
   function persistDrawings(pushHistory = false) {
