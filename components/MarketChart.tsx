@@ -2532,7 +2532,7 @@ export function MarketChart({
         </section></div>}
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replayMarkerX !== null && <>
-          {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
+          <div className="replay-future-shade" style={{ left: replayMarkerX }} />
           <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX }} aria-label="Drag to a starting candle; Enter to select" onPointerDown={event => {
             if (!replaySelecting) return;
             event.stopPropagation(); event.preventDefault();
