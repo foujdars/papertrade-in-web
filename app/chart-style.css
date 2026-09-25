@@ -30,7 +30,7 @@
 .chart-history-message { position: absolute; z-index: 10; bottom: 32px; left: 10px; max-width: calc(100% - 85px); padding: 0; color: var(--muted); background: transparent; font-size: 10px; pointer-events: none; text-shadow: 0 1px 1px var(--surface, white); }
 @media (max-width: 768px) {
   .terminal-shell .chart-statusbar { flex-wrap: wrap; height: auto; min-height: 27px; }
-  .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-status-clock { margin-left: auto; max-width: 100px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-status-clock { margin-left: auto; flex: 0 0 auto; overflow: visible; white-space: nowrap; }
   .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { flex-basis: 100%; order: -1; }
 }
 .chart-style-groups { padding: 6px 0 10px; }

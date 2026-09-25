@@ -15,7 +15,7 @@ import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
 
 import {
   Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
-  Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Radio, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
+  Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, Pencil,
 } from "lucide-react";
@@ -2968,11 +2968,8 @@ export function TradingDashboard() {
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
             <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} afterDate={<button type="button" className="chart-statusbar-replay" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={15} /></button>} />
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
-            <div className={`chart-status-live-pnl ${chartPnlVisible ? "visible" : ""}`}>
-              {chartPnlVisible ? <><Radio size={12} /><span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b></> : null}
-            </div>
             {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}
-            <div className="chart-status-clock">{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
+            <div className="chart-status-clock">{clock ? `${clock.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</div>
           </div>
           {activeNavigationSection === "trade" && !replayOnChart && <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">

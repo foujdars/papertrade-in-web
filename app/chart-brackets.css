@@ -33,7 +33,12 @@
 .terminal-shell .chart-bracket-tool .bracket-unset .bracket-level-chip { border-style: dashed; }
 .terminal-shell .chart-bracket-tool .bracket-help { position: absolute; bottom: 36px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
 .terminal-shell .chart-bracket-tool .bracket-help span { padding: 6px; background: transparent; }
-.terminal-shell .chart-bracket-tool .bracket-close-trade { position: absolute; top: 64px; right: 16px; display: grid; place-items: center; pointer-events: auto; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--red); font: inherit; font-size: 30px; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-entry-cluster { position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 1px; pointer-events: auto; z-index: 2; }
+.terminal-shell .chart-bracket-tool .bracket-entry-cluster .bracket-entry-chip { position: static; transform: none; }
+.terminal-shell .chart-bracket-tool .bracket-hide-trade,
+.terminal-shell .chart-bracket-tool .bracket-close-trade { position: static; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted, #748095); cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-close-trade { color: var(--red); font: inherit; font-size: 22px; line-height: 1; }
+.terminal-shell .chart-bracket-tool.bracket-hidden .risk-entry-line { border-color: transparent; }
 .terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip, .bracket-close-trade):hover { background: transparent; box-shadow: none; }
 .terminal-shell .chart-bracket-tool :is(button, [role="slider"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
 .terminal-shell .pnl-trade-row { -webkit-touch-callout: none; user-select: none; }

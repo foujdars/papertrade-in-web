@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import type { IChartApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
+import { X } from "lucide-react";
 import { filterCandlePatterns, findCandlePatterns, PATTERN_NAMES, spreadPatternTags, type CandlePatternHit, type PatternBias } from "@/lib/candle-patterns";
 
 const dateText = (time: number) => new Date(time * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const FILTER_KEY = "papertrade-pattern-filter";
 
-export function CandlePatterns({ candles, chart, series, timeframe, replay, refreshRef, triggerHost }: {
+export function CandlePatterns({ candles, chart, series, timeframe, replay, refreshRef, triggerHost, onRemove }: {
   candles: Candle[];
   chart: IChartApi | null;
   series: { priceToCoordinate: (price: number) => number | null } | null;
@@ -18,6 +19,7 @@ export function CandlePatterns({ candles, chart, series, timeframe, replay, refr
   replay: boolean;
   refreshRef: MutableRefObject<(() => void) | null>;
   triggerHost?: HTMLElement | null;
+  onRemove?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function CandlePatterns({ candles, chart, series, timeframe, replay, refr
     if (x === null || y === null || x < 8 || x > pane.width - 8 || y < 8 || y > pane.height - 8) return [];
     return [{ hit, name: hit.name, x, y, above: hit.bias !== "bullish" }];
   }).slice(-14));
-  const trigger = <button type="button" className="chart-pattern-chip" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="Candlestick patterns">Patterns <span>{hits.length}</span></button>;
+  const trigger = <span className="chart-pattern-controls"><button type="button" className="chart-pattern-chip" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="Candlestick patterns">Patterns <span>{hits.length}</span></button>{onRemove && <button type="button" className="chart-pattern-remove" aria-label="Remove candlestick patterns" title="Remove candlestick patterns" onClick={onRemove}><X size={12} /></button>}</span>;
   return <>
     {triggerHost !== undefined ? triggerHost && createPortal(trigger, triggerHost) : <div className="chart-pattern-float">{trigger}</div>}
     {tags.map(({ hit, x, y, above }) => <button key={hit.id} type="button" className={`candle-pattern-tag ${hit.bias} ${above ? "above" : "below"} ${selected === hit.id ? "active" : ""}`} style={{ left: x, top: y }} aria-pressed={selected === hit.id} onClick={() => { setSelected(hit.id); setOpen(true); }}>{hit.name}</button>)}
@@ -64,9 +66,7 @@ export function CandlePatterns({ candles, chart, series, timeframe, replay, refr
       <header><b>Candle patterns</b><button type="button" onClick={() => setOpen(false)} aria-label="Close candle patterns">Close</button></header>
       <div className="pattern-filters" role="group" aria-label="Filter by direction">{(["all", "bullish", "bearish", "neutral"] as const).map((item) => <button key={item} type="button" aria-pressed={bias === item} onClick={() => setBias(item)}>{item === "all" ? "All" : item[0].toUpperCase() + item.slice(1)}</button>)}</div>
       <div className="pattern-name-filters" role="group" aria-label="Filter pattern names">{PATTERN_NAMES.map((name) => <button key={name} type="button" aria-pressed={!hidden.includes(name)} onClick={() => setHidden((current) => current.includes(name) ? current.filter((item) => item !== name) : [...current, name])}>{name}</button>)}</div>
-      <p>These labels describe the candle shape on closed bars. They are not buy or sell signals.</p>
       {focused && <article className={focused.bias}><b>{focused.name}</b><small>{dateText(focused.time)} IST</small><span>{focused.note}</span></article>}
-      <div>{[...hits].reverse().slice(0, 12).map((hit) => <button type="button" key={hit.id} className={hit.bias} aria-pressed={selected === hit.id} onClick={() => setSelected(hit.id)}><b>{hit.name}</b><small>{dateText(hit.time)} IST</small></button>)}</div>
       {!hits.length && <p>No pattern matches this filter on the closed candles.</p>}
     </section>}
   </>;
