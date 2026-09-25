@@ -589,7 +589,7 @@ export function MarketChart({
   const [priceMenu, setPriceMenu] = useState<number | null>(null);
   useTransientBack(priceMenu !== null, () => setPriceMenu(null));
   const replayRef = useRef({ selecting: replaySelecting, start: replayStartTime, onSelect: onReplaySelect, onPreview: onReplayPreview });
-  const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
+  const replayFocusRef = useRef<{ time: number | null; mode: "pick" | "play" | null }>({ time: null, mode: null });
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
   const chartHost = useRef<HTMLDivElement>(null);
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
@@ -2175,10 +2175,33 @@ export function MarketChart({
     paintPriceSeries(replayCandles);
     setLatestCandle(replayCandles.at(-1));
     syncIndicatorData(replayCandles);
-    // No quote callbacks, live subscriptions or portfolio execution in replay.
-    if (!replaySelecting) { applyVisibleRange(); chartApi.current?.timeScale().scrollToRealTime(); }
     scheduleOverlayRefresh();
-  }, [replayCandles, replaySelecting, timeframe]);
+  }, [replayCandles, timeframe]);
+
+  useEffect(() => {
+    if (!isReplay || replayStartTime == null) {
+      replayFocusRef.current = { time: null, mode: null };
+      return;
+    }
+    const mode = !replaySelecting ? "play" : replayPrompt ? "pick" : null;
+    if (!mode) return;
+    const previous = replayFocusRef.current;
+    if (mode === "play" && previous.mode === "play" && previous.time != null) {
+      const previousIndex = dataRef.current.findIndex((candle) => candle.time === previous.time);
+      const nextIndex = dataRef.current.findIndex((candle) => candle.time === replayStartTime);
+      replayFocusRef.current = { time: replayStartTime, mode };
+      if (nextIndex >= 0 && previousIndex >= 0 && nextIndex === previousIndex + 1) return;
+    } else if (mode === "pick" && previous.time === replayStartTime) return;
+    replayFocusRef.current = { time: replayStartTime, mode };
+    const index = dataRef.current.findIndex((candle) => candle.time === replayStartTime);
+    const chart = chartApi.current;
+    if (index < 0 || !chart) return;
+    const range = chart.timeScale().getVisibleLogicalRange();
+    const width = range ? Math.max(12, range.to - range.from) : Math.max(24, visibleBarsRef.current || 40);
+    const from = Math.max(-0.5, index - width * 0.32);
+    chart.timeScale().setVisibleLogicalRange({ from, to: from + width });
+    scheduleOverlayRefresh();
+  }, [isReplay, replaySelecting, replayPrompt, replayStartTime]);
 
   useEffect(() => {
     if (historyRequest) { historyWasActiveRef.current = true; return; }
