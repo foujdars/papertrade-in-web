@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type MutableRefObject } from "react";
-import type { IChartApi, ISeriesApi } from "lightweight-charts";
+import type { IChartApi } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import { anchoredVwap } from "@/lib/anchored-vwap";
 
@@ -10,7 +10,7 @@ const storageKey = (instrumentKey: string) => `papertrade-anchored-vwap:${instru
 export function AnchoredVwap({ candles, chart, series, timeframe, instrumentKey, replay, refreshRef }: {
   candles: Candle[];
   chart: IChartApi | null;
-  series: ISeriesApi<"Candlestick" | "Bar" | "Line" | "Area" | "Baseline" | "Histogram"> | null;
+  series: { priceToCoordinate: (price: number) => number | null } | null;
   timeframe: string;
   instrumentKey: string;
   replay: boolean;
