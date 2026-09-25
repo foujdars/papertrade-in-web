@@ -72,7 +72,21 @@
 /* Study names use the existing clock row, leaving candle space unobstructed. */
 .terminal-shell .chart-statusbar { display: flex; flex-wrap: wrap; align-items: center; padding-inline: 8px; gap: 8px; }
 .terminal-shell .chart-statusbar .chart-indicator-slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
-.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { flex: 1 0 100%; order: 1; border-bottom: 1px solid var(--line, #e3e6ee); }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-history-controls { grid-column: 1; grid-row: 1; justify-self: start; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-statusbar-replay { grid-column: 2; grid-row: 1; justify-self: center; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-status-clock { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:not(:has(.chart-indicator-strip)) { display: none; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { grid-column: 1 / -1; border-bottom: 1px solid var(--line, #e3e6ee); }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-feed-warning { grid-column: 1 / -1; }
+.chart-script-box { display: grid; gap: 6px; margin: 0 8px 6px; padding: 8px; border: 1px solid var(--line); background: var(--surface, #fff); }
+.chart-script-box header { display: flex; align-items: center; gap: 8px; }
+.chart-script-box header b { font-size: 12px; font-weight: 500; }
+.chart-script-box header button { min-height: 26px; padding: 0 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: 11px; cursor: pointer; }
+.chart-script-box header button[type="submit"] { margin-left: auto; color: var(--purple, #753bce); border-color: var(--purple, #753bce); }
+.chart-script-box textarea { width: 100%; min-height: 84px; resize: vertical; padding: 6px; border: 1px solid var(--line); background: var(--soft, #f6f7fb); color: var(--ink); font: 12px/1.45 ui-monospace, monospace; }
+.chart-script-box small, .chart-script-error { margin: 0; color: var(--muted); font-size: 10px; }
+.chart-script-error { color: var(--red, #d94064); }
 .terminal-shell .chart-statusbar .chart-indicator-strip::before { content: "Active"; margin-right: 2px; color: var(--muted); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .chart-indicator-slot::-webkit-scrollbar { display: none; }
 .chart-indicator-slot:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }

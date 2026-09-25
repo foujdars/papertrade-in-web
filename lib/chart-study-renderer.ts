@@ -1,6 +1,7 @@
 import { LineSeries, HistogramSeries, MismatchDirection, type Logical, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
 import type { Candle } from './market';
 import { computeStudy, type StudyResult } from './study-calculations';
+import { runChartScript } from './chart-script';
 import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
 import { buildVolumeProfile } from './volume-profile';
 
@@ -66,7 +67,7 @@ export class ChartStudyRenderer {
   this.update(data,new Map(selected.map(s=>[s.definition.id,s.result])));
  }
  update(data:Candle[],results?:Map<string,StudyResult>){this.data=data;for(const b of this.bundles){
-  b.result=results?.get(b.id)??computeStudy(b.id,data,b.config);
+  b.result=b.id==='script'?b.result:(results?.get(b.id)??computeStudy(b.id,data,b.config));
   for(let k=0;k<b.series.length;k++){
    const plot=b.id==='vpvr'?{name:'Profile anchor',values:data.map(c=>c.close)}:b.result.plots[k],offset=plot?.offset??0;
    // Displacements beyond loaded candles are not extrapolated through weekends/holidays.
@@ -117,4 +118,23 @@ export class ChartStudyRenderer {
  }
  summaries(){return this.bundles.map(b=>({id:b.id,pane:b.pane,message:b.result.message,value:b.result.plots[0]?.values.filter(Number.isFinite).at(-1),extra:b.result.plots[1]?.values.filter(Number.isFinite).at(-1)}));}
  volumeLabel(){const b=this.bundles.find(bundle=>bundle.id==='volume');if(!b||!b.config.showValue)return null;const values=b.result.plots[0]?.values??[];let index=-1;for(let i=values.length-1;i>=0;i--)if(Number.isFinite(values[i])){index=i;break;}if(index<0)return null;const bar=this.data[index],up=!bar||bar.close>=bar.open;return {value:values[index],y:b.series[0]?.priceToCoordinate(values[index]),color:b.config.colors[up?0:1]};}
+ scriptSignature='';
+ syncScript(source:string,data:Candle[]){
+  const result=runChartScript(source,data);
+  const existing=this.bundles.find(bundle=>bundle.id==='script');
+  const signature=JSON.stringify([source.trim(),result.overlay,result.levels,result.plots.map(plot=>plot.name),result.error]);
+  if(!source.trim()||result.error||!result.plots.length){
+   if(existing){for(const series of existing.series)this.chart.removeSeries(series);this.bundles=this.bundles.filter(bundle=>bundle!==existing);}
+   const changed=this.scriptSignature!==signature;this.scriptSignature=signature;return changed;
+  }
+  if(existing&&this.scriptSignature===signature){existing.result=result;this.update(data);return false;}
+  if(existing)for(const series of existing.series)this.chart.removeSeries(series);
+  this.bundles=this.bundles.filter(bundle=>bundle.id!=='script');
+  const pane=result.overlay?0:Math.max(0,...this.bundles.map(bundle=>bundle.pane))+1;
+  const config=existing?.config??{inputs:{},source:'close',smoothing:'None',hidden:false,timeframes:[],colors:['#753bce','#0b9f7a','#e23b4a','#2563eb'],width:1,dash:0,showValue:true,opacity:100};
+  const series=result.plots.map((plot,index)=>this.chart.addSeries(LineSeries,{color:plot.colors?.[0]??config.colors[index%config.colors.length],lineWidth:1,priceLineVisible:false,lastValueVisible:index===0,title:'',priceScaleId:undefined},pane));
+  for(const level of result.levels)series[0]?.createPriceLine({price:level,color:'#8054da66',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});
+  const bundle:Bundle={id:'script',config,signature,series,pane,result};
+  this.bundles.push(bundle);this.scriptSignature=signature;this.update(data);return true;
+ }
 }

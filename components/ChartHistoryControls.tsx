@@ -1,14 +1,14 @@
 "use client";
 import { CalendarDays, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { ChartHistoryRequest } from "@/lib/chart-history";
 import { useTransientBack } from "./useTransientBack";
 import { ChartDialogPortal } from "./ChartDialogPortal";
 
-export function ChartHistoryControls({ request, onChange, afterDate }: {
+export function ChartHistoryControls({ request, onChange, onScript }: {
   request?: ChartHistoryRequest;
   onChange: (request?: ChartHistoryRequest) => void;
-  afterDate?: ReactNode;
+  onScript?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
@@ -17,8 +17,8 @@ export function ChartHistoryControls({ request, onChange, afterDate }: {
   return <>
     <div className="chart-history-controls" aria-label="Chart history">
       {[3, 5, 10].map(years => <button key={years} className={request?.years === years ? "active" : ""} onClick={() => onChange({ years, token: Date.now() })}>{years}Y</button>)}
-      <button onClick={() => setOpen(true)} aria-label="Go to date"><CalendarDays size={13} /><span>Go to date</span></button>
-      {afterDate}
+      <button onClick={() => setOpen(true)} aria-label="Go to date"><CalendarDays size={13} /></button>
+      {onScript && <button type="button" onClick={onScript} aria-label="Chart script">Script</button>}
       {request && <button onClick={() => onChange()}>Latest</button>}
     </div>
     {open && <ChartDialogPortal><div className="chart-history-backdrop" onClick={() => setOpen(false)}>

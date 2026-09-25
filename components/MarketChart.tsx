@@ -492,6 +492,8 @@ export function MarketChart({
   onRemoveIndicator,
   onChartTap,
   onPrice,
+  chartScript = "",
+  onEditScript,
   liveTick,
   onFeedStatus,
 }: {
@@ -537,6 +539,8 @@ export function MarketChart({
   onRemoveIndicator?: (id: string) => void;
   onChartTap?: () => void;
   onPrice?: (value: number, timestampMs: number) => void;
+  chartScript?: string;
+  onEditScript?: () => void;
   liveTick?: CandleTick;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -607,6 +611,8 @@ export function MarketChart({
   const [chartGeneration, setChartGeneration] = useState(0);
   const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string; edges: Array<{ x: number; label: string }> }>>([]);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
+  const chartScriptRef = useRef(chartScript);
+  chartScriptRef.current = chartScript;
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
@@ -1069,13 +1075,15 @@ export function MarketChart({
     const old = studyRenderer.current.signature;
     studyRenderer.current.comparisons=comparisonRef.current;
     studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data);
+    const scriptLayout = studyRenderer.current.syncScript(chartScriptRef.current, data);
     if (compareModeRef.current === "pane" && compareSeries.current.size) {
       const comparePane = Math.max(1, ...studyRenderer.current.bundles.map((bundle) => bundle.pane + 1));
       overlayComparedRef.current.forEach((item,index) => compareSeries.current.get(item.instrumentKey)?.moveToPane(comparePane+index));
     }
-    if (old !== studyRenderer.current.signature) fitStudyPanes();
+    if (old !== studyRenderer.current.signature || scriptLayout) fitStudyPanes();
     refreshStudyHeaders();
   }
+  useEffect(() => { syncIndicatorData(); }, [chartScript]);
   function syncIndicators(next: ChartIndicators) {
     indicatorsRef.current = next;
     syncIndicatorData();
@@ -2601,8 +2609,9 @@ export function MarketChart({
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
-  const indicatorLegend = (activeStudies.length || indicators.patterns) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+  const indicatorLegend = (activeStudies.length || indicators.patterns || chartScript.trim()) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
     {indicators.patterns && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => activateStudyRef.current("patterns", event.clientX, event.clientY)} aria-label="Candlestick pattern actions" title="Tap for function actions"><i style={{ background: "var(--purple, #8054d9)" }} />Patterns</button>}
+    {chartScript.trim() && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={() => onEditScript?.()} aria-label="Edit chart script" title="Edit script"><i style={{ background: "var(--purple, #8054d9)" }} />Script</button>}
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "anchored-vwap"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
   return (
