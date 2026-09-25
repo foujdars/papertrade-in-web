@@ -1551,12 +1551,13 @@ export function MarketChart({
           : null;
         setHoveredCandle((previous) => previous?.scope === legendScope && previous.time === time
           ? previous : { scope: legendScope, time });
+        if (replayRef.current.selecting && time != null) replayRef.current.onPreview?.(time);
       };
       chart.subscribeCrosshairMove(crosshairMove);
       replayClick = (event) => {
         if (!replayRef.current.selecting || event.time === undefined) return;
         const time = timeToTimestamp(event.time) - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0);
-        replayRef.current.onPreview?.(time);
+        replayRef.current.onSelect?.(time);
       };
       if (isReplay) chart.subscribeClick(replayClick);
 
@@ -2520,7 +2521,7 @@ export function MarketChart({
           }}><span>↔</span></button>
           {replayPrompt && <div className="replay-start-popover" style={{ left: `clamp(90px, ${replayMarkerX}px, calc(100% - 90px))` }}>
             <small>{replayStartTime !== null ? new Date(replayStartTime * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} IST</small>
-            <button type="button" onClick={onReplayPlay}>▶ Replay from here</button>
+            <button type="button" onClick={onReplayPlay}>Start from here</button>
           </div>}
         </>}
         <div className="chart-symbol-legend lightweight-symbol-legend">

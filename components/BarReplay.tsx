@@ -90,13 +90,17 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
   }
   function previewAt(time: number) {
     const index = candles.findIndex(candle => candle.time === time);
+    if (!selecting || index < 0 || index >= candles.length - 1 || index === cursor) return;
+    setCursor(index); setShowStart(false);
+  }
+  function armStart(time: number) {
+    const index = candles.findIndex((candle) => candle.time === time);
     if (!selecting || index < 0 || index >= candles.length - 1) return;
-    setCursor(index); setShowStart(true);
+    setHasStarted(false); setShowStart(true); setCursor(index); setStartTime(time); setPlaying(false);
   }
   function playFromHere() {
     if (!current || cursor >= candles.length - 1) return;
-    if (selecting) startAt(current.time);
-    setHasStarted(true); setShowStart(false); setPlaying(true);
+    setStartTime(current.time); setSelecting(false); setHasStarted(true); setShowStart(false); setPlaying(true);
   }
   function restart() {
     if (startTime == null) return;
@@ -108,7 +112,7 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
     candles, visible, cursor, selecting, playing, loading, message, speed, startTime, current, ended,
     prompt: showStart && !hasStarted,
     replayStartTime: hasStarted ? null : selecting ? current?.time ?? null : startTime,
-    resetSelection, previewAt, playFromHere, selectAt: startAt,
+    resetSelection, previewAt, playFromHere, selectAt: armStart,
     togglePlay: () => { if (playing) setPlaying(false); else playFromHere(); },
     step: () => { setPlaying(false); setCursor((value) => Math.min(value + 1, Math.max(0, candles.length - 1))); if (selecting) setShowStart(true); },
     setSpeed,
@@ -121,10 +125,9 @@ const REPLAY_SPEEDS = [0.5, 1, 2, 4, 8, 10];
 
 export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; onExit?: () => void }) {
   return <div className="chart-replay-bar" role="toolbar" aria-label="Bar replay">
-    <div className="chart-replay-meta"><span>{replay.loading ? "Loading replay…" : replay.message ? replay.message : replay.selecting ? "Choose a candle, then play" : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : ""}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
+    <div className="chart-replay-meta"><span>{replay.loading ? "Loading replay…" : replay.message ? replay.message : replay.selecting ? (replay.prompt ? "Tap Start from here" : "Move the crosshair, then tap a candle") : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : ""}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
     {!!replay.message && !replay.loading && <button type="button" onClick={replay.retryLoad}>Retry</button>}
     <div className="chart-replay-transport">
-      <button type="button" onClick={replay.resetSelection} disabled={!replay.candles.length}>Select</button>
       <button type="button" onClick={replay.togglePlay} disabled={!replay.candles.length || replay.ended}>{replay.playing ? "Pause" : "Play"}</button>
       <button type="button" onClick={replay.step} disabled={!replay.candles.length || replay.ended}>Next</button>
       <button type="button" onClick={replay.restart} disabled={replay.startTime == null}>Again</button>
