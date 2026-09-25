@@ -65,7 +65,7 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
 
   private paintFootprint(ctx: CanvasRenderingContext2D, bars: Candle[], from: number) {
     const spacing = this.chart!.timeScale().options().barSpacing ?? 6;
-    if (spacing < 7) return;
+    if (spacing < 5) return;
     const rows = spacing >= 16 ? 10 : 6;
     ctx.font = `${Math.max(8, Math.min(11, spacing - 4))}px Inter, system-ui, sans-serif`;
     ctx.textAlign = "center";

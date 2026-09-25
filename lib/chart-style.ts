@@ -5,6 +5,7 @@ export const CHART_STYLE_GROUPS = [
   { id: "line", styles: ["line", "line-markers", "step-line"] },
   { id: "area", styles: ["area", "hlc-area", "baseline"] },
   { id: "columns", styles: ["columns", "high-low"] },
+  { id: "profile", styles: ["volume-footprint"] },
   { id: "heikin", styles: ["heikin-ashi"] },
 ] as const;
 
@@ -31,8 +32,10 @@ export type ChartStyleId = (typeof CHART_STYLES)[number]["id"];
 export const DEFAULT_CHART_STYLE: ChartStyleId = "candles";
 const STYLE_IDS = new Set<string>(CHART_STYLES.map((style) => style.id));
 
+const HIDDEN_STYLES = new Set(["tpo", "session-volume-profile"]);
+
 export function isChartStyle(value: unknown): value is ChartStyleId {
-  return typeof value === "string" && STYLE_IDS.has(value) && !["volume-footprint", "tpo", "session-volume-profile"].includes(value);
+  return typeof value === "string" && STYLE_IDS.has(value) && !HIDDEN_STYLES.has(value);
 }
 
 export function chartStyleLabel(id: ChartStyleId) {

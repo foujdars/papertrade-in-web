@@ -47,9 +47,11 @@ test('incremental painting is allowed only when earlier candles are unchanged', 
   assert.equal(trailingCandleUpdate(candles, candles.slice(1)), false);
 });
 
-test('unsupported profile chart modes are removed and saved choices migrate to candles', () => {
+test('unfinished profile chart modes stay out of the style menu', () => {
   const visible = CHART_STYLE_GROUPS.flatMap(group => group.styles);
-  for(const style of ['volume-footprint','tpo','session-volume-profile']) {
+  assert.equal(visible.includes('volume-footprint'), true);
+  assert.equal(isChartStyle('volume-footprint'), true);
+  for(const style of ['tpo','session-volume-profile']) {
     assert.equal(visible.includes(style),false);
     assert.equal(isChartStyle(style),false);
   }
