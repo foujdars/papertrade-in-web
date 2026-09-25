@@ -7,38 +7,18 @@
 .chart-selected-drawing { position: absolute; z-index: 24; top: 54px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface, white); box-shadow: 0 3px 12px #0001; }
 .chart-selected-drawing button { min-height: 32px; white-space: nowrap; padding: 4px 9px; border: 0; border-radius: 6px; color: var(--purple); background: transparent; font-size: 12px; cursor: pointer; }
 .chart-selected-drawing button:first-child { color: var(--red); }
-.terminal-shell .chart-bracket-tool .risk-entry-line { pointer-events: none; border-top: 1px solid var(--purple, #765cff); }
-.terminal-shell .chart-bracket-tool .risk-target-line { border-top: 1px dotted var(--green, #00c991); color: var(--green, #0b8a5b); }
-.terminal-shell .chart-bracket-tool .risk-stop-line { border-top: 1px dotted var(--red, #f04458); color: var(--red, #d94064); }
-.terminal-shell .chart-bracket-tool .bracket-box {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; min-height: 22px;
-  padding: 1px 5px; border: 1px solid currentColor; border-radius: 4px; background: var(--surface, #fff);
-  color: inherit; font: inherit; font-size: 11px; font-weight: 750; line-height: 1.2; font-variant-numeric: tabular-nums;
-}
-.terminal-shell .chart-bracket-tool .bracket-entry-cluster { color: var(--purple, #6657ee); gap: 3px; }
-.terminal-shell .chart-bracket-tool .bracket-entry-cluster .bracket-entry-chip,
-.terminal-shell .chart-bracket-tool .bracket-hide-trade,
-.terminal-shell .chart-bracket-tool .bracket-close-trade { position: static; width: auto; height: auto; transform: none; padding: 1px 5px; border: 1px solid currentColor; border-radius: 4px; background: var(--surface, #fff); color: var(--purple, #6657ee); font-size: 11px; box-shadow: none; }
-.terminal-shell .chart-bracket-tool .bracket-level-chip { position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 3px; min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; }
-.terminal-shell .chart-bracket-tool .bracket-entry-chip { pointer-events: auto; cursor: pointer; }
-.terminal-shell .chart-bracket-tool .risk-target-line,
-.terminal-shell .chart-bracket-tool .risk-stop-line { pointer-events: none; cursor: default; }
-.terminal-shell .chart-bracket-tool .risk-target-line::before,
-.terminal-shell .chart-bracket-tool .risk-stop-line::before { content: none; }
-.terminal-shell .chart-bracket-tool .bracket-level-chip { pointer-events: auto; }
-.terminal-shell .chart-bracket-tool .bracket-level-chip::after { content: ""; position: absolute; inset: -9px 0; }
+.terminal-shell .chart-bracket-tool .risk-entry-line { pointer-events: none; border-top: 1.5px solid var(--purple, #5b4bdb); color: var(--purple, #5b4bdb); }
+.terminal-shell .chart-bracket-tool .risk-target-line { pointer-events: none; border-top: 1.5px dotted var(--green, #0b9f7a); color: var(--green, #0b9f7a); }
+.terminal-shell .chart-bracket-tool .risk-stop-line { pointer-events: none; border-top: 1.5px dotted var(--red, #e23b4a); color: var(--red, #e23b4a); }
+.terminal-shell .chart-bracket-tool .bracket-pill { position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: flex; align-items: stretch; height: 28px; border: 1.5px solid currentColor; border-radius: 7px; background: var(--surface, #fff); color: inherit; overflow: hidden; pointer-events: auto; z-index: 2; }
+.terminal-shell .chart-bracket-tool .bracket-pill > * { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; padding: 0 8px; border: 0; border-right: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-pill > *:last-child { border-right: 0; }
+.terminal-shell .chart-bracket-tool .bracket-price { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; min-height: 24px; padding: 0 6px; border: 1.5px solid currentColor; border-radius: 4px; background: var(--surface, #fff); font-size: 11px; font-weight: 700; pointer-events: none; }
+.terminal-shell .chart-bracket-tool.bracket-hidden .risk-entry-line { border-color: transparent; }
+.terminal-shell .chart-bracket-tool .bracket-pill button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .terminal-shell .chart-trade-marker.stacked-marker { transform: translateX(-50%); width: auto; height: auto; }
 .terminal-shell .chart-trade-marker.stacked-marker svg { display: block; flex: none; }
-.terminal-shell .chart-bracket-tool .risk-target-line { color: var(--green); border-top: 1px dotted var(--green); box-shadow: none; }
-.terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--red); border-top: 1px dotted var(--red); box-shadow: none; }
-.terminal-shell .chart-bracket-tool .bracket-unset { border-color: transparent; }
-.terminal-shell .chart-bracket-tool .bracket-unset::before { display: none; }
-.terminal-shell .chart-bracket-tool .bracket-unset .bracket-box { border-style: dashed; }
-.terminal-shell .chart-bracket-tool .bracket-entry-cluster { position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 3px; pointer-events: auto; z-index: 2; color: var(--purple, #6657ee); }
-.terminal-shell .chart-bracket-tool .bracket-entry-cluster .bracket-entry-chip { position: static; transform: none; }
-.terminal-shell .chart-bracket-tool.bracket-hidden .risk-entry-line { border-color: transparent; }
-.terminal-shell .chart-bracket-tool :is(.bracket-box, .bracket-entry-chip, .bracket-hide-trade, .bracket-close-trade):hover { background: var(--surface, #fff); }
-.terminal-shell .chart-bracket-tool :is(button, [role="slider"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+
 .terminal-shell .pnl-trade-row { -webkit-touch-callout: none; user-select: none; }
 .terminal-shell .pnl-trade-row :is(input, textarea) { user-select: text; }
 .terminal-shell .toast { max-width: min(440px, calc(100vw - 32px)); line-height: 1.5; font-size: 14px; }

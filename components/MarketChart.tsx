@@ -2585,7 +2585,8 @@ export function MarketChart({
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
-  const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+  const indicatorLegend = (activeStudies.length || indicators.patterns) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+    {indicators.patterns && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => activateStudyRef.current("patterns", event.clientX, event.clientY)} aria-label="Candlestick pattern actions" title="Tap for function actions"><i style={{ background: "var(--purple, #8054d9)" }} />Patterns</button>}
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "anchored-vwap"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
   return (
@@ -2601,10 +2602,9 @@ export function MarketChart({
         {compareMode === "pane" && overlayCompared.map((item,index)=>comparePaneTops[item.instrumentKey] === undefined ? null : <div key={item.instrumentKey} className="compare-pane-heading" style={{top:comparePaneTops[item.instrumentKey]+5}}><span style={{color:item.color??compareColor(index)}}><button type="button" onClick={()=>setEditingLine(item.instrumentKey)} aria-label={`Change ${item.symbol} line color`}><i style={{background:item.color??compareColor(index)}}/>{item.symbol}</button><button type="button" onClick={()=>setComparedSymbols((current)=>current.filter((row)=>row.instrumentKey!==item.instrumentKey))} aria-label={`Remove ${item.symbol} from compare`}><X size={12}/></button></span></div>)}
         {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+4}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
-          <strong>{studyTitle(selectedStudy,studySettings[selectedStudy]??studyDefaults(selectedStudy))}</strong>
-          <button aria-label="Indicator settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={15}/></button>
-          {onRemoveIndicator&&<button onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={14}/>Remove indicator</button>}
-          <button aria-label="Close indicator actions" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={15}/></button>
+          <button aria-label="Indicator settings" title="Settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={16}/></button>
+          {onRemoveIndicator&&<button aria-label="Remove indicator" title="Remove" onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={15}/></button>}
+          <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {editingLine && <ChartLineColorSettings key={editingLine} name={editingLine === "primary" ? instrument.symbol : overlayCompared.find((item) => item.instrumentKey === editingLine)?.symbol ?? "Compared symbol"} color={editingLine === "primary" ? primaryLineColor : overlayCompared.find((item) => item.instrumentKey === editingLine)?.color ?? compareColor(Math.max(0, overlayCompared.findIndex((item) => item.instrumentKey === editingLine)))} onChange={(color) => {
@@ -2613,7 +2613,7 @@ export function MarketChart({
         }} onClose={() => setEditingLine(null)} />}
         {!candlesOnly && !isReplay && priceTasks.length > 0 && <ChartAlertLevels chart={chartApi.current} series={candleSeries.current} tasks={priceTasks} instrumentKey={instrument.instrumentKey} dark={chartTheme === "neon"} />}
         {indicators.smc && <SmcLearner key={`${instrument.instrumentKey}:${timeframe}`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} dark={chartTheme === "neon"} refreshRef={smcRefreshRef} triggerHost={indicatorHost} />}
-        {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} triggerHost={indicatorHost} onActivate={(x, y) => activateStudyRef.current("patterns", x, y)} />}
+        {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} />}
         {indicators["opening-range"] && !studySettings["opening-range"]?.hidden && <OpeningRange key={`${instrument.instrumentKey}:${timeframe}:opening-range`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} refreshRef={openingRangeRefreshRef} />}
         {indicators["previous-day"] && !studySettings["previous-day"]?.hidden && <PreviousDayLevels key={`${instrument.instrumentKey}:${timeframe}:previous-day`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={previousDayRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
@@ -2736,11 +2736,11 @@ export function MarketChart({
         {!candlesOnly && orderTool?.enabled && riskCoordinates && (
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
-              <div className="bracket-entry-cluster">
-                <button type="button" className="bracket-box bracket-hide-trade" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                {hiddenBracket !== entryKey && <button type="button" className="bracket-box bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Position quantity" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{orderTool.quantity}</button>}
-                {hiddenBracket !== entryKey && <button type="button" className="bracket-box bracket-entry-chip" aria-expanded={branchesOpen} aria-label="Position profit and loss" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</button>}
-                {onOrderToolExit && <button type="button" className="bracket-box bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
+              <div className="bracket-pill">
+                <button type="button" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                {hiddenBracket !== entryKey && <button type="button" aria-expanded={branchesOpen} aria-label="Position quantity" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{orderTool.quantity}</button>}
+                {hiddenBracket !== entryKey && <button type="button" aria-expanded={branchesOpen} aria-label="Position profit and loss" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</button>}
+                {onOrderToolExit && <button type="button" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
               </div>
             </div>}
             {hiddenBracket !== entryKey && (["target", "stopLoss"] as const).map((level) => {
@@ -2758,7 +2758,7 @@ export function MarketChart({
                 onPointerMove={(event) => moveRiskDrag(level, event)}
                 onPointerUp={(event) => endRiskDrag(level, event)}
                 onPointerCancel={(event) => endRiskDrag(level, event)}>
-                <div className="bracket-level-chip" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : `${orderTool.currency ?? "INR"} ${Number(price.toFixed(10))}`}
+                <div className="bracket-pill" role="slider" tabIndex={0} aria-label={`Drag ${level === "target" ? "take profit" : "stop loss"} price`} aria-valuenow={unset ? undefined : price} aria-valuetext={unset ? "Not set. Drag to choose a price." : `${orderTool.currency ?? "INR"} ${Number(price.toFixed(10))}`}
                   onKeyDown={(event) => {
                     if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
                     event.preventDefault();
@@ -2769,8 +2769,9 @@ export function MarketChart({
                     const next = tool.tickSize ? Number((Math.round(raw / step) * step).toFixed(10)) : Math.round(raw * 100) / 100;
                     if (next > 0) onOrderToolChange?.(level, next, true);
                   }}>
-                  <span className="bracket-box">{orderTool.quantity}</span><span className="bracket-box">{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span>
+                  <span>{orderTool.quantity}</span><span>{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span><button type="button" aria-label={level === "target" ? "Remove take profit" : "Remove stop loss"} onPointerDown={(event) => event.stopPropagation()} onClick={() => onOrderToolChange?.(level, 0, true)}><span aria-hidden="true">×</span></button>
                 </div>
+                {!unset && <em className="bracket-price">{price.toLocaleString("en-US", { maximumFractionDigits: price >= 100 ? 2 : 4 })}</em>}
               </div>;
             })}
           </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, type MutableRefObject } from "react";
-import { createPortal } from "react-dom";
 import type { IChartApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import { filterCandlePatterns, findCandlePatterns, PATTERN_NAMES, spreadPatternTags, type CandlePatternHit, type PatternBias } from "@/lib/candle-patterns";
@@ -10,15 +9,13 @@ const dateText = (time: number) => new Date(time * 1000).toLocaleString("en-IN",
 
 const FILTER_KEY = "papertrade-pattern-filter";
 
-export function CandlePatterns({ candles, chart, series, timeframe, replay, refreshRef, triggerHost, onActivate }: {
+export function CandlePatterns({ candles, chart, series, timeframe, replay, refreshRef }: {
   candles: Candle[];
   chart: IChartApi | null;
   series: { priceToCoordinate: (price: number) => number | null } | null;
   timeframe: string;
   replay: boolean;
   refreshRef: MutableRefObject<(() => void) | null>;
-  triggerHost?: HTMLElement | null;
-  onActivate?: (x: number, y: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -57,9 +54,7 @@ export function CandlePatterns({ candles, chart, series, timeframe, replay, refr
     if (x === null || y === null || x < 8 || x > pane.width - 8 || y < 8 || y > pane.height - 8) return [];
     return [{ hit, name: hit.name, x, y, above: hit.bias !== "bullish" }];
   }).slice(-14));
-  const trigger = <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => { if (onActivate) onActivate(event.clientX, event.clientY); else setOpen((value) => !value); }} aria-label="Candlestick pattern actions" title="Tap for function actions"><i /><span>Patterns</span></button>;
   return <>
-    {triggerHost !== undefined ? triggerHost && createPortal(trigger, triggerHost) : <div className="chart-pattern-float">{trigger}</div>}
     {tags.map(({ hit, x, y, above }) => <button key={hit.id} type="button" className={`candle-pattern-tag ${hit.bias} ${above ? "above" : "below"} ${selected === hit.id ? "active" : ""}`} style={{ left: x, top: y }} aria-pressed={selected === hit.id} onClick={() => { setSelected(hit.id); setOpen(true); }}>{hit.name}</button>)}
     {open && <section className="candle-pattern-sheet" aria-label="Recognised candlestick patterns">
       <header><b>Candle patterns</b><button type="button" onClick={() => setOpen(false)} aria-label="Close candle patterns">Close</button></header>

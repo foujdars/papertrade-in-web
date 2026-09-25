@@ -1938,12 +1938,27 @@ export function TradingDashboard() {
         try {
           const quote = selectedDeltaOption ? options[symbol]?.quote : perps[symbol]?.quote;
           if (!quote) throw new Error("Waiting for a fresh global quote.");
-          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now());
+          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value > 0 ? value : undefined, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now());
         } catch (cause) { error = cause instanceof Error ? cause.message : error; throw cause; }
       }).then(saved => setToast(saved ? `${level === "target" ? "Target" : "Stop loss"} saved · ${symbol} · USD` : error));
       return;
     }
     if (!committed || selectedPosition.quantity <= 0 || selectedPosition.side === "FLAT") return;
+    if (Number.isFinite(value) && value <= 0) {
+      if (level === "target") setTargetPrice("");
+      else setStopLossPrice("");
+      saveProtection({
+        id: selectedProtection?.id ?? `${new Date().getTime()}-chart-risk`,
+        symbol: selected.symbol,
+        product: positionProduct,
+        side: selectedPosition.side,
+        targetPrice: level === "target" ? undefined : selectedProtection?.targetPrice,
+        stopLossPrice: level === "stopLoss" ? undefined : selectedProtection?.stopLossPrice,
+        createdAt: selectedProtection?.createdAt ?? new Date().getTime(),
+      }, selected.symbol, positionProduct);
+      setToast(`${level === "target" ? "Take profit" : "Stop loss"} removed · ${selected.symbol}`);
+      return;
+    }
     if (!verifiedLivePrice || !Number.isFinite(value) || value <= 0) {
       setToast("Live price unavailable. Protection was not placed.");
       return;

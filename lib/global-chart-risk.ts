@@ -15,6 +15,11 @@ export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "tar
   if (!p || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("A position and fresh quote are required to move protection.");
   if (p.protection?.activeExit) throw new Error("An exit has already triggered. Manage it in Positions.");
   const plan: GlobalProtection = p.protection ?? { source: "mark", takeProfit: p.target ? { mode: "Market", trigger: p.target } : undefined, stopLoss: p.stop ? { mode: "Market", trigger: p.stop } : undefined };
+  if (!(value > 0)) {
+    const key = level === "target" ? "takeProfit" : "stopLoss";
+    const field = level === "target" ? "target" : "stop";
+    return { ...a, revision: a.revision + 1, positions: a.positions.map(item => item.symbol === symbol ? { ...item, [field]: undefined, protection: { ...plan, [key]: undefined } } : item) };
+  }
   const reference = triggerValue(q, plan.source);
   const price = roundGlobalPrice(value, p.spec);
   if (!reference || !Number.isFinite(price) || price <= 0) throw new Error("A valid price and fresh trigger source are required.");
