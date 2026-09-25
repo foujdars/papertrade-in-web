@@ -2737,7 +2737,7 @@ export function MarketChart({
           <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <div className="bracket-pill">
-                <button type="button" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                <button type="button" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={11} /> : <Eye size={11} />}</button>
                 {hiddenBracket !== entryKey && <button type="button" aria-expanded={branchesOpen} aria-label="Position quantity" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{orderTool.quantity}</button>}
                 {hiddenBracket !== entryKey && <button type="button" aria-expanded={branchesOpen} aria-label="Position profit and loss" onClick={() => setExpandedEntry(branchesOpen ? "" : entryKey)}>{compactRiskPnl(orderTool.livePnl ?? orderToolPnl(orderTool, latestCandle?.close ?? orderTool.entryPrice))}</button>}
                 {onOrderToolExit && <button type="button" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
@@ -2771,7 +2771,6 @@ export function MarketChart({
                   }}>
                   <span>{orderTool.quantity}</span><span>{unset ? "—" : compactRiskPnl(orderToolPnl(orderTool, price))}</span><button type="button" aria-label={level === "target" ? "Remove take profit" : "Remove stop loss"} onPointerDown={(event) => event.stopPropagation()} onClick={() => onOrderToolChange?.(level, 0, true)}><span aria-hidden="true">×</span></button>
                 </div>
-                {!unset && <em className="bracket-price">{price.toLocaleString("en-US", { maximumFractionDigits: price >= 100 ? 2 : 4 })}</em>}
               </div>;
             })}
           </div>
