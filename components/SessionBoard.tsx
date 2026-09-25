@@ -22,7 +22,7 @@ export function SessionBoard({ variant = "home", hiddenShades = [], onToggleShad
   }, []);
   if (variant === "chip") {
     const board = sessionBoard(now);
-    const shortName: Record<string, string> = { sydney: "Sydney", tokyo: "Tokyo", india: "India", london: "London", newyork: "NY" };
+    const shortName: Record<string, string> = { sydney: "SYD", tokyo: "TYO", india: "IND", london: "LON", newyork: "NY" };
     return (
       <div className="chart-session-row" role="group" aria-label="Session shading">
         {board.map((item) => {
@@ -37,7 +37,7 @@ export function SessionBoard({ variant = "home", hiddenShades = [], onToggleShad
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => { event.stopPropagation(); onToggleShade?.(item.id); }}
             >
-              {shortName[item.id] ?? item.name} {item.period}
+              {shortName[item.id] ?? item.name}
             </button>
           );
         })}

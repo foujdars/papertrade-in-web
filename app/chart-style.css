@@ -140,8 +140,8 @@
 .timeframe-menu .timeframe-star.saved { color: var(--purple, #753bce); }
 .timeframe-menu .timeframe-line.active .timeframe-star.saved { color: #fff; }
 .chart-session-shade { position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; }
-.chart-session-row { position: absolute; z-index: 9; top: 50px; left: 12px; right: 64px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
-.chart-session-chip { position: static; z-index: 9; max-width: none; padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--line, #e4e7ef) 80%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: var(--muted, #65708a); font: inherit; font-size: 10px; font-weight: 700; line-height: 1.4; text-align: left; cursor: pointer; pointer-events: auto; touch-action: manipulation; white-space: nowrap; }
+.chart-session-row { position: absolute; z-index: 9; top: 50px; left: 12px; right: 64px; display: flex; flex-wrap: nowrap; gap: 4px; pointer-events: none; }
+.chart-session-chip { position: static; z-index: 9; max-width: none; padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--line, #e4e7ef) 80%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: var(--muted, #65708a); font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; text-align: left; cursor: pointer; pointer-events: auto; touch-action: manipulation; white-space: nowrap; }
 .terminal-shell .chart-body > .drawing-toolbar.collapsed ~ .chart-stack .chart-session-row { left: 22px; }
 .chart-session-chip.is-open { color: #0f9f6e; border-color: color-mix(in srgb, #12b886 55%, var(--line, #e4e7ef)); }
 .chart-session-chip.shades-off { border-style: dashed; opacity: 0.72; }
