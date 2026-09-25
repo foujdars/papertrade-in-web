@@ -25,6 +25,7 @@ export class AnchoredVwapOverlay implements ISeriesPrimitive<Time> {
     this.candles = candles;
     this.anchor = anchor;
     this.request?.();
+    requestAnimationFrame(() => this.request?.());
   }
 
   paneViews(): IPrimitivePaneView[] {
@@ -41,7 +42,7 @@ export class AnchoredVwapOverlay implements ISeriesPrimitive<Time> {
     ctx.rect(0, 0, width, height);
     ctx.clip();
     ctx.strokeStyle = "#d946ef";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.beginPath();
     let moved = false;

@@ -662,8 +662,10 @@ export function MarketChart({
   const previousDayRefreshRef = useRef<(() => void) | null>(null);
   const avwapSeries = useRef<AnchoredVwapOverlay | null>(null);
   const [avwapAnchor, setAvwapAnchor] = useState<number | null>(null);
+  const avwapAnchorRef = useRef<number | null>(null);
   const avwapEnabledRef = useRef(false);
   avwapEnabledRef.current = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
+  avwapAnchorRef.current = avwapAnchor;
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -1074,6 +1076,7 @@ export function MarketChart({
       hlcSeries.current.low.setData(source.map((candle) => ({ time: chartTimeFromEpoch(Number(candle.time), timeframe), value: candle.low })));
     }
     profileOverlay.current?.update(style, candles, timeframe, chartTheme === "neon");
+    avwapSeries.current?.update(candles, avwapEnabledRef.current ? avwapAnchorRef.current : null);
   }
 
   function paintLastBar(candles = dataRef.current) {
@@ -1090,6 +1093,7 @@ export function MarketChart({
       hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
     }
     profileOverlay.current?.update(style, candles, timeframe, chartTheme === "neon");
+    avwapSeries.current?.update(candles, avwapEnabledRef.current ? avwapAnchorRef.current : null);
   }
 
   function persistDrawings(pushHistory = false) {
@@ -1553,6 +1557,9 @@ export function MarketChart({
         series.attachPrimitive(overlay);
         profileOverlay.current = overlay;
       } else profileOverlay.current = null;
+      const avwapOverlay = new AnchoredVwapOverlay();
+      series.attachPrimitive(avwapOverlay);
+      avwapSeries.current = avwapOverlay;
       paintPriceSeries();
       setChartGeneration((value) => value + 1);
 
@@ -2557,17 +2564,12 @@ export function MarketChart({
   }, [indicators, instrument.instrumentKey, timeframe, latestCandle, chartGeneration]);
 
   useEffect(() => {
-    const series = candleSeries.current;
-    const enabled = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
-    if (!series || !enabled) {
-      if (avwapSeries.current && series) {
-        try { series.detachPrimitive(avwapSeries.current); } catch { /* The candle series was already replaced. */ }
-      }
-      avwapSeries.current = null;
+    const candles = dataRef.current;
+    const overlay = avwapSeries.current;
+    if (!avwapEnabledRef.current || candles.length < 2) {
+      overlay?.update(candles, null);
       return;
     }
-    const candles = dataRef.current;
-    if (candles.length < 2) return;
     let anchor = avwapAnchor;
     const chosen = anchor;
     if (chosen == null || !candles.some((candle) => candle.time >= chosen)) {
@@ -2577,12 +2579,8 @@ export function MarketChart({
       if (anchor != null) setAvwapAnchor(anchor);
     }
     if (anchor == null) return;
-    const start = anchor;
-    if (!avwapSeries.current) {
-      avwapSeries.current = new AnchoredVwapOverlay();
-      series.attachPrimitive(avwapSeries.current);
-    }
-    avwapSeries.current.update(candles, start);
+    avwapAnchorRef.current = anchor;
+    overlay?.update(candles, anchor);
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
