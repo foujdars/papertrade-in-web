@@ -29,9 +29,7 @@
 .chart-date-arrow { position: absolute; z-index: 12; transform: translateX(-50%); color: var(--purple, #794bd4); font-family: sans-serif; font-weight: 700; line-height: 1; pointer-events: none; filter: drop-shadow(0 1px 1px var(--surface, white)); }
 .chart-history-message { position: absolute; z-index: 10; bottom: 32px; left: 10px; max-width: calc(100% - 85px); padding: 0; color: var(--muted); background: transparent; font-size: 10px; pointer-events: none; text-shadow: 0 1px 1px var(--surface, white); }
 @media (max-width: 768px) {
-  .terminal-shell .chart-statusbar { flex-wrap: wrap; height: auto; min-height: 27px; }
-  .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-status-clock { margin-left: auto; flex: 0 0 auto; overflow: visible; white-space: nowrap; }
-  .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { flex: 1 0 100%; order: 1; }
+  .terminal-shell .chart-statusbar { height: auto; min-height: 27px; }
 }
 .chart-style-groups { padding: 6px 0 10px; }
 .chart-style-groups section { display: flex; flex-direction: column; }

@@ -44,7 +44,6 @@
 .indicator-card-name:disabled{cursor:default;opacity:.65}
 .indicator-card-name .indicator-applied{display:flex;align-items:center;gap:4px;color:var(--green);font-size:10px;margin-top:4px}
 .indicator-card-name:focus-visible{outline:2px solid var(--purple);outline-offset:3px;border-radius:5px}
-.study-quick-actions{position:absolute;left:10px;bottom:38px;z-index:12;max-width:calc(100% - 20px);display:flex;align-items:center;gap:5px;padding:5px 7px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 4px 18px #0002;font-size:11px}
-.study-quick-actions strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px}
-.study-quick-actions button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:34px;min-width:30px;padding:4px;background:transparent;border:0;color:var(--purple);font:inherit;white-space:nowrap}
+.study-quick-actions{position:absolute;left:10px;bottom:38px;z-index:12;display:flex;align-items:center;gap:2px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 4px 18px #0002}
+.study-quick-actions button{display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--purple)}
 .study-quick-actions button:focus-visible,.study-pane-heading button:focus-visible{outline:2px solid var(--purple);outline-offset:1px}

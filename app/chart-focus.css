@@ -69,8 +69,9 @@
 @media (min-width: 761px) { .terminal-shell .permanent-trade-footer { height: 32px; min-height: 32px; flex-basis: 32px; } }
 
 /* Study names use the existing clock row, leaving candle space unobstructed. */
-.terminal-shell .chart-statusbar { display: flex; padding-inline: 8px; gap: 8px; }
-.terminal-shell .chart-statusbar .chart-indicator-slot { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 9px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
+.terminal-shell .chart-statusbar { display: flex; flex-wrap: wrap; align-items: center; padding-inline: 8px; gap: 8px; }
+.terminal-shell .chart-statusbar .chart-indicator-slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { flex: 1 0 100%; order: 1; }
 .chart-indicator-slot::-webkit-scrollbar { display: none; }
 .chart-indicator-slot:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
 .terminal-shell .chart-statusbar .chart-indicator-strip { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; margin-left: 0; color: var(--muted); font-size: 9px; line-height: 22px; }
