@@ -35,3 +35,50 @@ export function buildVolumeProfile(candles: VolumeCandle[], from: number, to: nu
   }
   return bins;
 }
+
+export type FootprintRow = { low: number; high: number; buy: number; sell: number; volume: number };
+
+/** Estimated bid/ask ladder from one OHLCV candle. Body rows carry more volume than wicks. */
+export function footprintLadder(candle: VolumeCandle, rows = 8): FootprintRow[] {
+  if (!Number.isFinite(candle.volume) || candle.volume <= 0 || !Number.isFinite(candle.high) || !Number.isFinite(candle.low) || candle.high < candle.low) return [];
+  const count = Math.max(1, Math.min(16, Math.floor(rows)));
+  const low = candle.low;
+  const high = candle.high;
+  const range = high - low || Math.max(Math.abs(low) * 0.001, 0.05);
+  const close = candle.close ?? (high + low) / 2;
+  const open = candle.open ?? close;
+  const bodyLow = Math.min(open, close);
+  const bodyHigh = Math.max(open, close);
+  const buyShare = Math.min(1, Math.max(0, (Math.min(high, Math.max(low, close)) - low) / range));
+  const draft = Array.from({ length: count }, (_, index) => {
+    const binLow = low + (index * range) / count;
+    const binHigh = low + ((index + 1) * range) / count;
+    const mid = (binLow + binHigh) / 2;
+    return { low: binLow, high: binHigh, weight: mid >= bodyLow && mid <= bodyHigh ? 3 : 1, position: (mid - low) / range };
+  });
+  const weightSum = draft.reduce((sum, row) => sum + row.weight, 0);
+  const raw = draft.map((row) => {
+    const volume = candle.volume * row.weight / weightSum;
+    const sell = volume * (1 - row.position);
+    const buy = volume * row.position;
+    return { low: row.low, high: row.high, sell, buy };
+  });
+  const sellSum = raw.reduce((sum, row) => sum + row.sell, 0) || 1;
+  const buySum = raw.reduce((sum, row) => sum + row.buy, 0) || 1;
+  const sellBudget = candle.volume * (1 - buyShare);
+  const buyBudget = candle.volume * buyShare;
+  return raw.map((row) => {
+    const sell = row.sell * sellBudget / sellSum;
+    const buy = row.buy * buyBudget / buySum;
+    return { low: row.low, high: row.high, sell, buy, volume: sell + buy };
+  });
+}
+
+export function compactVolume(value: number) {
+  const abs = Math.abs(value);
+  const trim = (text: string) => text.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  if (abs >= 1e9) return `${trim((value / 1e9).toFixed(2))}B`;
+  if (abs >= 1e6) return `${trim((value / 1e6).toFixed(3))}M`;
+  if (abs >= 1e3) return `${trim((value / 1e3).toFixed(3))}K`;
+  return String(Math.round(value));
+}

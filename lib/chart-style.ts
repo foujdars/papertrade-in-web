@@ -139,6 +139,9 @@ export function toStyleSeriesPoint(
       low: candle.low,
       close: highLow ? candle.high : candle.close,
     };
+    if (style === "volume-footprint") {
+      return { time, open: candle.open, high: candle.high, low: candle.low, close: candle.close, color: "rgba(0,0,0,0)", borderColor: "rgba(0,0,0,0)", wickColor: "rgba(0,0,0,0)" };
+    }
     if (style === "volume-candles") {
       const color = volumeCandleColor(candle, source);
       point.color = color;

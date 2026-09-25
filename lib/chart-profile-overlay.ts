@@ -1,6 +1,6 @@
 import type { IChartApi, ISeriesApi, ISeriesPrimitive, IPrimitivePaneView, SeriesAttachedParameter, Time } from "lightweight-charts";
 import type { Candle } from "./market";
-import { buildVolumeProfile } from "./volume-profile";
+import { buildVolumeProfile, compactVolume, footprintLadder, volumeValueArea } from "./volume-profile";
 import { isProfileStyle, type ChartStyleId } from "./chart-style";
 
 const TPO_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -65,39 +65,104 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
 
   private paintFootprint(ctx: CanvasRenderingContext2D, bars: Candle[], from: number) {
     const spacing = this.chart!.timeScale().options().barSpacing ?? 6;
-    if (spacing < 5) return;
-    const rows = spacing >= 16 ? 10 : 6;
-    ctx.font = `${Math.max(8, Math.min(11, spacing - 4))}px Inter, system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    const series = this.series!;
+    const scale = this.chart!.timeScale();
     for (let index = 0; index < bars.length; index += 1) {
       const candle = bars[index];
-      const x = this.chart!.timeScale().logicalToCoordinate((from + index) as never);
-      if (x === null) continue;
-      const bins = buildVolumeProfile([candle], candle.time, candle.time, rows);
-      const max = Math.max(0, ...bins.map((bin) => bin.volume));
-      if (!max) continue;
-      const half = Math.max(4, spacing * 0.42);
-      for (const bin of bins) {
-        const top = this.series!.priceToCoordinate(bin.high);
-        const bottom = this.series!.priceToCoordinate(bin.low);
-        if (top === null || bottom === null) continue;
-        const h = Math.max(1, bottom - top);
-        const buy = bin.volume * (bin.upVolume / (bin.volume || 1));
-        const sell = bin.volume - buy;
-        const buyW = (buy / max) * half;
-        const sellW = (sell / max) * half;
-        ctx.fillStyle = "rgba(240,68,88,.55)";
-        ctx.fillRect(x - sellW, top, sellW, h);
-        ctx.fillStyle = "rgba(0,166,126,.55)";
-        ctx.fillRect(x, top, buyW, h);
-        if (spacing >= 14 && h >= 10) {
-          ctx.fillStyle = "#4b5568";
-          ctx.fillText(String(Math.round(bin.volume)), x, top + h / 2);
+      const x = scale.logicalToCoordinate((from + index) as never);
+      const yHigh = series.priceToCoordinate(candle.high);
+      const yLow = series.priceToCoordinate(candle.low);
+      if (x === null || yHigh === null || yLow === null) continue;
+      const top = Math.min(yHigh, yLow);
+      const bottom = Math.max(yHigh, yLow);
+      const pixel = bottom - top;
+      if (spacing < 16 || pixel < 36) {
+        this.paintFootprintCandle(ctx, candle, x, yHigh, yLow);
+        continue;
+      }
+      const rows = Math.max(4, Math.min(10, Math.floor(pixel / 18)));
+      const ladder = footprintLadder(candle, rows);
+      if (!ladder.length) continue;
+      const area = volumeValueArea(ladder);
+      const max = Math.max(...ladder.map((row) => row.volume));
+      const cell = Math.min(62, Math.max(28, (spacing - 10) / 2));
+      const font = Math.max(8, Math.min(12, Math.floor(pixel / rows * 0.42)));
+      ctx.font = `700 ${font}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      let sellTotal = 0;
+      let buyTotal = 0;
+      ladder.forEach((row, rowIndex) => {
+        const rowTop = series.priceToCoordinate(row.high);
+        const rowBottom = series.priceToCoordinate(row.low);
+        if (rowTop === null || rowBottom === null) return;
+        const y = Math.min(rowTop, rowBottom) + 1;
+        const h = Math.max(8, Math.abs(rowBottom - rowTop) - 2);
+        const poc = rowIndex === area.poc;
+        const inValue = area.low >= 0 && rowIndex >= area.low && rowIndex <= area.high;
+        const strength = 0.28 + 0.62 * (row.volume / max);
+        this.paintFootprintCell(ctx, x - cell - 1, y, cell, h, poc ? "#1c1c1c" : inValue ? `rgba(190, 42, 62, ${strength})` : `rgba(240, 98, 112, ${strength * 0.72})`, compactVolume(row.sell), font);
+        this.paintFootprintCell(ctx, x + 1, y, cell, h, poc ? "#1c1c1c" : inValue ? `rgba(8, 122, 96, ${strength})` : `rgba(18, 168, 128, ${strength * 0.72})`, compactVolume(row.buy), font);
+        sellTotal += row.sell;
+        buyTotal += row.buy;
+        if (rowIndex === area.high || rowIndex === area.low) {
+          const line = rowIndex === area.high ? Math.min(rowTop, rowBottom) : Math.max(rowTop, rowBottom);
+          ctx.save();
+          ctx.strokeStyle = "rgba(36, 48, 73, .55)";
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x - cell - 1, line);
+          ctx.lineTo(x + cell + 1, line);
+          ctx.stroke();
+          ctx.restore();
         }
+      });
+      this.paintFootprintCandle(ctx, candle, x, yHigh, yLow);
+      if (spacing >= 36) {
+        ctx.font = "700 9px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "top";
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#d23b52";
+        ctx.fillText(compactVolume(sellTotal), x - 3, bottom + 4);
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#0c9a72";
+        ctx.fillText(compactVolume(buyTotal), x + 3, bottom + 4);
       }
     }
   }
+
+  private paintFootprintCell(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, fill: string, label: string, font: number) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = "rgba(255,255,255,.9)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+    if (height >= font + 2 && width >= 24) {
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + width / 2, y + height / 2);
+    }
+  }
+
+  private paintFootprintCandle(ctx: CanvasRenderingContext2D, candle: Candle, x: number, yHigh: number, yLow: number) {
+    const open = candle.open ?? candle.close;
+    const up = candle.close >= open;
+    const yOpen = this.series!.priceToCoordinate(open);
+    const yClose = this.series!.priceToCoordinate(candle.close);
+    if (yOpen === null || yClose === null) return;
+    ctx.strokeStyle = up ? "#00a67e" : "#f04458";
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, Math.min(yHigh, yLow));
+    ctx.lineTo(x, Math.max(yHigh, yLow));
+    ctx.stroke();
+    const bodyTop = Math.min(yOpen, yClose);
+    const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
+    ctx.fillRect(x - 2.5, bodyTop, 5, bodyHeight);
+  }
+
 
   private paintTpo(ctx: CanvasRenderingContext2D, bars: Candle[]) {
     const sessions = new Map<string, Candle[]>();
