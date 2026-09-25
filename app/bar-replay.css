@@ -85,8 +85,9 @@
 .chart-replay-bar { display: grid; gap: 6px; margin: 0 8px 8px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .chart-replay-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 650; }
 .chart-replay-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chart-replay-transport { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.chart-replay-transport button { width: 100%; min-height: 34px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); color: var(--ink); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.chart-replay-transport { display: flex; gap: 6px; }
+.chart-replay-transport button { flex: 1 1 0; width: auto; min-width: 0; min-height: 34px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); color: var(--ink); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.chart-replay-transport .replay-step-symbol { font-size: 18px; line-height: 1; }
 .chart-replay-transport button:disabled { opacity: .4; cursor: not-allowed; }
 .chart-replay-transport button, .chart-replay-speeds button, .replay-drag-marker span { transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, filter 160ms ease; }
 @media (hover: hover) and (pointer: fine) {

@@ -131,8 +131,8 @@ export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; o
     {!!replay.message && !replay.loading && <button type="button" onClick={replay.retryLoad}>Retry</button>}
     <div className="chart-replay-transport">
       {replay.playing && <button type="button" onClick={replay.togglePlay}>Pause</button>}
-      <button type="button" onClick={replay.back} disabled={!replay.candles.length || replay.cursor <= 0}>Back</button>
-      <button type="button" onClick={replay.step} disabled={!replay.candles.length || replay.ended}>Next</button>
+      <button type="button" className="replay-step-symbol" aria-label="Previous candle" onClick={replay.back} disabled={!replay.candles.length || replay.cursor <= 0}>←</button>
+      <button type="button" className="replay-step-symbol" aria-label="Next candle" onClick={replay.step} disabled={!replay.candles.length || replay.ended}>→</button>
       <button type="button" onClick={replay.restart} disabled={replay.startTime == null}>Again</button>
       {onExit && <button type="button" onClick={onExit}>Exit</button>}
     </div>
