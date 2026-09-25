@@ -2,7 +2,7 @@
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
-import { Activity, Cable, Search, Star, X } from "lucide-react";
+import { Activity, Cable, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { FnoUnderlying } from "@/lib/fno";
 import { formatInr } from "@/lib/market";
@@ -17,7 +17,6 @@ export function FnoListsWorkspace({
   onSelect,
   onFutureSelect,
   onStar,
-  onClose,
 }: {
   quotes: Record<string, NormalizedQuote>;
   starredSymbols: ReadonlySet<string>;
@@ -25,7 +24,7 @@ export function FnoListsWorkspace({
   onSelect: (underlying: FnoUnderlying) => void;
   onFutureSelect: (underlying: FnoUnderlying) => void;
   onStar: (underlying: FnoUnderlying) => void;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<FnoListTab>("indices");
   const [underlyings, setUnderlyings] = useState<FnoUnderlying[]>([]);
@@ -64,7 +63,6 @@ export function FnoListsWorkspace({
       <nav className="trend-tabs fno-list-tabs" aria-label="F&O market lists">
         <button className={tab === "indices" ? "active" : ""} onClick={() => { setTab("indices"); setSearch(""); }}>Indices</button>
         <button className={tab === "fno" ? "active" : ""} onClick={() => { setTab("fno"); setSearch(""); }}>F&amp;O stocks</button>
-        <button className="fno-list-close" onClick={onClose} aria-label="Close F&O symbols"><X size={18} /></button>
       </nav>
       <label className="market-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "indices" ? "Search indices" : "Search F&O stocks"} /></label>
       <div className="market-discovery-list">

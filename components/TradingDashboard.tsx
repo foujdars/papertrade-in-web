@@ -94,7 +94,7 @@ import { useToastNotice } from "./useToastNotice";
 import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { RiskSizingPlan } from "@/components/RiskSizingPlan";
-import { BarReplayDialog } from "@/components/BarReplay";
+import { BarReplayDialog, ChartReplayBar, useReplayController } from "@/components/BarReplay";
 import { TradingCoach, type CoachTab } from "@/components/TradingCoach";
 import {
   buildOptionPayoff,
@@ -554,6 +554,9 @@ export function TradingDashboard() {
             ? "pnl"
             : workspaceMode;
   const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
+  const replayOnChart = Boolean(replayInstrument && activeNavigationSection === "trade" && selected.instrumentKey === replayInstrument.instrumentKey && selected.assetType !== "OPTION");
+  const chartReplay = useReplayController(replayOnChart ? selected : null, replayReviewTimeframe ?? timeframe);
+  const exitChartReplay = () => { setReplayInstrument(null); setReplayReviewTimeframe(null); };
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
@@ -2916,7 +2919,7 @@ export function TradingDashboard() {
               <div className="fno-chart-underlay" />
             ) : (
               <MarketChart
-                key={`${selected.symbol}-${timeframe}`}
+                key={`${selected.symbol}-${timeframe}${replayOnChart && chartReplay.candles.length ? "-replay" : ""}`}
                 instrument={selected}
                 timeframe={timeframe}
                 historyRequest={chartHistory}
@@ -2936,23 +2939,31 @@ export function TradingDashboard() {
                 externalCandles={selectedDeltaChartSymbol ? (globalCandleScopeRef.current === `${selectedDeltaChartSymbol}:${timeframe}` ? globalCandles : []) : undefined}
                 priceIncrement={selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.spec.tick : selectedDeltaOption ? globalTrading.optionSnapshots[selectedDeltaOption]?.spec.tick : undefined}
                 exchangeLabel={selectedVenueLabel}
-                tradeMarkers={selectedTradeMarkers}
-                orderTool={selectedGlobalPosition ? { enabled: true, side: selectedGlobalPosition.side, entryPrice: selectedGlobalPosition.entry, ...globalChartLevels(selectedGlobalPosition), quantity: Number((selectedGlobalPosition.contracts * selectedGlobalPosition.spec.lot).toFixed(8)), currency: "USD", tickSize: selectedGlobalPosition.spec.tick, referencePrice: selectedGlobalQuote ? triggerValue(selectedGlobalQuote, selectedGlobalPosition.protection?.source) : undefined, positionKey: String(selectedGlobalPosition.openedAt) }
+                tradeMarkers={replayOnChart ? [] : selectedTradeMarkers}
+                orderTool={replayOnChart ? undefined : selectedGlobalPosition ? { enabled: true, side: selectedGlobalPosition.side, entryPrice: selectedGlobalPosition.entry, ...globalChartLevels(selectedGlobalPosition), quantity: Number((selectedGlobalPosition.contracts * selectedGlobalPosition.spec.lot).toFixed(8)), currency: "USD", tickSize: selectedGlobalPosition.spec.tick, referencePrice: selectedGlobalQuote ? triggerValue(selectedGlobalQuote, selectedGlobalPosition.protection?.source) : undefined, positionKey: String(selectedGlobalPosition.openedAt) }
                   : selectedOptionPosition ? { enabled: true, side: selectedOptionPosition.side, entryPrice: selectedOptionPosition.entry, targetPrice: selectedOptionPosition.target ?? 0, stopLossPrice: selectedOptionPosition.stopLoss ?? 0, quantity: Number((selectedOptionPosition.contracts * selectedOptionPosition.spec.lot).toFixed(8)), currency: "USD", tickSize: selectedOptionPosition.spec.tick, referencePrice: selectedOptionQuote?.mark, positionKey: String(selectedOptionPosition.openedAt) }
                   : { enabled: !selectedDeltaChartSymbol && activeRiskToolEnabled, side: riskToolSide, entryPrice: riskEntryPrice, targetPrice: selectedProtection?.targetPrice ?? 0, stopLossPrice: selectedProtection?.stopLossPrice ?? 0, quantity: riskDisplayQuantity }}
                 onOrderToolChange={updateChartRiskLevel}
                 onOrderToolExit={selectedGlobalPosition || selectedOptionPosition ? closeGlobalChartPosition : selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
-                liveTick={selectedGlobalQuote ? { instrumentKey: selected.instrumentKey, price: selectedGlobalQuote.last, timestampMs: selectedGlobalQuote.at }
+                liveTick={replayOnChart ? undefined : selectedGlobalQuote ? { instrumentKey: selected.instrumentKey, price: selectedGlobalQuote.last, timestampMs: selectedGlobalQuote.at }
                   : selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
                 onPriceAction={(price, mode) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode }); }}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
                 onFeedStatus={handleFeedStatus}
+                replayCandles={replayOnChart && chartReplay.candles.length ? chartReplay.visible : undefined}
+                replaySelecting={replayOnChart && chartReplay.selecting}
+                replayStartTime={replayOnChart ? chartReplay.replayStartTime : null}
+                replayPrompt={replayOnChart && chartReplay.prompt}
+                onReplayPreview={replayOnChart ? chartReplay.previewAt : undefined}
+                onReplaySelect={replayOnChart ? chartReplay.selectAt : undefined}
+                onReplayPlay={replayOnChart ? chartReplay.playFromHere : undefined}
               />
             )}
           </div>
+          {replayOnChart && <ChartReplayBar replay={chartReplay} onExit={exitChartReplay} />}
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
             <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} afterDate={<button type="button" className="chart-statusbar-replay" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={15} /></button>} />
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
@@ -2962,7 +2973,7 @@ export function TradingDashboard() {
             {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}
             <div className="chart-status-clock">{clock ? `India · ${clock.toLocaleDateString("en-IN")} · ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} IST` : "India · IST"}</div>
           </div>
-          {activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer">
+          {activeNavigationSection === "trade" && !replayOnChart && <div className="chart-trade-footer permanent-trade-footer">
             <div className="chart-trade-buttons">
               <button disabled={!selectedOrderTicketAvailable} className="sell" onClick={() => openOrderSheet("SELL")}><span>Sell</span><b>{orderButtonPriceLabel}</b></button>
               <button disabled={!selectedOrderTicketAvailable} className="buy" onClick={() => openOrderSheet("BUY")}><span>Buy</span><b>{orderButtonPriceLabel}</b></button>
@@ -3157,7 +3168,7 @@ export function TradingDashboard() {
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><ChartNoAxesCombined size={19} /><span>P&amp;L</span></button>
       </nav>
 
-      {replayInstrument && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={() => { setReplayInstrument(null); setReplayReviewTimeframe(null); }} />}
+      {replayInstrument && !replayOnChart && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={exitChartReplay} />}
       {coachOpen && <TradingCoach initialTab={coachTab} timeframe={timeframe} theme={theme} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onOpenInsights={() => { setCoachOpen(false); openNavigationSection("pnl"); setPnlTab("insights"); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
@@ -3329,7 +3340,7 @@ export function TradingDashboard() {
                       <div className="pnl-trade-review-chart" onClick={(event) => event.stopPropagation()}>
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
-                          <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><StepBack size={17} /></button>
+                          <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); openNavigationSection("trade"); chooseTradeInstrument(reviewInstrument); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><StepBack size={17} /></button>
                           <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => chooseTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
                         </div>
                         <div className="pnl-trade-review-body">
