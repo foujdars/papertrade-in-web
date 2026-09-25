@@ -9,6 +9,23 @@ import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
 const readableFont = () => "13px sans-serif";
 
+function centerPositionAnchors(type: string, center: Anchor, source: VolumeCandle[]): Anchor[] {
+  const price = center.price;
+  const time = Number(center.time);
+  const times = source.map((candle) => Number(candle.time)).filter(Number.isFinite).sort((a, b) => a - b);
+  const gaps = times.slice(1).map((value, index) => value - times[index]).filter((gap) => gap > 0).sort((a, b) => a - b);
+  const step = gaps[Math.floor(gaps.length / 2)] || (time > 10_000 ? 86_400 : 1);
+  const half = step * 6;
+  const risk = Math.abs(price) * 0.015 || 1;
+  const long = type === "long-position";
+  const at = (offset: number) => (Number.isFinite(time) ? time + offset : center.time) as Anchor["time"];
+  return [
+    { time: at(0), price },
+    { time: at(-half), price: price + (long ? -risk : risk) },
+    { time: at(half), price: price + (long ? risk * 2 : -risk * 2) },
+  ];
+}
+
 export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
   // A registry belongs to one chart; replay and live charts must not share a data-source closure.
   type Entry = NonNullable<ReturnType<ReturnType<typeof drawing.getToolRegistry>["get"]>>;
@@ -85,23 +102,39 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
 
   class PositionDrawing extends drawing.Drawing {
     readonly type: string;
-    constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors,style,options); this.type=type; }
+    constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors.length===1?centerPositionAnchors(type,anchors[0],candles()):anchors,style,options); this.type=type; }
+    setAnchors(anchors: Anchor[]) { super.setAnchors(anchors.length===1?centerPositionAnchors(this.type,anchors[0],candles()):anchors); }
+    updateAnchor(index: number, anchor: Anchor) {
+      const current=this.anchors[index]; if(!current) return;
+      this.setAnchors(this.anchors.map((item,itemIndex)=>itemIndex===index?{...item,price:anchor.price}:item));
+    }
     isValid() { return this.anchors.length >= 3; }
-    computeGeometry(viewport: Viewport): (Geometry & { fill?: string })[] {
-      if (!this.isValid()) return [];
+    getControlPoints(viewport: Viewport) {
+      const box=this.positionBox(viewport); if(!box) return [];
+      const x=(box.left+box.end)/2;
+      return [{x,y:box.entry.y,index:0},{x,y:box.stop.y,index:1},{x,y:box.target.y,index:2}];
+    }
+    positionBox(viewport: Viewport) {
+      if (!this.isValid()) return null;
       const points=this.anchors.map(a=>this.anchorToPixel(a,viewport));
-      if(points.some(p=>!p))return [];
-      const [entry,stop,target]=points as Point[], [e,s,t]=this.anchors.map(a=>a.price);
+      if(points.some(p=>!p)) return null;
+      const [entry,stop,target]=points as Point[];
       const left=Math.min(entry.x,stop.x,target.x), right=Math.max(entry.x,stop.x,target.x);
-      // Horizontal extent belongs to the selected anchors, never a fixed 200px overhang.
-      const end=right-left<8?left+64:right, center=(left+end)/2;
-      if(end<0||left>(plotSize?.().width??viewport.width))return [];
+      const end=right-left<8?left+64:right;
+      if(end<0||left>(plotSize?.().width??viewport.width)) return null;
+      return {entry,stop,target,left,end};
+    }
+    computeGeometry(viewport: Viewport): (Geometry & { fill?: string })[] {
+      const box=this.positionBox(viewport); if(!box) return [];
+      const {entry,stop,target,left,end}=box, [e,s,t]=this.anchors.map(a=>a.price), center=(left+end)/2;
       const sign=this.type==="long-position"?1:-1, reward=(t-e)*sign, risk=(e-s)*sign;
       const riskColor=plotSize?.().dark?"#ff819b":"#ce355b", rewardColor=plotSize?.().dark?"#40dfb4":"#00876b";
       const zone=(y:number,fill:string):Geometry & {fill:string}=>({type:"polygon",closed:true,points:[{x:left,y:entry.y},{x:end,y:entry.y},{x:end,y},{x:left,y}],fill});
       const delta=(n:number)=>`${n>=0?"+":""}${n.toFixed(2)} (${n>=0?"+":""}${(e?n/e*100:0).toFixed(2)}%)`;
       return [zone(target.y,"rgba(0,174,132,.19)"),zone(stop.y,"rgba(242,62,103,.18)"),
         {type:"line",start:{x:left,y:entry.y},end:{x:end,y:entry.y}},
+        {type:"line",start:{x:left,y:stop.y},end:{x:end,y:stop.y}},
+        {type:"line",start:{x:left,y:target.y},end:{x:end,y:target.y}},
         {type:"text",position:{x:center,y:target.y+(target.y<entry.y?-10:22)},text:`${t.toFixed(2)} · ${delta(reward)}`,align:"center",color:rewardColor},
         {type:"text",position:{x:center,y:entry.y-6},text:`${e.toFixed(2)} · ${risk>0&&reward>=0?`1:${(reward/risk).toFixed(2)}`:"—"}`,align:"center",color:plotSize?.().dark?"#c4a2ff":"#7653bd"},
         {type:"text",position:{x:center,y:stop.y+(stop.y<entry.y?-10:22)},text:`${s.toFixed(2)} · ${delta(-risk)}`,align:"center",color:riskColor},
@@ -275,7 +308,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     clone(id:string) { return new LabeledFibonacci(id,[...this.anchors],this.style,this.fibOptions); }
   }
   registry.register({...registry.get("fib-retracement")!,factory:(id,anchors,style,options)=>new LabeledFibonacci(id,anchors,style,options)});
-  for(const type of ["long-position","short-position"])registry.register({...registry.get(type)!,factory:(id,anchors,style,options)=>new PositionDrawing(type,id,anchors,style,options)});
+  for(const type of ["long-position","short-position"])registry.register({...registry.get(type)!,requiredAnchors:1,factory:(id,anchors,style,options)=>new PositionDrawing(type,id,anchors??[],style,options)});
   for(const tool of EXTRA_DRAWING_TOOLS)registry.register({type:tool.id,name:tool.label,category:"shape",requiredAnchors:tool.anchors,factory:(id,anchors,style,options)=>new ManualPattern(tool.id,id,anchors,style,options)});
   for (const [type,name,Tool] of [["price-range","Price measurement",PriceMeasurement],["volume-profile","Fixed-range volume profile",VolumeProfile]] as const) {
     registry.register({type,name,category:"measurement",requiredAnchors:2,factory:(id:string,anchors?:Anchor[],style?:Partial<DrawingStyle>,options?:Partial<DrawingOptions>)=>new Tool(id,anchors,style,options)});

@@ -27,6 +27,25 @@ test('position drawings use actual anchor width, numeric per-unit values, distin
   assert.equal(item.testHit({x:160,y:200},viewport),true); assert.equal(item.testHit({x:330,y:200},viewport),false);
  }
 });
+test('a position click is the centre and each price line moves on its own',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ const item=registry.createDrawing('long-position','center',[{time:2,price:100}],{},{visible:true});
+ assert.equal(item.anchors.length,3);
+ assert.equal(item.anchors[0].time,2); assert.equal(item.anchors[0].price,100);
+ assert.ok(item.anchors[1].time<2&&item.anchors[2].time>2);
+ assert.ok(item.anchors[1].price<100&&item.anchors[2].price>100);
+ item.setAnchors([{time:2,price:100}]);
+ assert.equal(item.anchors[0].time,2); assert.equal(item.anchors.length,3);
+ item.updateAnchor(1,{time:9,price:90});
+ assert.equal(item.anchors[1].price,90); assert.notEqual(item.anchors[1].time,9);
+ item.updateAnchor(0,{time:4,price:101}); item.updateAnchor(2,{time:0,price:120});
+ assert.equal(item.anchors[0].price,101); assert.equal(item.anchors[0].time,2);
+ assert.equal(item.anchors[2].price,120); assert.equal(item.anchors[1].price,90);
+ const points=item.getControlPoints(viewport);
+ assert.equal(points.length,3); assert.equal(points[0].x,points[1].x); assert.equal(points[1].x,points[2].x);
+ const short=registry.createDrawing('short-position','short',[{time:2,price:100}],{},{visible:true});
+ assert.ok(short.anchors[1].price>100&&short.anchors[2].price<100);
+});
 test('dense labels stay inside narrow plots, shrink and never overlap each other',()=>{
  for(const width of [120,240,320,768]) {
   const labels=Array.from({length:14},(_,i)=>({text:i<3?'23380.15 · +77.61 (+0.35%)':`${i*.236}`,x:i%2?-15:width+90,y:95,align:'center'}));
