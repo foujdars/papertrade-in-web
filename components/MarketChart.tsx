@@ -5,7 +5,7 @@ import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
 import { PreviousDayLevels } from "./PreviousDayLevels";
-import { anchoredVwap } from "@/lib/anchored-vwap";
+import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
@@ -39,7 +39,7 @@ import type {
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
-import { ColorType, LineSeries, MismatchDirection } from "lightweight-charts";
+import { ColorType, MismatchDirection } from "lightweight-charts";
 import type {
   Anchor,
   DrawingManager,
@@ -660,7 +660,7 @@ export function MarketChart({
   const patternRefreshRef = useRef<(() => void) | null>(null);
   const openingRangeRefreshRef = useRef<(() => void) | null>(null);
   const previousDayRefreshRef = useRef<(() => void) | null>(null);
-  const avwapSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const avwapSeries = useRef<AnchoredVwapOverlay | null>(null);
   const [avwapAnchor, setAvwapAnchor] = useState<number | null>(null);
   const avwapEnabledRef = useRef(false);
   avwapEnabledRef.current = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
@@ -2557,39 +2557,33 @@ export function MarketChart({
   }, [indicators, instrument.instrumentKey, timeframe, latestCandle, chartGeneration]);
 
   useEffect(() => {
-    const chart = chartApi.current;
-    const enabled = avwapEnabledRef.current;
-    if (!chart || !enabled || avwapAnchor == null) {
-      if (avwapSeries.current && chart) {
-        try { chart.removeSeries(avwapSeries.current); } catch { /* The chart was already replaced. */ }
+    const series = candleSeries.current;
+    const enabled = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
+    if (!series || !enabled) {
+      if (avwapSeries.current && series) {
+        try { series.detachPrimitive(avwapSeries.current); } catch { /* The candle series was already replaced. */ }
       }
       avwapSeries.current = null;
       return;
     }
-    if (!avwapSeries.current) {
-      avwapSeries.current = chart.addSeries(LineSeries, {
-        color: "#d946ef",
-        lineWidth: 2,
-        priceLineVisible: true,
-        priceLineColor: "#d946ef",
-        priceLineStyle: 2,
-        lastValueVisible: true,
-        title: "AVWAP",
-        ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
-      }, 0);
+    const candles = dataRef.current;
+    if (candles.length < 2) return;
+    let anchor = avwapAnchor;
+    const chosen = anchor;
+    if (chosen == null || !candles.some((candle) => candle.time >= chosen)) {
+      const visible = chartApi.current?.timeScale().getVisibleLogicalRange();
+      const index = visible ? Math.max(0, Math.min(candles.length - 2, Math.floor(visible.from))) : Math.max(0, candles.length - 40);
+      anchor = candles[index]?.time ?? null;
+      if (anchor != null) setAvwapAnchor(anchor);
     }
-    const points = anchoredVwap(dataRef.current, avwapAnchor).map((point) => ({
-      time: chartTimeFromEpoch(point.time, timeframe),
-      value: point.value,
-    }));
-    avwapSeries.current.setData(points);
-    return () => {
-      if (avwapSeries.current && chartApi.current === chart) {
-        try { chart.removeSeries(avwapSeries.current); } catch { /* The chart was already replaced. */ }
-      }
-      avwapSeries.current = null;
-    };
-  }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle, externalFeed]);
+    if (anchor == null) return;
+    const start = anchor;
+    if (!avwapSeries.current) {
+      avwapSeries.current = new AnchoredVwapOverlay();
+      series.attachPrimitive(avwapSeries.current);
+    }
+    avwapSeries.current.update(candles, start);
+  }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
   const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
