@@ -159,6 +159,8 @@
 .chart-or-tag.high { color: #0f9f6e; }
 .chart-or-tag.low { color: #e24b4b; }
 .chart-or-note { position: absolute; z-index: 6; left: 12px; bottom: 36px; color: var(--muted); font-size: 10px; font-weight: 700; pointer-events: none; }
+.chart-avwap-tag { position: absolute; z-index: 6; top: 78px; transform: translateX(-50%); padding: 1px 6px; border: 1px solid #d946ef; border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: #d946ef; font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; pointer-events: auto; }
+.chart-avwap-tag { position: absolute; z-index: 6; top: 78px; transform: translateX(-50%); padding: 1px 6px; border: 1px solid #d946ef; border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: #d946ef; font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; pointer-events: auto; }
 .chart-previous-day { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
 .chart-pd-line { position: absolute; left: 0; height: 0; border-top: 1px dashed currentColor; }
 .chart-pd-line.high { color: #0f9f6e; }

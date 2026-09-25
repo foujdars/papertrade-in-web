@@ -102,6 +102,7 @@ export const STUDIES:StudyDefinition[]=[
  make('vpvr','Volume Profile Visible Range','Volume',true,[{...length(24,'Rows','rows'),min:8,max:80}],{volume:true,note:'Approximate volume-at-price from visible OHLCV candles; not exchange tick-level volume.'}),
  make('vortex','Vortex Indicator','Momentum',false,[length(14)]),
  make('vwap','VWAP','Volume',true,[],{volume:true,note:'Resets each IST trading session. Requires actual candle volume.'}),
+ make('anchored-vwap','Anchored VWAP','Volume',true,[],{volume:true,note:'Tap a candle to start VWAP from that bar. Requires traded volume.'}),
  make('vwma','VWMA','Volume',true,[length(20)],{volume:true}),
  make('williams','Williams %R','Momentum',false,[length(14)]),
  make('alligator','Williams Alligator','Trend',true,[length(13,'Jaw length'),length(8,'Teeth length','teeth'),length(5,'Lips length','lips')],{note:'Smoothed median-price averages displaced by 8/5/3 bars.'}),
