@@ -142,7 +142,11 @@
 .chart-session-shade { position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; }
 .chart-session-edge { position: absolute; z-index: 4; bottom: 2px; transform: translateX(-50%); padding: 1px 4px; border-radius: 6px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: var(--ink, #243049); font-size: 9px; font-weight: 750; line-height: 1.3; pointer-events: none; white-space: nowrap; box-shadow: 0 1px 2px #1518241a; }
 .chart-session-row { position: absolute; z-index: 9; top: 50px; left: 12px; right: 64px; display: flex; flex-wrap: nowrap; gap: 4px; pointer-events: none; }
-.chart-session-chip { position: static; z-index: 9; max-width: none; padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--line, #e4e7ef) 80%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: var(--muted, #65708a); font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; text-align: left; cursor: pointer; pointer-events: auto; touch-action: manipulation; white-space: nowrap; }
+.chart-session-chip { position: static; z-index: 9; max-width: none; padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--line, #e4e7ef) 80%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: var(--muted, #65708a); font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; text-align: left; cursor: pointer; pointer-events: auto; touch-action: manipulation; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .chart-session-chip:hover { border-color: color-mix(in srgb, var(--purple, #753bce) 42%, var(--line)); color: var(--ink, #243049); background: var(--surface, #fff); }
+  .chart-buy-button:hover, .chart-sell-button:hover { filter: brightness(1.08); }
+}
 .terminal-shell .chart-body > .drawing-toolbar.collapsed ~ .chart-stack .chart-session-row { left: 22px; }
 .chart-session-chip.is-open { color: #0f9f6e; border-color: color-mix(in srgb, #12b886 55%, var(--line, #e4e7ef)); }
 .chart-session-chip.shades-off { border-style: dashed; opacity: 0.72; }

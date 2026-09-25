@@ -88,6 +88,12 @@
 .chart-replay-transport { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .chart-replay-transport button { width: 100%; min-height: 34px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); color: var(--ink); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 .chart-replay-transport button:disabled { opacity: .4; cursor: not-allowed; }
+.chart-replay-transport button, .chart-replay-speeds button, .replay-drag-marker span { transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, filter 160ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .chart-replay-transport button:not(:disabled):hover { border-color: color-mix(in srgb, var(--purple, #753bce) 46%, var(--line)); background: var(--purple-soft, #f3e9ff); color: var(--purple, #753bce); }
+  .chart-replay-speeds button:not(:disabled):not([aria-pressed="true"]):hover { border-color: color-mix(in srgb, var(--purple, #753bce) 40%, var(--line)); color: var(--ink); background: color-mix(in srgb, var(--purple-soft, #f3e9ff) 72%, transparent); }
+  .replay-drag-marker:hover span { filter: brightness(1.12); }
+}
 .chart-replay-speeds { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .chart-replay-speeds button { min-height: 30px; padding: 4px 0; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 .chart-replay-speeds button[aria-pressed="true"] { color: var(--purple, #753bce); border-color: color-mix(in srgb, var(--purple, #753bce) 55%, var(--line)); background: var(--purple-soft, #f3e9ff); }
