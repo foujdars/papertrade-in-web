@@ -5,7 +5,7 @@ import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
 import { PreviousDayLevels } from "./PreviousDayLevels";
-import { AnchoredVwap } from "./AnchoredVwap";
+import { anchoredVwap } from "@/lib/anchored-vwap";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
@@ -39,7 +39,7 @@ import type {
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
-import { ColorType, MismatchDirection } from "lightweight-charts";
+import { ColorType, LineSeries, MismatchDirection } from "lightweight-charts";
 import type {
   Anchor,
   DrawingManager,
@@ -660,7 +660,10 @@ export function MarketChart({
   const patternRefreshRef = useRef<(() => void) | null>(null);
   const openingRangeRefreshRef = useRef<(() => void) | null>(null);
   const previousDayRefreshRef = useRef<(() => void) | null>(null);
-  const anchoredVwapRefreshRef = useRef<(() => void) | null>(null);
+  const avwapSeries = useRef<ISeriesApi<"Line"> | null>(null);
+  const [avwapAnchor, setAvwapAnchor] = useState<number | null>(null);
+  const avwapEnabledRef = useRef(false);
+  avwapEnabledRef.current = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
   const riskDragPriceRef = useRef(0);
@@ -832,7 +835,6 @@ export function MarketChart({
       patternRefreshRef.current?.();
       openingRangeRefreshRef.current?.();
       previousDayRefreshRef.current?.();
-      anchoredVwapRefreshRef.current?.();
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
@@ -1434,6 +1436,7 @@ export function MarketChart({
     let refreshOverlays: (() => void) | null = null;
     let crosshairMove: ((event: MouseEventParams<Time>) => void) | null = null;
     let replayClick: ((event: MouseEventParams<Time>) => void) | null = null;
+    let avwapClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
     let profileClient: ReturnType<typeof createProfileDataClient> | undefined;
     let profileRefresh: ReturnType<typeof setInterval> | undefined;
@@ -1577,6 +1580,12 @@ export function MarketChart({
         replayRef.current.onSelect?.(time);
       };
       if (isReplay) chart.subscribeClick(replayClick);
+      avwapClick = (event) => {
+        if (!avwapEnabledRef.current || event.time === undefined) return;
+        const time = timeToTimestamp(event.time) - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0);
+        setAvwapAnchor(time);
+      };
+      chart.subscribeClick(avwapClick);
 
       manager = new drawing.DrawingManager();
       manager.attach(chart, series, host);
@@ -1978,6 +1987,8 @@ export function MarketChart({
       if (refreshOverlays) chartApi.current?.timeScale().unsubscribeVisibleLogicalRangeChange(refreshOverlays);
       if (crosshairMove) chartApi.current?.unsubscribeCrosshairMove(crosshairMove);
       if (replayClick) chartApi.current?.unsubscribeClick(replayClick);
+      if (avwapClick) chartApi.current?.unsubscribeClick(avwapClick);
+      avwapSeries.current = null;
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup?.();
       cancelDraft();
       editRef.current = null;
@@ -2533,6 +2544,53 @@ export function MarketChart({
     return () => { disposed = true; request?.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
   }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
+  useEffect(() => {
+    if (!avwapEnabledRef.current) return;
+    const candles = dataRef.current;
+    if (!candles.length) return;
+    setAvwapAnchor((current) => {
+      if (current != null && candles.some((candle) => candle.time >= current)) return current;
+      const visible = chartApi.current?.timeScale().getVisibleLogicalRange();
+      const index = visible ? Math.max(0, Math.min(candles.length - 1, Math.floor(visible.from))) : Math.max(0, candles.length - 40);
+      return candles[index]?.time ?? null;
+    });
+  }, [indicators, instrument.instrumentKey, timeframe, latestCandle, chartGeneration]);
+
+  useEffect(() => {
+    const chart = chartApi.current;
+    const enabled = avwapEnabledRef.current;
+    if (!chart || !enabled || avwapAnchor == null) {
+      if (avwapSeries.current && chart) {
+        try { chart.removeSeries(avwapSeries.current); } catch { /* The chart was already replaced. */ }
+      }
+      avwapSeries.current = null;
+      return;
+    }
+    if (!avwapSeries.current) {
+      avwapSeries.current = chart.addSeries(LineSeries, {
+        color: "#d946ef",
+        lineWidth: 2,
+        priceLineVisible: true,
+        priceLineColor: "#d946ef",
+        priceLineStyle: 2,
+        lastValueVisible: true,
+        title: "AVWAP",
+        ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
+      }, 0);
+    }
+    const points = anchoredVwap(dataRef.current, avwapAnchor).map((point) => ({
+      time: chartTimeFromEpoch(point.time, timeframe),
+      value: point.value,
+    }));
+    avwapSeries.current.setData(points);
+    return () => {
+      if (avwapSeries.current && chartApi.current === chart) {
+        try { chart.removeSeries(avwapSeries.current); } catch { /* The chart was already replaced. */ }
+      }
+      avwapSeries.current = null;
+    };
+  }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle, externalFeed]);
+
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
   const indicatorLegend = activeStudies.length ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "anchored-vwap"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
@@ -2565,7 +2623,8 @@ export function MarketChart({
         {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} triggerHost={indicatorHost} />}
         {indicators["opening-range"] && !studySettings["opening-range"]?.hidden && <OpeningRange key={`${instrument.instrumentKey}:${timeframe}:opening-range`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} refreshRef={openingRangeRefreshRef} />}
         {indicators["previous-day"] && !studySettings["previous-day"]?.hidden && <PreviousDayLevels key={`${instrument.instrumentKey}:${timeframe}:previous-day`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={previousDayRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
-        {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && <AnchoredVwap key={`${instrument.instrumentKey}:${timeframe}:anchored-vwap`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} instrumentKey={instrument.instrumentKey} replay={isReplay} refreshRef={anchoredVwapRefreshRef} />}
+        {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
+        {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: Math.max(28, (priceCursor?.y ?? 88) - 16) }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
         {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
