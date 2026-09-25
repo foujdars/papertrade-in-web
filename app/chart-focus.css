@@ -89,7 +89,7 @@
 .candle-pattern-tag.bearish { color: var(--red, #d94064); }
 .candle-pattern-tag.neutral { color: var(--muted); }
 .candle-pattern-tag.active { border-color: currentColor; }
-.candle-pattern-sheet { position: absolute; z-index: 12; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 6px; max-height: 58%; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 28px #171b3524; }
+.candle-pattern-sheet { position: absolute; z-index: 32; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 6px; max-height: 58%; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 10px 28px #171b3524; }
 .candle-pattern-sheet header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .candle-pattern-sheet header button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .candle-pattern-sheet p, .candle-pattern-sheet small { color: var(--muted); font-size: 10px; }
