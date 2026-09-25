@@ -5,6 +5,7 @@ const num=(key:string,label:string,value:number,min=.1,max=20,step=.1):StudyFiel
 const make=(id:string,name:string,group:string,overlay=false,fields:StudyField[]=[length()],extra:Partial<StudyDefinition>={}):StudyDefinition=>({id,name,group,overlay,fields,...extra});
 export const STUDIES:StudyDefinition[]=[
  make('smc','SMC Learner','Learning',true,[],{note:'Structure and zone filters are in SMC Learn. No SMC alerts are added.'}),
+ make('patterns','Candlestick patterns','Price',true,[],{note:'Classic candle shapes on closed bars. Labels describe the shape only. They are not trade signals.'}),
  ...[5,21,30,50,100,200].map(n=>make(`ema${n}`,`EMA ${n}`,'Trend',true,[length(n)])),
  ...[20,50,200].map(n=>make(`sma${n}`,`SMA ${n}`,'Trend',true,[length(n)])),
  make('ad','Accumulation/Distribution','Volume',false,[],{volume:true}),

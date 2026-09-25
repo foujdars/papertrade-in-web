@@ -79,6 +79,26 @@
 .chart-indicator-strip b { display: none; }
 .terminal-shell .chart-smc-learn { position: static; display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; padding: 0; min-height: 22px; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--purple); font: inherit; font-size: 9px; white-space: nowrap; cursor: pointer; }
 .chart-smc-learn:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
+.chart-pattern-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 2px; border: 0; background: transparent; color: var(--purple); font: inherit; font-size: 9px; font-weight: 800; cursor: pointer; }
+.chart-pattern-chip span { color: var(--muted); font-weight: 700; }
+.chart-pattern-float { position: absolute; z-index: 6; top: 8px; right: 8px; }
+.candle-pattern-tag { position: absolute; z-index: 5; max-width: 92px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--ink); font: inherit; font-size: 8px; font-weight: 800; line-height: 1.4; white-space: nowrap; cursor: pointer; }
+.candle-pattern-tag.above { transform: translate(-50%, -120%); }
+.candle-pattern-tag.below { transform: translate(-50%, 6px); }
+.candle-pattern-tag.bullish { color: var(--green, #0b8a5b); }
+.candle-pattern-tag.bearish { color: var(--red, #d94064); }
+.candle-pattern-tag.neutral { color: var(--muted); }
+.candle-pattern-tag.active { border-color: currentColor; }
+.candle-pattern-sheet { position: absolute; z-index: 12; left: 8px; right: 8px; bottom: 8px; display: grid; gap: 6px; max-height: 42%; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 28px #171b3524; }
+.candle-pattern-sheet header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.candle-pattern-sheet header button, .candle-pattern-sheet > div button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.candle-pattern-sheet p, .candle-pattern-sheet small { color: var(--muted); font-size: 10px; }
+.candle-pattern-sheet > div { display: grid; gap: 4px; }
+.candle-pattern-sheet > div button, .candle-pattern-sheet article { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; text-align: left; }
+.candle-pattern-sheet article { padding: 6px; border-radius: 10px; background: var(--soft); }
+.candle-pattern-sheet .bullish b { color: var(--green, #0b8a5b); }
+.candle-pattern-sheet .bearish b { color: var(--red, #d94064); }
+.candle-pattern-sheet article span { flex-basis: 100%; color: var(--ink); font-size: 11px; }
 .terminal-shell .chart-statusbar .chart-status-live-pnl:not(.visible) { display: none; }
 .terminal-shell .chart-statusbar .chart-status-live-pnl.visible { flex: 0 0 auto; min-width: 0; }
 .terminal-shell .chart-statusbar .chart-feed-warning { flex: 0 1 150px; max-width: 28%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
