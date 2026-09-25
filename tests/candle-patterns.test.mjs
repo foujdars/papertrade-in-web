@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { filterCandlePatterns, findCandlePatterns } from "../lib/candle-patterns.ts";
+import { filterCandlePatterns, findCandlePatterns, spreadPatternTags } from "../lib/candle-patterns.ts";
 
 const bar = (time, open, high, low, close) => ({ time, open, high, low, close });
 
@@ -51,4 +51,13 @@ test("names a morning star and explains it", () => {
 
 test("does not invent a pattern on a plain trend", () => {
   assert.deepEqual(findCandlePatterns(drift(100, 1, 12)).map((hit) => hit.name), []);
+});
+
+test("moves a second label off a neighbour on the same candles", () => {
+  const [first, second] = spreadPatternTags([
+    { name: "Hanging man", x: 100, y: 80, above: true },
+    { name: "Doji", x: 118, y: 86, above: true },
+  ]);
+  assert.equal(first.y, 80);
+  assert.ok(second.y < first.y);
 });

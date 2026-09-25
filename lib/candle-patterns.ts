@@ -56,6 +56,31 @@ function realBody(c: Bar) {
 
 export const PATTERN_NAMES = Object.keys(NOTES);
 
+export function spreadPatternTags<T extends { name: string; x: number; y: number; above: boolean }>(tags: readonly T[]): T[] {
+  const placed: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+  return tags.map((tag) => {
+    const width = Math.min(92, 12 + tag.name.length * 4.8);
+    const height = 16;
+    let y = tag.y;
+    let box = tagBox(tag.x, y, width, height, tag.above);
+    for (let attempt = 0; attempt < 6 && placed.some((other) => overlaps(box, other)); attempt += 1) {
+      y += tag.above ? -(height + 3) : height + 3;
+      box = tagBox(tag.x, y, width, height, tag.above);
+    }
+    placed.push(box);
+    return y === tag.y ? tag : { ...tag, y };
+  });
+}
+
+function tagBox(x: number, y: number, width: number, height: number, above: boolean) {
+  const top = above ? y - height * 1.2 : y + 6;
+  return { left: x - width / 2, right: x + width / 2, top, bottom: top + height };
+}
+
+function overlaps(a: { left: number; right: number; top: number; bottom: number }, b: { left: number; right: number; top: number; bottom: number }) {
+  return a.left < b.right - 4 && a.right > b.left + 4 && a.top < b.bottom && a.bottom > b.top;
+}
+
 export function filterCandlePatterns(hits: CandlePatternHit[], bias: "all" | PatternBias, hidden: readonly string[]) {
   const skip = new Set(hidden);
   return hits.filter((hit) => (bias === "all" || hit.bias === bias) && !skip.has(hit.name));
