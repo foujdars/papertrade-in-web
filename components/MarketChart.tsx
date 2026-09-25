@@ -680,6 +680,8 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
+  const [drawingActions, setDrawingActions] = useState<{ x: number; y: number } | null>(null);
+  const [priceScaleWidth, setPriceScaleWidth] = useState(72);
   const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
   const drawingAimRef = useRef<Anchor | null>(null);
   const lastCrosshairAnchorRef = useRef<Anchor | null>(null);
@@ -841,6 +843,20 @@ export function MarketChart({
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
+      const scaleWidth = chartApi.current?.priceScale("right").width() ?? 72;
+      setPriceScaleWidth((current) => Math.abs(current - scaleWidth) < 1 ? current : Math.max(48, scaleWidth));
+      const selectedDrawing = drawingManager.current?.getSelectedDrawing();
+      const anchors = selectedDrawing?.anchors ?? [];
+      const actionPoints = anchors.flatMap((anchor) => {
+        const pointX = chartApi.current?.timeScale().timeToCoordinate(anchor.time) ?? null;
+        const pointY = candleSeries.current?.priceToCoordinate(anchor.price) ?? null;
+        return pointX === null || pointY === null ? [] : [{ x: pointX, y: pointY }];
+      });
+      const nextActions = actionPoints.length ? {
+        x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 64, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 28)),
+        y: Math.max(4, Math.min(...actionPoints.map((point) => point.y)) - 32),
+      } : null;
+      setDrawingActions((current) => current && nextActions && Math.abs(current.x - nextActions.x) < 1 && Math.abs(current.y - nextActions.y) < 1 ? current : nextActions);
       refreshRiskCoordinates();
       refreshTradeMarkerCoordinates();
     });
@@ -1507,7 +1523,7 @@ export function MarketChart({
       const kind = styleSeriesKind(style);
       const shared = {
         ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
-        priceLineVisible: true,
+        priceLineVisible: !isReplay,
         priceLineColor: "#6657ee",
         priceLineWidth: 1 as const,
         priceLineStyle: lwc.LineStyle.Dashed,
@@ -2634,7 +2650,7 @@ export function MarketChart({
           }}>Draw horizontal line at ₹{priceMenu.toFixed(2)}</button>
         </section></div>}
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
-        {isReplay && replayMarkerX !== null && <>
+        {isReplay && replaySelecting && replayMarkerX !== null && <>
           {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
           <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX, pointerEvents: replayPlaying ? "none" : "auto" }} aria-label="Play from this candle" onPointerDown={event => {
             if (!replaySelecting) return;
@@ -2711,7 +2727,7 @@ export function MarketChart({
         {!isReplay && <SessionBoard variant="chip" hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
-        {!hiddenDrawings && selectedDrawingId && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions">
+        {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions" style={{ left: drawingActions.x, top: drawingActions.y }}>
           <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
           <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
         </div>}
@@ -2734,7 +2750,7 @@ export function MarketChart({
           </div>
         ))}
         {!candlesOnly && orderTool?.enabled && riskCoordinates && (
-          <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} aria-label="Position target and stop-loss controls">
+          <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} style={{ right: priceScaleWidth }} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <div className="bracket-pill">
                 <button type="button" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={11} /> : <Eye size={11} />}</button>

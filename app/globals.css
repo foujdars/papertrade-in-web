@@ -421,7 +421,6 @@
 @media (max-width: 560px) {
   .chart-quick-order-buttons { width: calc(100% - 58px); gap: 6px; }
   .chart-quick-order-buttons button { height: 35px; }
-  .chart-risk-tool { right: 58px; }
 }
 
 * { box-sizing: border-box; }
@@ -1431,7 +1430,7 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 .chart-buy-button { border-color: #00dca1 !important; background: linear-gradient(135deg, #00a67eeb, #00cf9aeb); }
 .chart-sell-button { border-color: #ff6375 !important; background: linear-gradient(135deg, #e72f4aeb, #ff5269eb); }
 .chart-quick-order-buttons button.active { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 4px #6657ee45, 0 9px 26px #17203338; }
-.chart-risk-tool { position: absolute; z-index: 13; inset: 0 72px 0 0; pointer-events: none; }
+.chart-risk-tool { position: absolute; z-index: 13; inset: 0 72px 0 0; overflow: hidden; pointer-events: none; }
 .risk-line { position: absolute; left: 0; right: 0; height: 0; transform: translateY(-50%); }
 .risk-tool-close { position: absolute; z-index: 2; top: 70px; right: 5px; width: 25px; height: 25px; display: grid; place-items: center; border: 1px solid #d9ddea; border-radius: 7px; color: #69738a; background: #ffffffed; font-size: 17px; line-height: 1; pointer-events: auto; cursor: pointer; }
 .risk-reward-summary { position: absolute; top: 70px; right: 36px; max-width: calc(100% - 85px); min-height: 24px; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 1px solid #dcd8ff66; border-radius: 7px; color: #667087; background: transparent; box-shadow: none; font-size: 8px; pointer-events: none; }
