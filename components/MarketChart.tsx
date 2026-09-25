@@ -599,7 +599,7 @@ export function MarketChart({
   const compareSeries = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const profileOverlay = useRef<ChartProfileOverlay | null>(null);
   const [chartGeneration, setChartGeneration] = useState(0);
-  const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string }>>([]);
+  const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string; edges: Array<{ x: number; label: string }> }>>([]);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
@@ -2013,17 +2013,57 @@ export function MarketChart({
       const x2 = scale.timeToCoordinate(visible.to);
       if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || x1 == null || x2 == null) return;
       const plotRight = chart.priceScale("right").width();
+      const plotWidth = Math.max(0, width - plotRight);
+      const step = /^(\d+)(m|h)$/.exec(timeframe);
+      const barSeconds = step ? Number(step[1]) * (step[2] === "h" ? 3600 : 60) : 300;
+      const bars = dataRef.current;
+      const edgeLabel = (ms: number) => {
+        const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+        const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+        const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+        return `${hour}:${minute}`;
+      };
       const at = (epochSeconds: number) => {
-        const shifted = epochSeconds + IST_OFFSET_SECONDS;
-        return x1 + ((shifted - from) / (to - from)) * (x2 - x1);
+        const chartTime = chartTimeFromEpoch(epochSeconds, timeframe);
+        const exact = scale.timeToCoordinate(chartTime);
+        if (exact != null) return exact;
+        let lo = 0;
+        let hi = bars.length;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (bars[mid].time < epochSeconds) lo = mid + 1;
+          else hi = mid;
+        }
+        const next = bars[lo];
+        const prev = bars[lo - 1];
+        const xOf = (time: number) => scale.timeToCoordinate(chartTimeFromEpoch(time, timeframe));
+        if (prev && next) {
+          const xPrev = xOf(prev.time);
+          const xNext = xOf(next.time);
+          const span = next.time - prev.time;
+          if (xPrev == null || xNext == null || span <= 0) return null;
+          return xPrev + ((epochSeconds - prev.time) / span) * (xNext - xPrev);
+        }
+        const anchor = prev ?? next;
+        const x = anchor ? xOf(anchor.time) : null;
+        if (!anchor || x == null) return x1 + ((chartTime - from) / (to - from)) * (x2 - x1);
+        const spacing = scale.options().barSpacing ?? 6;
+        return x + ((epochSeconds - anchor.time) / barSeconds) * spacing;
       };
       const hidden = new Set(hiddenSessionShades);
       const next = sessionIntervals((from - IST_OFFSET_SECONDS) * 1000, (to - IST_OFFSET_SECONDS) * 1000).flatMap((interval) => {
         if (hidden.has(interval.id)) return [];
-        const left = Math.max(0, Math.min(at(interval.start / 1000), at(interval.end / 1000)));
-        const right = Math.min(Math.max(0, width - plotRight), Math.max(at(interval.start / 1000), at(interval.end / 1000)));
+        const startX = at(interval.start / 1000);
+        const endX = at(interval.end / 1000);
+        if (startX == null || endX == null) return [];
+        const left = Math.max(0, Math.min(startX, endX));
+        const right = Math.min(plotWidth, Math.max(startX, endX));
         if (right - left < 2) return [];
-        return [{ key: `${interval.id}-${interval.start}`, left, width: right - left, color: interval.color }];
+        const edges = [
+          startX >= 4 && startX <= plotWidth - 4 ? { x: startX, label: edgeLabel(interval.start) } : null,
+          endX >= 4 && endX <= plotWidth - 4 ? { x: endX, label: edgeLabel(interval.end) } : null,
+        ].filter((edge): edge is { x: number; label: string } => edge !== null);
+        return [{ key: `${interval.id}-${interval.start}`, left, width: right - left, color: interval.color, edges }];
       });
       setSessionShades(next);
     };
@@ -2455,6 +2495,7 @@ export function MarketChart({
       <div className="price-chart-wrap lightweight-chart-wrap">
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
+        {sessionShades.flatMap((shade) => shade.edges.map((edge) => <span key={`${shade.key}-${edge.label}-${edge.x}`} className="chart-session-edge" style={{ left: edge.x }}>{edge.label}</span>))}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
