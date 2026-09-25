@@ -23,6 +23,7 @@ export type ReplayController = {
   loading: boolean;
   message: string;
   speed: number;
+  setSpeed: (speed: number) => void;
   startTime: number | null;
   current?: Candle;
   ended: boolean;
@@ -34,7 +35,6 @@ export type ReplayController = {
   selectAt: (time: number) => void;
   togglePlay: () => void;
   step: () => void;
-  cycleSpeed: () => void;
   restart: () => void;
   retryLoad: () => void;
 };
@@ -111,11 +111,13 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
     resetSelection, previewAt, playFromHere, selectAt: startAt,
     togglePlay: () => { if (playing) setPlaying(false); else playFromHere(); },
     step: () => { setPlaying(false); setCursor((value) => Math.min(value + 1, Math.max(0, candles.length - 1))); if (selecting) setShowStart(true); },
-    cycleSpeed: () => setSpeed((value) => value === 4 ? 0.5 : value * 2),
+    setSpeed,
     restart,
     retryLoad: () => setRetry((value) => value + 1),
   };
 }
+
+const REPLAY_SPEEDS = [0.5, 1, 2, 4, 8, 10];
 
 export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; onExit?: () => void }) {
   return <div className="chart-replay-bar" role="toolbar" aria-label="Bar replay">
@@ -125,9 +127,11 @@ export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; o
       <button type="button" onClick={replay.resetSelection} disabled={!replay.candles.length}>Select</button>
       <button type="button" onClick={replay.togglePlay} disabled={!replay.candles.length || replay.ended}>{replay.playing ? "Pause" : "Play"}</button>
       <button type="button" onClick={replay.step} disabled={!replay.candles.length || replay.ended}>Next</button>
-      <button type="button" onClick={replay.cycleSpeed} disabled={!replay.candles.length} aria-label={`Replay speed ${replay.speed} times`}>{replay.speed}×</button>
       <button type="button" onClick={replay.restart} disabled={replay.startTime == null}>Again</button>
       {onExit && <button type="button" onClick={onExit}>Exit</button>}
+    </div>
+    <div className="chart-replay-speeds" role="group" aria-label="Replay speed">
+      {REPLAY_SPEEDS.map((speed) => <button key={speed} type="button" aria-pressed={replay.speed === speed} disabled={!replay.candles.length} onClick={() => replay.setSpeed(speed)}>{speed}×</button>)}
     </div>
   </div>;
 }
