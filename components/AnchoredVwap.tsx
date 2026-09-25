@@ -18,13 +18,15 @@ function epochFromClick(time: Time, timeframe: string) {
   return Date.UTC(time.year, time.month - 1, time.day) / 1000;
 }
 
-export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeTool, replay, refreshRef }: {
+export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeTool, replay, hoverTime, hoverY, refreshRef }: {
   candles: Candle[];
   chart: IChartApi | null;
   timeframe: string;
   instrumentKey: string;
   activeTool: string;
   replay: boolean;
+  hoverTime: number | null;
+  hoverY: number | null;
   refreshRef: MutableRefObject<(() => void) | null>;
 }) {
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -32,6 +34,14 @@ export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeT
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const stamp = candles.length ? `${candles.length}:${candles.at(-1)?.time}:${candles.at(-1)?.close}:${candles.at(-1)?.volume}` : "";
   const hasVolume = candles.some((candle) => candle.volume > 0);
+
+  function remember(time: number | null) {
+    if (time == null) return;
+    const candle = [...candles].reverse().find((item) => item.time <= time) ?? candles.find((item) => item.time >= time);
+    if (!candle) return;
+    window.localStorage.setItem(storageKey(instrumentKey), String(candle.time));
+    setAnchor(candle.time);
+  }
 
   useEffect(() => {
     const saved = Number(window.localStorage.getItem(storageKey(instrumentKey)));
@@ -42,11 +52,13 @@ export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeT
     if (!chart || anchor === null || !hasVolume) return;
     const series = chart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 2 as const, priceLineVisible: false, lastValueVisible: true, title: "AVWAP" });
     seriesRef.current = series;
+    const points = anchoredVwap(candles, anchor).map((point) => ({ time: chartTime(point.time, timeframe), value: point.value }));
+    if (points.length) series.setData(points);
     return () => {
       seriesRef.current = null;
       chart.removeSeries(series);
     };
-  }, [chart, anchor, hasVolume]);
+  }, [chart, anchor, hasVolume, candles, timeframe]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -57,13 +69,16 @@ export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeT
 
   useEffect(() => {
     if (!chart || activeTool !== "cursor" || replay) return;
-    const onClick = (param: { time?: Time }) => {
-      if (param.time === undefined) return;
-      const epoch = epochFromClick(param.time, timeframe);
-      const candle = [...candles].reverse().find((item) => item.time <= epoch) ?? candles.find((item) => item.time >= epoch);
-      if (!candle) return;
-      window.localStorage.setItem(storageKey(instrumentKey), String(candle.time));
-      setAnchor(candle.time);
+    const onClick = (param: { time?: Time; point?: { x: number } }) => {
+      if (param.time !== undefined) {
+        remember(epochFromClick(param.time, timeframe));
+        return;
+      }
+      if (!param.point || !chart) return;
+      const logical = chart.timeScale().coordinateToLogical(param.point.x);
+      if (logical == null || !candles.length) return;
+      const index = Math.min(candles.length - 1, Math.max(0, Math.round(logical)));
+      remember(candles[index]?.time ?? null);
     };
     chart.subscribeClick(onClick);
     return () => chart.unsubscribeClick(onClick);
@@ -89,7 +104,8 @@ export function AnchoredVwap({ candles, chart, timeframe, instrumentKey, activeT
 
   if (!hasVolume) return <div className="chart-or-note">Anchored VWAP needs traded volume</div>;
   return <>
-    {anchor === null && <div className="chart-or-note">Tap a candle to anchor VWAP</div>}
+    {anchor === null && <div className="chart-or-note">Move the crosshair, then tap Anchor</div>}
+    {activeTool === "cursor" && !replay && hoverTime != null && <button type="button" className="chart-avwap-anchor" style={{ top: Math.max(24, (hoverY ?? 80) - 16) }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); remember(hoverTime); }}>Anchor</button>}
     {x !== null && <button type="button" className="chart-avwap-tag" style={{ left: x }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); window.localStorage.removeItem(storageKey(instrumentKey)); setAnchor(null); }} aria-label="Clear anchored VWAP">AVWAP</button>}
   </>;
 }
