@@ -127,7 +127,7 @@ const REPLAY_SPEEDS = [0.5, 1, 2, 4, 8, 10];
 
 export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; onExit?: () => void }) {
   return <div className="chart-replay-bar" role="toolbar" aria-label="Bar replay">
-    <div className="chart-replay-meta"><span>{replay.loading ? "Loading replay…" : replay.message ? replay.message : replay.selecting ? (replay.prompt ? "Tap Play on the candle" : "Move the crosshair, then tap a candle") : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : ""}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
+    <div className="chart-replay-meta"><span>{replay.loading ? "Loading replay…" : replay.message ? replay.message : replay.selecting ? "Move the line, then tap Play" : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : ""}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
     {!!replay.message && !replay.loading && <button type="button" onClick={replay.retryLoad}>Retry</button>}
     <div className="chart-replay-transport">
       {replay.playing && <button type="button" onClick={replay.togglePlay}>Pause</button>}

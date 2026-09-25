@@ -36,7 +36,7 @@
 .replay-future-shade { position: absolute; top: 0; bottom: 28px; right: 0; background: color-mix(in srgb, var(--surface, white) 32%, transparent); pointer-events: none; z-index: 3; }
 .replay-start-marker.replay-drag-marker { width: 28px; margin-left: -14px; border: 0; background: transparent; padding: 0; pointer-events: auto; touch-action: none; cursor: ew-resize; z-index: 5; }
 .replay-drag-marker::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: #8560dc; }
-.replay-drag-marker span { left: 0; bottom: 10px; }
+.replay-drag-marker span { left: 50%; bottom: 8px; transform: translateX(-50%); min-width: 54px; padding: 6px 10px; border-radius: 8px; background: #7437dc; font-size: 12px; font-weight: 750; line-height: 1.2; text-align: center; }
 .replay-drag-marker:focus-visible { outline: 2px solid #8560dc; }
 .replay-start-popover { position: absolute; top: 65px; transform: translateX(-50%); z-index: 8; display: grid; gap: 5px; width: 170px; padding: 9px; background: var(--surface, white); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px #27113d24; }
 .replay-start-popover small { font-size: 10px; }

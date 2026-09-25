@@ -473,6 +473,7 @@ export function MarketChart({
   priceIncrement,
   exchangeLabel = 'NSE',
   replaySelecting = false,
+  replayPlaying = false,
   replayStartTime = null,
   onReplaySelect,
   onReplayPreview,
@@ -517,6 +518,7 @@ export function MarketChart({
   priceIncrement?: number;
   exchangeLabel?: string;
   replaySelecting?: boolean;
+  replayPlaying?: boolean;
   replayStartTime?: number | null;
   onReplaySelect?: (time: number) => void;
   onReplayPreview?: (time: number) => void;
@@ -2567,7 +2569,7 @@ export function MarketChart({
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replayMarkerX !== null && <>
           {replaySelecting && <div className="replay-future-shade" style={{ left: replayMarkerX }} />}
-          <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX }} aria-label="Drag to a starting candle; Enter to select" onPointerDown={event => {
+          <button type="button" className="replay-start-marker replay-drag-marker" style={{ left: replayMarkerX, pointerEvents: replayPlaying ? "none" : "auto" }} aria-label="Play from this candle" onPointerDown={event => {
             if (!replaySelecting) return;
             event.stopPropagation(); event.preventDefault();
             replayDrag.current = { id: event.pointerId, x: event.clientX, moved: false, original: replayStartTime };
@@ -2589,23 +2591,19 @@ export function MarketChart({
             if (!drag) return;
             event.stopPropagation();
             if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-            if (!drag.moved && replayStartTime !== null) onReplaySelect?.(replayStartTime);
+            if (!drag.moved) onReplayPlay?.();
           }} onPointerCancel={event => {
             const original = replayDrag.current?.original; replayDrag.current = null;
             if (original != null) onReplayPreview?.(original);
             if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
           }} onClick={event => event.stopPropagation()} onKeyDown={event => {
-            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (replayStartTime !== null) onReplaySelect?.(replayStartTime); }
+            if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onReplayPlay?.(); }
             if (replaySelecting && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
               event.preventDefault(); const index = dataRef.current.findIndex(candle => candle.time === replayStartTime);
               const candle = dataRef.current[Math.max(0, Math.min(dataRef.current.length - 2, index + (event.key === "ArrowLeft" ? -1 : 1)))];
               if (candle) onReplayPreview?.(candle.time);
             }
-          }}><span>↔</span></button>
-          {replayPrompt && <div className="replay-start-popover" style={{ left: `clamp(90px, ${replayMarkerX}px, calc(100% - 90px))` }}>
-            <small>{replayStartTime !== null ? new Date(replayStartTime * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""} IST</small>
-            <button type="button" onClick={onReplayPlay}>Play</button>
-          </div>}
+          }}>{!replayPlaying && <span>Play</span>}</button>
         </>}
         <div className="chart-symbol-legend lightweight-symbol-legend">
           <b>{instrument.name.toUpperCase()} · {timeframe} · {exchangeLabel}</b>

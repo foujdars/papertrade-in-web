@@ -68,10 +68,10 @@ test("the chart's actual drag handlers snap, cancel safely and confirm only a ta
     replayDrag: { current: null }, dataRef: { current: [bar(100, 1), bar(200, 2), bar(300, 3), bar(400, 4)] },
     chartApi: { current: { timeScale: () => ({ coordinateToLogical: x => x / 10 }) } },
     chartHost: { current: { clientWidth: 360, getBoundingClientRect: () => ({ left: 0 }) } },
-    onReplayPreview: time => previews.push(time), onReplaySelect: time => selections.push(time), onReplayPlay() {},
+    onReplayPreview: time => previews.push(time), onReplaySelect: time => selections.push(time), onReplayPlay() { plays.push(1); }, replayPlaying: false,
   };
   const compiled = ts.transpileModule(`export function render(props) { const {${Object.keys(props).join(",")}} = props; return <>${source.slice(start, end)}</>; }`, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS }, fileName: "overlay.tsx" }).outputText;
-  const exports = {}, previews = [], selections = [];
+  const exports = {}, previews = [], selections = [], plays = [];
   new Function("require", "exports", compiled)(require, exports);
   const marker = () => treeElements(exports.render(props)).find(node => node.props?.className === "replay-start-marker replay-drag-marker").props;
   const event = { pointerId: 1, clientX: 0, preventDefault() {}, stopPropagation() {}, currentTarget: { setPointerCapture() {}, hasPointerCapture: () => true, releasePointerCapture() {} } };
@@ -87,7 +87,8 @@ test("the chart's actual drag handlers snap, cancel safely and confirm only a ta
   marker().onPointerCancel(event);
   assert.equal(previews.at(-1), 100, "Interrupted drags restore their original candle");
   marker().onPointerDown(event); marker().onPointerUp(event);
-  assert.deepEqual(selections, [100]);
+  assert.deepEqual(selections, [], "A tap does not open a popup");
+  assert.deepEqual(plays, [1], "A tap on Play starts replay");
   marker().onKeyDown({ ...event, key: "ArrowRight" });
   assert.equal(previews.at(-1), 200);
 });

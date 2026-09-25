@@ -2955,6 +2955,7 @@ export function TradingDashboard() {
                 onFeedStatus={handleFeedStatus}
                 replayCandles={replayOnChart && chartReplay.candles.length ? chartReplay.visible : undefined}
                 replaySelecting={replayOnChart && chartReplay.selecting}
+                replayPlaying={replayOnChart && chartReplay.playing}
                 replayStartTime={replayOnChart ? chartReplay.replayStartTime : null}
                 replayPrompt={replayOnChart && chartReplay.prompt}
                 onReplayPreview={replayOnChart ? chartReplay.previewAt : undefined}
