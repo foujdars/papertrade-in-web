@@ -30,7 +30,7 @@
 .indicator-strip-control{display:flex;align-items:center;gap:4px;border:0;background:transparent;color:inherit;padding:0;white-space:nowrap;font-size:inherit}.indicator-strip-control>i{width:5px;height:5px;border-radius:50%;display:inline-block}
 .study-pane-heading{position:absolute;left:8px;z-index:5;display:inline-flex;align-items:center;gap:2px;width:max-content;max-width:calc(100% - 70px);height:26px;padding:0 4px 0 6px;border-radius:8px;background:color-mix(in srgb,var(--surface,#fff) 90%,transparent);pointer-events:none;font-size:11px}
 .study-pane-heading button{pointer-events:auto;display:grid;place-items:center;width:24px;height:24px;background:transparent;border:0;color:var(--muted);border-radius:7px;padding:0;flex-shrink:0}
-.study-pane-heading .study-pane-title{display:block;width:auto;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px;color:var(--ink);font-size:12px;font-weight:700;margin-right:1px}
+.study-pane-heading .study-pane-title{display:block;width:auto;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px;color:var(--ink);font-size:12px;font-weight:400;margin-right:1px}
 .study-pane-value{flex:none;font-size:12px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#8054da;padding-right:2px}
 .study-pane-heading.is-oversold .study-pane-value{color:#089981}
 .study-pane-heading.is-overbought .study-pane-value{color:#f04458}

@@ -17,7 +17,8 @@
 .terminal-shell .chart-bracket-tool .risk-target-line { color: var(--bracket-target); }
 .terminal-shell .chart-bracket-tool .risk-stop-line { color: var(--bracket-stop); }
 .terminal-shell .chart-bracket-tool .bracket-pill { position: absolute; top: 50%; left: 0; width: max-content; max-width: calc(100% - 8px); transform: translateY(-50%); display: flex; height: 18px; border: 1px solid currentColor; border-radius: 0; background: color-mix(in srgb, var(--surface, #fff) 82%, transparent); color: inherit; overflow: hidden; pointer-events: auto; z-index: 2; }
-.terminal-shell .chart-bracket-tool .bracket-pill > * { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 16px; padding: 0 4px; border: 0; border-right: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 9px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-pill > * { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 16px; padding: 0 4px; border: 0; border-right: 1px solid currentColor; background: transparent; color: inherit; font-size: 9px; font-weight: 400; font-synthesis: none; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; }
+.terminal-shell .chart-bracket-tool .bracket-pill * { font-weight: 400; font-synthesis: none; }
 .terminal-shell .chart-bracket-tool .bracket-pill > :last-child { border-right: 0; }
 .terminal-shell .chart-bracket-tool .bracket-unset { background: none; }
 .terminal-shell .chart-bracket-tool .bracket-unset .bracket-pill { border-style: dashed; }
