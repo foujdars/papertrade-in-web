@@ -18,7 +18,11 @@
 }
 .terminal-shell .chart-bracket-tool .bracket-entry-chip { pointer-events: auto; cursor: pointer; }
 .terminal-shell .chart-bracket-tool .bracket-entry-chip small { font-size: 11px; padding-left: 6px; border-left: 1px solid var(--line); }
-.terminal-shell .chart-bracket-tool .bracket-level-chip { cursor: ns-resize; touch-action: none; color: inherit; }
+.terminal-shell .chart-bracket-tool .risk-target-line,
+.terminal-shell .chart-bracket-tool .risk-stop-line { pointer-events: none; cursor: default; }
+.terminal-shell .chart-bracket-tool .risk-target-line::before,
+.terminal-shell .chart-bracket-tool .risk-stop-line::before { content: none; }
+.terminal-shell .chart-bracket-tool .bracket-level-chip { pointer-events: auto; }
 .terminal-shell .chart-bracket-tool :is(.bracket-entry-chip, .bracket-level-chip)::after { content: ""; position: absolute; inset: -9px 0; }
 .terminal-shell .chart-trade-marker.stacked-marker { transform: translateX(-50%); width: auto; height: auto; }
 .terminal-shell .chart-trade-marker.stacked-marker svg { display: block; flex: none; }

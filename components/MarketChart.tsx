@@ -2064,10 +2064,10 @@ export function MarketChart({
         const right = Math.min(plotWidth, Math.max(startX, endX));
         const band = right - left;
         if (band < 2) return [];
-        const edges = band >= 48 ? [
+        const edges = [
           startX >= 4 && startX <= plotWidth - 4 ? { x: startX, label: edgeLabel(interval.start) } : null,
           endX >= 4 && endX <= plotWidth - 4 ? { x: endX, label: edgeLabel(interval.end) } : null,
-        ].filter((edge): edge is { x: number; label: string } => edge !== null) : [];
+        ].filter((edge): edge is { x: number; label: string } => edge !== null);
         return [{ key: `${interval.id}-${interval.start}`, left, width: band, color: interval.color, edges }];
       });
       setSessionShades(next);
@@ -2705,7 +2705,7 @@ export function MarketChart({
                 </div>
               </div>;
             })}
-            {branchesOpen && <div className="bracket-help"><span>Drag TP / SL to place protection</span></div>}
+            {branchesOpen && <div className="bracket-help"><span>Drag the TP or SL box, not the dotted line</span></div>}
             {onOrderToolExit && <button type="button" className="bracket-close-trade" aria-label="Close trade" title="Close trade" onClick={onOrderToolExit}><span aria-hidden="true">×</span></button>}
           </div>
         )}
