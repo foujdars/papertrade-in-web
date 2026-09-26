@@ -12,7 +12,7 @@
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger b { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger svg { width: 12px; flex: 0 0 12px; }
 .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger { justify-content: center; width: auto; min-width: 44px; flex-basis: auto; padding: 0 8px; }
-.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > .chart-fx-mark { display: block; width: 22px; height: 24px; flex: 0 0 22px; }
+.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > .chart-fx-mark { display: block; width: 19px; height: 24px; flex: 0 0 19px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 48px; min-width: 48px; flex-basis: 48px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger small { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger b { display: block; font-size: 12px; }

@@ -92,7 +92,7 @@ html, body { touch-action: pan-x pan-y; }
     border-radius: 10px;
     background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
   }
-  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > .chart-fx-mark { width: 20px; height: 22px; flex-basis: 20px; }
+  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > .chart-fx-mark { width: 17px; height: 22px; flex-basis: 17px; }
 }
 
 /* Symbol actions stay with the name. Chart actions sit apart on the right. */
