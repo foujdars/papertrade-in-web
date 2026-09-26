@@ -8,7 +8,7 @@ import { studyLinePoints, type StudyDrawing } from "@/lib/study-pane-drawings";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
-  for (let pane = 0; pane < index; pane += 1) top += chart.paneSize(pane).height;
+  for (let pane = 0; pane < index; pane += 1) top += chart.panes()[pane]?.getHeight() ?? 0;
   return top;
 }
 
@@ -39,15 +39,18 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
   if (!chart) return null;
   const width = chart.timeScale().width();
   let height = 0;
-  for (let pane = 0; pane < chart.panes().length; pane += 1) height += chart.paneSize(pane).height;
+  // Newly added RSI panes have a model before their rendered widget exists.
+  // Reading paneSize in that render window throws and unmounts the dashboard.
+  for (const pane of chart.panes()) height += pane.getHeight();
   const point = (studyId: string, marker: StudyDrawing["a"]) => {
     const bundle = studyRenderer.current?.bundles.find((item) => item.id === studyId);
     const series = bundle?.series[0] as ISeriesApi<"Line"> | undefined;
-    if (!bundle || !series) return null;
+    const pane = bundle && chart.panes()[bundle.pane];
+    if (!bundle || !series || !pane) return null;
     const x = chart.timeScale().timeToCoordinate(marker.time as UTCTimestamp);
     const y = series.priceToCoordinate(marker.value);
     if (x == null || y == null) return null;
-    return { x, y: y + paneTop(chart, bundle.pane), top: paneTop(chart, bundle.pane), paneHeight: chart.paneSize(bundle.pane).height };
+    return { x, y: y + paneTop(chart, bundle.pane), top: paneTop(chart, bundle.pane), paneHeight: pane.getHeight() };
   };
   let toolbar: { x: number; y: number } | null = null;
   const selected = selectedId ? drawings.find((line) => line.id === selectedId) : undefined;

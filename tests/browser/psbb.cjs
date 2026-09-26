@@ -25,11 +25,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         assert.equal(await page.locator('.chart-psbb-level.entry').count(), 0);
         await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 27 });
         await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*Waiting for MSS close$`)).waitFor();
-        assert.equal(await page.locator('.chart-psbb text.entry').textContent(), 'MSS?');
+        assert.match(await page.locator('.chart-psbb text.entry').textContent(), /^Entry .*pending$/);
         assert.equal(await page.locator('.chart-psbb text.target').count(), 0);
         await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 29 });
         await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*MSS confirmed$`)).waitFor();
-        assert.deepEqual(await page.locator('.chart-psbb text.chart-psbb-level').allTextContents(), ['SL', 'E', 'TP1', 'TP2']);
+        const levelNames = await page.locator('.chart-psbb text.chart-psbb-level').allTextContents();
+        assert.equal(levelNames.length, 3);
+        assert.match(levelNames[0], /^SL /); assert.match(levelNames[1], /^Entry /); assert.match(levelNames[2], /^Target 1R /);
+        assert.ok(await page.locator('.chart-psbb line.entry').getAttribute('marker-end'));
+        assert.equal(await page.locator('.chart-psbb line.entry').evaluate((node) => getComputedStyle(node).strokeDasharray), '2px, 4px');
         const geometry = await page.evaluate(() => {
           const { chart, series, analysis } = window.psbbQa, setup = analysis.setups.at(-1);
           const line = document.querySelector('.chart-psbb line.entry');
@@ -42,6 +46,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     }
     assert.deepEqual(errors, []);
     if (process.env.PSBB_SCREENSHOT) await page.screenshot({ path: process.env.PSBB_SCREENSHOT });
-    console.log('PSBB mobile chart: D1, waiting structure, pending MSS, confirmed entry/SL/TP1/TP2 and exact MSS alignment pass in both directions on all six intervals.');
+    console.log('PSBB mobile chart: D1, pending MSS, dotted purple entry arrow, swing stop and 1R target align on all six intervals.');
   } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

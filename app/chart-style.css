@@ -182,7 +182,7 @@
 .chart-psbb-diverge { stroke: #e0a100; stroke-width: 1.5; fill: none; }
 .chart-psbb-level { stroke-width: 1; }
 .chart-psbb-level.stop { stroke: #e24b4b; }
-.chart-psbb-level.entry { stroke: #753bce; }
+.chart-psbb-level.entry { stroke: #753bce; stroke-dasharray: 2 4; }
 .chart-psbb-level.entry.extended { stroke-dasharray: 4 3; }
 .chart-psbb-level.waiting { stroke-dasharray: 3 4; opacity: .7; }
 .chart-psbb text.chart-psbb-point { fill: #b48100; text-anchor: middle; }

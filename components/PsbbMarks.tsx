@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MutableRefObject, type RefObject } from "react";
+import { useEffect, useId, useMemo, useState, type MutableRefObject, type RefObject } from "react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import type { StudyConfig } from "@/lib/indicator-catalog";
@@ -24,9 +24,10 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   studyRenderer: RefObject<ChartStudyRenderer | null>;
 }) {
   const [, redraw] = useState(0);
+  const arrowId = `psbb-entry-${useId().replace(/:/g, '')}`;
   const closed = candles.at(-2);
   const stamp = `${candles.length}:${candles.at(-1)?.time}:${closed?.high}:${closed?.low}:${closed?.close}`;
-  const inputs = useMemo(() => ({ ...studyDefaults("psbb").inputs, ...config?.inputs, target1: config?.inputs?.target1 || 1, target2: config?.inputs?.target2 || 1.5 }), [config?.inputs]);
+  const inputs = useMemo(() => ({ ...studyDefaults("psbb").inputs, ...config?.inputs }), [config?.inputs]);
   const allowed = PSBB_TIMEFRAMES.some((value) => value === timeframe) && (!config?.timeframes.length || config.timeframes.includes(timeframe));
   // Candle arrays can be updated in place by the live feed; the closed-bar stamp
   // invalidates this calculation without recalculating on every forming tick.
@@ -74,9 +75,8 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const ry2 = rsiY(setup.secondRsi);
   const levels = setup.shifted && setup.entry !== null && setup.stop !== null && setup.target1 !== null && setup.target2 !== null ? [
     ["SL", setup.stop, "stop"],
-    ["E", setup.entry, "entry"],
-    ["TP1", setup.target1, "target"],
-    ["TP2", setup.target2, "target"],
+    ["Entry", setup.entry, "entry"],
+    ["Target 1R", setup.target1, "target"],
   ] as const : [];
   const levelX = xOf(setup.mssTime ?? setup.secondTime) ?? x2 ?? 0;
   const waitingY = setup.entry === null ? null : yOf(setup.entry);
@@ -84,25 +84,26 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const swing = setup.side === "short" ? "swing low" : "swing high";
   const status = setup.phase === "waiting-structure" ? `Waiting for new ${swing}`
     : setup.phase === "waiting-mss" ? "Waiting for MSS close"
-    : setup.status === "passed" ? "TP2 reached" : setup.status === "failed" ? "Stop reached"
-    : setup.target1Hit ? "TP1 reached · TP2 active" : "MSS confirmed";
+    : setup.status === "passed" ? "Success · 1R reached" : setup.status === "failed" ? "Failed · stop reached"
+    : "Active · MSS confirmed";
   const description = `${timeframe} PSBB · ${setup.side === "short" ? "Bearish" : "Bullish"}${setup.structureCase ? ` · Case ${setup.structureCase === "before" ? "A" : "B"}` : ""} · ${status}`;
   return <><div className="chart-or-note">{description}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label={description}>
+    <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#753bce" /></marker></defs>
     {anchorMarks}
     {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
     {x1 != null && y1 != null && <text className="chart-psbb-point" x={Math.max(12, x1)} y={y1 + (setup.side === "short" ? -8 : 14)}>D1</text>}
     {x2 != null && y2 != null && <text className="chart-psbb-point" x={Math.max(12, x2)} y={y2 + (setup.side === "short" ? -8 : 14)}>{setup.side === "short" ? "SH" : "SL"}</text>}
     {!setup.shifted && waitingX != null && waitingY != null && <g>
-      <line className="chart-psbb-level entry waiting" x1={waitingX} y1={waitingY} x2={plotWidth - 4} y2={waitingY} />
-      <text className="chart-psbb-level entry" textAnchor="end" x={plotWidth - 6} y={waitingY - 4}>MSS?</text>
+      <line className="chart-psbb-level entry waiting" markerEnd={`url(#${arrowId})`} x1={waitingX} y1={waitingY} x2={plotWidth - 4} y2={waitingY} />
+      <text className="chart-psbb-level entry" textAnchor="end" x={plotWidth - 6} y={waitingY - 4}>Entry {setup.entry?.toFixed(2)} · pending</text>
     </g>}
     {levels.map(([name, price, tone]) => {
       const y = yOf(price);
       if (y == null) return null;
       return <g key={name}>
-        <line className={`chart-psbb-level ${tone}${setup.extended && name === "E" ? " extended" : ""}`} x1={levelX} y1={y} x2={plotWidth - 4} y2={y} />
-        <text className={`chart-psbb-level ${tone}`} textAnchor="end" x={plotWidth - 6} y={y - 4}>{name}</text>
+        <line className={`chart-psbb-level ${tone}`} markerEnd={tone === 'entry' ? `url(#${arrowId})` : undefined} x1={levelX} y1={y} x2={plotWidth - 4} y2={y} />
+        <text className={`chart-psbb-level ${tone}`} textAnchor="end" x={plotWidth - 6} y={y - 4}>{name} {price.toFixed(2)}</text>
       </g>;
     })}
   </svg></>;

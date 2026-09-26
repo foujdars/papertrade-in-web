@@ -1,0 +1,45 @@
+.trading-watchlist { padding: 12px; min-width: 0; overflow-y: auto; color: var(--ink); }
+.tw-heading, .tw-row-title, .tw-actions { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.tw-heading h2 { font-size: 19px; margin: 0; font-weight: 650; }
+.tw-heading p, .tw-monthly p, .tw-progress, .tw-actions, .tw-row small { color: var(--muted); font-size: 11px; }
+.tw-heading p { margin: 4px 0 14px; }
+.tw-paper { font-size: 10px; padding: 5px 8px; border-radius: 12px; background: #8054da12; color: #8054da; white-space: nowrap; }
+.tw-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tw-scope { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 0 0 10px; }
+.tw-controls label { font-size: 11px; color: var(--muted); min-width: 0; }
+.tw-controls :is(input, select) { width: 100%; min-width: 0; box-sizing: border-box; display: block; margin: 5px 0 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 7px; font: inherit; font-size: 12px; background: var(--panel, #fff); color: var(--ink); }
+.tw-timeframes { display: flex; gap: 5px; }
+.tw-timeframes button { flex: 1; padding: 10px 0; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: inherit; font-size: 12px; }
+.tw-timeframes [aria-selected="true"] { background: #8054da16; border-color: #8054da; color: #8054da; font-weight: 700; }
+.tw-actions { flex-wrap: wrap; margin: 10px 0; font-size: 10px; }
+.tw-actions button, .tw-more { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: inherit; padding: 6px; font-size: 11px; cursor: pointer; }
+.tw-states { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 13px; }
+.tw-states button { flex: 1; display: grid; gap: 4px; padding: 8px 4px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: inherit; font-size: 10px; }
+.tw-states button b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.tw-states [aria-pressed="true"] { background: #8054da12; border-color: #8054da; }
+.tw-monthly { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.tw-monthly summary, .tw-errors summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.tw-monthly table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+.tw-monthly th, .tw-monthly td { padding: 7px 3px; text-align: right; border-bottom: 1px solid var(--line); }
+.tw-monthly th:first-child { text-align: left; }
+.tw-monthly th button { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 650; padding: 4px; }
+.tw-monthly tr.selected { background: #8054da0c; }
+.tw-monthly p { font-size: 10px; line-height: 1.5; margin: 9px 0 0; }
+.tw-progress { margin: 12px 0; line-height: 1.5; }
+.tw-progress span { display: block; color: #ae7712; }
+.tw-errors { color: #ba4256; margin: 12px 0; font-size: 11px; overflow-wrap: anywhere; }
+.tw-rows { display: grid; gap: 8px; }
+.tw-row { display: block; width: 100%; text-align: left; color: inherit; background: var(--panel, #fff); border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+.tw-row-title b { flex: 1; font-size: 13px; overflow-wrap: anywhere; }
+.tw-row small { display: block; margin: 5px 0; line-height: 1.4; }
+.tw-badge { padding: 4px 7px; border-radius: 20px; background: #8054da0c; font-size: 10px; }
+.tw-prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 10px; color: var(--muted); margin-top: 10px; }
+.tw-prices b { display: block; color: var(--ink); margin-top: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tw-states .pending, .tw-badge.pending { color: #ae7712; }
+.tw-states .active, .tw-badge.active { color: #8054da; }
+.tw-states .failed, .tw-badge.failed { color: #cf3e5e; }
+.tw-states .success, .tw-badge.success { color: #008f72; }
+.tw-empty { color: var(--muted); font-size: 12px; padding: 15px 0; }
+.tw-more { margin: 12px auto; }
+.terminal-shell[data-theme="neon"] .trading-watchlist { --panel: #101c2e; }
+@media (min-width: 760px) { .section-watchlist .tw-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

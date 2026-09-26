@@ -31,6 +31,8 @@ import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartStyleMenu } from "@/components/ChartStyleMenu";
 import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
+import { TradingWatchlist } from "@/components/TradingWatchlist";
+import { TRADING_WATCHLIST_ID } from "@/lib/psbb-watchlist";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { IpoWorkspace } from "@/components/IpoWorkspace";
@@ -406,6 +408,7 @@ export function TradingDashboard() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistLimit, setWatchlistLimit] = useState(60);
   const [watchlist, setWatchlist] = useState<string>("NIFTY 50");
+  const [tradingWatchlistCount, setTradingWatchlistCount] = useState(0);
   const [customWatchlists, setCustomWatchlists] = useState<CustomWatchlist[]>([]);
   const [watchlistPickerOpen, setWatchlistPickerOpen] = useState(false);
   const [watchlistTarget, setWatchlistTarget] = useState<Instrument | null>(null);
@@ -413,7 +416,11 @@ export function TradingDashboard() {
   const [search, setSearch] = useState("");
   const [timeframe, setTimeframe] = useState("5m");
   const [chartHistory, setChartHistory] = useState<ChartHistoryRequest>();
-  useEffect(() => setChartHistory(undefined), [selected.instrumentKey]);
+  const pendingTradingHistory = useRef<ChartHistoryRequest | undefined>(undefined);
+  useEffect(() => {
+    setChartHistory(pendingTradingHistory.current);
+    pendingTradingHistory.current = undefined;
+  }, [selected.instrumentKey]);
   const [chartPreferencesReady, setChartPreferencesReady] = useState(false);
   const chooseTimeframe = (period: string) => {
     if (!periods.includes(period)) return;
@@ -1151,12 +1158,14 @@ export function TradingDashboard() {
 
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
   const customWatchlistSymbols = useMemo(() => new Set(customWatchlists.flatMap((list) => list.symbols)), [customWatchlists]);
-  const activeWatchlistName = activeCustomList?.name ?? watchlist;
-  const activeWatchlistCount = activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
+  const activeWatchlistName = watchlist === TRADING_WATCHLIST_ID ? "Trading watchlist" : activeCustomList?.name ?? watchlist;
+  const activeWatchlistCount = watchlist === TRADING_WATCHLIST_ID ? tradingWatchlistCount : activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
   const watchlistChoices = useMemo(() => [
-    ...watchlistTabs.map((tab) => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
+    { id: watchlistTabs[0], name: watchlistTabs[0], count: watchlistCounts[watchlistTabs[0]] },
+    { id: TRADING_WATCHLIST_ID, name: "Trading watchlist", count: tradingWatchlistCount, description: "PSBB setups · monthly results" },
+    ...watchlistTabs.slice(1).map((tab) => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
     ...customWatchlists.map((list) => ({ id: `custom:${list.id}`, name: list.name, count: list.symbols.length, custom: true })),
-  ], [customWatchlists, watchlistCounts]);
+  ], [customWatchlists, watchlistCounts, tradingWatchlistCount]);
   const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return null;
     if (fnoUnderlying?.instrumentKey === spotInstrument.instrumentKey) return fnoUnderlying;
@@ -2796,7 +2805,18 @@ export function TradingDashboard() {
           <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>
           {showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
-          <div className="instrument-list">
+          {watchlist === TRADING_WATCHLIST_ID ? <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={search} active={activeNavigationSection === "watchlist" || sidebarOpen} onCount={setTradingWatchlistCount} onOpen={(instrument, frame, time) => {
+            const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
+            if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
+            else pendingTradingHistory.current = history;
+            openNavigationSection("trade");
+            chooseTradeInstrument(instrument);
+            setTimeframe(frame);
+            setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
+            const url = new URL(window.location.href);
+            url.searchParams.set("timeframe", frame);
+            window.history.replaceState({ ...window.history.state, papertradeChart: { instrument, timeframe: frame } }, "", url);
+          }} /> : <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
@@ -2819,7 +2839,7 @@ export function TradingDashboard() {
             {watchlistLoading && <CandleLoader label="Loading NSE stocks" />}
             {!watchlistLoading && !filtered.length && <div className="empty-list">No matching NSE stocks.</div>}
             {visibleInstruments.length < filtered.length && <button className="load-more-stocks" onClick={() => setWatchlistLimit((value) => value + 60)}>Load 60 more <small>{visibleInstruments.length} of {filtered.length}</small></button>}
-          </div>
+          </div>}
         </aside>
 
         <section className="chart-area">

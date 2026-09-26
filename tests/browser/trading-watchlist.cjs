@@ -1,0 +1,68 @@
+const fs = require('node:fs'), http = require('node:http'), assert = require('node:assert/strict');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const esbuild = require('esbuild');
+(async () => {
+  const bundle = await esbuild.build({ entryPoints: ['tests/browser/trading-watchlist.fixture.jsx'], bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
+  const css = fs.readFileSync('app/trading-watchlist.css', 'utf8');
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', req.url === '/qa.js' ? 'application/javascript' : 'text/html');
+    res.end(req.url === '/qa.js' ? bundle.outputFiles[0].text : `<meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f9f7fe;--ink:#282137;--muted:#797383;--line:#e5deef;--panel:#fff}button,select{cursor:pointer}.qa-header{padding:18px;font-weight:600}.qa-header span{display:block;font-size:12px;color:#797383;margin-top:6px}input[aria-label="Search setups"]{margin:0 12px;width:calc(100% - 24px);padding:12px;border:1px solid #e5deef;border-radius:12px}</style><div id="root"></div><script src="/qa.js"></script>`);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
+    const errors = [], calls = []; let fail = false;
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/api/market/psbb-scan?*', async route => {
+      const p = new URL(route.request().url()).searchParams;
+      calls.push(Object.fromEntries(p));
+      if (fail) return route.fulfill({ status: 503, json: { ok: false, error: { message: 'Market data unavailable for test' } } });
+      const stamp = Date.parse(`${p.get('month')}-03T10:00:00+05:30`) / 1000;
+      const rows = ['pending', 'active', 'failed', 'success'].map((status, i) => ({ id: String(i), status, setup: { side: i % 2 ? 'long' : 'short', confirmedTime: stamp, mssTime: i ? stamp + i * 300 : null, entry: 1234, stop: i % 2 ? 1224 : 1244, target1: i % 2 ? 1244 : 1224 } }));
+      await route.fulfill({ json: { ok: true, report: { instrumentKey: p.get('instrumentKey'), timeframe: p.get('timeframe'), month: p.get('month'), rows, counts: { pending: 1, active: 1, failed: 1, success: 1 }, coverage: 'available', scannedAt: Date.now(), lastCandleAt: stamp } } });
+    });
+    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    await page.getByRole('status').filter({ hasText: '2/2 stocks scanned' }).waitFor();
+    assert.equal(await page.locator('.tw-row').count(), 8);
+    assert.deepEqual(await page.locator('.tw-timeframes button').allTextContents(), ['1m','5m','15m','1H','4H']);
+    assert.deepEqual(await page.locator('select option').allTextContents(), ['Nifty 50 stocks','F&O stocks','Indices','PSU bank stocks','Nifty 500 stocks']);
+    await page.getByRole('button', { name: 'Success 2', exact: true }).click();
+    assert.equal(await page.locator('.tw-row').count(), 2);
+    await page.locator('.tw-row').first().click();
+    assert.equal((await page.evaluate(() => window.openedSetup)).frame, '5m');
+    assert.ok((await page.evaluate(() => window.openedSetup)).time > 0);
+    const before = calls.length;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.tw-progress').textContent.includes('2/2 stocks scanned'));
+    assert.ok(calls.length > before, 'Refresh actually sends requests even when client cache is fresh');
+    await page.getByLabel('Trading stock universe').selectOption('F&O stocks');
+    await page.getByRole('status').filter({ hasText: '1/1 stocks scanned' }).waitFor();
+    assert.ok((await page.locator('.tw-row-title b').allTextContents()).every(symbol => symbol === 'SBIN'));
+    await page.getByLabel('Trading stock universe').selectOption('Indices');
+    await page.getByRole('status').filter({ hasText: '3/3 stocks scanned' }).waitFor();
+    assert.deepEqual([...new Set(await page.locator('.tw-row-title b').allTextContents())].sort(), ['BANKNIFTY','NIFTY','SENSEX']);
+    await page.getByRole('tab', { name: '1m', exact: true }).click();
+    await page.getByRole('status').filter({ hasText: '3/3 stocks scanned' }).waitFor();
+    await page.getByRole('button', { name: 'Scan all 5', exact: true }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('.tw-monthly tbody tr')].every(row => row.lastChild.textContent === '3/3'));
+    assert.equal(await page.locator('.tw-monthly tbody tr').count(), 5);
+    await page.getByLabel('Trading stock universe').selectOption('PSU bank stocks');
+    await page.getByRole('status').filter({ hasText: '2/2 stocks scanned' }).waitFor();
+    assert.deepEqual([...new Set(await page.locator('.tw-row-title b').allTextContents())].sort(), ['BANKINDIA','SBIN']);
+    await page.getByLabel('Trading month').fill('2025-05');
+    await page.getByRole('status').filter({ hasText: '2/2 stocks scanned' }).waitFor();
+    assert.equal(calls.at(-1).month, '2025-05');
+    await page.getByLabel('Search setups').fill('BANKINDIA');
+    assert.equal(await page.locator('.tw-row').count(), 4);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'No mobile horizontal overflow');
+    if (process.env.WATCHLIST_SCREENSHOT) await page.screenshot({ path: process.env.WATCHLIST_SCREENSHOT, fullPage: true });
+    fail = true;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.locator('.tw-errors summary').filter({ hasText: 'excluded from totals' }).waitFor();
+    assert.equal(await page.locator('.tw-row').count(), 0);
+    assert.equal(await page.locator('.tw-states .failed b').textContent(), '0', 'Data errors are not failed trades');
+    assert.deepEqual(errors, []);
+    console.log('Mobile Trading watchlist: all categories, five frames, statuses, monthly totals, refresh, chart links, search and unavailable data passed.');
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -77,8 +77,10 @@ function updateOutcome(setup: PsbbSetup, bar: Bar) {
   // candle. Later candles that touch both are conservatively stop-first.
   const stopped = setup.side === "long" ? bar.low <= setup.stop : bar.high >= setup.stop;
   if (stopped) { setup.status = "failed"; return; }
-  if (setup.side === "long" ? bar.high >= setup.target1 : bar.low <= setup.target1) setup.target1Hit = true;
-  if (setup.side === "long" ? bar.high >= setup.target2 : bar.low <= setup.target2) setup.status = "passed";
+  if (setup.side === "long" ? bar.high >= setup.target1 : bar.low <= setup.target1) {
+    setup.target1Hit = true;
+    setup.status = "passed";
+  }
 }
 
 type Episode = { first: number; extreme: number; pushes: number; setup?: PsbbSetup; structure?: number };
@@ -91,13 +93,11 @@ type Episode = { first: number; extreme: number; pushes: number; setup?: PsbbSet
  * Case B waits for the first opposite swing after it. Only a subsequent close
  * through that level confirms MSS. The final (still-forming) candle is excluded.
  */
-function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}) {
-  const last = Math.max(0, candles.length - 1);
+function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false) {
+  const last = Math.max(0, candles.length - (allCandlesClosed ? 0 : 1));
   const span = Math.max(1, Math.floor(inputs.left || 3));
   const oversold = inputs.oversold ?? 30;
   const overbought = inputs.overbought ?? 70;
-  const firstMultiple = inputs.target1 || 1;
-  const secondMultiple = inputs.target2 || 1.5;
   const setups: PsbbSetup[] = [];
   const pivots: Record<"low" | "high", number[]> = { low: [], high: [] };
   const episodes: Partial<Record<"long" | "short", Episode>> = {};
@@ -152,15 +152,16 @@ function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, num
       setup.structureCase = structure < extreme ? "before" : "after";
       setup.entry = candles[structure][structureKind];
       setup.entryTime = candles[structure].time;
-      // The most recently confirmed opposing swing may be a newer lower high /
-      // higher low, so the stop must not be pinned to the divergence extreme.
-      const stopIndex = pivots[extremeKind].at(-1)!;
+      // The episode extreme is the highest high / lowest low since D1. Keep
+      // this full setup swing as the stop, not a later minor retracement pivot.
+      const stopIndex = extreme;
       setup.stop = candles[stopIndex][extremeKind];
       setup.stopTime = candles[stopIndex].time;
       const risk = long ? setup.entry - setup.stop : setup.stop - setup.entry;
       if (!(risk > 0)) continue;
-      setup.target1 = setup.entry + (long ? 1 : -1) * firstMultiple * risk;
-      setup.target2 = setup.entry + (long ? 1 : -1) * secondMultiple * risk;
+      setup.target1 = setup.entry + (long ? 1 : -1) * risk;
+      // Retain the old field for saved consumers; PSBB now has ONE 1R target.
+      setup.target2 = setup.target1;
       const priorClose = candles[index - 1]?.close;
       const broke = index > extreme && index > structure && (long
         ? priorClose <= setup.entry && bar.close > setup.entry
@@ -180,17 +181,18 @@ function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, num
     const episode = episodes[side];
     if (episode) anchors.push({ side, time: candles[episode.first].time, price: candles[episode.first][side === "long" ? "low" : "high"], rsi: momentum[episode.first] });
   }
-  return { setups: setups.sort((a, b) => a.secondTime - b.secondTime).slice(-4), anchors };
+  // Monthly statistics need the full history, not just the last four setups.
+  return { setups: setups.sort((a, b) => a.secondTime - b.secondTime), anchors };
 }
 
 export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
   return scanPsbb(candles, momentum, inputs).setups;
 }
 
-export function psbbAnalysis(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {
+export function psbbAnalysis(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string, allCandlesClosed = false) {
   if (timeframe && !PSBB_TIMEFRAMES.some((allowed) => allowed === timeframe)) return { setups: [], anchors: [] };
   const momentum = rsi(candles.map((bar) => bar.close), Math.max(2, inputs.length || 14));
-  return scanPsbb(candles, momentum, inputs);
+  return scanPsbb(candles, momentum, inputs, allCandlesClosed);
 }
 
 export function psbbPlots(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {

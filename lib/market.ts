@@ -12,7 +12,7 @@ export type Candle = {
 export type Instrument = {
   symbol: string;
   name: string;
-  exchange: "NSE" | "DELTA" | "GLOBAL" | "TVC";
+  exchange: "NSE" | "BSE" | "DELTA" | "GLOBAL" | "TVC";
   price: number;
   change: number;
   instrumentKey: string;

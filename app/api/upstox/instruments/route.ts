@@ -16,6 +16,7 @@ const INDEX_URLS = {
   "NIFTY 50": "https://www.niftyindices.com/IndexConstituent/ind_nifty50list.csv",
   "NIFTY 500": "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
   "BANK NIFTY": "https://www.niftyindices.com/IndexConstituent/ind_niftybanklist.csv",
+  "NIFTY PSU BANK": "https://www.niftyindices.com/IndexConstituent/ind_niftypsubanklist.csv",
 } as const;
 
 type UpstoxInstrument = {
@@ -85,7 +86,7 @@ async function loadInstruments(forceRefresh = false) {
   const now = Date.now();
   if (cache && cache.expiresAt > now && (!forceRefresh || now - cache.fetchedAtMs < FORCED_REFRESH_MIN_AGE)) return cache;
 
-  const [master, nifty50Csv, nifty500Csv, bankNiftyCsv] = await Promise.all([
+  const [master, nifty50Csv, nifty500Csv, bankNiftyCsv, psuBankCsv] = await Promise.all([
     fetchInstrumentMaster(),
     fetch(INDEX_URLS["NIFTY 50"], { cache: "no-store" }).then((response) => {
       if (!response.ok) throw new Error("Unable to download NIFTY 50 constituents.");
@@ -99,12 +100,16 @@ async function loadInstruments(forceRefresh = false) {
       if (!response.ok) throw new Error("Unable to download Bank NIFTY constituents.");
       return response.text();
     }),
+    // Failure of this additional group must not take the existing master down.
+    fetch(INDEX_URLS["NIFTY PSU BANK"], { cache: "no-store", signal: AbortSignal.timeout(10000) })
+      .then((response) => response.ok ? response.text() : '').catch(() => ''),
   ]);
 
   const membership = {
     "NIFTY 50": symbolsFromCsv(nifty50Csv),
     "NIFTY 500": symbolsFromCsv(nifty500Csv),
     "BANK NIFTY": symbolsFromCsv(bankNiftyCsv),
+    "NIFTY PSU BANK": symbolsFromCsv(psuBankCsv),
   };
   const bySymbol = new Map<string, Instrument & { seriesPriority: number }>();
   for (const item of master) {

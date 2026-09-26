@@ -73,7 +73,7 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
   );
 }
 
-type WatchlistChoice = { id: string; name: string; count: number; custom?: boolean };
+type WatchlistChoice = { id: string; name: string; count: number; custom?: boolean; description?: string };
 
 export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onClose }: { activeId: string; choices: WatchlistChoice[]; onSelect: (id: string) => void; onNewList: () => void; onClose: () => void }) {
   useEscape(onClose);
@@ -84,7 +84,7 @@ export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onCl
         <div className="watchlist-selector-options">
           {choices.map((choice) => (
             <button key={choice.id} className={activeId === choice.id ? "active" : ""} onClick={() => onSelect(choice.id)}>
-              <span><b>{choice.name}</b><small>{choice.custom ? "Custom watchlist" : "NSE market list"}</small></span>
+              <span><b>{choice.name}</b><small>{choice.description ?? (choice.custom ? "Custom watchlist" : "NSE market list")}</small></span>
               <em>{choice.count}</em>
               {activeId === choice.id && <Check size={15} />}
             </button>

@@ -1,5 +1,13 @@
 # Live chart regression
 
+## PSBB Trading watchlist
+
+`npm run test:psbb` checks divergence/MSS, swing-extreme stops, fixed 1R outcomes, full monthly ledgers, calendar boundaries, category membership and the history endpoint with mocked upstream data.
+
+`node tests/browser/psbb.cjs` checks chart entry/stop/target placement on all six chart intervals. `node tests/browser/trading-watchlist.cjs` checks the real watchlist component at mobile width: five categories, five intraday frames, status filters, monthly totals, search, refresh, errors and chart links. Optional screenshot variables: `PSBB_SCREENSHOT`, `WATCHLIST_SCREENSHOT`.
+
+With a production server at localhost:3228 (`TEST_BASE_URL` overrides it), `node tests/browser/trading-watchlist-dashboard.cjs` checks second-place placement in the full app, scrolling and opening Sensex at the chosen timeframe/setup date. All broker responses in these browser tests are mocked; they do not place orders or change cloud data.
+
 Run from the repository root with Playwright and its Chromium browser installed:
 
 ```sh

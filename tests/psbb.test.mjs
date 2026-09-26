@@ -22,7 +22,7 @@ test("positive divergence has no entry until price closes through the high betwe
   const shifted = psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1);
   assert.equal(shifted.shifted, true);
   assert.equal(shifted.target1, 165);
-  assert.equal(shifted.target2, 182.5);
+  assert.equal(shifted.target2, 165);
 });
 
 test("negative divergence is not a trade when the low between the highs never breaks", () => {
@@ -103,7 +103,7 @@ for (const long of [false, true]) {
     assert.equal(waiting.mssTime, null);
   });
 
-  test(`${name} Case B enters on a later break, with the immediate preceding swing stop`, () => {
+  test(`${name} Case B uses the highest/lowest setup swing for its stop and a fixed 1R target`, () => {
     const setup = latest(caseB(long));
     assert.equal(setup.side, long ? 'long' : 'short');
     assert.equal(setup.phase, 'entered');
@@ -111,11 +111,11 @@ for (const long of [false, true]) {
     assert.equal(setup.entry, 100);
     assert.equal(setup.entryTime, 5);
     assert.equal(setup.mssTime, 8);
-    assert.equal(setup.stopTime, 6);
-    assert.equal(setup.stop, long ? 78 : 122);
-    assert.notEqual(setup.stop, setup.secondPrice);
-    assert.equal(setup.target1, long ? 122 : 78);
-    assert.equal(setup.target2, long ? 133 : 67);
+    assert.equal(setup.stopTime, 3);
+    assert.equal(setup.stop, long ? 70 : 130);
+    assert.equal(setup.stop, setup.secondPrice);
+    assert.equal(setup.target1, long ? 130 : 70);
+    assert.equal(setup.target2, setup.target1);
     assert.equal(setup.status, 'formed');
   });
 
@@ -159,8 +159,8 @@ test('Case B locks the first post-divergence swing even when another one forms',
   const setup = latest(data);
   assert.equal(setup.entryTime, 5);
   assert.equal(setup.entry, 100); // Not the newer swing at 104.
-  assert.equal(setup.stopTime, 8);
-  assert.equal(setup.stop, 119);
+  assert.equal(setup.stopTime, 3);
+  assert.equal(setup.stop, 130);
 });
 
 test('a more extreme price replaces a pending divergence, keeping the original D1', () => {
@@ -213,17 +213,17 @@ test('entry candle extremes do not imply target fills before close-confirmed ent
   assert.equal(setup.target1Hit, false);
 });
 
-test('TP1 does not finish tracking TP2; same-bar stop and target are stop-first', () => {
+test('1R finishes as success; later stops cannot change it and ambiguous bars are stop-first', () => {
   const data = caseB();
-  data.candles[9] = bar(9, 105, 75, 80);
+  data.candles[9] = bar(9, 105, 70, 80);
   data.candles.push(bar(10, 100, 70, 80)); data.momentum.push(40);
   const first = latest(data);
   assert.equal(first.target1Hit, true);
-  assert.equal(first.status, 'formed');
-  data.candles[10] = bar(10, 100, 66, 70);
+  assert.equal(first.status, 'passed');
+  data.candles[10] = bar(10, 135, 66, 70);
   data.candles.push(bar(11, 100, 68, 75)); data.momentum.push(40);
   assert.equal(latest(data).status, 'passed');
-  data.candles[10] = bar(10, 123, 66, 80);
+  data.candles[9] = bar(9, 130, 66, 80);
   assert.equal(latest(data).status, 'failed');
 });
 
@@ -246,7 +246,7 @@ test('all six requested intervals use identical candle-based rules', () => {
     const setup = latest(data);
     assert.equal(setup.entry, 100);
     assert.equal(setup.mssTime, 1700000000 + 8 * seconds);
-    assert.equal(setup.stop, 122);
+    assert.equal(setup.stop, 130);
   }
   for (const timeframe of PSBB_TIMEFRAMES) assert.deepEqual(psbbPlots(base.candles, { length: 2, left: 1 }, timeframe), psbbPlots(base.candles, { length: 2, left: 1 }));
   assert.deepEqual(psbbPlots(base.candles, {}, '2m'), []);
