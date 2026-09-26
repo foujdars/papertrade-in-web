@@ -1,5 +1,5 @@
 .terminal-shell :is(.indicator-studio-backdrop,.indicator-editor-backdrop){position:fixed;inset:0;z-index:230;display:flex;align-items:flex-end;justify-content:center;background:#10102666;padding:0;backdrop-filter:blur(3px)}
-.terminal-shell .indicator-editor-backdrop{z-index:240}
+.terminal-shell .indicator-editor-backdrop{z-index:320}
 .terminal-shell :is(.indicator-studio,.indicator-editor){position:relative;display:flex;flex-direction:column;width:min(620px,100%);height:min(850px,93dvh);max-height:93dvh;overflow:hidden;padding:0;border:0;border-radius:24px 24px 0 0;background:var(--surface,#fff);color:var(--ink,#242037);box-shadow:0 -12px 64px #10072b22;text-align:left}
 .indicator-grip{flex:0 0 4px;width:34px;margin:12px auto 3px;border-radius:6px;background:var(--line,#ddd)}
 .terminal-shell :is(.indicator-studio,.indicator-editor)>header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:16px 20px;border:0;background:transparent;color:inherit}
