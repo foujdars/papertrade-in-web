@@ -113,6 +113,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
       if (y == null || levelX == null || levelEndX == null) return null;
       return <g key={name}>
         <line className={`chart-psbb-level ${tone}`} markerEnd={tone === 'entry' ? `url(#${arrowId})` : undefined} x1={levelX} y1={y} x2={levelEndX} y2={y} />
+        {tone === 'entry' && visible(levelX,y) && <circle className="chart-psbb-entry-point" cx={levelX} cy={y} r={3.5} fill="#e39b12"><title>Entry {price.toFixed(2)}</title></circle>}
         <text className={`chart-psbb-level ${tone}`} textAnchor="end" x={levelEndX - 2} y={y - 4}>{name} {price.toFixed(2)}</text>
       </g>;
     })}

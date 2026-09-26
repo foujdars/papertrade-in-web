@@ -1,9 +1,41 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from 'node:fs';
 import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
 
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
+
+test('actual reported candles: Case B ignores pre-divergence highs and enters at 401.10', () => {
+  // Upstox INDSWFTLAB 5m OHLC, retrieved 2026-09-27. Includes RSI warmup.
+  const rows = JSON.parse(readFileSync(new URL('./fixtures/psbb-new-leg-candles.json', import.meta.url), 'utf8'));
+  const candles = rows.map(([time,open,high,low,close]) => ({time,open,high,low,close}));
+  const result = psbbAnalysis(candles, {}, '5m').setups.at(-1);
+  assert.equal(result.entry,401.10);
+  assert.equal(result.entryTime,1790240700);
+  assert.equal(result.mssTime,1790241900);
+  assert.equal(result.stop,393.6);
+  assert.ok(Math.abs(result.target1-408.6)<1e-9);
+  assert.equal(result.status,'passed');assert.equal(result.end,1790314200);
+  const entryIndex=candles.findIndex(c=>c.time===result.mssTime), endIndex=candles.findIndex(c=>c.time===result.end);
+  const before=psbbAnalysis(candles.slice(0,entryIndex),{},'5m',true).setups.at(-1);
+  assert.equal(before.entry,401.10);assert.equal(before.shifted,false);
+  const atEntry=psbbAnalysis(candles.slice(0,entryIndex+1),{},'5m',true).setups.at(-1);
+  assert.equal(atEntry.mssTime,result.mssTime,'First touch is known without future candles');
+  assert.ok(candles.slice(entryIndex+1,endIndex).every(c=>c.high<result.target1&&c.low>result.stop));
+  // Same shape at different price scales and inverted for bearish symbols:
+  // the implementation has no symbol-specific conditions.
+  for (const [i,timeframe] of PSBB_TIMEFRAMES.entries()) for(const scale of [.1,1,10]) for(const inverse of [false,true]) {
+    const step=[60,300,900,3600,14400,86400][i];
+    const price=v=>(inverse?1000-v:v)*scale;
+    const transformed=candles.map((c,index)=>({time:1700000000+index*step,open:price(c.open),close:price(c.close),high:price(inverse?c.low:c.high),low:price(inverse?c.high:c.low)}));
+    const setup=psbbAnalysis(transformed,{},timeframe).setups.at(-1);
+    assert.ok(Math.abs(setup.entry-price(result.entry))<1e-8);
+    assert.equal(setup.mssTime,transformed[entryIndex].time);
+    assert.equal(setup.end,transformed[endIndex].time);
+    assert.equal(setup.status,'passed');
+  }
+});
 
 for (const inverse of [false, true]) {
   const analyze = (candles, momentum, closed = true) => psbbAnalysisFromRsi(

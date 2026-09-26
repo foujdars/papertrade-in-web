@@ -71,12 +71,30 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
             await page.evaluate(() => window.psbbQa.candles[29].time), 'Endpoint is the first outcome candle, not later candles');
           // Endpoint and labels follow that candle through pan/zoom and blank future space.
           await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 20, to: 42 }));
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
           await page.waitForFunction(endpointsMatch);
           await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 25, to: 36 }));
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
           await page.waitForFunction(endpointsMatch);
         }
       }
     }
+    await page.evaluate(() => window.psbbView({timeframe:'5m',actual:true}));
+    await page.getByText(/^5m PSBB.*Success/).waitFor();
+    await page.evaluate(() => {
+      const { chart, candles }=window.psbbQa;
+      const entry=candles.findIndex(c=>c.time===1790241900), end=candles.findIndex(c=>c.time===1790314200);
+      chart.timeScale().setVisibleLogicalRange({from:entry-9,to:end+5});
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.waitForFunction(endpointsMatch);
+    await page.waitForFunction(() => {
+      const {chart,series}=window.psbbQa, dot=document.querySelector('.chart-psbb-entry-point');
+      return dot && Math.abs(+dot.getAttribute('cx')-chart.timeScale().timeToCoordinate(1790241900+19800))<1
+        && Math.abs(+dot.getAttribute('cy')-series.priceToCoordinate(401.10))<1;
+    });
+    assert.match(await page.locator('.chart-psbb text.entry').textContent(),/401.10/);
+    assert.match(await page.locator('.chart-psbb text.target').textContent(),/408.60/);
     assert.deepEqual(errors, []);
     if (process.env.PSBB_SCREENSHOT) await page.screenshot({ path: process.env.PSBB_SCREENSHOT });
     console.log('PSBB mobile chart: D1, pending/active levels and first target/stop candle endpoints stay aligned through pan/zoom on all six intervals, both directions.');

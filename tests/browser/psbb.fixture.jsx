@@ -5,6 +5,7 @@ import { PsbbMarks } from '../../components/PsbbMarks';
 import { ChartStudyRenderer } from '../../lib/chart-study-renderer';
 import { studyDefaults } from '../../lib/indicator-catalog';
 import { psbbAnalysis } from '../../lib/psbb';
+import actualRows from '../fixtures/psbb-new-leg-candles.json';
 
 const seconds = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400 };
 const config = { ...studyDefaults('psbb'), inputs: { ...studyDefaults('psbb').inputs, length: 2, left: 1, oversold: 1, overbought: 99 } };
@@ -14,10 +15,11 @@ function Fixture({ view }) {
   const [ready, setReady] = useState(null);
   const host = useRef(null), renderer = useRef(null), refresh = useRef(null);
   const timeframe = view.timeframe;
+  const appliedConfig = view.actual ? studyDefaults('psbb') : config;
   useEffect(() => {
     const outcome = view.outcome ? [view.outcome === 'passed' ? [95, 49, 90] : [131, 85, 90], [100, 85, 90], [100, 85, 90], [100, 85, 90]] : [];
     const rows = [...Array.from({ length: 20 }, () => [100, 90, 95]), ...pattern, ...outcome].slice(0, view.count);
-    const candles = rows.map(([high, low, close], i) => ({
+    const candles = view.actual ? actualRows.map(([time,open,high,low,close]) => ({time,open,high,low,close,volume:100})) : rows.map(([high, low, close], i) => ({
       time: 1700000000 + i * seconds[timeframe], high: view.long ? 200 - low : high,
       low: view.long ? 200 - high : low, open: view.long ? 200 - close : close,
       close: view.long ? 200 - close : close, volume: 100,
@@ -27,23 +29,23 @@ function Fixture({ view }) {
     const series = chart.addSeries(CandlestickSeries);
     series.setData(candles.map((c) => ({ ...c, time: time(c.time) })));
     renderer.current = new ChartStudyRenderer(chart, time);
-    renderer.current.sync({ rsi: true }, { rsi: { ...studyDefaults('rsi'), inputs: { ...studyDefaults('rsi').inputs, length: 2 }, smoothing: 'None' } }, timeframe, candles);
+    renderer.current.sync({ rsi: true }, { rsi: { ...studyDefaults('rsi'), inputs: { ...studyDefaults('rsi').inputs, length: view.actual ? 14 : 2 }, smoothing: 'None' } }, timeframe, candles);
     renderer.current.fit(680);
     chart.timeScale().fitContent();
     chart.priceScale('right').setAutoScale(false);
-    chart.priceScale('right').setVisibleRange({ from: 30, to: 175 });
-    window.psbbQa = { chart, series, candles, analysis: psbbAnalysis(candles, config.inputs, timeframe) };
+    chart.priceScale('right').setVisibleRange(view.actual ? { from: 390, to: 412 } : { from: 30, to: 175 });
+    window.psbbQa = { chart, series, candles, analysis: psbbAnalysis(candles, appliedConfig.inputs, timeframe) };
     setReady({ chart, series, candles });
     return () => { renderer.current = null; chart.remove(); };
   }, [view, timeframe]);
   return <div className="terminal-shell" data-theme="light"><div style={{ position: 'relative', width: '100%', height: 680 }}>
     <div ref={host} />
-    {ready && <PsbbMarks key={`${view.timeframe}:${view.count}:${view.long}`} {...ready} timeframe={timeframe} config={config} studyRenderer={renderer} refreshRef={refresh} />}
+    {ready && <PsbbMarks key={`${view.timeframe}:${view.count}:${view.long}`} {...ready} timeframe={timeframe} config={appliedConfig} studyRenderer={renderer} refreshRef={refresh} />}
   </div></div>;
 }
 function App() {
   const [view, setView] = useState({ timeframe: '5m', count: 22, long: false });
   window.psbbView = setView;
-  return <Fixture key={`${view.timeframe}:${view.count}:${view.long}:${view.outcome}`} view={view} />;
+  return <Fixture key={`${view.timeframe}:${view.count}:${view.long}:${view.outcome}:${view.actual}`} view={view} />;
 }
 createRoot(document.getElementById('root')).render(<App />);

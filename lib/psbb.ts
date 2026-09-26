@@ -64,11 +64,11 @@ function rsi(closes: number[], length: number) {
   });
 }
 
-function isPivot(candles: Bar[], side: "low" | "high", index: number, span: number) {
-  if (index < span) return false;
+function isPivot(candles: Bar[], side: "low" | "high", index: number, span: number, legStart = index - span) {
+  if (legStart < 0 || index <= legStart) return false;
   const value = candles[index][side];
   if (!Number.isFinite(value)) return false;
-  for (let cursor = index - span; cursor <= index + span; cursor += 1) {
+  for (let cursor = Math.max(legStart, index - span); cursor <= index + span; cursor += 1) {
     if (cursor === index) continue;
     const other = candles[cursor][side];
     if (!Number.isFinite(other) || (side === "low" ? other <= value : other >= value)) return false;
@@ -108,9 +108,10 @@ function moveD1(episode: Episode, index: number) {
  * D1 before replacing it: price HH + RSI LH (or LL + HL) preserves the reference
  * for D2. A non-divergent visit becomes the new D1. After divergence is already
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
- * Swings become usable only after `left` closed candles on BOTH sides. Case A
+ * Swings need `left` closed candles on the right. Case A
  * uses the most recent opposite swing strictly between D1 and the extreme;
- * Case B waits for the first opposite swing after it. A touch of a known
+ * Case B waits for the first opposite swing in the NEW leg after it: its left
+ * comparison cannot include candles before the divergence extreme. A touch of a known
  * Case A level also confirms D2 without waiting extra right-hand pivot bars.
  * The first subsequent candle whose high/low reaches the structure level
  * triggers entry AT that level, without requiring its close to cross. The
@@ -205,8 +206,11 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       const setup = episode.setup;
       if (!setup) continue;
       setup.end = bar.time;
-      // A Case B level is locked to the FIRST new swing, not a later better fit.
-      if (episode.structure === undefined) episode.structure = pivots[structureKind].find((pivot) => pivot > extreme);
+      // Case B is a new leg, not a global pivot. A high/low from BEFORE D2
+      // must not reject its first new-leg swing and move entry to a later one.
+      // Confirm using only the available left-hand bars since D2, plus the
+      // configured right-hand bars. Lock the first such swing permanently.
+      if (episode.structure === undefined && confirmed > extreme && isPivot(candles, structureKind, confirmed, span, extreme)) episode.structure = confirmed;
       const structure = episode.structure;
       if (structure === undefined) continue;
       setup.phase = "waiting-mss";
