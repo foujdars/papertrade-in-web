@@ -371,7 +371,7 @@ function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle
     ...item,
     anchors: item.anchors.map((anchor) => {
       const timestamp = timeToTimestamp(anchor.time);
-      if(timestamp<Number(candleTimes[0])||timestamp>Number(candleTimes.at(-1)))return anchor;
+      if (timestamp < Number(candleTimes[0]) || timestamp > Number(candleTimes.at(-1))) return anchor;
       let nearest = candleTimes[0];
       let distance = Math.abs(nearest - timestamp);
       for (let index = 1; index < candleTimes.length; index += 1) {
@@ -851,7 +851,7 @@ export function MarketChart({
       const selectedDrawing = drawingManager.current?.getSelectedDrawing();
       const anchors = selectedDrawing?.anchors ?? [];
       const actionPoints = anchors.flatMap((anchor) => {
-        const pointX = chartApi.current?.timeScale().timeToCoordinate(anchor.time) ?? null;
+        const pointX = drawingX(anchor.time);
         const pointY = candleSeries.current?.priceToCoordinate(anchor.price) ?? null;
         return pointX === null || pointY === null ? [] : [{ x: pointX, y: pointY }];
       });
@@ -1187,6 +1187,15 @@ export function MarketChart({
     const price = series.coordinateToPrice(y);
     if (time === null || price === null) return null;
     return useMagnet ? snapAnchor(time, price) : { time, price };
+  }
+
+  function drawingX(time: Time) {
+    const chart = chartApi.current;
+    if (!chart) return null;
+    const direct = chart.timeScale().timeToCoordinate(time);
+    if (direct !== null) return direct;
+    const logical = drawingLogicalAtTime(timeToTimestamp(time), dataRef.current.map((candle) => Number(chartTimeFromEpoch(Number(candle.time), timeframe))));
+    return logical === null ? null : chart.timeScale().logicalToCoordinate(logical as Logical);
   }
 
   function drawingTimeAtCoordinate(x: number): Time | null {
@@ -1703,7 +1712,7 @@ export function MarketChart({
             drawing: hit,
             pointerId: event.pointerId,
             startX: event.clientX,
-            originalPixels: hit.anchors.map(anchor => hit.getViewport()?.timeScale.timeToCoordinate(anchor.time) ?? null),
+            originalPixels: hit.anchors.map((anchor) => drawingX(anchor.time)),
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
@@ -1797,7 +1806,18 @@ export function MarketChart({
         if (edit && edit.pointerId === event.pointerId) {
           const current = pointerAnchor(event, false);
           if (!current) return;
-          if (edit.anchorIndex !== null) {
+          const positionTool = edit.drawing.type === "long-position" || edit.drawing.type === "short-position";
+          if (positionTool) {
+            const centerX = edit.originalPixels[0];
+            const nextCenter = centerX === null ? current.time : drawingTimeAtCoordinate(centerX + event.clientX - edit.startX) ?? edit.originalAnchors[0].time;
+            const timeDelta = Number(nextCenter) - Number(edit.originalAnchors[0].time);
+            const priceDelta = current.price - edit.start.price;
+            const grabbed = edit.anchorIndex;
+            edit.drawing.setAnchors(edit.originalAnchors.map((anchor, index) => ({
+              time: (Number(anchor.time) + timeDelta) as Time,
+              price: anchor.price + (grabbed === null || grabbed === 0 || index === grabbed ? priceDelta : 0),
+            })));
+          } else if (edit.anchorIndex !== null) {
             const original = edit.originalAnchors[edit.anchorIndex];
             const originalX = edit.originalPixels[edit.anchorIndex];
             const next = { time: originalX === null ? original.time : drawingTimeAtCoordinate(originalX + event.clientX - edit.startX) ?? original.time, price: original.price + current.price - edit.start.price };
