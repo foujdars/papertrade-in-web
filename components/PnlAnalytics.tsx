@@ -69,22 +69,19 @@ function PnlFindings({ trades, orders, onSelect }: { trades: ClosedPaperTrade[];
   const autoNet = auto.reduce((sum, trade) => sum + trade.netPnl, 0);
   const worstShare = stats.worst && stats.net < 0 && stats.worst.netPnl < 0 ? Math.abs(stats.worst.netPnl) / Math.abs(stats.net) * 100 : null;
   if (!trades.length) return null;
-  return <section className="pnl-a-card pnl-findings"><header><div><span className="pnl-kicker">What changed the result</span><h3>Three numbers that matter</h3></div></header>
+  return <section className="pnl-a-card pnl-findings"><header><div><span className="pnl-kicker">What changed the result</span></div></header>
     <div className="pnl-finding-list">
-      <button type="button" disabled={!stats.worst} onClick={() => stats.worst && onSelect([stats.worst.id], "Largest loss")}>
-        <span>Largest loss</span>
-        <b className="negative">{stats.worst ? `${stats.worst.symbol} · ${rupees(stats.worst.netPnl)}` : "—"}</b>
-        <small>{worstShare === null ? "No net loss in this selection." : `${worstShare.toFixed(0)}% of the net loss`}</small>
+      <button type="button" className="is-loss" disabled={!stats.worst} onClick={() => stats.worst && onSelect([stats.worst.id], "Largest loss")}>
+        <span className="pnl-finding-copy"><small>Largest loss</small><b>{stats.worst?.symbol ?? "—"}</b></span>
+        <span className="pnl-finding-figure"><strong className="negative">{rupees(stats.worst?.netPnl ?? null)}</strong><small>{worstShare === null ? "No net loss" : `${worstShare.toFixed(0)}% of the net loss`}</small></span>
       </button>
-      <button type="button" disabled={!auto.length} onClick={() => auto.length && onSelect(auto.map(trade => trade.id), "Auto exits")}>
-        <span>Auto exits</span>
-        <b className={signClass(autoNet)}>{auto.length ? rupees(autoNet) : "None"}</b>
-        <small>{auto.length ? `${auto.length} of ${trades.length} exits closed by the session rule` : "No session auto-exit in this selection."}</small>
+      <button type="button" className="is-loss" disabled={!auto.length} onClick={() => auto.length && onSelect(auto.map(trade => trade.id), "Auto exits")}>
+        <span className="pnl-finding-copy"><small>Auto exits</small><b>{auto.length ? `${auto.length} of ${trades.length} exits` : "None"}</b></span>
+        <span className="pnl-finding-figure"><strong className={signClass(autoNet)}>{auto.length ? rupees(autoNet) : "—"}</strong><small>{auto.length ? "Closed at the session" : "No session auto-exit"}</small></span>
       </button>
-      <button type="button" onClick={() => onSelect(trades.map(trade => trade.id), "Charges")}>
-        <span>Charges</span>
-        <b>{rupees(stats.charges)}</b>
-        <small>{stats.costReversals ? `${stats.costReversals} winner${stats.costReversals === 1 ? "" : "s"} turned into a loss after costs` : "No winner was flipped by costs."}</small>
+      <button type="button" className="is-cost" onClick={() => onSelect(trades.map(trade => trade.id), "Charges")}>
+        <span className="pnl-finding-copy"><small>Charges</small><b>{stats.costReversals ? `${stats.costReversals} winner${stats.costReversals === 1 ? "" : "s"} flipped` : "No winner flipped"}</b></span>
+        <span className="pnl-finding-figure"><strong>{rupees(stats.charges)}</strong><small>Already inside net P&L</small></span>
       </button>
     </div>
   </section>;
@@ -93,17 +90,20 @@ function PnlFindings({ trades, orders, onSelect }: { trades: ClosedPaperTrade[];
 function PnlInsights({ trades, orders, journal, onSelect }: { trades: ClosedPaperTrade[]; orders: PaperOrder[]; journal: Record<string, TradeJournalEntry>; onSelect: Drill }) {
   const stats = useMemo(() => summarisePnl(trades), [trades]), distribution = useMemo(() => pnlDistribution(trades), [trades]);
   const rolling = useMemo(() => rollingPnl(trades).map(p => ({ time: p.time, value: p.value, ids: p.ids, label: `10-trade window ending ${dateText(p.time)}` })), [trades]);
-  const gross = stats.grossGains - stats.grossLosses;
-  const steps = [{ label: "Gains", from: 0, to: stats.grossGains, change: stats.grossGains, ids: trades.filter(t => t.grossPnl > 0).map(t => t.id) }, { label: "Losses", from: stats.grossGains, to: gross, change: -stats.grossLosses, ids: trades.filter(t => t.grossPnl < 0).map(t => t.id) }, { label: "Charges", from: gross, to: gross - stats.charges, change: -stats.charges, ids: trades.map(t => t.id) }, { label: "Net", from: 0, to: stats.net, change: stats.net, ids: trades.map(t => t.id) }];
-  const low = Math.min(0, ...steps.flatMap(s => [s.from, s.to])), high = Math.max(0, ...steps.flatMap(s => [s.from, s.to])), y = (v: number) => 146 - (v - low) / (high - low || 1) * 108;
+  const steps = [
+    { label: "Gains", change: stats.grossGains, tone: "gain", ids: trades.filter(t => t.grossPnl > 0).map(t => t.id) },
+    { label: "Losses", change: -stats.grossLosses, tone: "loss", ids: trades.filter(t => t.grossPnl < 0).map(t => t.id) },
+    { label: "Charges", change: -stats.charges, tone: "cost", ids: trades.map(t => t.id) },
+    { label: "Net", change: stats.net, tone: stats.net >= 0 ? "gain" : "loss", ids: trades.map(t => t.id) },
+  ];
+  const flowMax = Math.max(1, ...steps.map(step => Math.abs(step.change)));
   const maxCount = Math.max(1, ...distribution.bins.map(b => b.trades.length)), hx = (v: number) => 32 + (v - distribution.min) / (distribution.max - distribution.min) * 344;
   const [selectedBin, setSelectedBin] = useState<number | null>(null);
   useEffect(() => setSelectedBin(null), [trades]);
   return <div className="pnl-insight-grid">
     <PnlFindings trades={trades} orders={orders} onSelect={onSelect} />
-    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Before costs → after costs</span><h3>Profit-to-net waterfall</h3></div></header>
-      <svg className="pnl-waterfall" viewBox="0 0 400 158" role="img" aria-label="Gross gains minus gross losses and charges equals net P&L"><line x1="18" x2="388" y1={y(0)} y2={y(0)} className="pnl-zero-line" />{steps.map((s, i) => <g key={s.label} role="button" tabIndex={0} aria-label={`${s.label}: ${rupees(s.change)}, view trades`} onClick={() => onSelect(s.ids, s.label)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s.ids, s.label); } }}><rect x={32 + i * 92} y={Math.min(y(s.from), y(s.to))} width="52" height={Math.max(2, Math.abs(y(s.from) - y(s.to)))} rx="4" fill={s.label === "Charges" ? "var(--purple)" : s.change >= 0 ? "var(--green)" : "var(--red)"} opacity=".8" /><text x={58 + i * 92} y={Math.max(15, Math.min(y(s.from), y(s.to)) - 8)} textAnchor="middle">{compact(s.change)}</text>{i < 2 && <line x1={84 + i * 92} x2={124 + i * 92} y1={y(s.to)} y2={y(s.to)} className="pnl-inspect-line" />}</g>)}</svg>
-      <div className="pnl-waterfall-values">{steps.map(s => <button key={s.label} onClick={() => onSelect(s.ids, s.label)}><span>{s.label}</span><b className={s.label === "Charges" ? "" : signClass(s.change)}>{rupees(s.change)}</b></button>)}</div>
+    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Before costs → after costs</span><h3>How the rupees add up</h3></div></header>
+      <div className="pnl-flow">{steps.map(step => <button key={step.label} type="button" onClick={() => onSelect(step.ids, step.label)}><span className="pnl-flow-top"><b>{step.label}</b><strong className={step.tone === "cost" ? "pnl-cost" : signClass(step.change)}>{rupees(step.change)}</strong></span><span className="pnl-flow-track" aria-hidden="true"><i className={step.tone} style={{ width: `${Math.abs(step.change) / flowMax * 100}%` }} /></span></button>)}</div>
       <p className="pnl-help">{stats.costReversals ? `${stats.costReversals} gross winner${stats.costReversals === 1 ? "" : "s"} became a loss after charges.` : "Charges did not turn any winner into a loss."}</p>
     </section>
     <section className="pnl-a-card"><header><div><span className="pnl-kicker">Beyond your win rate</span><h3>Trade-result distribution</h3></div></header>

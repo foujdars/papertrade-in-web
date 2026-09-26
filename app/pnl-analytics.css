@@ -17,11 +17,29 @@
 .pnl-view-tabs button { min-height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
 .pnl-view-tabs button[aria-selected="true"] { color: var(--purple); background: var(--surface); box-shadow: 0 2px 7px #00000008; }
 .pnl-findings { grid-column: 1 / -1; }
-@media (min-width: 700px) { .pnl-finding-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.pnl-finding-list button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--pnl-border); border-radius: 12px; background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
-.pnl-finding-list button:disabled { cursor: default; opacity: .7; }
-.pnl-finding-list span, .pnl-finding-list small { color: var(--muted); font-size: 10px; }
-.pnl-finding-list b { font-size: 14px; font-weight: 650; }
+.pnl-findings > header { margin-bottom: 2px; }
+.pnl-finding-list { display: grid; }
+.pnl-finding-list button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 13px 2px 13px 12px; border: 0; border-bottom: 1px solid var(--pnl-border); border-left: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.pnl-finding-list button:last-child { border-bottom: 0; }
+.pnl-finding-list button.is-loss { border-left-color: color-mix(in srgb, var(--red) 70%, transparent); }
+.pnl-finding-list button.is-cost { border-left-color: color-mix(in srgb, var(--purple) 70%, transparent); }
+.pnl-finding-list button:disabled { cursor: default; }
+.pnl-finding-copy, .pnl-finding-figure { display: grid; gap: 3px; min-width: 0; }
+.pnl-finding-figure { text-align: right; flex-shrink: 0; }
+.pnl-finding-copy b { font-size: 13px; font-weight: 550; letter-spacing: -.2px; }
+.pnl-finding-figure strong { font-size: 15px; font-weight: 550; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+.pnl-finding-list small { color: var(--muted); font-size: 11px; font-weight: 450; }
+.pnl-flow { display: grid; gap: 16px; }
+.pnl-flow button { display: grid; gap: 7px; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.pnl-flow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pnl-flow-top b { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pnl-flow-top strong { font-size: 13px; font-weight: 550; letter-spacing: -.2px; font-variant-numeric: tabular-nums; }
+.pnl-flow-top .pnl-cost { color: var(--purple); }
+.pnl-flow-track { display: block; height: 6px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+.pnl-flow-track i { display: block; height: 100%; border-radius: inherit; min-width: 4px; }
+.pnl-flow-track i.gain { background: var(--green); }
+.pnl-flow-track i.loss { background: var(--red); }
+.pnl-flow-track i.cost { background: var(--purple); }
 .pnl-summary-six { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
 .pnl-summary-six > :is(div,button) { min-width: 0; padding: 14px; border: 1px solid var(--pnl-border); border-radius: 13px; background: var(--surface); text-align: left; display: flex; flex-direction: column; gap: 8px; color: var(--ink); }
 .pnl-summary-six > button { cursor: pointer; }
