@@ -178,13 +178,13 @@
 .terminal-shell[data-theme="neon"] .chart-prior-mark.month { color: #f4f5f8; }
 .terminal-shell .timeframe-sheet .timeframe-groups { min-height: 0; flex: 1; overflow: auto; }
 .chart-prior-label { position: absolute; transform: translateY(-50%); border: 0; background: transparent; padding: 0; color: inherit; font: inherit; font-size: 10px; font-weight: 500; line-height: 1; white-space: nowrap; pointer-events: auto; cursor: pointer; }
-.chart-psbb { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
-.chart-psbb-line { position: absolute; height: 0; border-top: 1px dashed currentColor; }
-.chart-psbb-line.trigger { color: #753bce; }
-.chart-psbb-line.stop { color: #e24b4b; }
-.chart-psbb-line.target { color: #0f9f6e; }
-.chart-psbb-tag { position: absolute; transform: translateY(-50%); padding: 1px 4px; border-radius: 2px; background: color-mix(in srgb, var(--surface, #fff) 88%, transparent); font-size: 9px; font-weight: 700; letter-spacing: .03em; line-height: 1.3; }
-.chart-psbb-tag.formed { color: #753bce; }
-.chart-psbb-tag.active { color: #d97706; }
-.chart-psbb-tag.passed { color: #0f9f6e; }
-.chart-psbb-tag.failed { color: #e24b4b; }
+.chart-psbb { position: absolute; inset: 0 auto auto 0; z-index: 5; overflow: visible; pointer-events: none; }
+.chart-psbb-diverge { stroke: #e0a100; stroke-width: 1.5; fill: none; }
+.chart-psbb-level { stroke-width: 1; }
+.chart-psbb-level.stop { stroke: #e24b4b; }
+.chart-psbb-level.entry { stroke: #753bce; }
+.chart-psbb-level.target { stroke: #0f9f6e; }
+.chart-psbb text { font-size: 9px; font-weight: 700; }
+.chart-psbb text.stop { fill: #e24b4b; }
+.chart-psbb text.entry { fill: #753bce; }
+.chart-psbb text.target { fill: #0f9f6e; }
