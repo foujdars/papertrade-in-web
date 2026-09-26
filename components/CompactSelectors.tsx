@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, Clock3, List, Plus, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTransientBack } from './useTransientBack';
 
 export const CHART_TIMEFRAMES = ["1m", "2m", "3m", "5m", "10m", "15m", "30m", "1H", "2H", "3H", "4H", "1D", "1W", "1M", "1Y"] as const;
 
@@ -76,6 +77,7 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
 type WatchlistChoice = { id: string; name: string; count: number; custom?: boolean; description?: string };
 
 export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onClose }: { activeId: string; choices: WatchlistChoice[]; onSelect: (id: string) => void; onNewList: () => void; onClose: () => void }) {
+  useTransientBack(true, onClose);
   useEscape(onClose);
   return (
     <div className="watchlist-selector-backdrop" role="presentation" onPointerDown={onClose}>

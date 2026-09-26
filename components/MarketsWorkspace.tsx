@@ -169,7 +169,7 @@ export function MarketsWorkspace({
   useEffect(() => {
     window.localStorage.setItem(SCANNER_SELECTION_STORAGE_KEY, JSON.stringify({ scannerGroup, activeScanner }));
     onScannerViewed?.(selectedOption.label);
-  }, [activeScanner, onGroupChange, onScannerViewed, scannerGroup, selectedOption.label]);
+  }, [activeScanner, onScannerViewed, scannerGroup, selectedOption.label]);
 
   const runSelectedScan = useCallback(async (requestedScanner?: ScannerId, force = false) => {
     if (scanInFlightRef.current) return;

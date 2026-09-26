@@ -7,7 +7,8 @@ import { TradeReviewDialog } from "./TradeReviewDialog";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
 import { LongPressTradeRow } from "@/components/LongPressTradeRow";
-import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransientBack";
+import { TRANSIENT_BACK_EVENT, useTransientBack, hasTransientBackLayer } from "@/components/useTransientBack";
+import { useWatchlistHistory } from "@/components/useWatchlistHistory";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 import { ChartHistoryControls } from "./ChartHistoryControls";
@@ -561,6 +562,23 @@ export function TradingDashboard() {
             ? "pnl"
             : workspaceMode;
   const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
+  const watchlistHistory = useWatchlistHistory<{ section: NavigationSection; group: ScannerGroup; scroll: Record<string, number> }>((saved) => {
+    openNavigationSection(saved.section, false);
+    setMarketsInitialGroup(saved.group);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const [selector, top] of Object.entries(saved.scroll)) {
+        const panel = document.querySelector(selector);
+        if (panel) panel.scrollTop = top;
+      }
+    }));
+  });
+  const watchlistHistoryRef = useRef(watchlistHistory); watchlistHistoryRef.current = watchlistHistory;
+  function rememberWatchlistLocation() {
+    const scroll = Object.fromEntries(['.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel'].map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
+    watchlistHistory.remember({ section: activeNavigationSection, group: marketsInitialGroup, scroll });
+  }
+  useTransientBack(sidebarOpen && Boolean(search), () => { setSearch(''); setWatchlistLimit(60); });
+  useTransientBack(watchlistPickerOpen, () => setWatchlistPickerOpen(false));
   const replayOnChart = Boolean(replayInstrument && activeNavigationSection === "trade" && selected.instrumentKey === replayInstrument.instrumentKey && selected.assetType !== "OPTION");
   const chartReplay = useReplayController(replayOnChart ? selected : null, replayReviewTimeframe ?? timeframe);
   const exitChartReplay = () => { setReplayInstrument(null); setReplayReviewTimeframe(null); };
@@ -606,6 +624,13 @@ export function TradingDashboard() {
   }, [timeframe]);
 
   const returnToTradeFromBack = useCallback(() => {
+    // A restored Watchlist has no in-session trail yet: its parent is the
+    // Watchlist scanner screen, not an unrelated jump straight to Home.
+    if (activeNavigationSectionRef.current === 'watchlist') {
+      setSidebarOpen(false); setHomeOpen(false); setMarketsOpen(true);
+      setMarketsInitialGroup(lastScannerGroupRef.current);
+      return;
+    }
     setTradeSelection(null);
     setPendingDeleteIds(null);
     setHomeOpen(true);
@@ -820,7 +845,7 @@ export function TradingDashboard() {
 
   useEffect(() => {
     if (workspaceMode !== "fno") return;
-    const handleHistoryBack = () => closeFnoWorkspace();
+    const handleHistoryBack = () => { if (!hasTransientBackLayer()) closeFnoWorkspace(); };
     window.addEventListener("popstate", handleHistoryBack);
     return () => {
       window.removeEventListener("popstate", handleHistoryBack);
@@ -835,6 +860,11 @@ export function TradingDashboard() {
     void CapacitorApp.addListener("backButton", () => {
       if (toolkitBackRef.current) { toolkitBackRef.current(); return; }
       if (!window.dispatchEvent(new Event(TRANSIENT_BACK_EVENT, { cancelable: true }))) return;
+      if (watchlistHistoryRef.current.back()) {
+        exitBackDeadlineRef.current = 0;
+        if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
+        setToast(''); return;
+      }
       if (activeNavigationSectionRef.current !== "home") {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
@@ -875,6 +905,7 @@ export function TradingDashboard() {
   useEffect(() => {
     if (workspaceMode === "fno") return;
     const restorePreviousChart = (event: PopStateEvent) => {
+      if (hasTransientBackLayer() || event.defaultPrevented) return;
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
       setSelected(snapshot.instrument);
@@ -2322,6 +2353,8 @@ export function TradingDashboard() {
   }
 
   function chooseTradeInstrument(item: Instrument) {
+    const fromWatchlist = marketNavigationActive;
+    if (fromWatchlist) rememberWatchlistLocation();
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
     const nextInstrument = { ...item, price: price > 0 ? price : 0 };
@@ -2356,7 +2389,7 @@ export function TradingDashboard() {
         window.history.replaceState({ ...currentState, papertradeChart: { instrument: selected, timeframe } }, "", window.location.href);
       }
       const nextState = { ...window.history.state, papertradeChart: { instrument: nextInstrument, timeframe } };
-      if (selected.instrumentKey === nextInstrument.instrumentKey && workspaceMode === "trade") window.history.replaceState(nextState, "", url);
+      if (fromWatchlist || selected.instrumentKey === nextInstrument.instrumentKey && workspaceMode === "trade") window.history.replaceState(nextState, "", url);
       else window.history.pushState(nextState, "", url);
     }
   }
@@ -2600,7 +2633,11 @@ export function TradingDashboard() {
     setOrderSheetOpen(true);
   }
 
-  function openNavigationSection(section: NavigationSection) {
+  function openNavigationSection(section: NavigationSection, remember = true) {
+    if (remember && section !== activeNavigationSection) {
+      if (section === 'watchlist' || section === 'markets') rememberWatchlistLocation();
+      else watchlistHistory.clear();
+    }
     setOptionChainOpen(false);
     if (section === "home") {
       setHomeOpen(true);
@@ -2797,7 +2834,7 @@ export function TradingDashboard() {
               setMarketsInitialGroup(section);
             }} />
           </div>}
-          <div className="search-box"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" /></div>
+          <div className="search-box"><Search size={16} /><input aria-label="Search watchlist" value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" />{search && <button type="button" className="icon-button" aria-label="Clear watchlist search" onClick={() => { setSearch(''); setWatchlistLimit(60); }}><X size={16} /></button>}</div>
           <div className="desktop-watchlist-tabs" role="tablist" aria-label="Watchlists">
             {watchlistChoices.map((choice) => <button type="button" role="tab" aria-selected={watchlist === choice.id} className={watchlist === choice.id ? "active" : ""} key={choice.id} onClick={() => { setWatchlist(choice.id); setWatchlistLimit(60); }}><span>{choice.name}</span><small>{choice.count}</small></button>)}
             <button type="button" className="new-list-tab" onClick={() => openWatchlistPicker(null)}><Plus size={14} /> New list</button>
@@ -2809,7 +2846,7 @@ export function TradingDashboard() {
             const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
             if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
             else pendingTradingHistory.current = history;
-            openNavigationSection("trade");
+            openNavigationSection("trade", false);
             chooseTradeInstrument(instrument);
             setTimeframe(frame);
             setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
@@ -3296,7 +3333,7 @@ export function TradingDashboard() {
           onSelectCash={(item, price) => { chooseTradeInstrument({ ...item, price }); setMarketsOpen(false); }}
           onOpenWatchlist={() => openNavigationSection("watchlist")}
           group={marketsInitialGroup}
-          onGroupChange={setMarketsInitialGroup}
+          onGroupChange={(group) => { if (group !== marketsInitialGroup) rememberWatchlistLocation(); setMarketsInitialGroup(group); }}
           onScannerViewed={rememberScanner}
         />
       )}

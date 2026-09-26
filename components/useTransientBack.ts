@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 
 export const TRANSIENT_BACK_EVENT = "papertrade:dismiss-layer";
 const layers: string[] = [];
+export function hasTransientBackLayer() { return layers.length > 0 || returningFromDismiss; }
 let returningFromDismiss = false;
 /** A transient screen consumes one Back action without leaving its parent. */
 export function useTransientBack(open: boolean, onDismiss: () => void) {

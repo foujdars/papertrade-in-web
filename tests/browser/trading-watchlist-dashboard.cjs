@@ -5,6 +5,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const errors = [], historyRequests = [];
+    if(process.env.TRACE_BACK) {
+      page.on('console',m=>{if(m.text().startsWith('BACK'))console.log(m.text());});
+      await page.addInitScript(()=>{
+        for(const name of ['pushState','replaceState']){const original=history[name].bind(history);history[name]=(...args)=>{console.log('BACK '+name+' '+JSON.stringify(args[0]));return original(...args);};}
+        window.addEventListener('popstate',e=>console.log('BACK pop '+JSON.stringify(e.state)),true);
+      });
+    }
     page.on('pageerror', error => { errors.push(error.message); console.error(error.stack); });
     await page.route('**/*.supabase.co/**', route => route.abort());
     await page.route('**/api/**', route => {
@@ -23,6 +30,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.launch-disclaimer').waitFor({ state: 'hidden', timeout: 30000 });
     await page.locator('.mobile-bottom-nav').getByRole('button', { name: 'Watchlist', exact: true }).click();
     await page.locator('.market-section-tabs').filter({ visible: true }).getByRole('button', { name: 'Watchlist', exact: true }).click();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='watchlist');
+    await page.getByRole('button', { name: /^Current watchlist:/ }).click();
+    await page.getByRole('dialog',{name:'Choose watchlist'}).waitFor();
+    await page.waitForFunction(()=>Boolean(history.state?.papertradeLayer));
+    await page.goBack();
+    await page.getByRole('dialog',{name:'Choose watchlist'}).waitFor({state:'hidden'});
+    assert.equal(await page.locator('.terminal-shell').getAttribute('data-section'),'watchlist','Back closes the list picker, not the tab');
+    await page.getByPlaceholder('Search all NSE stocks').fill('SENSEX');
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.search-box input')?.value==='');
+    assert.equal(await page.locator('.terminal-shell').getAttribute('data-section'),'watchlist','Back clears search first');
     await page.getByRole('button', { name: /^Current watchlist:/ }).click();
     const options = page.locator('.watchlist-selector-options button');
     assert.equal(await options.nth(1).locator('b').textContent(), 'Trading watchlist');
@@ -42,7 +60,31 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.waitForFunction(() => new URL(location.href).searchParams.get('timeframe') === '4H');
     await page.waitForTimeout(700);
     assert.ok(historyRequests.some(request => request.instrumentKey === 'BSE_INDEX|SENSEX' && request.date), 'Chart requests the selected setup date');
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='watchlist');
+    assert.equal(await page.getByLabel('Trading stock universe').inputValue(),'Indices');
+    assert.equal(await page.getByRole('tab',{name:'4H',exact:true}).getAttribute('aria-selected'),'true');
+    await page.getByPlaceholder('Search all NSE stocks').fill('SENSEX');
+    await last.click();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='trade');
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='watchlist');
+    assert.equal(await page.getByPlaceholder('Search all NSE stocks').inputValue(),'SENSEX');
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.search-box input')?.value==='');
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='markets');
+    const marketTabs=page.locator('.market-section-tabs').filter({visible:true});
+    await marketTabs.getByRole('button',{name:'Investment',exact:true}).click();
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.market-section-tabs button.active')?.textContent?.includes('Trading'));
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='home');
+    await page.locator('.mobile-bottom-nav').getByRole('button',{name:'Charts',exact:true}).click();
+    await page.locator('.mobile-bottom-nav').getByRole('button',{name:'Watchlist',exact:true}).click();
+    await page.goBack();
+    await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='trade');
     assert.deepEqual(errors, []);
-    console.log('Production dashboard: Trading watchlist is second, mobile list scrolls, Sensex 4H opens at setup date.');
+    console.log('Dashboard: picker/search Back stays in Watchlist, stock-chart Back restores category/timeframe/search, then returns to scanners.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
