@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type MutableRefObject } from "react";
+import { useEffect, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
+import { Check, Trash2 } from "lucide-react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
 import { studyLinePoints, type StudyDrawing } from "@/lib/study-pane-drawings";
@@ -11,13 +12,15 @@ function paneTop(chart: IChartApi, index: number) {
   return top;
 }
 
-export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selectedId, refreshRef }: {
+export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selectedId, refreshRef, onDelete, onDone }: {
   chart: IChartApi | null;
   studyRenderer: MutableRefObject<ChartStudyRenderer | null>;
   drawings: StudyDrawing[];
   cursor: { y: number; text: string; color?: string } | null;
   selectedId: string | null;
   refreshRef: MutableRefObject<(() => void) | null>;
+  onDelete?: (id: string) => void;
+  onDone?: () => void;
 }) {
   const [, redraw] = useState(0);
   useEffect(() => {
@@ -46,6 +49,8 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
     if (x == null || y == null) return null;
     return { x, y: y + paneTop(chart, bundle.pane), top: paneTop(chart, bundle.pane), paneHeight: chart.paneSize(bundle.pane).height };
   };
+  let toolbar: { x: number; y: number } | null = null;
+  const stopToolbar = (event: ReactPointerEvent) => event.stopPropagation();
   return <>
     <svg className="chart-study-drawings" width={width} height={height} aria-hidden="true">
     {cursor && <line className="chart-study-crosshair" style={cursor.color ? { stroke: cursor.color } : undefined} x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
@@ -55,6 +60,11 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       if (!from || !to) return null;
       const ends = studyLinePoints(line.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight);
       const selected = line.id === selectedId;
+      if (selected) {
+        const midX = ends ? (ends.x1 + ends.x2) / 2 : (from.x + to.x) / 2;
+        const midY = ends ? Math.min(ends.y1, ends.y2) : Math.min(from.y, to.y);
+        toolbar = { x: Math.max(4, Math.min(width - 72, midX - 28)), y: Math.max(from.top + 4, midY - 36) };
+      }
       if (!ends) {
         const x = Math.min(from.x, to.x);
         const y = Math.min(from.y, to.y);
@@ -64,5 +74,9 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
     })}
     </svg>
     {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width, background: cursor.color, color: cursor.color ? "#fff" : undefined }}>{cursor.text}</b>}
+    {selectedId && toolbar && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions" style={{ left: toolbar.x, top: toolbar.y }} onPointerDown={stopToolbar}>
+      <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => onDelete?.(selectedId)}><Trash2 size={19} /></button>
+      <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => onDone?.()}><Check size={21} /></button>
+    </div>}
   </>;
 }
