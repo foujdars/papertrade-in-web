@@ -141,7 +141,7 @@ export function computeStudy(id:string,data:Candle[],c:StudyConfig,comparison?:C
  case 'sar':{let up=data.length>1?close[1]>=close[0]:true,sar=up?lo[0]:hi[0],extreme=up?hi[0]:lo[0],af=p.start;const vals=close.map((_,i)=>{if(!i)return N;sar+=af*(extreme-sar);sar=up?Math.min(sar,lo[i-1],lo[Math.max(0,i-2)]):Math.max(sar,hi[i-1],hi[Math.max(0,i-2)]);if(up?lo[i]<sar:hi[i]>sar){sar=extreme;up=!up;extreme=up?hi[i]:lo[i];af=p.start;}else if(up?hi[i]>extreme:lo[i]<extreme){extreme=up?hi[i]:lo[i];af=Math.min(p.maximum,af+p.increment);}return sar;});add('SAR',vals,{points:true});break;}
  case 'entry':{const marks=entryPlots(data,p);add('EMA 21',marks.ema21);add('EMA 50',marks.ema50);add('VWAP',marks.vwap);add('Long',marks.long,{points:true});add('Short',marks.short,{points:true});break;}
  case 'zing-inside':case 'zing-traffic':case 'zing-ema':{const marks=strategyPlots(data,id,p);add('Entry',marks.entry);add('Stop',marks.stop);add('Target',marks.target);add('Long',marks.long,{points:true});add('Short',marks.short,{points:true});break;}
- case 'psbb':{const marks=psbbPlots(data,p);add('Entry',marks.entry);add('Stop',marks.stop);add('Target 1',marks.target1);add('Target 2',marks.target2);add('Long',marks.long,{points:true});add('Short',marks.short,{points:true});break;}
+ case 'psbb': return { plots: [], message: psbbPlots(data, p).length ? undefined : 'No PSBB setup in these candles' };
  default:return {plots:[],message:'This indicator is not implemented.'};
  }
  return {plots,levels,range,message:plots.length&&plots.every(s=>!s.values.some(Number.isFinite))?'More candle history is needed for these settings.':undefined};
