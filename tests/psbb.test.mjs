@@ -262,7 +262,7 @@ test('threshold equality, missing RSI history and no crossing cannot invent D1',
   }
 });
 
-test('a break before pivot confirmation is not backdated into a trade', () => {
+test('Case A activates on the closed MSS candle without waiting for later pivot bars', () => {
   const candles = flat(16);
   candles[2] = bar(2, 130, 120, 125);
   candles[5] = bar(5, 118, 100, 110);
@@ -274,9 +274,20 @@ test('a break before pivot confirmation is not backdated into a trade', () => {
   candles[14] = bar(14, 110, 94, 99);
   const momentum = Array(16).fill(50);
   momentum[2] = 80; momentum[9] = 65;
-  const setup = latest({ candles, momentum }, { left: 2 });
-  assert.equal(setup.entry, 100);
-  assert.equal(setup.shifted, false);
+  for (const inverse of [false, true]) {
+    const data = { candles: inverse ? candles.map(c => ({ ...c, open: 250-c.open, high: 250-c.low, low: 250-c.high, close: 250-c.close })) : candles,
+      momentum: inverse ? momentum.map(r => 100-r) : momentum };
+    const setup = latest(data, { left: 2 });
+    assert.equal(setup.entry, inverse ? 150 : 100);
+    assert.equal(setup.shifted, true);
+    assert.equal(setup.mssTime, 10);
+    assert.equal(setup.confirmedTime, 10);
+    assert.equal(latest(prefix(data, 11), { left: 2 })?.shifted ?? false, false, 'Live breakout cannot activate');
+    const immediate = latest(prefix(data, 12), { left: 2 });
+    assert.equal(immediate.mssTime, 10, 'No future bars needed to recognize the entry');
+    data.candles = data.candles.map((c, i) => i === 10 ? { ...c, close: inverse ? 149 : 101 } : c);
+    assert.equal(latest(prefix(data, 12), { left: 2 })?.shifted ?? false, false, 'A wick alone is not an entry');
+  }
 });
 
 test('entry candle extremes do not imply target fills before close-confirmed entry', () => {

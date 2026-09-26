@@ -550,8 +550,17 @@ export function MarketChart({
   // Hiding studies never changes which studies the user has selected.
   const indicators = useMemo(() => candlesOnly
     ? Object.fromEntries(Object.keys(suppliedIndicators).map(key => [key, false])) as ChartIndicators
-    : suppliedIndicators, [candlesOnly, suppliedIndicators]);
+    : suppliedIndicators.psbb ? { ...suppliedIndicators, rsi: true } : suppliedIndicators, [candlesOnly, suppliedIndicators]);
   const { settings: studySettings, setStudy } = useIndicatorSettings();
+  const psbbWasEnabled = useRef(false);
+  useEffect(() => {
+    if (indicators.psbb && !psbbWasEnabled.current) {
+      const companion = studySettings.rsi ?? studyDefaults('rsi');
+      // Include the RSI pane even when an earlier session hid or filtered it.
+      if (companion.hidden || companion.timeframes.length) setStudy('rsi', { ...companion, hidden: false, timeframes: [] });
+    }
+    psbbWasEnabled.current = !!indicators.psbb;
+  }, [indicators.psbb, studySettings.rsi, setStudy]);
   const [chartStyle] = useChartPreference("chartStyle");
   const [primaryLineColor, setPrimaryLineColor] = useChartPreference("primaryLineColor");
   const [comparedSymbols, setComparedSymbols] = useChartPreference("comparedSymbols");

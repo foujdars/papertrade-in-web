@@ -67,12 +67,12 @@ test('position drawings use actual anchor width, numeric per-unit values, distin
   assert.equal(item.testHit({x:160,y:200},viewport),true); assert.equal(item.testHit({x:330,y:200},viewport),false);
  }
 });
-test('a position click is the centre and each price line moves on its own',()=>{
+test('a position starts at the clicked candle and each price line moves on its own',()=>{
  const registry=createChartDrawingRegistry(drawing,()=>candles);
  const item=registry.createDrawing('long-position','center',[{time:2,price:100}],{},{visible:true});
  assert.equal(item.anchors.length,3);
  assert.equal(item.anchors[0].time,2); assert.equal(item.anchors[0].price,100);
- assert.ok(item.anchors[1].time<2&&item.anchors[2].time>2);
+ assert.ok(item.anchors[1].time>2&&item.anchors[2].time>2);
  assert.ok(item.anchors[1].price<100&&item.anchors[2].price>100);
  const freshRisk=item.anchors[0].price-item.anchors[1].price, freshReward=item.anchors[2].price-item.anchors[0].price;
  assert.ok(Math.abs(freshReward/freshRisk-2)<1e-9);
@@ -88,6 +88,20 @@ test('a position click is the centre and each price line moves on its own',()=>{
  const short=registry.createDrawing('short-position','short',[{time:2,price:100}],{},{visible:true});
  assert.ok(short.anchors[1].price>100&&short.anchors[2].price<100);
 });
+test('position left/right extension follows settings, including restored legacy boxes',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const type of ['long-position','short-position']) {
+  const item=registry.createDrawing(type,'legacy',[{time:2,price:100},{time:1,price:95},{time:3,price:110}],{},{visible:true,extendLeft:false,extendRight:false});
+  const bounds=()=>{const xs=item.computeGeometry(viewport).filter(g=>g.type==='polygon').flatMap(g=>g.points.map(p=>p.x));return [Math.min(...xs),Math.max(...xs)];};
+  assert.deepEqual(bounds(),[200,300]);
+  item.updateOptions({extendLeft:true});assert.deepEqual(bounds(),[0,300]);
+  item.updateOptions({extendLeft:false,extendRight:true});assert.deepEqual(bounds(),[200,400]);
+  item.updateOptions({extendRight:false});assert.deepEqual(bounds(),[200,300]);
+  const saved=item.toJSON(),restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);
+  assert.deepEqual(restored.computeGeometry(viewport),item.computeGeometry(viewport));
+ }
+});
+
 test('dense labels stay inside narrow plots, shrink and never overlap each other',()=>{
  for(const width of [120,240,320,768]) {
   const labels=Array.from({length:14},(_,i)=>({text:i<3?'23380.15 · +77.61 (+0.35%)':`${i*.236}`,x:i%2?-15:width+90,y:95,align:'center'}));

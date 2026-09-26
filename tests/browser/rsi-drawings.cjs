@@ -10,6 +10,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.qaCanvasText=new Set();window.qaCanvasPositions=new Map();const fill=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.qaCanvasText.add(String(text));window.qaCanvasPositions.set(String(text),{x:args[0],y:args[1]});return fill.call(this,text,...args);};});
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaCandles?.data().length>300);
+ // PSBB includes its RSI companion, even if RSI was previously hidden/filtered.
+ await page.evaluate(()=>{localStorage.setItem('papertrade-indicator-settings-v1',JSON.stringify({settings:{rsi:{hidden:true,timeframes:['1D']}}}));window.dispatchEvent(new Event('papertrade:indicator-settings'));window.qaIndicators({psbb:true});});
+ await page.waitForFunction(()=>window.qaStudies?.bundles.some(b=>b.id==='rsi'));
+ await page.reload();await page.waitForFunction(()=>window.qaStudies?.bundles.some(b=>b.id==='rsi'));
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('papertrade-chart-indicators-v1')).rsi),true);
  await page.evaluate(()=>{window.qaIndicators({rsi:true});window.qaMagnet(true);});await page.waitForFunction(()=>window.qaStudies?.bundles.some(b=>b.id==='rsi'));await page.waitForTimeout(250);
  const points=await page.evaluate(()=>{const chart=window.qaChart,s=window.qaStudies.bundles.find(b=>b.id==='rsi').series[0],bounds=document.querySelector('.lightweight-chart').getBoundingClientRect();let top=0;for(let i=0;i<s.getPane().paneIndex();i++)top+=chart.panes()[i].getHeight();const data=s.data();return [data.at(-20),data.at(-10)].map(p=>({...p,x:bounds.left+chart.timeScale().timeToCoordinate(p.time),y:bounds.top+top+s.priceToCoordinate(p.value)}));});
  await page.mouse.move(points[0].x,points[0].y+18);

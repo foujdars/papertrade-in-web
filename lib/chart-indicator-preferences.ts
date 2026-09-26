@@ -18,7 +18,7 @@ const EMPTY_INDICATORS: ChartIndicators = {
 function normalizeIndicators(value: unknown): ChartIndicators {
   const candidate = value && typeof value === "object" ? value as Partial<ChartIndicators> : {};
   return Object.fromEntries(
-    STUDIES.map((study) => [study.id, !study.unavailable && candidate[study.id] === true]),
+    STUDIES.map((study) => [study.id, !study.unavailable && (candidate[study.id] === true || study.id === 'rsi' && candidate.psbb === true)]),
   ) as unknown as ChartIndicators;
 }
 

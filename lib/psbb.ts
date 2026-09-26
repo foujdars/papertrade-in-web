@@ -110,8 +110,10 @@ function moveD1(episode: Episode, index: number) {
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
  * Swings become usable only after `left` closed candles on BOTH sides. Case A
  * uses the most recent opposite swing strictly between D1 and the extreme;
- * Case B waits for the first opposite swing after it. Only a subsequent close
- * through that level confirms MSS. The final (still-forming) candle is excluded.
+ * Case B waits for the first opposite swing after it. A close through a known
+ * Case A level also confirms D2 without waiting extra right-hand pivot bars.
+ * Only a subsequent close through the structure level confirms MSS. The final
+ * (still-forming) candle is excluded.
  */
 export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false) {
   const last = Math.max(0, candles.length - (allCandlesClosed ? 0 : 1));
@@ -175,13 +177,20 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
         episode.structure = undefined;
       }
       const { first, extreme } = episode;
-      if (confirmed === extreme && pivots[extremeKind].at(-1) === extreme) {
+      const divergence = extreme > first && Number.isFinite(momentum[extreme]) && (long
+        ? momentum[extreme] > momentum[first]
+        : momentum[extreme] < momentum[first]);
+      const before = pivots[structureKind].findLast(pivot => pivot > first && pivot < extreme);
+      // A close through an already-confirmed intervening swing is itself MSS
+      // confirmation. Do not wait additional right-hand pivot bars and miss
+      // that crossing. Nothing is backdated or read from future candles.
+      const earlyMss = divergence && before !== undefined && index > extreme && (long
+        ? candles[index - 1].close <= candles[before].high && bar.close > candles[before].high
+        : candles[index - 1].close >= candles[before].low && bar.close < candles[before].low);
+      if (!episode.setup && ((confirmed === extreme && pivots[extremeKind].at(-1) === extreme) || earlyMss)) {
         episode.pushes += 1;
-        const divergence = extreme > first && Number.isFinite(momentum[extreme]) && (long
-          ? momentum[extreme] > momentum[first]
-          : momentum[extreme] < momentum[first]);
         if (divergence) {
-          episode.structure = pivots[structureKind].findLast((pivot) => pivot > first && pivot < extreme);
+          episode.structure = before;
           episode.setup = {
             side, status: "active", phase: "waiting-structure", structureCase: null,
             shifted: false, extended: episode.pushes >= 3,

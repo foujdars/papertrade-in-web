@@ -10,21 +10,21 @@ import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts
 import { drawingTextPosition, type DrawingPresentation } from './study-pane-drawings.ts';
 const readableFont = () => "13px sans-serif";
 
-function centerPositionAnchors(type: string, center: Anchor, source: VolumeCandle[]): Anchor[] {
-  const price = center.price;
-  const time = Number(center.time);
+function initialPositionAnchors(type: string, entry: Anchor, source: VolumeCandle[]): Anchor[] {
+  const price = entry.price;
+  const time = Number(entry.time);
   const times = source.map((candle) => Number(candle.time)).filter(Number.isFinite).sort((a, b) => a - b);
   const gaps = times.slice(1).map((value, index) => value - times[index]).filter((gap) => gap > 0).sort((a, b) => a - b);
   const step = gaps[Math.floor(gaps.length / 2)] || (time > 10_000 ? 86_400 : 1);
-  const half = step * 6;
+  const duration = step * 12;
   const risk = Math.abs(price) * 0.01 || 1;
   const reward = risk * 2;
   const long = type === "long-position";
-  const at = (offset: number) => (Number.isFinite(time) ? time + offset : center.time) as Anchor["time"];
+  const at = (offset: number) => (Number.isFinite(time) ? time + offset : entry.time) as Anchor["time"];
   return [
     { time: at(0), price },
-    { time: at(-half), price: price + (long ? -risk : risk) },
-    { time: at(half), price: price + (long ? reward : -reward) },
+    { time: at(duration), price: price + (long ? -risk : risk) },
+    { time: at(duration), price: price + (long ? reward : -reward) },
   ];
 }
 
@@ -166,8 +166,8 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
 
   class PositionDrawing extends drawing.Drawing {
     readonly type: string;
-    constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors.length===1?centerPositionAnchors(type,anchors[0],candles()):anchors,style,options); this.type=type; }
-    setAnchors(anchors: Anchor[]) { super.setAnchors(anchors.length===1?centerPositionAnchors(this.type,anchors[0],candles()):anchors); }
+    constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors.length===1?initialPositionAnchors(type,anchors[0],candles()):anchors,style,options); this.type=type; }
+    setAnchors(anchors: Anchor[]) { super.setAnchors(anchors.length===1?initialPositionAnchors(this.type,anchors[0],candles()):anchors); }
     updateAnchor(index: number, anchor: Anchor) {
       if (index === 0 && this.anchors[0]) {
         const delta = anchor.price - this.anchors[0].price;
@@ -188,9 +188,12 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       const points=this.anchors.map(a=>this.anchorToPixel(a,viewport));
       if(points.some(p=>!p)) return null;
       const [entry,stop,target]=points as Point[];
-      const left=Math.min(entry.x,stop.x,target.x), right=Math.max(entry.x,stop.x,target.x);
-      const end=right-left<8?left+64:right;
-      if(end<0||left>(plotSize?.().width??viewport.width)) return null;
+      const width=plotSize?.().width??viewport.width;
+      // The entry candle is the left boundary even for saved legacy boxes
+      // whose stop anchor was automatically placed before that candle.
+      const left=this.options.extendLeft?0:entry.x, right=Math.max(entry.x,stop.x,target.x);
+      const end=this.options.extendRight?width:right-entry.x<8?entry.x+64:right;
+      if(end<0||left>width) return null;
       return {entry,stop,target,left,end};
     }
     computeGeometry(viewport: Viewport): (Geometry & { fill?: string })[] {
