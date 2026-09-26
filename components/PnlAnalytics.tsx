@@ -168,7 +168,7 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
       {curve.undated > 0 && <p className="pnl-help">{curve.undated} undated legacy exits are in the totals, but excluded from dated charts.</p>}
       <div className="pnl-drawdown-heading"><div><ArrowDownRight size={18} /><b>Drawdown from prior peak</b></div><strong className="negative">Max {rupees(curve.maxDrawdown)}</strong></div><PnlLineChart points={drawdown} label="Closed-trade drawdown" negativeOnly onSelect={onSelect} />
       <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div>
-    </section><PnlCalendar trades={calendarTrades} scope={scope} onScope={onScope} now={now} onSelect={onSelect} /></div></>}
+    </section><PnlCalendar trades={calendarTrades} scope={scope} onScope={onScope} now={now} onSelect={onSelect} /></div>}
     {tab === "insights" && <PnlInsights trades={trades} orders={orders} journal={journal} onSelect={onSelect} />}
   </div>;
 }
