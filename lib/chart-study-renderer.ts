@@ -57,7 +57,7 @@ export class ChartStudyRenderer {
     }
     const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
     if(d.id==='volume')this.chart.priceScale('volume',0).applyOptions({visible:false,autoScale:true,scaleMargins:{top:.79,bottom:0}});
-    if(d.id==='rsi'){this.chart.priceScale('right',index).applyOptions({scaleMargins:{top:.1,bottom:.12}});const bands=new OscillatorBands(c.inputs.lower??30,c.inputs.upper??70);(series[0] as ISeriesApi<'Line'>).attachPrimitive(bands);bundle.primitive=bands;}
+    if(d.id==='rsi'){const label=/^#[\da-f]{6}/i.test(c.colors[0]||'')?c.colors[0].slice(0,7):'#8054da';series[0].applyOptions({priceLineColor:label});this.chart.priceScale('right',index).applyOptions({scaleMargins:{top:.1,bottom:.12},alignLabels:true});const bands=new OscillatorBands(c.inputs.lower??30,c.inputs.upper??70);(series[0] as ISeriesApi<'Line'>).attachPrimitive(bands);bundle.primitive=bands;}
     if(d.id==='vpvr'){series[0].applyOptions({visible:true,lastValueVisible:false,color:'transparent',autoscaleInfoProvider:()=>null});const primitive=new VisibleProfile(c);(series[0] as ISeriesApi<'Line'>).attachPrimitive(primitive);bundle.primitive=primitive;}
     this.bundles.push(bundle);
    }

@@ -1736,11 +1736,20 @@ export function MarketChart({
         return best;
       };
       let rsiScalePurple = false;
+      let rsiLastHidden = false;
       const rsiCursorColor = (studyId: string | undefined) => {
         if (studyId !== "rsi") return undefined;
         const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
         const match = color?.match(/#[\da-f]{6}/i);
         return match ? match[0] : "#8054da";
+      };
+      const rsiBundle = () => studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi");
+      const setRsiLastVisible = (visible: boolean) => {
+        const bundle = rsiBundle();
+        const line = bundle?.series[0];
+        if (!line || visible !== rsiLastHidden) return;
+        rsiLastHidden = !visible;
+        line.applyOptions({ lastValueVisible: visible && bundle.config.showValue !== false });
       };
       const paintRsiCrosshair = (studyId: string | undefined) => {
         const purple = studyId === "rsi";
@@ -1776,12 +1785,20 @@ export function MarketChart({
         if (event.point) {
           // Lightweight Charts reports the crosshair point inside the hovered pane, not from the top of the chart.
           const located = studyUnderCrosshair(event.paneIndex, event.point.y);
-          const text = located ? formatStudyValue(located.value) : "";
-          const color = rsiCursorColor(located?.studyId);
+          const onRsi = located?.studyId === "rsi";
           paintRsiCrosshair(located?.studyId);
-          setStudyCursor((current) => located ? current && current.text === text && current.color === color && Math.abs(current.y - located.y) < 0.4 ? current : { y: located.y, text, color } : current ? null : current);
+          setRsiLastVisible(!onRsi);
+          // The native scale chip is the RSI readout. A second HTML tag was painting another number on top of it.
+          if (onRsi) {
+            setStudyCursor((current) => current ? null : current);
+          } else {
+            const text = located ? formatStudyValue(located.value) : "";
+            const color = rsiCursorColor(located?.studyId);
+            setStudyCursor((current) => located ? current && current.text === text && current.color === color && Math.abs(current.y - located.y) < 0.4 ? current : { y: located.y, text, color } : current ? null : current);
+          }
         } else {
           paintRsiCrosshair(undefined);
+          setRsiLastVisible(true);
           setStudyCursor((current) => current ? null : current);
         }
         // Series data works in price and indicator panes, and for touch crosshairs.
