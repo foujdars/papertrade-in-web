@@ -6,6 +6,7 @@ import type { PaperOrder } from "@/lib/paper-trading";
 import { readTradeJournal, type TradeJournalEntry } from "@/lib/trading-coach";
 import { CLOUD_CHANGE_EVENT } from "@/lib/cloud-journal";
 import { ModernSelect } from "./ModernSelect";
+import { StockLogo } from "./StockLogo";
 import { PNL_BREAKDOWN_KEY, readPreference, writePreference } from "@/lib/interface-preferences";
 import { PNL_DIMENSIONS, groupPnl, pnlBounds, pnlCurve, pnlDay, pnlDistribution, pnlOutcome, rollingPnl, summarisePnl, type PnlDimension, type PnlScope } from "@/lib/pnl-analytics";
 
@@ -62,27 +63,27 @@ export function PnlBreakdown({ trades, orders, journal, onSelect }: { trades: Cl
 
 function PnlFindings({ trades, orders, onSelect }: { trades: ClosedPaperTrade[]; orders: PaperOrder[]; onSelect: Drill }) {
   const stats = useMemo(() => summarisePnl(trades), [trades]);
-  const auto = useMemo(() => {
-    const exits = new Map(orders.map(order => [order.id, order]));
-    return trades.filter(trade => { const order = exits.get(trade.id); return Boolean(order?.autoSquareOff || order?.exitReason === "AUTO_SQUARE_OFF"); });
-  }, [trades, orders]);
+  const ordersById = useMemo(() => new Map(orders.map(order => [order.id, order])), [orders]);
+  const auto = useMemo(() => trades.filter(trade => { const order = ordersById.get(trade.id); return Boolean(order?.autoSquareOff || order?.exitReason === "AUTO_SQUARE_OFF"); }), [trades, ordersById]);
+  const flipped = useMemo(() => trades.filter(trade => trade.grossPnl > 0 && pnlOutcome(trade.netPnl) === "loss"), [trades]);
   const autoNet = auto.reduce((sum, trade) => sum + trade.netPnl, 0);
   const worstShare = stats.worst && stats.net < 0 && stats.worst.netPnl < 0 ? Math.abs(stats.worst.netPnl) / Math.abs(stats.net) * 100 : null;
+  const worstOrder = stats.worst ? [stats.worst.id, ...stats.worst.sourceOrderIds].map(id => ordersById.get(id)).find(order => order?.instrumentKey || order?.underlyingKey) : undefined;
   if (!trades.length) return null;
   return <section className="pnl-a-card pnl-findings"><header><div><span className="pnl-kicker">What changed the result</span></div></header>
     <div className="pnl-finding-list">
       <button type="button" className="is-loss" disabled={!stats.worst} onClick={() => stats.worst && onSelect([stats.worst.id], "Largest loss")}>
-        <span className="pnl-finding-copy"><small>Largest loss</small><b>{stats.worst?.symbol ?? "—"}</b></span>
+        <span className="pnl-finding-copy"><small>Largest loss</small><span className="pnl-finding-symbol">{stats.worst && <StockLogo symbol={stats.worst.symbol} instrumentKey={worstOrder?.instrumentKey} underlyingKey={worstOrder?.underlyingKey} underlyingSymbol={worstOrder?.underlyingSymbol} assetType={worstOrder?.assetType} size={28} />}<b>{stats.worst?.symbol ?? "—"}</b></span></span>
         <span className="pnl-finding-figure"><strong className="negative">{rupees(stats.worst?.netPnl ?? null)}</strong><small>{worstShare === null ? "No net loss" : `${worstShare.toFixed(0)}% of the net loss`}</small></span>
       </button>
       <button type="button" className="is-loss" disabled={!auto.length} onClick={() => auto.length && onSelect(auto.map(trade => trade.id), "Auto exits")}>
         <span className="pnl-finding-copy"><small>Auto exits</small><b>{auto.length ? `${auto.length} of ${trades.length} exits` : "None"}</b></span>
         <span className="pnl-finding-figure"><strong className={signClass(autoNet)}>{auto.length ? rupees(autoNet) : "—"}</strong><small>{auto.length ? "Closed at the session" : "No session auto-exit"}</small></span>
       </button>
-      <button type="button" className="is-cost" onClick={() => onSelect(trades.map(trade => trade.id), "Charges")}>
-        <span className="pnl-finding-copy"><small>Charges</small><b>{stats.costReversals ? `${stats.costReversals} winner${stats.costReversals === 1 ? "" : "s"} flipped` : "No winner flipped"}</b></span>
+      <div className="is-cost">
+        <span className="pnl-finding-copy"><small>Charges</small><button type="button" className="pnl-finding-drill" disabled={!flipped.length} onClick={() => flipped.length && onSelect(flipped.map(trade => trade.id), "Winners flipped by charges")}>{flipped.length ? `${flipped.length} winner${flipped.length === 1 ? "" : "s"} flipped` : "No winner flipped"}</button></span>
         <span className="pnl-finding-figure"><strong>{rupees(stats.charges)}</strong><small>Already inside net P&L</small></span>
-      </button>
+      </div>
     </div>
   </section>;
 }

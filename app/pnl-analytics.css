@@ -19,11 +19,16 @@
 .pnl-findings { grid-column: 1 / -1; }
 .pnl-findings > header { margin-bottom: 2px; }
 .pnl-finding-list { display: grid; }
-.pnl-finding-list button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 13px 2px 13px 12px; border: 0; border-bottom: 1px solid var(--pnl-border); border-left: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-.pnl-finding-list button:last-child { border-bottom: 0; }
-.pnl-finding-list button.is-loss { border-left-color: color-mix(in srgb, var(--red) 70%, transparent); }
-.pnl-finding-list button.is-cost { border-left-color: color-mix(in srgb, var(--purple) 70%, transparent); }
-.pnl-finding-list button:disabled { cursor: default; }
+.pnl-finding-list > button, .pnl-finding-list > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 13px 2px 13px 12px; border: 0; border-bottom: 1px solid var(--pnl-border); border-left: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.pnl-finding-list > div { cursor: default; }
+.pnl-finding-list > button:last-child, .pnl-finding-list > div:last-child { border-bottom: 0; }
+.pnl-finding-list :is(button, div).is-loss { border-left-color: color-mix(in srgb, var(--red) 70%, transparent); }
+.pnl-finding-list :is(button, div).is-cost { border-left-color: color-mix(in srgb, var(--purple) 70%, transparent); }
+.pnl-finding-list > button:disabled { cursor: default; }
+.pnl-finding-symbol { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pnl-finding-symbol b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pnl-finding-drill { width: auto; margin: 0; padding: 0; border: 0; border-left: 0; border-radius: 0; background: transparent; color: var(--purple); font: inherit; font-size: 13px; font-weight: 550; letter-spacing: -.2px; cursor: pointer; }
+.pnl-finding-drill:disabled { color: var(--muted); cursor: default; }
 .pnl-finding-copy, .pnl-finding-figure { display: grid; gap: 3px; min-width: 0; }
 .pnl-finding-figure { text-align: right; flex-shrink: 0; }
 .pnl-finding-copy b { font-size: 13px; font-weight: 550; letter-spacing: -.2px; }
