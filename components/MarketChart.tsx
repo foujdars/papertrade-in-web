@@ -1739,7 +1739,8 @@ export function MarketChart({
       const rsiCursorColor = (studyId: string | undefined) => {
         if (studyId !== "rsi") return undefined;
         const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
-        return color && /^#[\da-f]{6}$/i.test(color) ? color : "#8054da";
+        const match = color?.match(/#[\da-f]{6}/i);
+        return match ? match[0] : "#8054da";
       };
       const paintRsiCrosshair = (studyId: string | undefined) => {
         const purple = studyId === "rsi";
@@ -1755,19 +1756,34 @@ export function MarketChart({
           },
         });
       };
+      const studyUnderCrosshair = (paneIndex: number | undefined, localY: number) => {
+        if (paneIndex == null || paneIndex <= 0) return null;
+        const bundle = studyRenderer.current?.bundles.find((item) => item.pane === paneIndex && item.series[0]);
+        if (!bundle) return null;
+        const value = bundle.series[0].coordinateToPrice(localY);
+        if (value == null || !Number.isFinite(value)) return null;
+        let top = 0;
+        const panes = chart.panes();
+        for (let index = 0; index < paneIndex && index < panes.length; index += 1) top += panes[index]?.getHeight() ?? 0;
+        return { studyId: bundle.id, value, y: top + localY };
+      };
       crosshairMove = (event) => {
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
-        if (!normalizeTool(activeToolRef.current) && event.point && event.time !== undefined && event.point.y <= (chart.panes()[0]?.getHeight() ?? 0)) {
+        if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
           const price = series.coordinateToPrice(event.point.y);
           if (price !== null) { lastCrosshairAnchorRef.current = { time: event.time, price }; setPriceCursor({ price: Math.round(price * 100) / 100, y: event.point.y }); }
         }
         if (event.point) {
-          const located = locateStudyPane(chart, studyRenderer.current?.bundles ?? [], event.point.y);
+          // Lightweight Charts reports the crosshair point inside the hovered pane, not from the top of the chart.
+          const located = studyUnderCrosshair(event.paneIndex, event.point.y);
           const text = located ? formatStudyValue(located.value) : "";
           const color = rsiCursorColor(located?.studyId);
           paintRsiCrosshair(located?.studyId);
           setStudyCursor((current) => located ? current && current.text === text && current.color === color && Math.abs(current.y - located.y) < 0.4 ? current : { y: located.y, text, color } : current ? null : current);
-        } else paintRsiCrosshair(undefined);
+        } else {
+          paintRsiCrosshair(undefined);
+          setStudyCursor((current) => current ? null : current);
+        }
         // Series data works in price and indicator panes, and for touch crosshairs.
         // Never feed a hovered historical price back into execution or live quotes.
         const bar = event.point ? event.seriesData.get(series) : undefined;
