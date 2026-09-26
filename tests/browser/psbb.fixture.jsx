@@ -15,7 +15,8 @@ function Fixture({ view }) {
   const host = useRef(null), renderer = useRef(null), refresh = useRef(null);
   const timeframe = view.timeframe;
   useEffect(() => {
-    const rows = [...Array.from({ length: 20 }, () => [100, 90, 95]), ...pattern].slice(0, view.count);
+    const outcome = view.outcome ? [view.outcome === 'passed' ? [95, 49, 90] : [131, 85, 90], [100, 85, 90], [100, 85, 90], [100, 85, 90]] : [];
+    const rows = [...Array.from({ length: 20 }, () => [100, 90, 95]), ...pattern, ...outcome].slice(0, view.count);
     const candles = rows.map(([high, low, close], i) => ({
       time: 1700000000 + i * seconds[timeframe], high: view.long ? 200 - low : high,
       low: view.long ? 200 - high : low, open: view.long ? 200 - close : close,
@@ -43,6 +44,6 @@ function Fixture({ view }) {
 function App() {
   const [view, setView] = useState({ timeframe: '5m', count: 22, long: false });
   window.psbbView = setView;
-  return <Fixture key={`${view.timeframe}:${view.count}:${view.long}`} view={view} />;
+  return <Fixture key={`${view.timeframe}:${view.count}:${view.long}:${view.outcome}`} view={view} />;
 }
 createRoot(document.getElementById('root')).render(<App />);

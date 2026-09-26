@@ -84,7 +84,11 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     ["Entry", setup.entry, "entry"],
     ["Target 1R", setup.target1, "target"],
   ] as const : [];
-  const levelX = xOf(setup.mssTime ?? setup.secondTime) ?? x2 ?? 0;
+  const levelX = xOf(setup.mssTime ?? setup.secondTime);
+  // Completed trades stop at their first outcome candle. Open/pending setups
+  // follow the latest candle, never the viewport edge or future blank space.
+  const finished = setup.status === 'passed' || setup.status === 'failed';
+  const levelEndX = xOf(finished ? setup.end : candles.at(-1)?.time ?? setup.end);
   const waitingY = setup.entry === null ? null : yOf(setup.entry);
   const waitingX = setup.entryTime === null ? null : xOf(setup.entryTime);
   const swing = setup.side === "short" ? "swing low" : "swing high";
@@ -94,22 +98,22 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     : "Active · MSS confirmed";
   const description = `${timeframe} PSBB · ${setup.side === "short" ? "Bearish" : "Bullish"}${setup.structureCase ? ` · Case ${setup.structureCase === "before" ? "A" : "B"}` : ""} · ${status}`;
   return <><div className="chart-or-note">{description}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label={description}>
-    <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#753bce" /></marker></defs>
+    <defs><marker id={arrowId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#753bce" /></marker></defs>
     {anchorMarks}
     {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
     {x1 != null && y1 != null && visible(x1,y1) && <text className="chart-psbb-point" x={x1} y={y1 + (setup.side === "short" ? -8 : 14)}>D1</text>}
     {x2 != null && y2 != null && visible(x2,y2) && <text className="chart-psbb-point" x={x2} y={y2 + (setup.side === "short" ? -8 : 14)}>{setup.side === "short" ? "SH" : "SL"}</text>}
-    {!setup.shifted && waitingX != null && waitingY != null && <g>
-      <line className="chart-psbb-level entry waiting" markerEnd={`url(#${arrowId})`} x1={waitingX} y1={waitingY} x2={plotWidth - 4} y2={waitingY} />
-      <text className="chart-psbb-level entry" textAnchor="end" x={plotWidth - 6} y={waitingY - 4}>Entry {setup.entry?.toFixed(2)} · pending</text>
+    {!setup.shifted && waitingX != null && waitingY != null && levelEndX != null && <g>
+      <line className="chart-psbb-level entry waiting" markerEnd={`url(#${arrowId})`} x1={waitingX} y1={waitingY} x2={levelEndX} y2={waitingY} />
+      <text className="chart-psbb-level entry" textAnchor="end" x={levelEndX - 2} y={waitingY - 4}>Entry {setup.entry?.toFixed(2)} · pending</text>
     </g>}
     {levels.map(([name, price, tone]) => {
       const y = yOf(price);
-      if (y == null) return null;
+      if (y == null || levelX == null || levelEndX == null) return null;
       return <g key={name}>
-        <line className={`chart-psbb-level ${tone}`} markerEnd={tone === 'entry' ? `url(#${arrowId})` : undefined} x1={levelX} y1={y} x2={plotWidth - 4} y2={y} />
-        <text className={`chart-psbb-level ${tone}`} textAnchor="end" x={plotWidth - 6} y={y - 4}>{name} {price.toFixed(2)}</text>
+        <line className={`chart-psbb-level ${tone}`} markerEnd={tone === 'entry' ? `url(#${arrowId})` : undefined} x1={levelX} y1={y} x2={levelEndX} y2={y} />
+        <text className={`chart-psbb-level ${tone}`} textAnchor="end" x={levelEndX - 2} y={y - 4}>{name} {price.toFixed(2)}</text>
       </g>;
     })}
   </svg></>;

@@ -14,6 +14,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 760 }, hasTouch: true });
     const errors = [];
+    const endpointsMatch = () => {
+      const { chart, candles, analysis } = window.psbbQa, setup = analysis.setups.at(-1);
+      const finished = setup.status === 'passed' || setup.status === 'failed';
+      const shift = candles[1].time - candles[0].time === 86400 ? 0 : 19800;
+      const x = chart.timeScale().timeToCoordinate((finished ? setup.end : candles.at(-1).time) + shift);
+      const lines = [...document.querySelectorAll('.chart-psbb line.chart-psbb-level')];
+      const labels = [...document.querySelectorAll('.chart-psbb text.chart-psbb-level')];
+      return lines.length > 0 && lines.every(line => Math.abs(+line.getAttribute('x2') - x) < 1)
+        && labels.every(label => Math.abs(+label.getAttribute('x') - (x - 2)) < 1);
+    };
     page.on('pageerror', (error) => { errors.push(error.message); console.error('Browser:', error.stack); });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.getByText('PSBB · D1 marked · Waiting for divergence', { exact: true }).waitFor();
@@ -36,6 +46,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*Waiting for MSS close$`)).waitFor();
         assert.match(await page.locator('.chart-psbb text.entry').textContent(), /^Entry .*pending$/);
         assert.equal(await page.locator('.chart-psbb text.target').count(), 0);
+        await page.waitForFunction(endpointsMatch);
         await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 29 });
         await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*MSS confirmed$`)).waitFor();
         const levelNames = await page.locator('.chart-psbb text.chart-psbb-level').allTextContents();
@@ -51,10 +62,23 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         });
         assert.ok(Math.abs(geometry.y - geometry.expectedY) < 1, 'Entry line uses swing price');
         assert.ok(Math.abs(geometry.x - geometry.expectedX) < 1, 'Entry starts at actual MSS candle');
+        await page.waitForFunction(endpointsMatch);
+        for (const outcome of ['passed', 'failed']) {
+          await page.evaluate(view => window.psbbView(view), { timeframe, long, count: 33, outcome });
+          await page.getByText(new RegExp(`^${timeframe} PSBB.*${outcome === 'passed' ? 'Success' : 'Failed'}`)).waitFor();
+          await page.waitForFunction(endpointsMatch);
+          assert.equal(await page.evaluate(() => window.psbbQa.analysis.setups.at(-1).end),
+            await page.evaluate(() => window.psbbQa.candles[29].time), 'Endpoint is the first outcome candle, not later candles');
+          // Endpoint and labels follow that candle through pan/zoom and blank future space.
+          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 20, to: 42 }));
+          await page.waitForFunction(endpointsMatch);
+          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 25, to: 36 }));
+          await page.waitForFunction(endpointsMatch);
+        }
       }
     }
     assert.deepEqual(errors, []);
     if (process.env.PSBB_SCREENSHOT) await page.screenshot({ path: process.env.PSBB_SCREENSHOT });
-    console.log('PSBB mobile chart: D1, pending MSS, dotted purple entry arrow, swing stop and 1R target align on all six intervals.');
+    console.log('PSBB mobile chart: D1, pending/active levels and first target/stop candle endpoints stay aligned through pan/zoom on all six intervals, both directions.');
   } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

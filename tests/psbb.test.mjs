@@ -305,11 +305,14 @@ test('1R finishes as success; later stops cannot change it and ambiguous bars ar
   const first = latest(data);
   assert.equal(first.target1Hit, true);
   assert.equal(first.status, 'passed');
+  assert.equal(first.end, 9);
   data.candles[10] = bar(10, 135, 66, 70);
   data.candles.push(bar(11, 100, 68, 75)); data.momentum.push(40);
   assert.equal(latest(data).status, 'passed');
+  assert.equal(latest(data).end, 9, 'Later candles cannot extend a successful trade');
   data.candles[9] = bar(9, 130, 66, 80);
   assert.equal(latest(data).status, 'failed');
+  assert.equal(latest(data).end, 9, 'Stop-first outcome freezes at the first hit candle');
 });
 
 test('confirmed entry/stop/targets remain fixed as future bars and pivots arrive', () => {
