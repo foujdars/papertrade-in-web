@@ -126,18 +126,18 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     }
     computeGeometry(viewport: Viewport): (Geometry & { fill?: string })[] {
       const box=this.positionBox(viewport); if(!box) return [];
-      const {entry,stop,target,left,end}=box, [e,s,t]=this.anchors.map(a=>a.price), center=(left+end)/2;
+      const {entry,stop,target,left,end}=box, [e,s,t]=this.anchors.map(a=>a.price), labelX=end-4;
       const sign=this.type==="long-position"?1:-1, reward=(t-e)*sign, risk=(e-s)*sign;
-      const riskColor=plotSize?.().dark?"#ff819b":"#ce355b", rewardColor=plotSize?.().dark?"#40dfb4":"#00876b";
+      const riskColor=plotSize?.().dark?"#ff819b":"#ce355b", rewardColor=plotSize?.().dark?"#40dfb4":"#00876b", entryColor=plotSize?.().dark?"#f0b429":"#e39b12";
       const zone=(y:number,fill:string):Geometry & {fill:string}=>({type:"polygon",closed:true,points:[{x:left,y:entry.y},{x:end,y:entry.y},{x:end,y},{x:left,y}],fill});
       const delta=(n:number)=>`${n>=0?"+":""}${n.toFixed(2)} (${n>=0?"+":""}${(e?n/e*100:0).toFixed(2)}%)`;
       return [zone(target.y,"rgba(0,174,132,.19)"),zone(stop.y,"rgba(242,62,103,.18)"),
+        {type:"line",start:{x:left,y:target.y},end:{x:end,y:target.y}},
         {type:"line",start:{x:left,y:entry.y},end:{x:end,y:entry.y}},
         {type:"line",start:{x:left,y:stop.y},end:{x:end,y:stop.y}},
-        {type:"line",start:{x:left,y:target.y},end:{x:end,y:target.y}},
-        {type:"text",position:{x:center,y:target.y+(target.y<entry.y?-10:22)},text:`${t.toFixed(2)} · ${delta(reward)}`,align:"center",color:rewardColor},
-        {type:"text",position:{x:center,y:entry.y-6},text:`${e.toFixed(2)} · ${risk>0&&reward>=0?`1:${(reward/risk).toFixed(2)}`:"—"}`,align:"center",color:plotSize?.().dark?"#c4a2ff":"#7653bd"},
-        {type:"text",position:{x:center,y:stop.y+(stop.y<entry.y?-10:22)},text:`${s.toFixed(2)} · ${delta(-risk)}`,align:"center",color:riskColor},
+        {type:"text",position:{x:labelX,y:target.y+(target.y<entry.y?-10:14)},text:`${t.toFixed(2)} · ${delta(reward)}`,align:"right",color:rewardColor},
+        {type:"text",position:{x:labelX,y:entry.y-6},text:`${e.toFixed(2)} · ${risk>0&&reward>=0?`1:${(reward/risk).toFixed(2)}`:"—"}`,align:"right",color:entryColor},
+        {type:"text",position:{x:labelX,y:stop.y+(stop.y<entry.y?-10:14)},text:`${s.toFixed(2)} · ${delta(-risk)}`,align:"right",color:riskColor},
       ];
     }
     paneViews():IPrimitivePaneView[] {return [{renderer:()=>({draw:target=>target.useMediaCoordinateSpace(({context:ctx})=>{
@@ -146,10 +146,18 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       ctx.save();ctx.beginPath();ctx.rect(0,0,size.width,size.height);ctx.clip();
       for(const g of this.computeGeometry(viewport)) {
         if(g.type==="polygon") {ctx.beginPath();g.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=g.fill!;ctx.fill();}
-        else if(g.type==="line") {ctx.beginPath();ctx.moveTo(g.start.x,g.start.y);ctx.lineTo(g.end.x,g.end.y);ctx.strokeStyle=plotSize?.().dark?"#a694d0":"#8c81a7";ctx.lineWidth=1;ctx.stroke();}
+        else if(g.type==="line") {
+          const reward=g.start.y===this.positionBox(viewport)?.target.y;
+          const entryLine=g.start.y===this.positionBox(viewport)?.entry.y;
+          ctx.beginPath();ctx.setLineDash([3,3]);ctx.lineWidth=1;ctx.moveTo(g.start.x,g.start.y);ctx.lineTo(g.end.x,g.end.y);
+          ctx.strokeStyle=entryLine?(plotSize?.().dark?"#f0b429":"#e39b12"):reward?(plotSize?.().dark?"#40dfb4":"#00876b"):(plotSize?.().dark?"#ff819b":"#ce355b");
+          ctx.stroke();ctx.setLineDash([]);
+        }
         else if(g.type==="text")labels.push({text:g.text,x:g.position.x,y:g.position.y,align:g.align,color:g.color});
       }
       paintDrawingLabels(ctx,labels,size.width,size.height);
+      const box=this.positionBox(viewport);
+      if(box){const x=(box.left+box.end)/2;ctx.beginPath();ctx.arc(x,box.entry.y,7,0,Math.PI*2);ctx.fillStyle=plotSize?.().dark?"#0c142b":"#fff";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=plotSize?.().dark?"#f0b429":"#e39b12";ctx.stroke();}
       if(["selected","editing","hovered"].includes(this.state))for(const p of this.getControlPoints(viewport)){ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#8657d9";ctx.stroke();}
       ctx.restore();
     })})}];}
