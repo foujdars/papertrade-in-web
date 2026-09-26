@@ -16,6 +16,12 @@
 .pnl-view-tabs { display: grid; grid-template-columns: repeat(3,1fr); padding: 4px; gap: 4px; background: var(--soft); border: 1px solid var(--pnl-border); border-radius: 13px; margin-bottom: 16px; }
 .pnl-view-tabs button { min-height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
 .pnl-view-tabs button[aria-selected="true"] { color: var(--purple); background: var(--surface); box-shadow: 0 2px 7px #00000008; }
+.pnl-findings { grid-column: 1 / -1; }
+@media (min-width: 700px) { .pnl-finding-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pnl-finding-list button { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--pnl-border); border-radius: 12px; background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.pnl-finding-list button:disabled { cursor: default; opacity: .7; }
+.pnl-finding-list span, .pnl-finding-list small { color: var(--muted); font-size: 10px; }
+.pnl-finding-list b { font-size: 14px; font-weight: 650; }
 .pnl-summary-six { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
 .pnl-summary-six > :is(div,button) { min-width: 0; padding: 14px; border: 1px solid var(--pnl-border); border-radius: 13px; background: var(--surface); text-align: left; display: flex; flex-direction: column; gap: 8px; color: var(--ink); }
 .pnl-summary-six > button { cursor: pointer; }

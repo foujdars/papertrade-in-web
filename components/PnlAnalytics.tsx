@@ -21,7 +21,7 @@ const signClass = (value: number) => pnlOutcome(value) === "profit" ? "positive"
 type Drill = (ids: string[], label: string) => void;
 type Point = { time: number; value: number; ids: string[]; label?: string };
 
-function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly = false }: { points: Point[]; label: string; onSelect: Drill; baseline?: boolean; negativeOnly?: boolean }) {
+function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly = false, focus = "end" }: { points: Point[]; label: string; onSelect: Drill; baseline?: boolean; negativeOnly?: boolean; focus?: "end" | "largest" }) {
   const uid = useId().replace(/:/g, ""), [selected, setSelected] = useState<number | null>(null);
   useEffect(() => setSelected(null), [points]);
   const left = 60, right = 388, top = 14, bottom = 157;
@@ -31,10 +31,11 @@ function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly 
   const x = (time: number) => left + (time - first) / (last - first || 1) * (right - left);
   const vertices = points.map(p => `${x(p.time)},${y(p.value)}`).join(" ");
   const path = `${baseline ? `${left},${y(0)} ` : ""}${vertices}`;
-  const active = points[selected ?? points.length - 1];
+  const focused = focus === "largest" ? points.reduce((best, point, index) => Math.abs(point.value - (points[index - 1]?.value ?? 0)) >= Math.abs(points[best].value - (points[best - 1]?.value ?? 0)) ? index : best, Math.max(0, points.length - 1)) : Math.max(0, points.length - 1);
+  const active = points[selected ?? focused];
   if (!points.length) return <div className="pnl-chart-empty">No dated completed trades in this period.</div>;
   return <div className="pnl-line-chart">
-    <svg viewBox="0 0 400 191" role="img" tabIndex={0} aria-label={`${label}. Use left and right arrow keys to inspect trades.`} onKeyDown={event => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); setSelected(i => Math.max(0, Math.min(points.length - 1, (i ?? points.length - 1) + (event.key === "ArrowRight" ? 1 : -1)))); } }} onPointerDown={event => { const bounds = event.currentTarget.getBoundingClientRect(), value = (event.clientX - bounds.left) / bounds.width * 400; let closest = 0; points.forEach((p, i) => { if (Math.abs(x(p.time) - value) < Math.abs(x(points[closest].time) - value)) closest = i; }); setSelected(closest); }}>
+    <svg viewBox="0 0 400 191" role="img" tabIndex={0} aria-label={`${label}. Use left and right arrow keys to inspect trades.`} onKeyDown={event => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); setSelected(i => Math.max(0, Math.min(points.length - 1, (i ?? focused) + (event.key === "ArrowRight" ? 1 : -1)))); } }} onPointerDown={event => { const bounds = event.currentTarget.getBoundingClientRect(), value = (event.clientX - bounds.left) / bounds.width * 400; let closest = 0; points.forEach((p, i) => { if (Math.abs(x(p.time) - value) < Math.abs(x(points[closest].time) - value)) closest = i; }); setSelected(closest); }}>
       <defs><clipPath id={`${uid}-up`}><rect x={left} y={0} width={right - left + 1} height={y(0)} /></clipPath><clipPath id={`${uid}-down`}><rect x={left} y={y(0)} width={right - left + 1} height={bottom + 1 - y(0)} /></clipPath></defs>
       {[high, ...(high !== 0 && low !== 0 ? [0] : high === low ? [] : [(high + low) / 2]), ...(high === low ? [] : [low])].map((value, i) => <g key={i}><line className="pnl-gridline" x1={left} x2={right} y1={y(value)} y2={y(value)} /><text x={left - 8} y={y(value) + 3} textAnchor="end">{compact(value)}</text></g>)}
       <line className="pnl-zero-line" x1={left} x2={right} y1={y(0)} y2={y(0)} />
@@ -53,9 +54,39 @@ export function PnlBreakdown({ trades, orders, journal, onSelect }: { trades: Cl
   return <section className="pnl-a-card pnl-breakdown"><header><div><span className="pnl-kicker">Where results come from</span><h3>Performance breakdown</h3></div><SlidersHorizontal size={18} /></header>
     <div className="pnl-breakdown-controls"><ModernSelect label="Group by" value={dimension} choices={PNL_DIMENSIONS.map(d => ({ value: d, label: d }))} onChange={value => { setDimension(value); writePreference(PNL_BREAKDOWN_KEY, { dimension: value, measure }); }} /><ModernSelect label="Compare" value={measure} choices={[{ value: "total", label: "Total net P&L", description: "Combined result after charges" }, { value: "average", label: "Average per trade", description: "Net result divided by completed exits" }]} onChange={value => { setMeasure(value); writePreference(PNL_BREAKDOWN_KEY, { dimension, measure: value }); }} /></div>
     {dimension === "Entry time" && <p className="pnl-help">Entry time in IST. Delivery / carry-forward trades stay separate.</p>}
-    <div className="pnl-ranked-list">{groups.map(g => { const value = measure === "total" ? g.net : g.average ?? 0; return <button className="pnl-ranked-row" key={g.label} onClick={() => onSelect(g.trades.map(t => t.id), `${dimension}: ${g.label}`)}><span className="pnl-ranked-heading"><b>{g.label}</b><strong className={signClass(value)}>{rupees(value)}</strong></span><span className="pnl-diverging-track"><i style={{ left: `${value >= 0 ? 50 : 50 - Math.abs(value) / max * 50}%`, width: `${Math.abs(value) / max * 50}%`, background: value >= 0 ? "var(--green)" : "var(--red)" }} /></span><small>{g.count} trade{g.count === 1 ? "" : "s"} · Avg {rupees(g.average)} · {g.count < 10 ? "Small sample" : `${g.winRate?.toFixed(0)}% wins`}</small></button>; })}</div>
+    <div className="pnl-ranked-list">{groups.map(g => { const value = measure === "total" ? g.net : g.average ?? 0; return <button className="pnl-ranked-row" key={g.label} onClick={() => onSelect(g.trades.map(t => t.id), `${dimension}: ${g.label}`)}><span className="pnl-ranked-heading"><b>{g.label}</b><strong className={signClass(value)}>{rupees(value)}</strong></span><span className="pnl-diverging-track"><i style={{ left: `${value >= 0 ? 50 : 50 - Math.abs(value) / max * 50}%`, width: `${Math.abs(value) / max * 50}%`, background: value >= 0 ? "var(--green)" : "var(--red)" }} /></span><small>{g.count} trade{g.count === 1 ? "" : "s"} · Avg {rupees(g.average)}{g.count >= 10 ? ` · ${g.winRate?.toFixed(0)}% wins` : ""}</small></button>; })}</div>
     {!groups.length && <p className="pnl-chart-empty">No trades match these filters.</p>}
-    <p className="pnl-help">Groups with fewer than 10 exits are flagged—not reliable rankings. Position size affects ₹ results.</p>
+    <p className="pnl-help">A group needs 10 exits before its win rate is shown. Position size changes the rupee result.</p>
+  </section>;
+}
+
+function PnlFindings({ trades, orders, onSelect }: { trades: ClosedPaperTrade[]; orders: PaperOrder[]; onSelect: Drill }) {
+  const stats = useMemo(() => summarisePnl(trades), [trades]);
+  const auto = useMemo(() => {
+    const exits = new Map(orders.map(order => [order.id, order]));
+    return trades.filter(trade => { const order = exits.get(trade.id); return Boolean(order?.autoSquareOff || order?.exitReason === "AUTO_SQUARE_OFF"); });
+  }, [trades, orders]);
+  const autoNet = auto.reduce((sum, trade) => sum + trade.netPnl, 0);
+  const worstShare = stats.worst && stats.net < 0 && stats.worst.netPnl < 0 ? Math.abs(stats.worst.netPnl) / Math.abs(stats.net) * 100 : null;
+  if (!trades.length) return null;
+  return <section className="pnl-a-card pnl-findings"><header><div><span className="pnl-kicker">What changed the result</span><h3>Three numbers that matter</h3></div></header>
+    <div className="pnl-finding-list">
+      <button type="button" disabled={!stats.worst} onClick={() => stats.worst && onSelect([stats.worst.id], "Largest loss")}>
+        <span>Largest loss</span>
+        <b className="negative">{stats.worst ? `${stats.worst.symbol} · ${rupees(stats.worst.netPnl)}` : "—"}</b>
+        <small>{worstShare === null ? "No net loss in this selection." : `${worstShare.toFixed(0)}% of the net loss`}</small>
+      </button>
+      <button type="button" disabled={!auto.length} onClick={() => auto.length && onSelect(auto.map(trade => trade.id), "Auto exits")}>
+        <span>Auto exits</span>
+        <b className={signClass(autoNet)}>{auto.length ? rupees(autoNet) : "None"}</b>
+        <small>{auto.length ? `${auto.length} of ${trades.length} exits closed by the session rule` : "No session auto-exit in this selection."}</small>
+      </button>
+      <button type="button" onClick={() => onSelect(trades.map(trade => trade.id), "Charges")}>
+        <span>Charges</span>
+        <b>{rupees(stats.charges)}</b>
+        <small>{stats.costReversals ? `${stats.costReversals} winner${stats.costReversals === 1 ? "" : "s"} turned into a loss after costs` : "No winner was flipped by costs."}</small>
+      </button>
+    </div>
   </section>;
 }
 
@@ -69,10 +100,11 @@ function PnlInsights({ trades, orders, journal, onSelect }: { trades: ClosedPape
   const [selectedBin, setSelectedBin] = useState<number | null>(null);
   useEffect(() => setSelectedBin(null), [trades]);
   return <div className="pnl-insight-grid">
+    <PnlFindings trades={trades} orders={orders} onSelect={onSelect} />
     <section className="pnl-a-card"><header><div><span className="pnl-kicker">Before costs → after costs</span><h3>Profit-to-net waterfall</h3></div></header>
-      <svg className="pnl-waterfall" viewBox="0 0 400 182" role="img" aria-label="Gross gains minus gross losses and charges equals net P&L"><line x1="18" x2="388" y1={y(0)} y2={y(0)} className="pnl-zero-line" />{steps.map((s, i) => <g key={s.label} role="button" tabIndex={0} aria-label={`${s.label}: ${rupees(s.change)}, view trades`} onClick={() => onSelect(s.ids, s.label)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s.ids, s.label); } }}><rect x={32 + i * 92} y={Math.min(y(s.from), y(s.to))} width="52" height={Math.max(2, Math.abs(y(s.from) - y(s.to)))} rx="4" fill={s.label === "Charges" ? "var(--purple)" : s.change >= 0 ? "var(--green)" : "var(--red)"} opacity=".8" /><text x={58 + i * 92} y={Math.max(15, Math.min(y(s.from), y(s.to)) - 8)} textAnchor="middle">{compact(s.change)}</text><text x={58 + i * 92} y="173" textAnchor="middle">{s.label}</text>{i < 2 && <line x1={84 + i * 92} x2={124 + i * 92} y1={y(s.to)} y2={y(s.to)} className="pnl-inspect-line" />}</g>)}</svg>
+      <svg className="pnl-waterfall" viewBox="0 0 400 158" role="img" aria-label="Gross gains minus gross losses and charges equals net P&L"><line x1="18" x2="388" y1={y(0)} y2={y(0)} className="pnl-zero-line" />{steps.map((s, i) => <g key={s.label} role="button" tabIndex={0} aria-label={`${s.label}: ${rupees(s.change)}, view trades`} onClick={() => onSelect(s.ids, s.label)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s.ids, s.label); } }}><rect x={32 + i * 92} y={Math.min(y(s.from), y(s.to))} width="52" height={Math.max(2, Math.abs(y(s.from) - y(s.to)))} rx="4" fill={s.label === "Charges" ? "var(--purple)" : s.change >= 0 ? "var(--green)" : "var(--red)"} opacity=".8" /><text x={58 + i * 92} y={Math.max(15, Math.min(y(s.from), y(s.to)) - 8)} textAnchor="middle">{compact(s.change)}</text>{i < 2 && <line x1={84 + i * 92} x2={124 + i * 92} y1={y(s.to)} y2={y(s.to)} className="pnl-inspect-line" />}</g>)}</svg>
       <div className="pnl-waterfall-values">{steps.map(s => <button key={s.label} onClick={() => onSelect(s.ids, s.label)}><span>{s.label}</span><b className={s.label === "Charges" ? "" : signClass(s.change)}>{rupees(s.change)}</b></button>)}</div>
-      <p className="pnl-help">{stats.costReversals} gross winner{stats.costReversals === 1 ? "" : "s"} became a loss after charges. Costs are deducted once.</p>
+      <p className="pnl-help">{stats.costReversals ? `${stats.costReversals} gross winner${stats.costReversals === 1 ? "" : "s"} became a loss after charges.` : "Charges did not turn any winner into a loss."}</p>
     </section>
     <section className="pnl-a-card"><header><div><span className="pnl-kicker">Beyond your win rate</span><h3>Trade-result distribution</h3></div></header>
       <svg className="pnl-distribution" viewBox="0 0 400 188" role="img" aria-label="Number of completed trades in each net profit or loss range"><text x="32" y="14">Trade count · max {maxCount}</text>{distribution.bins.map((bin, i) => { const height = bin.trades.length / maxCount * 112; return <g key={i} role="button" tabIndex={0} aria-label={`${rupees(bin.from)} to ${rupees(bin.to)}: ${bin.trades.length} trades`} onClick={() => setSelectedBin(i)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedBin(i); } }}><rect x={33 + i * 43} y={146 - height} width="39" height={Math.max(2, height)} rx="3" fill={i < 4 ? "var(--red)" : "var(--green)"} opacity={selectedBin === i ? 1 : .55} /><text x={52 + i * 43} y={138 - height} textAnchor="middle">{bin.trades.length || ""}</text></g>; })}
@@ -82,10 +114,10 @@ function PnlInsights({ trades, orders, journal, onSelect }: { trades: ClosedPape
       {selectedBin !== null && <div className="pnl-chart-readout"><span>{rupees(distribution.bins[selectedBin].from)} to {rupees(distribution.bins[selectedBin].to)}</span><button onClick={() => onSelect(distribution.bins[selectedBin].trades.map(t => t.id), "Selected result range")}>View {distribution.bins[selectedBin].trades.length} trades</button></div>}
       <div className="pnl-distribution-markers"><span className="positive">Avg win <b>{rupees(stats.averageWin)}</b></span><span className="negative">Avg loss <b>{rupees(stats.averageLoss)}</b></span><span>Median <b>{rupees(stats.median)}</b></span></div>
       <div className="pnl-extreme-links">{[["Best", stats.best], ["Worst", stats.worst]].map(([title, trade]) => { const t = trade as ClosedPaperTrade | null; return <button key={title as string} disabled={!t} onClick={() => t && onSelect([t.id], `${title} trade`)}><span>{title as string}</span><b className={signClass(t?.netPnl ?? 0)}>{rupees(t?.netPnl ?? null)}</b><ChevronRight size={13} /></button>; })}</div>
-      <p className="pnl-help">{stats.breakevens} breakeven exits included at zero. Tap a bar to inspect its range.</p>
+      <p className="pnl-help">Tap a bar to see the trades in that range.</p>
     </section>
     <PnlBreakdown trades={trades} orders={orders} journal={journal} onSelect={onSelect} />
-    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Recent consistency</span><h3>Average of the last 10 trades</h3></div></header>{rolling.length ? <PnlLineChart points={rolling} label="Rolling 10-trade net average" onSelect={onSelect} /> : <div className="pnl-chart-empty">Needs 10 dated completed trades. {pnlCurve(trades).points.length} available in this selection.</div>}<p className="pnl-help">Each point includes 10 exits. Windows overlap; this is historical performance, not a forecast.</p></section>
+    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Recent consistency</span><h3>Average of the last 10 trades</h3></div></header>{rolling.length ? <PnlLineChart points={rolling} label="Rolling 10-trade net average" onSelect={onSelect} /> : <div className="pnl-chart-empty">Needs 10 dated completed trades. {pnlCurve(trades).points.length} available in this selection.</div>}<p className="pnl-help">Each point is the average of 10 exits. Overlapping windows, not a forecast.</p></section>
   </div>;
 }
 
@@ -124,7 +156,7 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
     {scope.period === "custom" && <div className="pnl-custom-dates"><label>From<input type="date" value={scope.start} onChange={e => setScope({ start: e.target.value })} /></label><label>Through<input type="date" value={scope.end} onChange={e => setScope({ end: e.target.value })} /></label></div>}
     {!bounds.valid && <p role="alert" className="pnl-filter-error">Choose a valid start and end date. The end date must not precede the start.</p>}
     <nav className="pnl-view-tabs" role="tablist" aria-label="P&L views">{(["overview", "insights", "trades"] as const).map((value, i, tabs) => <button key={value} role="tab" tabIndex={tab === value ? 0 : -1} aria-selected={tab === value} onClick={() => onTab(value)} onKeyDown={e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const next = (i + (e.key === "ArrowRight" ? 1 : 2)) % 3; onTab(tabs[next]); (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus(); } }}>{value[0].toUpperCase() + value.slice(1)}</button>)}</nav>
-    {tab !== "trades" && <><div className="pnl-summary-six">
+    {tab === "overview" && <><div className="pnl-summary-six">
       <div><span>Net P&amp;L</span><b data-testid="pnl-net" className={signClass(stats.net)}>{rupees(stats.net)}</b><small>Completed exits only</small></div>
       <button onClick={() => onSelect(allIds, "Completed trades")}><span>Completed trades</span><b data-testid="pnl-count">{stats.count}</b><small>View exits <ChevronRight size={11} /></small></button>
       <div><span>Win rate</span><b>{stats.winRate === null ? "—" : `${stats.winRate.toFixed(1)}%`}</b><small>{stats.wins} W · {stats.losses} L · {stats.breakevens} flat</small></div>
@@ -132,11 +164,11 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
       <div><span>Average net P&amp;L / trade</span><b className={signClass(stats.average ?? 0)}>{rupees(stats.average)}</b></div>
       <div><span>Charges</span><b>{rupees(stats.charges)}</b><small>Included in net P&amp;L</small></div>
     </div></>}
-    {tab === "overview" && <div className="pnl-overview-grid"><section className="pnl-a-card pnl-performance-card"><header><div><h3>Cumulative realised P&amp;L</h3></div></header><PnlLineChart points={points} label="Cumulative realised P&L" baseline onSelect={onSelect} />
+    {tab === "overview" && <div className="pnl-overview-grid"><section className="pnl-a-card pnl-performance-card"><header><div><h3>Cumulative realised P&amp;L</h3></div></header><PnlLineChart points={points} label="Cumulative realised P&L" baseline focus="largest" onSelect={onSelect} />
       {curve.undated > 0 && <p className="pnl-help">{curve.undated} undated legacy exits are in the totals, but excluded from dated charts.</p>}
       <div className="pnl-drawdown-heading"><div><ArrowDownRight size={18} /><b>Drawdown from prior peak</b></div><strong className="negative">Max {rupees(curve.maxDrawdown)}</strong></div><PnlLineChart points={drawdown} label="Closed-trade drawdown" negativeOnly onSelect={onSelect} />
-      <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div><p className="pnl-help">Starts at ₹0 for this selection. Drawdown uses completed exits, not intratrade price swings.</p>
-    </section><PnlCalendar trades={calendarTrades} scope={scope} onScope={onScope} now={now} onSelect={onSelect} /></div>}
+      <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div>
+    </section><PnlCalendar trades={calendarTrades} scope={scope} onScope={onScope} now={now} onSelect={onSelect} /></div></>}
     {tab === "insights" && <PnlInsights trades={trades} orders={orders} journal={journal} onSelect={onSelect} />}
   </div>;
 }
