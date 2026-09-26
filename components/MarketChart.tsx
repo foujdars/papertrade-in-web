@@ -18,6 +18,7 @@ import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
 import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
+import { snapStudyCrosshair } from "@/lib/study-crosshair";
 import { STUDY_LINE_TOOLS, formatStudyValue, locateStudyPane, studyLinePoints, type StudyDrawing } from "@/lib/study-pane-drawings";
 import { STUDIES, studyDefaults, studyTitle } from "@/lib/indicator-catalog";
 import { useIndicatorSettings, restoreHiddenStudies } from "@/lib/indicator-settings";
@@ -1791,6 +1792,9 @@ export function MarketChart({
           // The native scale chip is the RSI readout. A second HTML tag was painting another number on top of it.
           if (onRsi) {
             setStudyCursor((current) => current ? null : current);
+            if (!normalizeTool(activeToolRef.current)) {
+              snapStudyCrosshair(chart, rsiBundle()?.series[0], event);
+            }
           } else {
             const text = located ? formatStudyValue(located.value) : "";
             const color = rsiCursorColor(located?.studyId);
