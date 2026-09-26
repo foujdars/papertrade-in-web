@@ -687,7 +687,7 @@ export function MarketChart({
   const [placementHint, setPlacementHint] = useState("");
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [studyDrawings, setStudyDrawings] = useState<StudyDrawing[]>([]);
-  const [studyCursor, setStudyCursor] = useState<{ y: number; text: string } | null>(null);
+  const [studyCursor, setStudyCursor] = useState<{ y: number; text: string; color?: string } | null>(null);
   const [selectedStudyLine, setSelectedStudyLine] = useState<string | null>(null);
   const studyDrawingsRef = useRef<StudyDrawing[]>([]);
   const studyDraftRef = useRef<StudyDrawing | null>(null);
@@ -1674,6 +1674,26 @@ export function MarketChart({
         }
         return best;
       };
+      let rsiScalePurple = false;
+      const rsiCursorColor = (studyId: string | undefined) => {
+        if (studyId !== "rsi") return undefined;
+        const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
+        return color && /^#[\da-f]{6}$/i.test(color) ? color : "#8054da";
+      };
+      const paintRsiCrosshair = (studyId: string | undefined) => {
+        const purple = studyId === "rsi";
+        if (purple === rsiScalePurple) return;
+        rsiScalePurple = purple;
+        const label = purple ? (rsiCursorColor("rsi") ?? "#8054da") : (neon ? "#342353" : "#252b3d");
+        chart.applyOptions({
+          crosshair: {
+            horzLine: {
+              color: purple ? label : (neon ? "#bf9aff" : "#8c96aa"),
+              labelBackgroundColor: label,
+            },
+          },
+        });
+      };
       crosshairMove = (event) => {
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.time !== undefined && event.point.y <= (chart.panes()[0]?.getHeight() ?? 0)) {
@@ -1683,8 +1703,10 @@ export function MarketChart({
         if (event.point) {
           const located = locateStudyPane(chart, studyRenderer.current?.bundles ?? [], event.point.y);
           const text = located ? formatStudyValue(located.value) : "";
-          setStudyCursor((current) => located ? current && current.text === text && Math.abs(current.y - located.y) < 0.4 ? current : { y: located.y, text } : current ? null : current);
-        }
+          const color = rsiCursorColor(located?.studyId);
+          paintRsiCrosshair(located?.studyId);
+          setStudyCursor((current) => located ? current && current.text === text && current.color === color && Math.abs(current.y - located.y) < 0.4 ? current : { y: located.y, text, color } : current ? null : current);
+        } else paintRsiCrosshair(undefined);
         // Series data works in price and indicator panes, and for touch crosshairs.
         // Never feed a hovered historical price back into execution or live quotes.
         const bar = event.point ? event.seriesData.get(series) : undefined;
@@ -1909,7 +1931,7 @@ export function MarketChart({
             const next = { ...draftStudy, b: { time: hit.time, value: hit.value } };
             studyDraftRef.current = next;
             setStudyDrawings([...studyDrawingsRef.current, { ...next, id: "draft" }]);
-            setStudyCursor({ y: hit.y, text: formatStudyValue(hit.value) });
+            setStudyCursor({ y: hit.y, text: formatStudyValue(hit.value), color: rsiCursorColor(hit.studyId) });
           }
           event.preventDefault();
           event.stopPropagation();

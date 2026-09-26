@@ -15,7 +15,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
   chart: IChartApi | null;
   studyRenderer: MutableRefObject<ChartStudyRenderer | null>;
   drawings: StudyDrawing[];
-  cursor: { y: number; text: string } | null;
+  cursor: { y: number; text: string; color?: string } | null;
   selectedId: string | null;
   refreshRef: MutableRefObject<(() => void) | null>;
 }) {
@@ -48,7 +48,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
   };
   return <>
     <svg className="chart-study-drawings" width={width} height={height} aria-hidden="true">
-    {cursor && <line className="chart-study-crosshair" x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
+    {cursor && <line className="chart-study-crosshair" style={cursor.color ? { stroke: cursor.color } : undefined} x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
     {drawings.map((line) => {
       const from = point(line.studyId, line.a);
       const to = point(line.studyId, line.b);
@@ -63,6 +63,6 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       return <line key={line.id} className={selected ? "selected" : undefined} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />;
     })}
     </svg>
-    {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width }}>{cursor.text}</b>}
+    {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width, background: cursor.color, color: cursor.color ? "#fff" : undefined }}>{cursor.text}</b>}
   </>;
 }
