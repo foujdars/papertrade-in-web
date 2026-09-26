@@ -126,7 +126,7 @@
 .terminal-shell .chart-body > .drawing-toolbar.collapsed ~ .chart-stack .chart-symbol-legend { left: 22px; }
 .terminal-shell .fno-focus-workspace.toolbar-collapsed > .fno-focus-charts { margin-left: 0; }
 .terminal-shell .fno-drawing-toolbar.collapsed { width: 0; padding: 0; border: 0; background: transparent; overflow: visible; }
-.chart-statusbar-replay { width: 28px; min-width: 28px; height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 999px; color: #fff; background: var(--purple, #753bce); cursor: pointer; }
+.chart-statusbar-replay { width: auto; min-width: 0; height: auto; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0; border: 0; border-radius: 0; color: inherit; background: transparent; font: inherit; font-size: 9px; font-weight: 400; line-height: 1; cursor: pointer; }
 .timeframe-menu .timeframe-groups { gap: 16px; padding: 6px 8px 18px; }
 .timeframe-menu .timeframe-groups h3 { margin: 0; padding: 8px 8px 4px; color: #8b93a6; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .timeframe-menu .timeframe-groups section > div { display: flex; flex-direction: column; gap: 0; }
@@ -172,6 +172,5 @@
 .chart-prior-line.week-low { color: #c26a12; }
 .chart-prior-line.month-high { color: #6a4cc7; }
 .chart-prior-line.month-low { color: #9a3d78; }
-.chart-prior-line button { border-radius: 0; font-weight: 500; padding: 0 4px; }
-.chart-prior-line.week-high button, .chart-prior-line.week-low button { left: 78px; }
-.chart-prior-line.month-high button, .chart-prior-line.month-low button { left: 148px; }
+.chart-prior-line button { left: auto; right: 2px; border: 0; border-radius: 0; background: transparent; padding: 0; font-weight: 500; }
+.chart-prior-line.week-high button, .chart-prior-line.week-low button, .chart-prior-line.month-high button, .chart-prior-line.month-low button { left: auto; right: 2px; }

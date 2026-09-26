@@ -2982,7 +2982,7 @@ export function TradingDashboard() {
           {replayOnChart && <ChartReplayBar replay={chartReplay} onExit={exitChartReplay} />}
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
             <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} />
-            <button type="button" className="chart-statusbar-replay" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={15} /></button>
+            <button type="button" className="chart-statusbar-replay" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={12} /><span>Replay</span></button>
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
             {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}
             <div className="chart-status-clock">{clock ? `${String(clock.getDate()).padStart(2, "0")}/${String(clock.getMonth() + 1).padStart(2, "0")}/${String(clock.getFullYear()).slice(-2)} ${clock.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}` : ""}</div>

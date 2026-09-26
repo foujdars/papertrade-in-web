@@ -74,7 +74,7 @@
 .terminal-shell .chart-statusbar .chart-indicator-slot { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-history-controls { grid-column: 1; grid-row: 1; justify-self: start; }
-.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-statusbar-replay { grid-column: 2; grid-row: 1; justify-self: center; }
+.terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-statusbar-replay { grid-column: 2; grid-row: 1; justify-self: center; align-self: center; color: inherit; background: transparent; font-size: 9px; font-weight: 400; }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-status-clock { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:not(:has(.chart-indicator-strip)) { display: none; }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { grid-column: 1 / -1; border-bottom: 1px solid var(--line, #e3e6ee); }

@@ -58,7 +58,7 @@ export function PriorLevels({ candles, chart, series, timeframe, session, refres
       const y = series.priceToCoordinate(row.price);
       if (y == null || y < 8 || y > pane.height - 8) return null;
       return <div key={row.key} className={`chart-pd-line chart-prior-line ${row.className}`} style={{ top: y, width }}>
-        <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onAlert?.(row.price); }}>{row.label} {priceLabel(row.price)}{onAlert ? " · Alert" : ""}</button>
+        <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onAlert?.(row.price); }} aria-label={`${row.label} ${priceLabel(row.price)}. Set alert`} title={`${row.label} ${priceLabel(row.price)}`}>{row.label}</button>
       </div>;
     })}
   </div>;
