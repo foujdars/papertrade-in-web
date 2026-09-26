@@ -1,7 +1,7 @@
 import type { Candle } from "./market";
 
 type Bar = Pick<Candle, "time" | "open" | "high" | "low" | "close">;
-export type PsbbStatus = "formed" | "success" | "failed";
+export type PsbbStatus = "active" | "formed" | "passed" | "failed";
 export type PsbbSetup = {
   side: "long" | "short";
   start: number;
@@ -57,18 +57,27 @@ function pivotIndexes(candles: Bar[], side: "low" | "high", span: number, last: 
   return indexes;
 }
 
-function outcome(candles: Bar[], from: number, side: "long" | "short", stop: number, target: number): { status: PsbbStatus; end: number } {
+function outcome(candles: Bar[], from: number, side: "long" | "short", trigger: number, stop: number, target: number): { status: PsbbStatus; end: number } | null {
+  let broken = false;
   for (let index = from; index < candles.length; index += 1) {
     const bar = candles[index];
+    const broke = side === "long" ? bar.close > trigger : bar.close < trigger;
     const stopped = side === "long" ? bar.low <= stop : bar.high >= stop;
     const won = side === "long" ? bar.high >= target : bar.low <= target;
-    if (won && !stopped) return { status: "success", end: index };
+    if (!broken) {
+      if (!broke) {
+        if (stopped) return null;
+        continue;
+      }
+      broken = true;
+    }
+    if (won && !stopped) return { status: "passed", end: index };
     if (stopped) return { status: "failed", end: index };
   }
-  return { status: "formed", end: Math.max(from, candles.length - 1) };
+  return { status: broken ? "formed" : "active", end: Math.max(from, candles.length - 1) };
 }
 
-/** A setup exists as soon as the divergence pivot is confirmed. Later bars mark success or failure. */
+/** ACTIVE while RSI is beyond 30 or 70. FORMED on the structure break. PASSED if the target is hit, otherwise FAILED. */
 export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
   const last = Math.max(0, candles.length - 1);
   const span = Math.max(1, inputs.left || 3);
@@ -77,28 +86,42 @@ export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<st
   const first = inputs.target1 || 1;
   const second = inputs.target2 || 2;
   const setups: PsbbSetup[] = [];
-  const add = (side: "long" | "short", newer: number, trigger: number, stop: number) => {
-    const formedAt = newer + span;
-    if (formedAt >= candles.length || !(side === "long" ? trigger > stop : stop > trigger)) return;
+  const add = (side: "long" | "short", newer: number, trigger: number, stop: number, from = newer + span) => {
+    const formedAt = Math.max(newer, Math.min(from, candles.length - 1));
+    if (!(side === "long" ? trigger > stop : stop > trigger)) return;
     const risk = Math.abs(trigger - stop);
     const target1 = side === "long" ? trigger + first * risk : trigger - first * risk;
     const target2 = side === "long" ? trigger + second * risk : trigger - second * risk;
-    const result = outcome(candles, formedAt, side, stop, target1);
+    const result = outcome(candles, formedAt, side, trigger, stop, target1);
+    if (!result) return;
     setups.push({ side, start: candles[newer].time, end: candles[result.end].time, trigger, stop, target1, target2, status: result.status });
   };
   const lows = pivotIndexes(candles, "low", span, last);
-  for (let pair = 1; pair < lows.length; pair += 1) {
-    const older = lows[pair - 1];
-    const newer = lows[pair];
-    const swing = Math.max(...candles.slice(older + 1, newer).map((bar) => bar.high));
-    if (candles[newer].low < candles[older].low && momentum[newer] > momentum[older] && momentum[newer] <= oversold && Number.isFinite(swing)) add("long", newer, swing, candles[newer].low);
-  }
   const highs = pivotIndexes(candles, "high", span, last);
-  for (let pair = 1; pair < highs.length; pair += 1) {
-    const older = highs[pair - 1];
-    const newer = highs[pair];
-    const swing = Math.min(...candles.slice(older + 1, newer).map((bar) => bar.low));
-    if (candles[newer].high > candles[older].high && momentum[newer] < momentum[older] && momentum[newer] >= overbought && Number.isFinite(swing)) add("short", newer, swing, candles[newer].high);
+  for (const newer of lows) {
+    if (!(momentum[newer] <= oversold)) continue;
+    const structure = [...highs].reverse().find((index) => index < newer);
+    const trigger = structure == null ? Math.max(...candles.slice(Math.max(0, newer - span), newer + 1).map((bar) => bar.high)) : candles[structure].high;
+    add("long", newer, trigger, candles[newer].low);
+  }
+  for (const newer of highs) {
+    if (!(momentum[newer] >= overbought)) continue;
+    const structure = [...lows].reverse().find((index) => index < newer);
+    const trigger = structure == null ? Math.min(...candles.slice(Math.max(0, newer - span), newer + 1).map((bar) => bar.low)) : candles[structure].low;
+    add("short", newer, trigger, candles[newer].high);
+  }
+  const live = momentum[candles.length - 1];
+  if (Number.isFinite(live) && (live <= oversold || live >= overbought)) {
+    const side = live <= oversold ? "long" : "short";
+    let from = candles.length - 1;
+    while (from > 0 && (side === "long" ? momentum[from - 1] <= oversold : momentum[from - 1] >= overbought)) from -= 1;
+    if (!setups.some((setup) => setup.side === side && setup.status === "active" && setup.start >= candles[from].time)) {
+      const zone = candles.slice(from);
+      const stop = side === "long" ? Math.min(...zone.map((bar) => bar.low)) : Math.max(...zone.map((bar) => bar.high));
+      const structure = candles.slice(Math.max(0, from - span), from + 1);
+      const trigger = side === "long" ? Math.max(...structure.map((bar) => bar.high)) : Math.min(...structure.map((bar) => bar.low));
+      add(side, from, trigger, stop, from);
+    }
   }
   return setups.sort((a, b) => a.start - b.start).slice(-8);
 }

@@ -76,7 +76,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, instrumentKey, co
       const start = xOf(setup.start);
       const finish = xOf(setup.end);
       const x1 = setup.frame === timeframe && start != null ? Math.max(0, start) : 8;
-      const x2 = setup.status === "formed" || finish == null ? width - 8 : Math.max(x1 + 36, Math.min(width - 8, finish));
+      const x2 = setup.status === "active" || setup.status === "formed" || finish == null ? width - 8 : Math.max(x1 + 36, Math.min(width - 8, finish));
       const anchor = yOf(series, setup.trigger, height);
       const top = anchor == null ? null : anchor < labelY + 14 ? labelY + 14 : anchor;
       if (top != null) labelY = top;
@@ -87,7 +87,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, instrumentKey, co
 
 function Setup({ setup, x1, x2, tagTop, series, height }: { setup: PsbbSetup & { frame: string }; x1: number; x2: number; tagTop: number | null; series: { priceToCoordinate: (price: number) => number | null }; height: number }) {
   const rows = [["Trigger", setup.trigger], ["Stop", setup.stop], ["Target 1", setup.target1], ["Target 2", setup.target2]] as const;
-  const label = setup.status === "success" ? "SUCCESS" : setup.status === "failed" ? "FAILED" : "FORMED";
+  const label = setup.status === "passed" ? "PASSED" : setup.status === "failed" ? "FAILED" : setup.status === "formed" ? "FORMED" : "ACTIVE";
   return <>
     {rows.map(([name, price]) => {
       const y = yOf(series, price, height);
