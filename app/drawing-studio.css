@@ -92,7 +92,8 @@ html, body { touch-action: pan-x pan-y; }
     border-radius: 10px;
     background: color-mix(in srgb, var(--purple, #753bce) 9%, var(--surface, #fff));
   }
-  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger small { font-size: 15px; font-weight: 750; letter-spacing: -.04em; }
+  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger .chart-fx-mark i { font-size: 18px; }
+  .terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger .chart-fx-mark em { font-size: 14px; font-weight: 650; }
 }
 
 /* Symbol actions stay with the name. Chart actions sit apart on the right. */

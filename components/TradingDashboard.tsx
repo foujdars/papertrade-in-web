@@ -2898,7 +2898,7 @@ export function TradingDashboard() {
               </div>}
             </div>
             <button className="chart-tools-trigger" aria-label="Open drawing tools" title="Drawing tools" onClick={() => setShowDrawingLibrary(true)}><Pencil size={18} /></button>
-            <button type="button" className={`compact-selector-trigger chart-functions-trigger ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} aria-label="Functions" title="Indicators" aria-haspopup="dialog"><span><small>fx</small></span></button>
+            <button type="button" className={`compact-selector-trigger chart-functions-trigger ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} aria-label="Functions" title="Indicators" aria-haspopup="dialog"><span className="chart-fx-mark" aria-hidden="true"><i>∫</i><em>fx</em></span></button>
             <CompactSelectorButton label="Timeframe" value={timeframe} className={showTimeframeMenu ? "active" : ""} onClick={() => { setShowChartFunctions(false); setShowTimeframeMenu(true); }} />
             <button type="button" className={`desktop-live-pnl ${chartPnlVisible ? "visible" : ""}`} onClick={openChartPositions}>
               <span>Live P&amp;L</span><b className={chartPnl >= 0 ? "positive" : "negative"}>{chartPnlText}</b>
