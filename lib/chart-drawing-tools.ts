@@ -1,4 +1,4 @@
-import type { Anchor, DrawingOptions, DrawingStyle, Geometry, Point, Viewport } from "lightweight-charts-drawing";
+import type { Anchor, ControlPoint, DrawingOptions, DrawingStyle, Geometry, Point, Viewport } from "lightweight-charts-drawing";
 import type { IPrimitivePaneView, Logical } from "lightweight-charts";
 import { buildVolumeProfile, volumeValueArea, type VolumeCandle } from "./volume-profile.ts";
 import { istSessionStart } from "./profile-range.ts";
@@ -109,10 +109,10 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       this.setAnchors(this.anchors.map((item,itemIndex)=>itemIndex===index?{...item,price:anchor.price}:item));
     }
     isValid() { return this.anchors.length >= 3; }
-    getControlPoints(viewport: Viewport) {
+    getControlPoints(viewport: Viewport): ControlPoint[] {
       const box=this.positionBox(viewport); if(!box) return [];
       const x=(box.left+box.end)/2;
-      return [{x,y:box.entry.y,index:0},{x,y:box.stop.y,index:1},{x,y:box.target.y,index:2}];
+      return [{x,y:box.entry.y,index:0,radius:6},{x,y:box.stop.y,index:1,radius:6},{x,y:box.target.y,index:2,radius:6}];
     }
     positionBox(viewport: Viewport) {
       if (!this.isValid()) return null;
