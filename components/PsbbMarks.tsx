@@ -65,13 +65,13 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   };
   const ry1 = rsiY(setup.firstRsi);
   const ry2 = rsiY(setup.secondRsi);
-  const levels = setup.shifted ? [
+  const levels = Number.isFinite(setup.entry) && Number.isFinite(setup.stop) ? [
     ["SL", setup.stop, "stop"],
     ["E", setup.entry, "entry"],
     ["T1", setup.target1, "target"],
     ["T2", setup.target2, "target"],
   ] as const : [];
-  const levelX = x2 ?? 0;
+  const levelX = xOf(setup.entryTime) ?? x2 ?? 0;
   return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} ${setup.side} divergence`}>
     {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}

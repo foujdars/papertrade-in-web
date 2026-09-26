@@ -2,55 +2,54 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { psbbSetups } from "../lib/psbb.ts";
 
-const flat = (count) => Array.from({ length: count }, (_, time) => ({ time, open: 115, high: 120, low: 110, close: 115 }));
+const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
+const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
 
-test("positive divergence waits for the structure shift, then uses a 1:1 and 1:1.5 target", () => {
-  const candles = flat(18);
-  candles[5] = { time: 5, open: 108, high: 112, low: 100, close: 108 };
-  candles[12] = { time: 12, open: 104, high: 110, low: 95, close: 104 };
-  candles[8] = { time: 8, open: 118, high: 130, low: 112, close: 122 };
-  const rsi = Array.from({ length: 18 }, () => 50);
+test("positive divergence uses the later swing high as entry and the higher low as the stop", () => {
+  const candles = flat(28);
+  candles[5] = bar(5, 112, 100, 108);
+  candles[12] = bar(12, 110, 95, 104);
+  candles[16] = bar(16, 122, 112, 118);
+  for (const time of [18, 19, 21, 22]) candles[time] = bar(time, 121, 118, 119);
+  candles[20] = bar(20, 120, 116, 118);
+  const rsi = Array.from({ length: 28 }, () => 50);
   rsi[5] = 22;
   rsi[12] = 28;
   const setup = psbbSetups(candles, rsi, { left: 2, oversold: 30, overbought: 70, target1: 1, target2: 1.5 }).at(-1);
   assert.equal(setup.side, "long");
-  assert.equal(setup.status, "active");
-  assert.equal(setup.shifted, false);
   assert.equal(setup.firstPrice, 100);
   assert.equal(setup.secondPrice, 95);
-  assert.equal(setup.entry, 130);
-  assert.equal(setup.stop, 95);
-  assert.equal(setup.target1, 165);
-  assert.equal(setup.target2, 182.5);
+  assert.equal(setup.entry, 122);
+  assert.equal(setup.stop, 116);
+  assert.equal(setup.shifted, false);
+  assert.equal(setup.target1, 128);
+  assert.equal(setup.target2, 131);
+  candles[24] = bar(24, 124, 121, 123);
+  assert.equal(psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1).shifted, true);
 });
 
-test("negative divergence puts the stop on the swing high and the entry on the shift", () => {
-  const candles = flat(20);
-  candles[5] = { time: 5, open: 118, high: 130, low: 116, close: 124 };
-  candles[8] = { time: 8, open: 112, high: 118, low: 100, close: 108 };
-  candles[12] = { time: 12, open: 128, high: 140, low: 124, close: 136 };
-  const rsi = Array.from({ length: 20 }, () => 50);
+test("negative divergence mirrors the structure: entry is the swing low and stop is the lower high", () => {
+  const candles = flat(28);
+  candles[5] = bar(5, 130, 118, 124);
+  candles[12] = bar(12, 140, 124, 136);
+  candles[16] = bar(16, 128, 108, 112);
+  for (const time of [18, 19, 21, 22]) candles[time] = bar(time, 118, 110, 114);
+  candles[20] = bar(20, 124, 112, 120);
+  const rsi = Array.from({ length: 28 }, () => 50);
   rsi[5] = 78;
   rsi[12] = 66;
-  const waiting = psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1);
-  assert.equal(waiting.side, "short");
-  assert.equal(waiting.stop, 140);
-  assert.equal(waiting.entry, 100);
-  assert.equal(waiting.shifted, false);
-  candles[16] = { time: 16, open: 108, high: 112, low: 96, close: 98 };
-  const shifted = psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1);
-  assert.equal(shifted.shifted, true);
-  assert.equal(shifted.target1, 60);
-  assert.equal(shifted.target2, 40);
-  candles[17] = { time: 17, open: 110, high: 141, low: 108, close: 136 };
-  assert.equal(psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1).status, "failed");
+  const setup = psbbSetups(candles, rsi, { left: 2, target1: 1, target2: 1.5 }).at(-1);
+  assert.equal(setup.side, "short");
+  assert.equal(setup.entry, 108);
+  assert.equal(setup.stop, 124);
+  assert.equal(setup.target1, 92);
+  assert.equal(setup.target2, 84);
 });
 
-test("RSI that never reaches 30 or 70 does not draw a divergence", () => {
+test("a lower low whose RSI never reached 30 is not a positive divergence", () => {
   const candles = flat(18);
-  candles[5] = { time: 5, open: 108, high: 112, low: 100, close: 108 };
-  candles[12] = { time: 12, open: 104, high: 110, low: 95, close: 104 };
-  candles[8] = { time: 8, open: 118, high: 130, low: 112, close: 122 };
+  candles[5] = bar(5, 112, 100, 108);
+  candles[12] = bar(12, 110, 95, 104);
   const rsi = Array.from({ length: 18 }, () => 50);
   rsi[5] = 40;
   rsi[12] = 45;

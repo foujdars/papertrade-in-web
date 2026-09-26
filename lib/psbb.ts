@@ -13,7 +13,9 @@ export type PsbbSetup = {
   firstRsi: number;
   secondRsi: number;
   entry: number;
+  entryTime: number;
   stop: number;
+  stopTime: number;
   target1: number;
   target2: number;
   shifted: boolean;
@@ -89,20 +91,18 @@ export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<st
   const firstMultiple = inputs.target1 || 1;
   const secondMultiple = inputs.target2 || 1.5;
   const setups: PsbbSetup[] = [];
-  const add = (side: "long" | "short", older: number, newer: number, entry: number) => {
-    const stop = side === "long" ? candles[newer].low : candles[newer].high;
-    if (!(side === "long" ? entry > stop : stop > entry)) return;
+  const blank = (side: "long" | "short", older: number, newer: number, entry = Number.NaN, entryTime = candles[newer].time, stop = Number.NaN, stopTime = candles[newer].time, from = newer) => {
     const risk = Math.abs(entry - stop);
-    const target1 = side === "long" ? entry + firstMultiple * risk : entry - firstMultiple * risk;
-    const target2 = side === "long" ? entry + secondMultiple * risk : entry - secondMultiple * risk;
-    const result = outcome(candles, newer + span, side, entry, stop, target1);
+    const target1 = Number.isFinite(risk) && risk > 0 ? side === "long" ? entry + firstMultiple * risk : entry - firstMultiple * risk : Number.NaN;
+    const target2 = Number.isFinite(risk) && risk > 0 ? side === "long" ? entry + secondMultiple * risk : entry - secondMultiple * risk : Number.NaN;
+    const result = Number.isFinite(stop) ? outcome(candles, from, side, entry, stop, target1) : { status: "active" as const, end: newer, shifted: false };
     setups.push({
       side, status: result.status, shifted: result.shifted,
       firstTime: candles[older].time, secondTime: candles[newer].time, end: candles[result.end].time,
       firstPrice: side === "long" ? candles[older].low : candles[older].high,
-      secondPrice: stop,
+      secondPrice: side === "long" ? candles[newer].low : candles[newer].high,
       firstRsi: momentum[older], secondRsi: momentum[newer],
-      entry, stop, target1, target2,
+      entry, entryTime, stop, stopTime, target1, target2,
     });
   };
   const lows = pivotIndexes(candles, "low", span, last);
@@ -110,16 +110,20 @@ export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<st
   for (let pair = 1; pair < lows.length; pair += 1) {
     const older = lows[pair - 1];
     const newer = lows[pair];
-    const between = candles.slice(older + 1, newer);
-    if (!between.length || !(candles[newer].low < candles[older].low) || !(momentum[newer] > momentum[older]) || !(momentum[older] <= oversold)) continue;
-    add("long", older, newer, Math.max(...between.map((bar) => bar.high)));
+    if (!(candles[newer].low < candles[older].low) || !(momentum[newer] > momentum[older]) || !(Math.min(momentum[older], momentum[newer]) <= oversold)) continue;
+    const entryIndex = highs.find((index) => index > newer);
+    const stopIndex = entryIndex == null ? undefined : lows.find((index) => index > entryIndex && candles[index].low > candles[newer].low);
+    if (entryIndex == null || stopIndex == null) blank("long", older, newer, entryIndex == null ? Number.NaN : candles[entryIndex].high, entryIndex == null ? candles[newer].time : candles[entryIndex].time);
+    else blank("long", older, newer, candles[entryIndex].high, candles[entryIndex].time, candles[stopIndex].low, candles[stopIndex].time, stopIndex + span);
   }
   for (let pair = 1; pair < highs.length; pair += 1) {
     const older = highs[pair - 1];
     const newer = highs[pair];
-    const between = candles.slice(older + 1, newer);
-    if (!between.length || !(candles[newer].high > candles[older].high) || !(momentum[newer] < momentum[older]) || !(momentum[older] >= overbought)) continue;
-    add("short", older, newer, Math.min(...between.map((bar) => bar.low)));
+    if (!(candles[newer].high > candles[older].high) || !(momentum[newer] < momentum[older]) || !(Math.max(momentum[older], momentum[newer]) >= overbought)) continue;
+    const entryIndex = lows.find((index) => index > newer);
+    const stopIndex = entryIndex == null ? undefined : highs.find((index) => index > entryIndex && candles[index].high < candles[newer].high);
+    if (entryIndex == null || stopIndex == null) blank("short", older, newer, entryIndex == null ? Number.NaN : candles[entryIndex].low, entryIndex == null ? candles[newer].time : candles[entryIndex].time);
+    else blank("short", older, newer, candles[entryIndex].low, candles[entryIndex].time, candles[stopIndex].high, candles[stopIndex].time, stopIndex + span);
   }
   return setups.sort((a, b) => a.secondTime - b.secondTime).slice(-4);
 }
