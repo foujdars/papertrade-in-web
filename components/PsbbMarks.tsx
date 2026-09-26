@@ -93,7 +93,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const waitingX = setup.entryTime === null ? null : xOf(setup.entryTime);
   const swing = setup.side === "short" ? "swing low" : "swing high";
   const status = setup.phase === "waiting-structure" ? `Waiting for new ${swing}`
-    : setup.phase === "waiting-mss" ? "Waiting for MSS close"
+    : setup.phase === "waiting-mss" ? "Waiting for entry level"
     : setup.status === "passed" ? "Success · 1R reached" : setup.status === "failed" ? "Failed · stop reached"
     : "Active · MSS confirmed";
   const description = `${timeframe} PSBB · ${setup.side === "short" ? "Bearish" : "Bullish"}${setup.structureCase ? ` · Case ${setup.structureCase === "before" ? "A" : "B"}` : ""} · ${status}`;

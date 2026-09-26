@@ -79,7 +79,7 @@ test('opposite threshold replaces pending D1 symmetrically, never reviving the e
   }
 });
 
-test("positive divergence has no entry until price closes through the high between the two lows", () => {
+test("positive divergence has no entry until price reaches the high between the two lows", () => {
   const candles = flat(20);
   candles[5] = bar(5, 112, 100, 108);
   candles[8] = bar(8, 130, 112, 122);
@@ -193,12 +193,18 @@ for (const long of [false, true]) {
     assert.equal(setup.status, 'formed');
   });
 
-  test(`${name} MSS needs a close beyond the level; equality or a wick is insufficient`, () => {
+  test(`${name} entry uses the first wick touch, not a later close beyond the level`, () => {
     const data = caseB(long);
     data.candles[8].close = 100;
-    assert.equal(latest(data).shifted, false);
+    assert.equal(latest(data).shifted, true);
     data.candles[8].close = long ? 99 : 101;
-    assert.equal(latest(data).shifted, false);
+    assert.equal(latest(data).shifted, true);
+    assert.equal(latest(data).mssTime, 8);
+    assert.equal(latest(data).entry, 100);
+    data.candles[8][long ? 'high' : 'low'] = 100;
+    assert.equal(latest(data).shifted, true, 'Exact touch of the horizontal level qualifies');
+    data.candles[8][long ? 'high' : 'low'] = long ? 99.9 : 100.1;
+    assert.equal(latest(data).shifted, false, 'A candle that does not reach the level stays pending');
   });
 
   test(`${name} live candle cannot confirm a divergence, pivot, or MSS`, () => {
@@ -286,11 +292,32 @@ test('Case A activates on the closed MSS candle without waiting for later pivot 
     const immediate = latest(prefix(data, 12), { left: 2 });
     assert.equal(immediate.mssTime, 10, 'No future bars needed to recognize the entry');
     data.candles = data.candles.map((c, i) => i === 10 ? { ...c, close: inverse ? 149 : 101 } : c);
-    assert.equal(latest(prefix(data, 12), { left: 2 })?.shifted ?? false, false, 'A wick alone is not an entry');
+    assert.equal(latest(prefix(data, 12), { left: 2 })?.shifted, true, 'A wick reaching the known level is entry');
   }
 });
 
-test('entry candle extremes do not imply target fills before close-confirmed entry', () => {
+test('401.10 Case B ray triggers on its first touch candle across all six timeframes', () => {
+  // Synthetic regression matching the reported level: three-bar confirmed
+  // swing high, then a wick touch, then a later close above it.
+  const values = [[405,400,402],[402,398,399],[400,396,397],[397,394,395],
+    [398,395,397],[400,396,399],[401.10,398,400],[400.9,397,399],
+    [400,397.5,399],[400.5,398,400],[401.10,399,400.8],[404,400,403],[405,402,404]];
+  const momentum = [50,25,28,35,40,45,55,45,48,50,55,60,62];
+  for (const seconds of [60,300,900,3600,14400,86400]) {
+    const candles = values.map(([h,l,c],i) => bar(1700000000+i*seconds,h,l,c));
+    const waiting = psbbAnalysisFromRsi(candles.slice(0,10),momentum.slice(0,10),{left:3},true).setups.at(-1);
+    assert.equal(waiting.entry,401.10);assert.equal(waiting.shifted,false);
+    const result = psbbAnalysisFromRsi(candles,momentum,{left:3}).setups.at(-1);
+    assert.equal(result.structureCase,'after');assert.equal(result.entry,401.10);
+    assert.equal(result.entryTime,candles[6].time);
+    assert.equal(result.mssTime,candles[10].time,'First touch, not the next closing breakout');
+    assert.equal(result.stop,394);assert.ok(Math.abs(result.target1-408.2)<1e-9);
+    const atTouch = psbbAnalysisFromRsi(candles.slice(0,11),momentum.slice(0,11),{left:3},true).setups.at(-1);
+    assert.equal(atTouch.mssTime,result.mssTime,'No later candle is needed to recognize the touch');
+  }
+});
+
+test('entry candle extremes do not invent intrabar ordering for target fills', () => {
   const data = caseB();
   data.candles[8] = bar(8, 121, 60, 98);
   const setup = latest(data);

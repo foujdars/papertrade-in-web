@@ -43,7 +43,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         await page.getByText(new RegExp(`^${timeframe} PSBB.*Waiting for new swing ${long ? 'high' : 'low'}$`)).waitFor();
         assert.equal(await page.locator('.chart-psbb-level.entry').count(), 0);
         await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 27 });
-        await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*Waiting for MSS close$`)).waitFor();
+        await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*Waiting for entry level$`)).waitFor();
         assert.match(await page.locator('.chart-psbb text.entry').textContent(), /^Entry .*pending$/);
         assert.equal(await page.locator('.chart-psbb text.target').count(), 0);
         await page.waitForFunction(endpointsMatch);

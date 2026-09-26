@@ -79,8 +79,8 @@ function isPivot(candles: Bar[], side: "low" | "high", index: number, span: numb
 function updateOutcome(setup: PsbbSetup, bar: Bar) {
   if (setup.status !== "formed" || setup.stop === null || setup.target1 === null || setup.target2 === null) return;
   setup.end = bar.time;
-  // Close-confirmed MSS cannot claim a target/stop touched earlier on the entry
-  // candle. Later candles that touch both are conservatively stop-first.
+  // Evaluate subsequent candles: OHLC alone cannot order entry and exits
+  // within the entry candle. Later bars touching both are stop-first.
   const stopped = setup.side === "long" ? bar.low <= setup.stop : bar.high >= setup.stop;
   if (stopped) { setup.status = "failed"; return; }
   if (setup.side === "long" ? bar.high >= setup.target1 : bar.low <= setup.target1) {
@@ -110,10 +110,11 @@ function moveD1(episode: Episode, index: number) {
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
  * Swings become usable only after `left` closed candles on BOTH sides. Case A
  * uses the most recent opposite swing strictly between D1 and the extreme;
- * Case B waits for the first opposite swing after it. A close through a known
+ * Case B waits for the first opposite swing after it. A touch of a known
  * Case A level also confirms D2 without waiting extra right-hand pivot bars.
- * Only a subsequent close through the structure level confirms MSS. The final
- * (still-forming) candle is excluded.
+ * The first subsequent candle whose high/low reaches the structure level
+ * triggers entry AT that level, without requiring its close to cross. The
+ * final (still-forming) candle is excluded from this confirmed history.
  */
 export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false) {
   const last = Math.max(0, candles.length - (allCandlesClosed ? 0 : 1));
@@ -181,12 +182,12 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
         ? momentum[extreme] > momentum[first]
         : momentum[extreme] < momentum[first]);
       const before = pivots[structureKind].findLast(pivot => pivot > first && pivot < extreme);
-      // A close through an already-confirmed intervening swing is itself MSS
+      // Reaching an already-confirmed intervening swing is itself MSS
       // confirmation. Do not wait additional right-hand pivot bars and miss
       // that crossing. Nothing is backdated or read from future candles.
       const earlyMss = divergence && before !== undefined && index > extreme && (long
-        ? candles[index - 1].close <= candles[before].high && bar.close > candles[before].high
-        : candles[index - 1].close >= candles[before].low && bar.close < candles[before].low);
+        ? bar.high >= candles[before].high
+        : bar.low <= candles[before].low);
       if (!episode.setup && ((confirmed === extreme && pivots[extremeKind].at(-1) === extreme) || earlyMss)) {
         episode.pushes += 1;
         if (divergence) {
@@ -222,10 +223,9 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       setup.target1 = setup.entry + (long ? 1 : -1) * risk;
       // Retain the old field for saved consumers; PSBB now has ONE 1R target.
       setup.target2 = setup.target1;
-      const priorClose = candles[index - 1]?.close;
       const broke = index > extreme && index > structure && (long
-        ? priorClose <= setup.entry && bar.close > setup.entry
-        : priorClose >= setup.entry && bar.close < setup.entry);
+        ? bar.high >= setup.entry
+        : bar.low <= setup.entry);
       if (!broke) continue;
       setup.phase = "entered";
       setup.status = "formed";
