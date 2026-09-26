@@ -11,11 +11,8 @@
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger small { font-size: 11px; line-height: 1.2; color: inherit; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger b { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger svg { width: 12px; flex: 0 0 12px; }
-.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger { justify-content: center; width: auto; min-width: 58px; flex-basis: auto; padding: 0 9px; }
-.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > svg { display: none; }
-.chart-fx-mark { display: inline-flex; align-items: center; gap: 3px; color: inherit; line-height: 1; }
-.chart-fx-mark i { font-family: Georgia, "Times New Roman", serif; font-style: normal; font-weight: 500; font-size: 20px; line-height: 1; }
-.chart-fx-mark em { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 650; font-size: 15px; letter-spacing: -0.03em; line-height: 1; }
+.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger { justify-content: center; width: auto; min-width: 44px; flex-basis: auto; padding: 0 8px; }
+.terminal-shell .trade-cockpit .chart-controls > .chart-functions-trigger > .chart-fx-mark { display: block; width: 22px; height: 24px; flex: 0 0 22px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 48px; min-width: 48px; flex-basis: 48px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger small { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger b { display: block; font-size: 12px; }
