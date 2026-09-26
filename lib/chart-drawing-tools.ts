@@ -7,6 +7,7 @@ import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
+import { drawingTextPosition, type DrawingPresentation } from './study-pane-drawings.ts';
 const readableFont = () => "13px sans-serif";
 
 function centerPositionAnchors(type: string, center: Anchor, source: VolumeCandle[]): Anchor[] {
@@ -55,6 +56,34 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     getAll() { return [...entries.values()]; },
     createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
       const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      // Some native tools serialize their original constructor options after
+      // edited options, which would silently undo extension changes on reload.
+      const originalJSON = item.toJSON.bind(item);
+      item.toJSON = () => {
+        const saved = originalJSON();
+        return { ...saved, options: { ...saved.options, ...item.options } };
+      };
+      const originalGeometry = item.computeGeometry.bind(item);
+      item.computeGeometry = (viewport) => {
+        const presentation = item.options as DrawingOptions & DrawingPresentation;
+        let geometry = originalGeometry(viewport);
+        if (type === 'rectangle') geometry = geometry.map(shape => {
+          if (shape.type !== 'rectangle') return shape;
+          const left = presentation.extendLeft ? 0 : shape.topLeft.x;
+          const right = presentation.extendRight ? viewport.width : shape.topLeft.x + shape.width;
+          return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: right - left };
+        });
+        if (presentation.text) {
+          const points: Point[] = item.anchors.flatMap(anchor => {const x=viewport.timeScale.timeToCoordinate(anchor.time),y=viewport.priceScale.priceToCoordinate(anchor.price);return x===null||y===null?[]:[{x:Number(x),y:Number(y)}];});
+          if (points.length) {
+            const a = {...points[0]}, b = {...points.at(-1)!};
+            if (type === 'horizontal-line') { a.x=0; b.x=viewport.width; }
+            const label = drawingTextPosition(a,b,presentation);
+            geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
+          }
+        }
+        return geometry;
+      };
       const getViewport=item.getViewport.bind(item);
       item.getViewport=()=>{
         const viewport=getViewport();if(!viewport)return null;

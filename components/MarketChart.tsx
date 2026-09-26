@@ -8,6 +8,8 @@ import { PreviousDayLevels } from "./PreviousDayLevels";
 import { PriorLevels } from "./PriorLevels";
 import { PsbbMarks } from "./PsbbMarks";
 import { StudyPaneLayer } from "./StudyPaneLayer";
+import { DrawingSettings } from './DrawingSettings';
+import type { DrawingPresentation } from '@/lib/study-pane-drawings';
 import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { TRANSIENT_BACK_EVENT, useTransientBack } from "./useTransientBack";
@@ -278,7 +280,7 @@ function toolStyle(tool: DrawingToolId): Partial<DrawingStyle> {
 }
 
 function toolOptions(tool: DrawingToolId) {
-  if (tool === "trend-line") return { visible: true, locked: false, extendRight: true };
+  if (tool === "trend-line") return { visible: true, locked: false, extendRight: false, extendLeft: false };
   if (tool === "rectangle") return { visible: true, locked: false, filled: true };
   if (tool === "parallel-channel") return { visible: true, locked: false, filled: true, showMiddleLine: true, extendLines: true };
   if (tool === "fib-retracement") return { visible: true, locked: false, levels: [0, .5, .618, .705, .786, 1, 1.618, 2.618], showPrices: false, showPercentages: false, extendLines: false, reverseDirection: true };
@@ -689,6 +691,9 @@ export function MarketChart({
   const [drafting, setDrafting] = useState(false);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [studyDrawings, setStudyDrawings] = useState<StudyDrawing[]>([]);
+  const [editingDrawing, setEditingDrawing] = useState<{id:string;study:boolean;value:DrawingPresentation}|null>(null);
+  const studyAimRef = useRef<{studyId:string;time:number;value:number;x:number;y:number}|null>(null);
+  const studyGestureRef = useRef<{pointerId:number;x:number;y:number;origin:NonNullable<typeof studyAimRef.current>;moved:boolean}|null>(null);
   const [studyCursor, setStudyCursor] = useState<{ y: number; text: string; color?: string } | null>(null);
   const [selectedStudyLine, setSelectedStudyLine] = useState<string | null>(null);
   const studyDrawingsRef = useRef<StudyDrawing[]>([]);
@@ -873,7 +878,7 @@ export function MarketChart({
         return pointX === null || pointY === null ? [] : [{ x: pointX, y: pointY }];
       });
       const nextActions = actionPoints.length ? {
-        x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 64, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 28)),
+        x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 112, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 48)),
         y: Math.max(4, Math.min(...actionPoints.map((point) => point.y)) - 32),
       } : null;
       setDrawingActions((current) => current && nextActions && Math.abs(current.x - nextActions.x) < 1 && Math.abs(current.y - nextActions.y) < 1 ? current : nextActions);
@@ -1231,6 +1236,12 @@ export function MarketChart({
     const element=drawingCrosshairRef.current,chart=chartApi.current,series=candleSeries.current,anchor=drawingAimRef.current;
     if(!element)return;
     const tool=normalizeTool(activeToolRef.current);
+    const studyAim=studyAimRef.current;
+    if(element&&chart&&tool&&studyAim&&!hiddenRef.current) {
+      element.hidden=false; element.style.width=`${chart.timeScale().width()}px`;
+      element.style.height=`${chart.panes().reduce((sum,p)=>sum+p.getHeight(),0)}px`;
+      element.style.setProperty('--aim-x',`${studyAim.x}px`);element.style.setProperty('--aim-y',`${studyAim.y}px`);return;
+    }
     if(!chart||!series||!anchor||!tool||hiddenRef.current||CONTINUOUS_TOOLS.has(tool)){element.hidden=true;return;}
     const logical=drawingLogicalAtTime(Number(anchor.time),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
     const x=chart.timeScale().timeToCoordinate(anchor.time)??(logical===null?null:chart.timeScale().logicalToCoordinate(logical as Logical));
@@ -1441,7 +1452,7 @@ export function MarketChart({
     const centerTime = chart ? drawingTimeAtCoordinate(chart.timeScale().width() / 2) : null;
     const centerPrice = chart ? candleSeries.current?.coordinateToPrice((chart.panes()[0]?.getHeight() ?? 0) / 2) : null;
     drawingAimRef.current = pointTool ? lastCrosshairAnchorRef.current ?? (centerTime !== null && centerPrice != null ? { time: centerTime, price: centerPrice } : null) : null;
-    if (drawingAimRef.current && candleSeries.current) chart?.setCrosshairPosition(drawingAimRef.current.price, drawingAimRef.current.time, candleSeries.current);
+    if (!studyAimRef.current && drawingAimRef.current && candleSeries.current) chart?.setCrosshairPosition(drawingAimRef.current.price, drawingAimRef.current.time, candleSeries.current);
     chart?.applyOptions({crosshair:{vertLine:{visible:!pointTool},horzLine:{visible:!pointTool}}});
     refreshDrawingCrosshair();
     const hint = definition ? `${definition.label} · drag crosshair, tap anywhere to confirm` : drawingType ? "Drag crosshair · tap anywhere to confirm" : "";
@@ -1659,6 +1670,7 @@ export function MarketChart({
       setChartGeneration((value) => value + 1);
 
       const studyStorageKey = `papertrade-study-drawings:${instrument.instrumentKey}`;
+      studyAimRef.current=null;studyGestureRef.current=null;
       const rememberStudyDrawings = (next: StudyDrawing[]) => {
         const stored = next.filter((item) => item.id !== "draft");
         studyDrawingsRef.current = stored;
@@ -1670,7 +1682,7 @@ export function MarketChart({
         const saved = JSON.parse(window.localStorage.getItem(studyStorageKey) ?? "[]") as StudyDrawing[];
         if (Array.isArray(saved)) rememberStudyDrawings(saved.filter((item) => item && item.a && item.b && item.studyId));
       } catch { rememberStudyDrawings([]); }
-      const studyAt = (event: PointerEvent) => {
+      const studyAt = (event: {clientX:number;clientY:number}) => {
         const bounds = host.getBoundingClientRect();
         const x = event.clientX - bounds.left;
         const y = event.clientY - bounds.top;
@@ -1678,6 +1690,16 @@ export function MarketChart({
         const located = locateStudyPane(chart, studyRenderer.current?.bundles ?? [], y);
         const time = drawingTimeAtCoordinate(x);
         if (!located || time == null) return null;
+        const bundle = studyRenderer.current?.bundles.find(item=>item.id===located.studyId);
+        if (magnetRef.current && bundle?.series[0]) {
+          const logical=chart.timeScale().coordinateToLogical(x);
+          const point=logical===null?undefined:bundle.series[0].dataByIndex(Math.round(Number(logical)));
+          if(point && 'value' in point && typeof point.value==='number' && Number.isFinite(point.value)) {
+            let top=0;for(let i=0;i<bundle.pane;i++)top+=chart.panes()[i].getHeight();
+            const sy=bundle.series[0].priceToCoordinate(point.value),sx=chart.timeScale().timeToCoordinate(point.time);
+            if(sy!==null&&sx!==null)return {...located,time:Number(point.time),value:point.value,x:sx,y:top+sy};
+          }
+        }
         return { ...located, time: Number(time), x };
       };
       const finishStudyTool = (selectedId?: string) => {
@@ -1692,6 +1714,8 @@ export function MarketChart({
         drawingManager.current?.setActiveTool("pointer-controlled");
         chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
         host.classList.remove("is-drawing");
+        setPlacementHint('');
+        if(drawingCrosshairRef.current)drawingCrosshairRef.current.hidden=true;
         onDrawingCompleteRef.current?.();
       };
       const placeStudyPoint = (tool: string, hit: { studyId: string; value: number; time: number }) => {
@@ -1708,6 +1732,7 @@ export function MarketChart({
             studyDraftRef.current = created;
             setStudyDrawings([...studyDrawingsRef.current, { ...created, id: "draft" }]);
             setDrafting(true);
+            setPlacementHint('1/2 points · move crosshair, tap anywhere to confirm');
           }
           return;
         }
@@ -1730,7 +1755,7 @@ export function MarketChart({
           const ay = series.priceToCoordinate(line.a.value);
           const by = series.priceToCoordinate(line.b.value);
           if (ax == null || bx == null || ay == null || by == null) continue;
-          const ends = studyLinePoints(line.tool, ax, ay + top, bx, by + top, chart.timeScale().width(), top, chart.panes()[bundle.pane]?.getHeight() ?? 0);
+          const ends = studyLinePoints(line.tool, ax, ay + top, bx, by + top, chart.timeScale().width(), top, chart.panes()[bundle.pane]?.getHeight() ?? 0, line.presentation);
           const distance = ends ? pointToSegmentDistance({ x, y }, { x: ends.x1, y: ends.y1 }, { x: ends.x2, y: ends.y2 }) : Math.min(pointDistance({ x, y }, { x: ax, y: ay + top }), pointDistance({ x, y }, { x: bx, y: by + top }));
           if (distance < score) { score = distance; best = line.id; }
         }
@@ -1760,6 +1785,8 @@ export function MarketChart({
         chart.applyOptions({
           crosshair: {
             horzLine: {
+              visible: !purple && !normalizeTool(activeToolRef.current),
+              labelVisible: !purple,
               color: purple ? label : (neon ? "#bf9aff" : "#8c96aa"),
               labelBackgroundColor: label,
             },
@@ -1778,6 +1805,7 @@ export function MarketChart({
         return { studyId: bundle.id, value, y: top + localY };
       };
       crosshairMove = (event) => {
+        if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
           const price = series.coordinateToPrice(event.point.y);
@@ -1787,14 +1815,25 @@ export function MarketChart({
           // Lightweight Charts reports the crosshair point inside the hovered pane, not from the top of the chart.
           const located = studyUnderCrosshair(event.paneIndex, event.point.y);
           const onRsi = located?.studyId === "rsi";
+          if(!normalizeTool(activeToolRef.current)) {
+            studyAimRef.current=located&&event.time!==undefined?{...located,time:Number(event.time),x:event.point.x}:null;
+          }
           paintRsiCrosshair(located?.studyId);
-          setRsiLastVisible(!onRsi);
-          // The native scale chip is the RSI readout. A second HTML tag was painting another number on top of it.
-          if (onRsi) {
-            setStudyCursor((current) => current ? null : current);
-            if (!normalizeTool(activeToolRef.current)) {
-              snapStudyCrosshair(chart, rsiBundle()?.series[0], event);
-            }
+          const rsiReadout=onRsi || (event.paneIndex===0&&!!rsiBundle());
+          setRsiLastVisible(!rsiReadout);
+          // Own the readout from the primary series datum; native pointer Y is
+          // not the RSI dot value. Hide the competing native label in RSI.
+          if (rsiReadout) {
+            const line=rsiBundle()?.series[0], point=line&&event.seriesData.get(line);
+            const value=point&&'value' in point&&typeof point.value==='number'?point.value:null;
+            const y=value!==null&&line?line.priceToCoordinate(value):null;
+            if(value!==null&&Number.isFinite(value)&&y!==null) {
+              let top=0;for(let i=0;i<(rsiBundle()?.pane??0);i++)top+=chart.panes()[i]?.getHeight()??0;
+              const globalY=top+y;
+              setStudyCursor({y:globalY,text:formatStudyValue(value),color:rsiCursorColor('rsi')});
+              if(onRsi&&studyAimRef.current&&magnetRef.current)studyAimRef.current={...studyAimRef.current,value,y:globalY};
+              if (!normalizeTool(activeToolRef.current)) snapStudyCrosshair(chart, line, event);
+            } else setStudyCursor(null);
           } else {
             const text = located ? formatStudyValue(located.value) : "";
             const color = rsiCursorColor(located?.studyId);
@@ -1872,10 +1911,29 @@ export function MarketChart({
       manager.on("drawing:cleared", syncSelectedDrawing);
 
       const pointers = new Set<number>();
+      let studyEdit: { pointerId:number; original:StudyDrawing; start:{x:number;value:number}; anchor:'a'|'b'|null } | null = null;
       let pinching = false;
       const aim = (event: PointerEvent) => {
         const gesture = drawingGestureRef.current;
         const origin = gesture?.origin;
+        // Before the first point is confirmed, the same remote crosshair can
+        // move from price into an indicator pane without changing tools.
+        const tool = normalizeTool(activeToolRef.current);
+        if (origin && gesture && tool && STUDY_LINE_TOOLS.has(tool) && !draftRef.current) {
+          const bounds = host.getBoundingClientRect();
+          const hit = studyAt({clientX:bounds.left+origin.x+event.clientX-gesture.x,clientY:bounds.top+origin.y+event.clientY-gesture.y});
+          if (hit) {
+            studyAimRef.current = hit;
+            studyGestureRef.current = {pointerId:event.pointerId,x:event.clientX,y:event.clientY,origin:hit,moved:true};
+            drawingGestureRef.current = null;
+            paintRsiCrosshair(hit.studyId);
+            const line = studyRenderer.current?.bundles.find(item=>item.id===hit.studyId)?.series[0];
+            if(line)chart.setCrosshairPosition(hit.value,hit.time as UTCTimestamp,line);
+            refreshDrawingCrosshair();
+            setStudyCursor({y:hit.y,text:formatStudyValue(hit.value),color:rsiCursorColor(hit.studyId)});
+            return;
+          }
+        }
         // Remote drags act like a trackpad, preserving the aim-to-finger offset.
         const x = origin && gesture ? Math.max(0, Math.min(chart.timeScale().width(), origin.x + event.clientX - gesture.x)) : null;
         const y = origin && gesture ? Math.max(0, Math.min(chart.panes()[0].getHeight(), origin.y + event.clientY - gesture.y)) : null;
@@ -1979,6 +2037,8 @@ export function MarketChart({
       };
 
       confirmDrawingPointRef.current = () => {
+        const tool=normalizeTool(activeToolRef.current);
+        if(tool&&studyAimRef.current&&STUDY_LINE_TOOLS.has(tool)){placeStudyPoint(tool,studyAimRef.current);return;}
         if (drawingAimRef.current && normalizeTool(activeToolRef.current)) commitOrEdit(new PointerEvent("pointerup"), drawingAimRef.current);
       };
       const onPointerDown = (event: PointerEvent) => {
@@ -1990,24 +2050,42 @@ export function MarketChart({
           viewportInteractedRef.current = true;
           pinching = true;
           drawingGestureRef.current = null;
+          studyGestureRef.current = null;
+          if (studyEdit) {
+            const original = studyEdit.original;
+            rememberStudyDrawings(studyDrawingsRef.current.map(item => item.id === original.id ? original : item));
+            studyEdit = null;
+          }
           if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
           chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
         const study = studyAt(event);
-        if (study && tool && STUDY_LINE_TOOLS.has(tool)) {
-          placeStudyPoint(tool, study);
+        if (tool && STUDY_LINE_TOOLS.has(tool) && (studyAimRef.current||study)) {
+          const aim=studyAimRef.current??study!;
+          studyAimRef.current=aim;
+          studyGestureRef.current={pointerId:event.pointerId,x:event.clientX,y:event.clientY,origin:{...aim},moved:false};
+          host.setPointerCapture?.(event.pointerId);
+          refreshDrawingCrosshair();
           event.preventDefault();
           event.stopPropagation();
           return;
         }
-        if (!tool && study) {
+        if (!tool && study && !hiddenRef.current) {
           const hit = hitStudyDrawing(study.x, study.y);
           selectedStudyLineRef.current = hit;
           setSelectedStudyLine(hit);
           if (hit) {
             drawingManager.current?.deselectAll();
+            if(!lockedRef.current) {
+              const line=studyDrawingsRef.current.find(item=>item.id===hit)!;
+              const bundle=studyRenderer.current?.bundles.find(item=>item.id===line.studyId);
+              let top=0;for(let i=0;i<(bundle?.pane??0);i++)top+=chart.panes()[i].getHeight();
+              const distance=(key:'a'|'b')=>{const x=chart.timeScale().timeToCoordinate(line[key].time as UTCTimestamp),y=bundle?.series[0].priceToCoordinate(line[key].value);return x==null||y==null?Infinity:Math.hypot(x-study.x,top+y-study.y);};
+              studyEdit={pointerId:event.pointerId,original:line,start:{x:study.x,value:study.value},anchor:distance('a')<14?'a':distance('b')<14?'b':null};
+              chart.applyOptions(chartInteractionOptions(false,preservePageScroll));host.setPointerCapture?.(event.pointerId);
+            }
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -2027,6 +2105,39 @@ export function MarketChart({
       const onPointerMove = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         if (pinching) return;
+        if(studyEdit?.pointerId===event.pointerId) {
+          const hit=studyAt(event),edit=studyEdit;
+          if(hit&&hit.studyId===edit.original.studyId) {
+            const move=(key:'a'|'b')=>{
+              const old=edit.original[key];
+              if(edit.anchor)return key===edit.anchor?{time:hit.time,value:hit.value}:old;
+              const x=chart.timeScale().timeToCoordinate(old.time as UTCTimestamp);
+              return {time:x===null?old.time:Number(drawingTimeAtCoordinate(x+hit.x-edit.start.x)??old.time),value:old.value+hit.value-edit.start.value};
+            };
+            const updated={...edit.original,a:move('a'),b:move('b')};
+            studyDrawingsRef.current=studyDrawingsRef.current.map(item=>item.id===updated.id?updated:item);
+            setStudyDrawings([...studyDrawingsRef.current]);
+          }
+          event.preventDefault();event.stopPropagation();return;
+        }
+        const studyGesture=studyGestureRef.current;
+        if(studyGesture?.pointerId===event.pointerId) {
+          if(Math.hypot(event.clientX-studyGesture.x,event.clientY-studyGesture.y)>6)studyGesture.moved=true;
+          if(studyGesture.moved) {
+            const bounds=host.getBoundingClientRect();
+            const hit=studyAt({clientX:bounds.left+studyGesture.origin.x+event.clientX-studyGesture.x,clientY:bounds.top+studyGesture.origin.y+event.clientY-studyGesture.y});
+            if(hit&&hit.studyId===studyGesture.origin.studyId) {
+              studyAimRef.current=hit;
+              const bundle=studyRenderer.current?.bundles.find(item=>item.id===hit.studyId);
+              if(bundle?.series[0])chart.setCrosshairPosition(hit.value,hit.time as UTCTimestamp,bundle.series[0]);
+              refreshDrawingCrosshair();
+              setStudyCursor({y:hit.y,text:formatStudyValue(hit.value),color:rsiCursorColor(hit.studyId)});
+              const draft=studyDraftRef.current;
+              if(draft)setStudyDrawings([...studyDrawingsRef.current,{...draft,id:'draft',b:{time:hit.time,value:hit.value}}]);
+            }
+          }
+          event.preventDefault();event.stopPropagation();return;
+        }
         const gesture = drawingGestureRef.current;
         if (gesture?.pointerId === event.pointerId && Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>6) gesture.moved = true;
         const tap = tapGestureRef.current;
@@ -2036,7 +2147,7 @@ export function MarketChart({
           viewportInteractedRef.current = true;
         }
         const draftStudy = studyDraftRef.current;
-        if (draftStudy) {
+        if (draftStudy && !STUDY_LINE_TOOLS.has(normalizeTool(activeToolRef.current)??'')) {
           const hit = studyAt(event);
           if (hit && hit.studyId === draftStudy.studyId) {
             const next = { ...draftStudy, b: { time: hit.time, value: hit.value } };
@@ -2105,6 +2216,22 @@ export function MarketChart({
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         pointers.delete(event.pointerId);
+        if(studyEdit?.pointerId===event.pointerId) {
+          const edit=studyEdit;studyEdit=null;
+          const next=event.type==='pointercancel'?studyDrawingsRef.current.map(item=>item.id===edit.original.id?edit.original:item):studyDrawingsRef.current;
+          rememberStudyDrawings(next);chart.applyOptions(chartInteractionOptions(true,preservePageScroll));
+          if(host.hasPointerCapture(event.pointerId))host.releasePointerCapture(event.pointerId);
+          event.preventDefault();event.stopPropagation();return;
+        }
+        const studyGesture=studyGestureRef.current;
+        if(studyGesture?.pointerId===event.pointerId) {
+          studyGestureRef.current=null;
+          const tool=normalizeTool(activeToolRef.current);
+          if(event.type!=='pointercancel'&&!studyGesture.moved&&tool)placeStudyPoint(tool,studyGesture.origin);
+          if(event.type==='pointercancel'&&studyDraftRef.current)cancelInProgressRef.current();
+          if(host.hasPointerCapture(event.pointerId))host.releasePointerCapture(event.pointerId);
+          event.preventDefault();event.stopPropagation();return;
+        }
         if (pinching) {
           if (!pointers.size) { pinching = false; chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll)); }
           return;
@@ -2177,7 +2304,7 @@ export function MarketChart({
           }
         }
         if ((event.key === "Delete" || event.key === "Backspace") && !draftRef.current) {
-          if (selectedStudyLineRef.current) {
+          if (selectedStudyLineRef.current && !lockedRef.current) {
             rememberStudyDrawings(studyDrawingsRef.current.filter((item) => item.id !== selectedStudyLineRef.current));
             selectedStudyLineRef.current = null;
             setSelectedStudyLine(null);
@@ -2903,6 +3030,10 @@ export function MarketChart({
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
+        {editingDrawing && <DrawingSettings key={editingDrawing.id} value={editingDrawing.value} onClose={()=>setEditingDrawing(null)} onApply={value=>{
+          if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id?{...line,presentation:value}:line));
+          else { const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){item.updateOptions(value);persistDrawings(true);} }
+        }}/>}
         {editingLine && <ChartLineColorSettings key={editingLine} name={editingLine === "primary" ? instrument.symbol : overlayCompared.find((item) => item.instrumentKey === editingLine)?.symbol ?? "Compared symbol"} color={editingLine === "primary" ? primaryLineColor : overlayCompared.find((item) => item.instrumentKey === editingLine)?.color ?? compareColor(Math.max(0, overlayCompared.findIndex((item) => item.instrumentKey === editingLine)))} onChange={(color) => {
           if (editingLine === "primary") setPrimaryLineColor(color);
           else setComparedSymbols((current) => current.map((item) => item.instrumentKey === editingLine ? { ...item, color } : item));
@@ -2914,7 +3045,7 @@ export function MarketChart({
         {indicators["previous-day"] && !studySettings["previous-day"]?.hidden && <PreviousDayLevels key={`${instrument.instrumentKey}:${timeframe}:previous-day`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={previousDayRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
         {indicators["prior-levels"] && !studySettings["prior-levels"]?.hidden && <PriorLevels key={`${instrument.instrumentKey}:${timeframe}:prior-levels`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} instrumentKey={instrument.instrumentKey} config={studySettings["prior-levels"]} refreshRef={priorLevelsRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
         {indicators.psbb && !studySettings.psbb?.hidden && <PsbbMarks key={`${instrument.instrumentKey}:${timeframe}:psbb`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} config={studySettings.psbb} refreshRef={psbbRefreshRef} studyRenderer={studyRenderer} />}
-        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={studyDrawings} cursor={studyCursor} selectedId={selectedStudyLine} refreshRef={studyPaneRefreshRef} onDelete={(id) => { rememberStudyDrawingsRef.current(studyDrawingsRef.current.filter((item) => item.id !== id)); selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} onDone={() => { selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} />
+        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} onSettings={id=>{const line=studyDrawingsRef.current.find(item=>item.id===id);if(line&&!lockedRef.current)setEditingDrawing({id,study:true,value:line.presentation??{}});}} onDelete={(id) => { if(lockedRef.current)return; rememberStudyDrawingsRef.current(studyDrawingsRef.current.filter((item) => item.id !== id)); selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} onDone={() => { selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} />
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: Math.max(28, (priceCursor?.y ?? 88) - 16) }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
@@ -3011,6 +3142,7 @@ export function MarketChart({
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions" style={{ left: drawingActions.x, top: drawingActions.y }}>
+          <button type="button" aria-label="Drawing settings" onClick={()=>{const item=drawingManager.current?.getSelectedDrawing();if(item&&!item.options.locked)setEditingDrawing({id:item.id,study:false,value:item.options as DrawingPresentation});}}><Settings2 size={19}/></button>
           <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
           <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
         </div>}

@@ -7,7 +7,7 @@ import { studyDefaults } from '../../lib/indicator-catalog';
 import { psbbAnalysis } from '../../lib/psbb';
 
 const seconds = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400, '1D': 86400 };
-const config = { ...studyDefaults('psbb'), inputs: { ...studyDefaults('psbb').inputs, length: 2, left: 1 } };
+const config = { ...studyDefaults('psbb'), inputs: { ...studyDefaults('psbb').inputs, length: 2, left: 1, oversold: 1, overbought: 99 } };
 const pattern = [[110, 90, 108], [120, 95, 100], [130, 100, 110], [125, 99, 105], [118, 90, 94], [122, 96, 115], [116, 94, 100], [112, 85, 88], [110, 85, 95]];
 
 function Fixture({ view }) {

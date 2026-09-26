@@ -1,9 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { psbbSetups, psbbPlots, psbbAnalysis, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
+import { psbbSetups, psbbPlots, psbbAnalysis, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
 
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
+
+test('a newer D1 replaces old chart levels without deleting the trade ledger', () => {
+  const old = { firstTime: 3, secondTime: 8, status: 'failed' };
+  const analysis = { setups: [old], anchors: [{ time: 12, side: 'short' }] };
+  assert.equal(currentPsbbSetup(analysis), undefined);
+  assert.equal(analysis.setups[0], old);
+  const pending = { firstTime: 12, secondTime: 18, status: 'active' };
+  analysis.setups.push(pending);
+  assert.equal(currentPsbbSetup(analysis), pending);
+});
+
+test('opposite threshold replaces pending D1 symmetrically, never reviving the earlier setup', () => {
+  for (const inverse of [false,true]) {
+    const candles=flat(18);
+    candles[3]=bar(3,112,95,100);candles[6]=bar(6,130,110,125);
+    candles[9]=bar(9,120,100,110);candles[12]=bar(12,140,112,125);
+    const momentum=Array(18).fill(50);momentum[3]=20;momentum[6]=80;momentum[12]=65;
+    const bars=inverse?candles.map(c=>({...c,high:250-c.low,low:250-c.high,open:250-c.open,close:250-c.close})):candles;
+    const result=psbbSetups(bars,inverse?momentum.map(r=>100-r):momentum,{left:1});
+    assert.equal(result.length,1);assert.equal(result[0].firstTime,6);
+    assert.equal(result[0].side,inverse?'long':'short');
+    assert.equal(result[0].shifted,false);
+  }
+});
 
 test("positive divergence has no entry until price closes through the high between the two lows", () => {
   const candles = flat(20);

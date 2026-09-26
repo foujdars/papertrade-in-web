@@ -10,8 +10,33 @@ import {holdingPerformance} from '../lib/holding-performance.ts';
 import {readFile} from 'node:fs/promises';
 import { layoutDrawingLabels } from '../lib/drawing-label-layout.ts';
 import { EXTRA_DRAWING_TOOLS } from '../lib/drawing-extras.ts';
+import { studyLinePoints, drawingTextPosition } from '../lib/study-pane-drawings.ts';
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
+
+test('indicator trend lines are finite unless explicitly extended in either direction',()=>{
+ assert.deepEqual(studyLinePoints('trend-line',100,500,200,450,400,400,200),{x1:100,y1:500,x2:200,y2:450});
+ assert.deepEqual(studyLinePoints('trend-line',200,450,100,500,400,400,200,{extendRight:true}),{x1:100,y1:500,x2:400,y2:350});
+ assert.deepEqual(studyLinePoints('trend-line',100,500,200,450,400,400,200,{extendLeft:true}),{x1:0,y1:550,x2:200,y2:450});
+ for(const vertical of ['above','middle','below'])for(const horizontal of ['left','center','right']){
+  const p=drawingTextPosition({x:100,y:450},{x:200,y:500},{textVertical:vertical,textHorizontal:horizontal});
+  assert.equal(p.x,{left:104,center:150,right:196}[horizontal]);
+  assert.equal(p.y,{above:443,middle:479,below:515}[vertical]);
+ }
+});
+
+test('main-chart labels and rectangle extensions persist through serialization',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const type of ['trend-line','horizontal-line','rectangle']){
+  const item=registry.createDrawing(type,'labelled',[{time:1,price:100},{time:2,price:90}],{}, {visible:true,extendLeft:false,extendRight:false,text:'My level',textVertical:'below',textHorizontal:'right'});
+  let geometry=item.computeGeometry(viewport);
+  const text=geometry.find(g=>g.type==='text'&&g.text==='My level');assert.ok(text);assert.equal(text.align,'right');
+  item.updateOptions({extendLeft:true,extendRight:true});geometry=item.computeGeometry(viewport);
+  if(type==='rectangle'){const rect=geometry.find(g=>g.type==='rectangle');assert.equal(rect.topLeft.x,0);assert.equal(rect.width,400);}
+  const saved=item.toJSON(), restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);
+  assert.deepEqual(restored.computeGeometry(viewport),geometry);
+ }
+});
 
 test('position drawings use actual anchor width, numeric per-unit values, distinct zones and serializable edits',()=>{
  const registry=createChartDrawingRegistry(drawing,()=>candles);
@@ -96,7 +121,7 @@ test('drawing mode uses a centre dot without a guidance banner and chart footer 
  const source=await readFile(new URL('../components/MarketChart.tsx',import.meta.url),'utf8');
  assert.match(source,/className="drawing-crosshair"/);assert.doesNotMatch(source,/className="chart-placement-hint"/);
  const dashboard=await readFile(new URL('../components/TradingDashboard.tsx',import.meta.url),'utf8');
- assert.match(dashboard,/activeNavigationSection === "trade" && <div className="chart-trade-footer permanent-trade-footer"/);
+ assert.match(dashboard,/activeNavigationSection === "trade" && !replayOnChart && <div className="chart-trade-footer permanent-trade-footer"/);
  const tools=await readFile(new URL('../lib/chart-drawing-tools.ts',import.meta.url),'utf8');
  assert.doesNotMatch(tools,/fillRect\(x-offset/);
 });

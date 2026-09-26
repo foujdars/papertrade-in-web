@@ -76,7 +76,7 @@ function realCandles() {
 }
 test('scanner evaluates all closed candles, omits forming bars, and uses highest swing + 1R', () => {
   const candles = realCandles(), end = candles.at(-1).time + 60;
-  const run = (now) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', candles, { length: 2, left: 1 }, now * 1000);
+  const run = (now) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', candles, { length: 2, left: 1, oversold: 1, overbought: 99 }, now * 1000);
   assert.equal(run(end - 1).counts.active, 0);
   const report = run(end);
   assert.equal(report.counts.active, 1);
@@ -88,7 +88,7 @@ test('scanner evaluates all closed candles, omits forming bars, and uses highest
 test('1R success is final, stop/target same-bar is failed, and next-month prices cannot alter past results', () => {
   const candles = realCandles();
   const next = candles.at(-1).time + 60;
-  const run = (data, now = (next + 300) * 1000) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', data, { length: 2, left: 1 }, now);
+  const run = (data, now = (next + 300) * 1000) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', data, { length: 2, left: 1, oversold: 1, overbought: 99 }, now);
   assert.equal(run([...candles, bar(next, 110, 45, 48)]).counts.success, 1);
   assert.equal(run([...candles, bar(next, 135, 45, 80)]).counts.failed, 1);
   const future = bar(epoch('2026-10-01T09:15:00+05:30'), 110, 45, 48);

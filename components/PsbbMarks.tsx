@@ -6,7 +6,7 @@ import type { Candle } from "@/lib/market";
 import type { StudyConfig } from "@/lib/indicator-catalog";
 import { studyDefaults } from "@/lib/indicator-catalog";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
-import { psbbAnalysis, PSBB_TIMEFRAMES } from "@/lib/psbb";
+import { psbbAnalysis, currentPsbbSetup, PSBB_TIMEFRAMES } from "@/lib/psbb";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
@@ -33,7 +33,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   // invalidates this calculation without recalculating on every forming tick.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const analysis = useMemo(() => allowed ? psbbAnalysis(candles, inputs, timeframe) : { setups: [], anchors: [] }, [allowed, candles, inputs, stamp, timeframe]);
-  const setup = analysis.setups.at(-1);
+  const setup = currentPsbbSetup(analysis);
   useEffect(() => {
     let frame = 0;
     const refresh = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; redraw((value) => value + 1); }); };

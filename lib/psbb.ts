@@ -29,6 +29,12 @@ export type PsbbSetup = {
   extended: boolean;
 };
 
+// The chart follows the newest D1, while statistics retain all entered trades.
+export function currentPsbbSetup(analysis: { setups: PsbbSetup[]; anchors: PsbbAnchor[] }) {
+  const setup = analysis.setups.at(-1);
+  return setup && !analysis.anchors.some(anchor => anchor.time > setup.firstTime) ? setup : undefined;
+}
+
 const rma = (values: number[], length: number) => {
   const alpha = 1 / length;
   let state = Number.NaN;
@@ -104,6 +110,13 @@ function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, num
   for (let index = 0; index < last; index += 1) {
     const bar = candles[index];
     for (const setup of setups) updateOutcome(setup, bar);
+    // The latest opposite threshold crossing owns the pending setup. Entered
+    // trades remain in the outcome ledger, but an obsolete D1 cannot trigger.
+    const previousRsi = momentum[index - 1], currentRsi = momentum[index];
+    if (Number.isFinite(previousRsi) && Number.isFinite(currentRsi)) {
+      if (previousRsi <= overbought && currentRsi > overbought) delete episodes.long;
+      if (previousRsi >= oversold && currentRsi < oversold) delete episodes.short;
+    }
     const confirmed = index - span;
     for (const kind of ["low", "high"] as const) {
       if (isPivot(candles, kind, confirmed, span)) pivots[kind].push(confirmed);
