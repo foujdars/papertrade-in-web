@@ -10,7 +10,7 @@ import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
-import { createChartDrawingRegistry } from "@/lib/chart-drawing-tools";
+import { createChartDrawingRegistry, positionLineIndex } from "@/lib/chart-drawing-tools";
 import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
@@ -1707,7 +1707,7 @@ export function MarketChart({
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
-              return hit.getControlPoints(viewport).find((control) => pointDistance(point, control) <= 18)?.index ?? null;
+              return positionLineIndex(hit as unknown as Parameters<typeof positionLineIndex>[0], point) ?? hit.getControlPoints(viewport).find((control) => pointDistance(point, control) <= 18)?.index ?? null;
             })(),
             start,
             originalAnchors: hit.anchors.map((anchor) => ({ ...anchor })),

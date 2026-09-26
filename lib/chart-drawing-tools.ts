@@ -16,14 +16,33 @@ function centerPositionAnchors(type: string, center: Anchor, source: VolumeCandl
   const gaps = times.slice(1).map((value, index) => value - times[index]).filter((gap) => gap > 0).sort((a, b) => a - b);
   const step = gaps[Math.floor(gaps.length / 2)] || (time > 10_000 ? 86_400 : 1);
   const half = step * 6;
-  const risk = Math.abs(price) * 0.015 || 1;
+  const risk = Math.abs(price) * 0.01 || 1;
+  const reward = risk * 2;
   const long = type === "long-position";
   const at = (offset: number) => (Number.isFinite(time) ? time + offset : center.time) as Anchor["time"];
   return [
     { time: at(0), price },
     { time: at(-half), price: price + (long ? -risk : risk) },
-    { time: at(half), price: price + (long ? risk * 2 : -risk * 2) },
+    { time: at(half), price: price + (long ? reward : -reward) },
   ];
+}
+
+export function positionLineIndex(drawing: { type?: string; getViewport?: () => Viewport | null; getControlPoints: (viewport: Viewport) => ControlPoint[]; computeGeometry: (viewport: Viewport) => Geometry[] }, point: Point) {
+  if (drawing.type !== "long-position" && drawing.type !== "short-position") return null;
+  const viewport = drawing.getViewport?.() ?? null;
+  if (!viewport) return null;
+  const lines = drawing.computeGeometry(viewport).filter((item): item is Geometry & { start: Point; end: Point } => item.type === "line");
+  let best: { index: number; distance: number } | null = null;
+  for (const control of drawing.getControlPoints(viewport)) {
+    const line = lines.find((item) => Math.abs(item.start.y - control.y) < 0.5);
+    if (!line) continue;
+    const left = Math.min(line.start.x, line.end.x) - 10;
+    const right = Math.max(line.start.x, line.end.x) + 10;
+    if (point.x < left || point.x > right) continue;
+    const distance = Math.abs(point.y - control.y);
+    if (distance <= 18 && (!best || distance < best.distance)) best = { index: control.index, distance };
+  }
+  return best?.index ?? null;
 }
 
 export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
@@ -105,8 +124,13 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     constructor(type: string,id:string,anchors:Anchor[]=[],style:Partial<DrawingStyle>={},options:Partial<DrawingOptions>={}) { super(id,anchors.length===1?centerPositionAnchors(type,anchors[0],candles()):anchors,style,options); this.type=type; }
     setAnchors(anchors: Anchor[]) { super.setAnchors(anchors.length===1?centerPositionAnchors(this.type,anchors[0],candles()):anchors); }
     updateAnchor(index: number, anchor: Anchor) {
-      const current=this.anchors[index]; if(!current) return;
-      this.setAnchors(this.anchors.map((item,itemIndex)=>itemIndex===index?{...item,price:anchor.price}:item));
+      if (index === 0 && this.anchors[0]) {
+        const delta = anchor.price - this.anchors[0].price;
+        this.setAnchors(this.anchors.map((item) => ({ ...item, price: item.price + delta })));
+        return;
+      }
+      if (!this.anchors[index]) return;
+      this.setAnchors(this.anchors.map((item, itemIndex) => itemIndex === index ? { ...item, price: anchor.price } : item));
     }
     isValid() { return this.anchors.length >= 3; }
     getControlPoints(viewport: Viewport): ControlPoint[] {

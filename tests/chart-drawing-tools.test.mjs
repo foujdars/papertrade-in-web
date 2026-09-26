@@ -34,13 +34,15 @@ test('a position click is the centre and each price line moves on its own',()=>{
  assert.equal(item.anchors[0].time,2); assert.equal(item.anchors[0].price,100);
  assert.ok(item.anchors[1].time<2&&item.anchors[2].time>2);
  assert.ok(item.anchors[1].price<100&&item.anchors[2].price>100);
+ const freshRisk=item.anchors[0].price-item.anchors[1].price, freshReward=item.anchors[2].price-item.anchors[0].price;
+ assert.ok(Math.abs(freshReward/freshRisk-2)<1e-9);
  item.setAnchors([{time:2,price:100}]);
  assert.equal(item.anchors[0].time,2); assert.equal(item.anchors.length,3);
  item.updateAnchor(1,{time:9,price:90});
  assert.equal(item.anchors[1].price,90); assert.notEqual(item.anchors[1].time,9);
  item.updateAnchor(0,{time:4,price:101}); item.updateAnchor(2,{time:0,price:120});
  assert.equal(item.anchors[0].price,101); assert.equal(item.anchors[0].time,2);
- assert.equal(item.anchors[2].price,120); assert.equal(item.anchors[1].price,90);
+ assert.equal(item.anchors[2].price,120); assert.equal(item.anchors[1].price,91);
  const points=item.getControlPoints(viewport);
  assert.equal(points.length,3); assert.equal(points[0].x,points[1].x); assert.equal(points[1].x,points[2].x);
  const short=registry.createDrawing('short-position','short',[{time:2,price:100}],{},{visible:true});
