@@ -27,10 +27,11 @@ test('indicator trend lines are finite unless explicitly extended in either dire
 
 test('main-chart labels and rectangle extensions persist through serialization',()=>{
  const registry=createChartDrawingRegistry(drawing,()=>candles);
- for(const type of ['trend-line','horizontal-line','rectangle']){
+ for(const type of ['trend-line','horizontal-line','vertical-line','rectangle']){
   const item=registry.createDrawing(type,'labelled',[{time:1,price:100},{time:2,price:90}],{}, {visible:true,extendLeft:false,extendRight:false,text:'My level',textVertical:'below',textHorizontal:'right'});
   let geometry=item.computeGeometry(viewport);
   const text=geometry.find(g=>g.type==='text'&&g.text==='My level');assert.ok(text);assert.equal(text.align,'right');
+  if(type==='vertical-line'){assert.equal(item.verticalLineOptions.showTime,false);assert.ok(text.position.y>0&&text.position.y<viewport.height);}
   item.updateOptions({extendLeft:true,extendRight:true});geometry=item.computeGeometry(viewport);
   if(type==='rectangle'){const rect=geometry.find(g=>g.type==='rectangle');assert.equal(rect.topLeft.x,0);assert.equal(rect.width,400);}
   const saved=item.toJSON(), restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);

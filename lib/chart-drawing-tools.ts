@@ -56,6 +56,11 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     getAll() { return [...entries.values()]; },
     createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
       const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      if (type === 'vertical-line' && 'setVerticalLineOptions' in item && typeof item.setVerticalLineOptions === 'function') {
+        // The native default prints raw Unix seconds. User text is rendered
+        // separately below, including for drawings restored from older builds.
+        item.setVerticalLineOptions({ showTime: false, showLabel: false });
+      }
       // Some native tools serialize their original constructor options after
       // edited options, which would silently undo extension changes on reload.
       const originalJSON = item.toJSON.bind(item);
@@ -74,10 +79,11 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: right - left };
         });
         if (presentation.text) {
-          const points: Point[] = item.anchors.flatMap(anchor => {const x=viewport.timeScale.timeToCoordinate(anchor.time),y=viewport.priceScale.priceToCoordinate(anchor.price);return x===null||y===null?[]:[{x:Number(x),y:Number(y)}];});
+          const points: Point[] = item.anchors.flatMap(anchor => {const x=viewport.timeScale.timeToCoordinate(anchor.time),y=type==='vertical-line'?0:viewport.priceScale.priceToCoordinate(anchor.price);return x===null||y===null?[]:[{x:Number(x),y:Number(y)}];});
           if (points.length) {
             const a = {...points[0]}, b = {...points.at(-1)!};
             if (type === 'horizontal-line') { a.x=0; b.x=viewport.width; }
+            if (type === 'vertical-line') { a.y=20; b.y=viewport.height-24; }
             const label = drawingTextPosition(a,b,presentation);
             geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
           }
@@ -99,7 +105,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         // Preserve specialized shapes (arrowheads, channels, risk/reward, etc.)
         // while normalizing their canvas units and transparent label treatment.
         item.paneViews=()=>nativeViews().map(view=>({zOrder:()=>view.zOrder?.()??"normal",renderer:()=>({draw:target=>target.useMediaCoordinateSpace(scope=>{
-          const viewport=item.getViewport();if(!viewport)return;
+          const viewport=item.getViewport();if(!viewport||!item.options.visible||!item.isValid())return;
           scope.context.save();scope.context.beginPath();scope.context.rect(0,0,viewport.width,viewport.height);scope.context.clip();
           let labelBox=false;
           const labels: DrawingLabel[] = [];
@@ -119,6 +125,13 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
             set(ctx,key,value){return Reflect.set(ctx,key,key==="font"?readableFont():value);},
           });
           view.renderer()?.draw({useBitmapCoordinateSpace:callback=>callback({context,horizontalPixelRatio:1,verticalPixelRatio:1,bitmapSize:scope.mediaSize,mediaSize:scope.mediaSize}),useMediaCoordinateSpace:callback=>callback({...scope,context})} as Parameters<NonNullable<ReturnType<IPrimitivePaneView["renderer"]>>["draw"]>[0]);
+          // Native renderers such as VerticalLine draw anchors directly and
+          // ignore text in computeGeometry. Paint our text explicitly once.
+          const text = (item.options as DrawingPresentation).text;
+          if (text && !labels.some(label => label.text === text)) {
+            const label = item.computeGeometry(viewport).find(shape => shape.type === 'text' && shape.text === text);
+            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:plotSize?.().dark?'#c4a2ff':item.style.lineColor});
+          }
           paintDrawingLabels(scope.context,labels,viewport.width,viewport.height);
           scope.context.restore();
         })})}));

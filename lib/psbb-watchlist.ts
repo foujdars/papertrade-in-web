@@ -5,7 +5,7 @@ export const TRADING_WATCHLIST_ID = 'psbb-trading';
 export const TRADING_TIMEFRAMES = ['1m', '5m', '15m', '1H', '4H'] as const;
 export type TradingTimeframe = typeof TRADING_TIMEFRAMES[number];
 export type TradingStatus = 'pending' | 'active' | 'failed' | 'success';
-export const PSBB_SCAN_VERSION = 'opposite-threshold-reset-1r-v2';
+export const PSBB_SCAN_VERSION = 'rsi-excursion-peak-d1-1r-v3';
 export const FRAME_SECONDS: Record<TradingTimeframe, number> = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400 };
 const DAY = 86400, IST = 19800;
 export type TradingSetup = { id: string; status: TradingStatus; setup: PsbbSetup };

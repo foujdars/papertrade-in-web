@@ -8,6 +8,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await chromium.launch({headless:true});try{
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{window.qaCanvasText=new Set();const fill=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.qaCanvasText.add(String(text));return fill.call(this,text,...args);};});
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaCandles?.data().length>300);
  await page.evaluate(()=>{window.qaIndicators({rsi:true});window.qaMagnet(true);});await page.waitForFunction(()=>window.qaStudies?.bundles.some(b=>b.id==='rsi'));await page.waitForTimeout(250);
  const points=await page.evaluate(()=>{const chart=window.qaChart,s=window.qaStudies.bundles.find(b=>b.id==='rsi').series[0],bounds=document.querySelector('.lightweight-chart').getBoundingClientRect();let top=0;for(let i=0;i<s.getPane().paneIndex();i++)top+=chart.panes()[i].getHeight();const data=s.data();return [data.at(-20),data.at(-10)].map(p=>({...p,x:bounds.left+chart.timeScale().timeToCoordinate(p.time),y:bounds.top+top+s.priceToCoordinate(p.value)}));});
@@ -45,6 +46,20 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await page.touchscreen.tap(host.x+100,host.y+160);
  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('papertrade-study-drawings:NSE_EQ|TEST')).length===2);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('papertrade-study-drawings:NSE_EQ|TEST'))[1].studyId),'rsi');
+ // Exercise the real native vertical-line renderer: geometry-only tests miss
+ // renderers that paint anchor timestamps directly and ignore custom text.
+ await page.mouse.move(host.x+150,host.y+200);await page.evaluate(()=>window.qaTool('vertical-line'));
+ await page.waitForFunction(()=>!document.querySelector('.drawing-crosshair').hidden);
+ await page.touchscreen.tap(host.x+100,host.y+160);
+ await page.waitForFunction(()=>window.qaManager.getAllDrawings().some(d=>d.type==='vertical-line'));
+ const verticalTime=await page.evaluate(()=>String(window.qaManager.getAllDrawings().find(d=>d.type==='vertical-line').anchors[0].time));
+ assert.equal(await page.evaluate(time=>window.qaCanvasText.has(time),verticalTime),false);
+ await page.getByRole('button',{name:'Drawing settings',exact:true}).click();
+ await page.getByLabel('Drawing text').fill('My D1 peak');await page.getByLabel('Text position').selectOption('middle');await page.getByRole('button',{name:'Apply',exact:true}).click();
+ await page.waitForFunction(()=>window.qaCanvasText.has('My D1 peak'));
+ await page.screenshot({path:'outputs/vertical-line-text-verified.png'});
+ await page.reload();await page.waitForFunction(()=>window.qaCanvasText.has('My D1 peak'));
+ assert.equal(await page.evaluate(time=>window.qaCanvasText.has(time),verticalTime),false);
  assert.deepEqual(errors,[]);console.log('RSI: dot-value readout, magnet, remote first/second-point confirmation, finite trend, text/settings and persistence pass.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

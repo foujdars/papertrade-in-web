@@ -89,17 +89,31 @@ function updateOutcome(setup: PsbbSetup, bar: Bar) {
   }
 }
 
-type Episode = { first: number; extreme: number; pushes: number; setup?: PsbbSetup; structure?: number };
+type Episode = {
+  first: number; extreme: number; pushes: number; setup?: PsbbSetup; structure?: number;
+  visit?: { start: number; peak: number; reference?: number; divergent: boolean };
+};
+
+function moveD1(episode: Episode, index: number) {
+  episode.first = index;
+  episode.extreme = index;
+  episode.pushes = 0;
+  episode.setup = undefined;
+  episode.structure = undefined;
+}
 
 /**
- * D1 is the first strict RSI threshold crossing, not a price pivot. Divergence
- * tracks a new extreme relative to D1. A newer extreme replaces a pending one.
+ * A threshold crossing starts a visit; D1 follows its RSI peak (>70) or trough
+ * (<30), never the first crossing by default. A later visit is checked against
+ * D1 before replacing it: price HH + RSI LH (or LL + HL) preserves the reference
+ * for D2. A non-divergent visit becomes the new D1. After divergence is already
+ * established, a fresh threshold visit starts a fresh setup, not a stale one.
  * Swings become usable only after `left` closed candles on BOTH sides. Case A
  * uses the most recent opposite swing strictly between D1 and the extreme;
  * Case B waits for the first opposite swing after it. Only a subsequent close
  * through that level confirms MSS. The final (still-forming) candle is excluded.
  */
-function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false) {
+export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false) {
   const last = Math.max(0, candles.length - (allCandlesClosed ? 0 : 1));
   const span = Math.max(1, Math.floor(inputs.left || 3));
   const oversold = inputs.oversold ?? 30;
@@ -127,9 +141,33 @@ function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, num
       const crossed = Number.isFinite(previous) && Number.isFinite(current) && (long
         ? previous >= oversold && current < oversold
         : previous <= overbought && current > overbought);
-      if (!episodes[side] && crossed) episodes[side] = { first: index, extreme: index, pushes: 0 };
+      if (crossed) {
+        const prior = episodes[side];
+        if (!prior || prior.setup) episodes[side] = { first: index, extreme: index, pushes: 0, visit: { start: index, peak: index, divergent: false } };
+        else prior.visit = { start: index, peak: index, reference: prior.first, divergent: false };
+      }
       const episode = episodes[side];
       if (!episode) continue;
+      const inZone = Number.isFinite(current) && (long ? current < oversold : current > overbought);
+      const visit = episode.visit;
+      if (visit && inZone) {
+        if (long ? current < momentum[visit.peak] : current > momentum[visit.peak]) visit.peak = index;
+        // RSI equal/higher highs (equal/lower lows for bullish) cannot be
+        // divergence. Promote this visit and keep following its RSI extreme.
+        if (visit.reference !== undefined && (long
+          ? momentum[visit.peak] <= momentum[visit.reference]
+          : momentum[visit.peak] >= momentum[visit.reference])) visit.reference = undefined;
+        if (visit.reference === undefined) {
+          if (episode.first !== visit.peak) moveD1(episode, visit.peak);
+        } else if (long
+          ? bar.low < candles[visit.reference].low && current > momentum[visit.reference]
+          : bar.high > candles[visit.reference].high && current < momentum[visit.reference]) visit.divergent = true;
+      } else if (visit && Number.isFinite(current)) {
+        // Finish the visit only on a closed bar outside the threshold zone.
+        // If it produced no price/RSI divergence, do not keep an obsolete D1.
+        if (visit.reference !== undefined && !visit.divergent) moveD1(episode, visit.peak);
+        episode.visit = undefined;
+      }
       const makesExtreme = long ? bar.low < candles[episode.extreme].low : bar.high > candles[episode.extreme].high;
       if (makesExtreme) {
         episode.extreme = index;
@@ -199,13 +237,13 @@ function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, num
 }
 
 export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
-  return scanPsbb(candles, momentum, inputs).setups;
+  return psbbAnalysisFromRsi(candles, momentum, inputs).setups;
 }
 
 export function psbbAnalysis(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string, allCandlesClosed = false) {
   if (timeframe && !PSBB_TIMEFRAMES.some((allowed) => allowed === timeframe)) return { setups: [], anchors: [] };
   const momentum = rsi(candles.map((bar) => bar.close), Math.max(2, inputs.length || 14));
-  return scanPsbb(candles, momentum, inputs, allCandlesClosed);
+  return psbbAnalysisFromRsi(candles, momentum, inputs, allCandlesClosed);
 }
 
 export function psbbPlots(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {

@@ -1,9 +1,59 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { psbbSetups, psbbPlots, psbbAnalysis, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
+import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
 
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
+
+for (const inverse of [false, true]) {
+  const analyze = (candles, momentum, closed = true) => psbbAnalysisFromRsi(
+    inverse ? candles.map(c=>({...c,high:300-c.low,low:300-c.high,open:300-c.open,close:300-c.close})) : candles,
+    inverse ? momentum.map(value=>100-value) : momentum, { left: 1 }, closed);
+  const side = inverse ? 'bullish' : 'bearish';
+  test(`${side}: D1 follows the RSI excursion extreme, then D2 uses the intervening structure`, () => {
+    const candles = flat(18), momentum = Array(18).fill(55);
+    candles[2]=bar(2,125,118);momentum[2]=71;
+    candles[3]=bar(3,130,121);momentum[3]=84;
+    candles[4]=bar(4,128,120);momentum[4]=77;
+    candles[5]=bar(5,127,115);candles[6]=bar(6,126,105);candles[7]=bar(7,128,118);
+    candles[8]=bar(8,140,125);momentum[8]=78;
+    candles[9]=bar(9,138,123);momentum[9]=73;
+    const before=analyze(candles.slice(0,8),momentum.slice(0,8));
+    assert.equal(before.anchors[0].time,3);assert.equal(before.anchors[0].rsi,inverse?16:84);
+    const setup=analyze(candles.slice(0,13),momentum.slice(0,13)).setups.at(-1);
+    assert.equal(setup.firstTime,3);assert.equal(setup.secondTime,8);
+    assert.equal(setup.entryTime,6);assert.equal(setup.entry,inverse?195:105);
+    assert.equal(setup.structureCase,'before');assert.equal(setup.shifted,false);
+    // Same chart, later excursion: retire the old pending setup and move D1
+    // to this visit's RSI extreme, even though its price is below the old D2.
+    candles[14]=bar(14,134,122);momentum[14]=72;
+    candles[15]=bar(15,138,125);momentum[15]=80;
+    candles[16]=bar(16,136,120);momentum[16]=69;
+    const fresh=analyze(candles,momentum);
+    assert.equal(fresh.anchors[0].time,15);assert.equal(fresh.setups.length,0);
+  });
+  test(`${side}: an unqualified later excursion replaces D1 instead of keeping a stale reference`, () => {
+    const candles=flat(13), momentum=Array(13).fill(55);
+    candles[1]=bar(1,125,118);momentum[1]=72;
+    candles[2]=bar(2,130,122);momentum[2]=86;
+    candles[3]=bar(3,128,120);momentum[3]=78;
+    candles[6]=bar(6,122,115);momentum[6]=72;
+    candles[7]=bar(7,125,118);momentum[7]=79;
+    candles[8]=bar(8,124,115);momentum[8]=68;
+    const result=analyze(candles.slice(0,10),momentum.slice(0,10));
+    assert.equal(result.anchors[0].time,7);assert.equal(result.setups.length,0);
+    candles[11]=bar(11,135,125);momentum[11]=66;
+    assert.equal(analyze(candles,momentum).setups.at(-1).firstTime,7);
+  });
+  test(`${side}: a stronger RSI peak replaces D1 and a forming bar cannot move it`, () => {
+    const candles=flat(8), momentum=[55,72,84,75,60,73,89,90];
+    candles[1]=bar(1,124,117);candles[2]=bar(2,130,120);
+    candles[5]=bar(5,133,125);candles[6]=bar(6,140,128);candles[7]=bar(7,145,130);
+    assert.equal(analyze(candles,momentum,false).anchors[0].time,6);
+    assert.equal(analyze(candles,momentum,true).anchors[0].time,7);
+    assert.equal(analyze(candles,momentum,true).setups.length,0);
+  });
+}
 
 test('a newer D1 replaces old chart levels without deleting the trade ledger', () => {
   const old = { firstTime: 3, secondTime: 8, status: 'failed' };
@@ -109,7 +159,7 @@ test('D1 is available for chart marking before divergence and only after its can
 
 for (const long of [false, true]) {
   const name = long ? 'bullish' : 'bearish';
-  test(`${name} Case B keeps D1 at the threshold cross and waits for a new structure`, () => {
+  test(`${name} Case B keeps D1 at the excursion RSI extreme and waits for a new structure`, () => {
     const data = caseB(long);
     const divergence = latest(prefix(data, 6));
     assert.equal(divergence.firstTime, 1);
