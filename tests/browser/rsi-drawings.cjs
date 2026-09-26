@@ -8,7 +8,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await chromium.launch({headless:true});try{
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{window.qaCanvasText=new Set();const fill=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.qaCanvasText.add(String(text));return fill.call(this,text,...args);};});
+ await page.addInitScript(()=>{window.qaCanvasText=new Set();window.qaCanvasPositions=new Map();const fill=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.qaCanvasText.add(String(text));window.qaCanvasPositions.set(String(text),{x:args[0],y:args[1]});return fill.call(this,text,...args);};});
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaCandles?.data().length>300);
  await page.evaluate(()=>{window.qaIndicators({rsi:true});window.qaMagnet(true);});await page.waitForFunction(()=>window.qaStudies?.bundles.some(b=>b.id==='rsi'));await page.waitForTimeout(250);
  const points=await page.evaluate(()=>{const chart=window.qaChart,s=window.qaStudies.bundles.find(b=>b.id==='rsi').series[0],bounds=document.querySelector('.lightweight-chart').getBoundingClientRect();let top=0;for(let i=0;i<s.getPane().paneIndex();i++)top+=chart.panes()[i].getHeight();const data=s.data();return [data.at(-20),data.at(-10)].map(p=>({...p,x:bounds.left+chart.timeScale().timeToCoordinate(p.time),y:bounds.top+top+s.priceToCoordinate(p.value)}));});
@@ -27,7 +27,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  assert.ok(Math.abs(line.a.value-points[0].value)<.001);assert.equal(line.a.time,points[0].time);assert.ok(Math.abs(line.b.value-points[1].value)<.001);
  const drawn=await page.locator('.chart-study-drawings g[clip-path]>line').first().evaluate(el=>({x1:+el.getAttribute('x1'),x2:+el.getAttribute('x2')}));
  assert.ok(drawn.x2-drawn.x1<250,'Trend line ends at its second point');
+ await page.evaluate(()=>{const dock=document.createElement('footer');dock.className='permanent-trade-footer';dock.innerHTML='<button>SELL</button><button>BUY</button>';dock.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:999999;background:white;height:74px';document.querySelector('.terminal-shell').append(dock);});
  await page.getByRole('button',{name:'Drawing settings',exact:true}).click();
+ assert.equal(await page.evaluate(()=>document.activeElement?.tagName),'DIALOG','Opening settings must not focus an input');
+ assert.equal(await page.locator('.permanent-trade-footer').evaluate(e=>getComputedStyle(e).visibility),'hidden');
+ // Simulate Android resize-visual without shrinking the underlying chart.
+ await page.evaluate(()=>{Object.defineProperty(visualViewport,'height',{configurable:true,value:360});Object.defineProperty(visualViewport,'offsetTop',{configurable:true,value:42});visualViewport.dispatchEvent(new Event('resize'));});
+ await page.getByLabel('Drawing text').fill('RSI divergence');
+ const apply=page.getByRole('button',{name:'Apply',exact:true});
+ assert.ok(await apply.evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=42&&r.bottom<=402&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e;}),'Apply stays visible and above the trading row with keyboard open');
+ await page.screenshot({path:'outputs/drawing-settings-keyboard-verified.png'});
+ await page.evaluate(()=>{delete visualViewport.height;delete visualViewport.offsetTop;visualViewport.dispatchEvent(new Event('resize'));});
  await page.getByLabel('Drawing text').fill('RSI divergence');await page.getByLabel('Text position').selectOption('below');await page.getByLabel('Text alignment').selectOption('right');await page.getByLabel('Extend right',{exact:true}).check();await page.getByRole('button',{name:'Apply',exact:true}).click();
  await page.getByText('RSI divergence',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('papertrade-study-drawings:NSE_EQ|TEST'))[0].presentation.extendRight),true);
@@ -60,6 +70,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await page.screenshot({path:'outputs/vertical-line-text-verified.png'});
  await page.reload();await page.waitForFunction(()=>window.qaCanvasText.has('My D1 peak'));
  assert.equal(await page.evaluate(time=>window.qaCanvasText.has(time),verticalTime),false);
+ await page.evaluate(()=>{window.qaChart.priceScale('right').setAutoScale(false);window.qaChart.priceScale('right').setVisibleRange({from:95,to:125});});
+ await page.waitForFunction(()=>{const line=window.qaManager.getAllDrawings().find(d=>d.type==='vertical-line'),bar=window.qaCandles.data().find(c=>c.time===line.anchors[0].time),painted=window.qaCanvasPositions.get('My D1 peak');return painted&&Math.abs(painted.y-(window.qaCandles.priceToCoordinate(bar.close)-8))<1;});
+ await page.evaluate(()=>{window.qaCanvasText.clear();window.qaChart.timeScale().setVisibleLogicalRange({from:0,to:25});});
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert.equal(await page.evaluate(()=>window.qaCanvasText.has('My D1 peak')),false,'Offscreen candle text does not stick to chart edge');
  assert.deepEqual(errors,[]);console.log('RSI: dot-value readout, magnet, remote first/second-point confirmation, finite trend, text/settings and persistence pass.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

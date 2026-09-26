@@ -76,9 +76,8 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       if (!from || !to) return null;
       const ends = studyLinePoints(line.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight, line.presentation);
       const selectedLine = line.id === selectedId;
-      const label = drawingTextPosition(ends ? {x:ends.x1,y:ends.y1} : from,ends ? {x:ends.x2,y:ends.y2} : to,line.presentation);
-      const labelY = Math.max(from.top + 14, Math.min(from.top + from.paneHeight - 6, label.y));
-      const text = line.presentation?.text && <text x={label.x} y={labelY} textAnchor={label.anchor} fill="#8054da" fontSize={12}>{line.presentation.text}</text>;
+      const label = drawingTextPosition(from,to,line.presentation);
+      const text = line.presentation?.text && <text x={label.x} y={label.y} textAnchor={label.anchor} fill="#8054da" fontSize={12}>{line.presentation.text}</text>;
       const clip = `study-clip-${clipPrefix}-${line.id}`;
       const wrap = (shape: React.ReactNode) => <g key={line.id}><defs><clipPath id={clip}><rect x={0} y={from.top} width={width} height={from.paneHeight}/></clipPath></defs><g clipPath={`url(#${clip})`}>{shape}{text}{selectedLine && <>{[from,to].map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="white" stroke="#8054da"/>)}</>}</g></g>;
       if (!ends) {

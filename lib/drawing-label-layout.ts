@@ -1,10 +1,19 @@
-export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number };
+export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number; anchored?: boolean };
 export type LabelBox = { x: number; y: number; width: number; height: number; fontSize: number; text: string; color?: string };
 /** CSS-pixel layout: labels never leave the plot or cover another label in this drawing. */
 export function layoutDrawingLabels(labels: DrawingLabel[], width: number, height: number, measure: (text: string, size: number) => number): LabelBox[] {
   const placed: LabelBox[] = [], padding = 5, top = Math.min(48, height / 5);
   if (width < 24 || height < 24) return placed;
   for (const label of labels) {
+    // User text belongs to its chart point. Clip it instead of relocating it
+    // to an edge or a collision-free row when the candle moves off-screen.
+    if (label.anchored) {
+      const size = label.fontSize ?? 12, w = measure(label.text, size);
+      const offset = label.align === 'center' ? w / 2 : label.align === 'right' || label.align === 'end' ? w : 0;
+      if(label.x < 0 || label.x > width || label.y < 0 || label.y > height) continue;
+      placed.push({text:label.text,x:label.x-offset,y:label.y-size,width:w,height:size+5,fontSize:size,color:label.color});
+      continue;
+    }
     const text = label.text.replaceAll("$", "₹");
     let size = label.fontSize ?? 12;
     while (size > 10 && measure(text, size) > width - padding * 2) size--;

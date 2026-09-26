@@ -18,6 +18,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.getByText('PSBB · D1 marked · Waiting for divergence', { exact: true }).waitFor();
     assert.equal(await page.locator('.chart-psbb-point').textContent(), 'D1');
+    // A pure price-axis change must reproject the label without a time scroll.
+    await page.evaluate(()=>{window.psbbQa.chart.priceScale('right').setVisibleRange({from:80,to:125});});
+    await page.waitForFunction(()=>{const {chart,series,analysis}=window.psbbQa,a=analysis.anchors[0],label=document.querySelector('.chart-psbb-point');return label&&Math.abs(Number(label.getAttribute('y'))-(series.priceToCoordinate(a.price)-8))<1&&Math.abs(Number(label.getAttribute('x'))-chart.timeScale().timeToCoordinate(a.time+19800))<1;});
+    await page.evaluate(()=>window.psbbQa.chart.timeScale().setVisibleLogicalRange({from:0,to:10}));
+    await page.waitForFunction(()=>document.querySelectorAll('.chart-psbb-point').length===0);
+    await page.evaluate(()=>window.psbbQa.chart.timeScale().setVisibleLogicalRange({from:18,to:28}));
+    await page.waitForFunction(()=>document.querySelectorAll('.chart-psbb-point').length===1);
+    await page.evaluate(()=>window.psbbQa.chart.priceScale('right').setVisibleRange({from:200,to:250}));
+    await page.waitForFunction(()=>document.querySelectorAll('.chart-psbb-point').length===0);
     for (const timeframe of ['1m', '5m', '15m', '1H', '4H', '1D']) {
       for (const long of [false, true]) {
         await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 25 });

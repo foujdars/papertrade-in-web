@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type MutableRefObject, type RefObject } from "react";
+import { useLayoutEffect, useId, useMemo, useState, type MutableRefObject, type RefObject } from "react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "@/lib/market";
 import type { StudyConfig } from "@/lib/indicator-catalog";
@@ -17,7 +17,7 @@ function paneTop(chart: IChartApi, index: number) {
 export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRef, studyRenderer }: {
   candles: Candle[];
   chart: IChartApi | null;
-  series: { priceToCoordinate: (price: number) => number | null } | null;
+  series: Pick<ISeriesApi<"Candlestick">, "priceToCoordinate" | "attachPrimitive" | "detachPrimitive"> | null;
   timeframe: string;
   config?: StudyConfig;
   refreshRef: MutableRefObject<(() => void) | null>;
@@ -34,15 +34,19 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const analysis = useMemo(() => allowed ? psbbAnalysis(candles, inputs, timeframe) : { setups: [], anchors: [] }, [allowed, candles, inputs, stamp, timeframe]);
   const setup = currentPsbbSetup(analysis);
-  useEffect(() => {
+  useLayoutEffect(() => {
     let frame = 0;
     const refresh = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; redraw((value) => value + 1); }); };
     refreshRef.current = refresh;
     const scale = chart?.timeScale();
     scale?.subscribeVisibleLogicalRangeChange(refresh);
+    // Price-axis changes do not fire time-range events. A non-rendering series
+    // primitive also follows vertical drags, autoscale and programmatic zoom.
+    const projection = { updateAllViews: refresh };
+    series?.attachPrimitive(projection);
     refresh();
-    return () => { cancelAnimationFrame(frame); scale?.unsubscribeVisibleLogicalRangeChange(refresh); refreshRef.current = null; };
-  }, [refreshRef, chart, stamp, setup?.secondTime, setup?.status]);
+    return () => { series?.detachPrimitive(projection); cancelAnimationFrame(frame); scale?.unsubscribeVisibleLogicalRangeChange(refresh); refreshRef.current = null; };
+  }, [refreshRef, chart, series, stamp, setup?.secondTime, setup?.status]);
   if (!allowed) return <div className="chart-or-note">PSBB divergence is shown on 1m, 5m, 15m, 1H, 4H and 1D</div>;
   if (!chart || !series) return null;
   const shift = timeframe === "1D" ? 0 : 19_800;
@@ -52,12 +56,14 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   for (let pane = 0; pane < paneCount; pane += 1) height += chart.panes()[pane]?.getHeight() ?? 0;
   const xOf = (time: number) => {
     const x = chart.timeScale().timeToCoordinate((time + shift) as UTCTimestamp);
-    return x == null ? null : Math.max(0, Math.min(plotWidth, x));
+    return x;
   };
   const yOf = (price: number) => series.priceToCoordinate(price);
+  const priceHeight = chart.panes()[0]?.getHeight() ?? 0;
+  const visible = (x: number | null, y: number | null) => x !== null && y !== null && x >= 0 && x <= plotWidth && y >= 0 && y <= priceHeight;
   const anchorMarks = analysis.anchors.filter((anchor) => anchor.time !== setup?.firstTime).map((anchor) => {
     const x = xOf(anchor.time), y = yOf(anchor.price);
-    return x === null || y === null ? null : <text key={`${anchor.side}:${anchor.time}`} className="chart-psbb-point" x={Math.max(12, x)} y={y + (anchor.side === "short" ? -8 : 14)}>D1</text>;
+    return x === null || y === null || !visible(x,y) ? null : <text key={`${anchor.side}:${anchor.time}`} className="chart-psbb-point" x={x} y={y + (anchor.side === "short" ? -8 : 14)}>D1</text>;
   });
   if (!setup) return <><div className="chart-or-note">{analysis.anchors.length ? "PSBB · D1 marked · Waiting for divergence" : "PSBB · Waiting for RSI to cross 70 or 30"}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label="PSBB threshold anchors">{anchorMarks}</svg></>;
   const x1 = xOf(setup.firstTime);
@@ -92,8 +98,8 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     {anchorMarks}
     {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
-    {x1 != null && y1 != null && <text className="chart-psbb-point" x={Math.max(12, x1)} y={y1 + (setup.side === "short" ? -8 : 14)}>D1</text>}
-    {x2 != null && y2 != null && <text className="chart-psbb-point" x={Math.max(12, x2)} y={y2 + (setup.side === "short" ? -8 : 14)}>{setup.side === "short" ? "SH" : "SL"}</text>}
+    {x1 != null && y1 != null && visible(x1,y1) && <text className="chart-psbb-point" x={x1} y={y1 + (setup.side === "short" ? -8 : 14)}>D1</text>}
+    {x2 != null && y2 != null && visible(x2,y2) && <text className="chart-psbb-point" x={x2} y={y2 + (setup.side === "short" ? -8 : 14)}>{setup.side === "short" ? "SH" : "SL"}</text>}
     {!setup.shifted && waitingX != null && waitingY != null && <g>
       <line className="chart-psbb-level entry waiting" markerEnd={`url(#${arrowId})`} x1={waitingX} y1={waitingY} x2={plotWidth - 4} y2={waitingY} />
       <text className="chart-psbb-level entry" textAnchor="end" x={plotWidth - 6} y={waitingY - 4}>Entry {setup.entry?.toFixed(2)} · pending</text>

@@ -14,6 +14,20 @@ import { studyLinePoints, drawingTextPosition } from '../lib/study-pane-drawings
 const candles=[{time:1,low:100,high:110,volume:100},{time:2,low:105,high:115,volume:200}];
 const viewport={width:400,height:600,timeScale:{timeToCoordinate:t=>Number(t)*100},priceScale:{priceToCoordinate:p=>600-p*4}};
 
+test('user text stays at its anchor and is hidden instead of sticking to viewport edges',()=>{
+ const measure=text=>text.length*7;
+ const label={text:'D1',x:110,y:120,align:'center',anchored:true};
+ const large=layoutDrawingLabels([label],400,600,measure)[0],small=layoutDrawingLabels([label],200,300,measure)[0];
+ assert.deepEqual(small,large);
+ for(const point of [{x:-20,y:120},{x:410,y:120},{x:110,y:-20},{x:110,y:610}])assert.equal(layoutDrawingLabels([{...label,...point}],400,600,measure).length,0);
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ const line=registry.createDrawing('vertical-line','anchor',[{time:1,price:20}],{},{visible:true,text:'D1',textVertical:'above'});
+ const text=line.computeGeometry(viewport).find(g=>g.type==='text');
+ assert.equal(text.position.y,viewport.priceScale.priceToCoordinate(candles[0].high)-7);
+ const zoom={...viewport,priceScale:{priceToCoordinate:p=>800-p*5}};
+ assert.equal(line.computeGeometry(zoom).find(g=>g.type==='text').position.y,zoom.priceScale.priceToCoordinate(candles[0].high)-7);
+});
+
 test('indicator trend lines are finite unless explicitly extended in either direction',()=>{
  assert.deepEqual(studyLinePoints('trend-line',100,500,200,450,400,400,200),{x1:100,y1:500,x2:200,y2:450});
  assert.deepEqual(studyLinePoints('trend-line',200,450,100,500,400,400,200,{extendRight:true}),{x1:100,y1:500,x2:400,y2:350});

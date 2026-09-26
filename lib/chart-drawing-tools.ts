@@ -79,11 +79,14 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: right - left };
         });
         if (presentation.text) {
-          const points: Point[] = item.anchors.flatMap(anchor => {const x=viewport.timeScale.timeToCoordinate(anchor.time),y=type==='vertical-line'?0:viewport.priceScale.priceToCoordinate(anchor.price);return x===null||y===null?[]:[{x:Number(x),y:Number(y)}];});
+          const points: Point[] = item.anchors.flatMap(anchor => {
+            const candle = type === 'vertical-line' ? candles().find(bar=>bar.time===Number(anchor.time)) : undefined;
+            const price = candle ? presentation.textVertical === 'below' ? candle.low : presentation.textVertical === 'middle' ? candle.close ?? (candle.high+candle.low)/2 : candle.high : anchor.price;
+            const x=viewport.timeScale.timeToCoordinate(anchor.time),y=viewport.priceScale.priceToCoordinate(price);
+            return x===null||y===null?[]:[{x:Number(x),y:Number(y)}];
+          });
           if (points.length) {
             const a = {...points[0]}, b = {...points.at(-1)!};
-            if (type === 'horizontal-line') { a.x=0; b.x=viewport.width; }
-            if (type === 'vertical-line') { a.y=20; b.y=viewport.height-24; }
             const label = drawingTextPosition(a,b,presentation);
             geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
           }
@@ -118,7 +121,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
               if(key==="stroke")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.stroke,ctx,args);};
               if(key==="fillText")return (text:string,x:number,y:number,maxWidth?:number)=>{
                 const point=baseTransform.inverse().multiply(ctx.getTransform()).transformPoint({x,y});
-                labels.push({text,x:point.x,y:labelBox?point.y-10:point.y,align:ctx.textAlign,color:plotSize?.().dark?"#c4a2ff":item.style.lineColor});
+                labels.push({text,x:point.x,y:labelBox?point.y-10:point.y,align:ctx.textAlign,color:plotSize?.().dark?"#c4a2ff":item.style.lineColor,anchored:text===(item.options as DrawingPresentation).text});
               };
               const value=Reflect.get(ctx,key);return typeof value==="function"?value.bind(ctx):value;
             },
@@ -130,7 +133,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const text = (item.options as DrawingPresentation).text;
           if (text && !labels.some(label => label.text === text)) {
             const label = item.computeGeometry(viewport).find(shape => shape.type === 'text' && shape.text === text);
-            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:plotSize?.().dark?'#c4a2ff':item.style.lineColor});
+            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:plotSize?.().dark?'#c4a2ff':item.style.lineColor,anchored:true});
           }
           paintDrawingLabels(scope.context,labels,viewport.width,viewport.height);
           scope.context.restore();
