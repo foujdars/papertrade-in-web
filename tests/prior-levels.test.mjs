@@ -1,46 +1,48 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { priorHighLows } from "../lib/prior-levels.ts";
+import { priorMarks } from "../lib/prior-levels.ts";
 
 const IST = 19_800;
 const at = (iso) => Math.floor(Date.parse(iso) / 1000) - IST;
-const bar = (iso, high, low) => ({ time: at(iso), high, low, close: (high + low) / 2, open: low, volume: 1 });
+const bar = (iso, high, low, open = low, close = (high + low) / 2) => ({ time: at(iso), high, low, open, close, volume: 1 });
 
-test("daily candles mark the previous day, week and month", () => {
-  const candles = [
-    bar("2026-08-01T09:15:00Z", 80, 70),
-    bar("2026-08-31T09:15:00Z", 100, 60),
-    bar("2026-09-14T09:15:00Z", 120, 90),
-    bar("2026-09-18T09:15:00Z", 140, 95),
-    bar("2026-09-24T09:15:00Z", 130, 88),
-    bar("2026-09-25T09:15:00Z", 150, 100),
-  ];
-  const levels = priorHighLows(candles, "1D", true);
-  assert.equal(levels?.day?.high, 130);
-  assert.equal(levels?.day?.low, 88);
-  assert.equal(levels?.day?.highTime, at("2026-09-24T09:15:00Z"));
-  assert.equal(levels?.day?.lowTime, at("2026-09-24T09:15:00Z"));
-  assert.equal(levels?.week?.high, 140);
-  assert.equal(levels?.week?.low, 90);
-  assert.equal(levels?.week?.highTime, at("2026-09-18T09:15:00Z"));
-  assert.equal(levels?.week?.lowTime, at("2026-09-14T09:15:00Z"));
-  assert.equal(levels?.month?.high, 100);
-  assert.equal(levels?.month?.low, 60);
-  assert.equal(levels?.month?.highTime, at("2026-08-31T09:15:00Z"));
-  assert.equal(levels?.month?.lowTime, at("2026-08-31T09:15:00Z"));
+const candles = [
+  bar("2025-04-01T09:15:00Z", 40, 30, 32, 38),
+  bar("2026-03-31T09:15:00Z", 90, 50, 55, 80),
+  bar("2026-08-01T09:15:00Z", 80, 70, 72, 76),
+  bar("2026-08-31T09:15:00Z", 100, 60, 70, 95),
+  bar("2026-09-14T09:15:00Z", 120, 90, 100, 110),
+  bar("2026-09-18T09:15:00Z", 140, 95, 100, 130),
+  bar("2026-09-24T09:15:00Z", 130, 88, 100, 120),
+  bar("2026-09-25T09:15:00Z", 150, 100, 140, 116),
+];
+
+test("default marks are the previous day, week and month high and low", () => {
+  const marks = priorMarks(candles);
+  const byId = Object.fromEntries(marks.map((mark) => [mark.id, mark]));
+  assert.equal(byId.PDH.price, 130);
+  assert.equal(byId.PDL.price, 88);
+  assert.equal(byId.PDH.time, at("2026-09-24T09:15:00Z"));
+  assert.equal(byId.PWH.price, 140);
+  assert.equal(byId.PWH.time, at("2026-09-18T09:15:00Z"));
+  assert.equal(byId.PWL.price, 90);
+  assert.equal(byId.PMH.price, 100);
+  assert.equal(byId.PML.price, 60);
+  assert.equal(byId.FYH, undefined);
 });
 
-test("a short intraday chart marks yesterday only", () => {
-  const candles = [
-    bar("2026-09-24T09:15:00Z", 130, 90),
-    bar("2026-09-24T15:25:00Z", 128, 92),
-    bar("2026-09-25T09:15:00Z", 140, 100),
-  ];
-  const levels = priorHighLows(candles, "1D", true);
-  assert.equal(levels?.week, null);
-  assert.equal(levels?.month, null);
+test("a day-only high does not draw the week, month or low", () => {
+  const marks = priorMarks(candles, { day: true, week: false, month: false, year: false, custom: 0, high: true, low: false, open: false, close: false });
+  assert.deepEqual(marks.map((mark) => mark.id), ["PDH"]);
 });
 
-test("a yearly chart has no prior day, week or month", () => {
-  assert.equal(priorHighLows([bar("2025-09-25T09:15:00Z", 10, 8), bar("2026-09-25T09:15:00Z", 12, 9)], "1Y", true), null);
+test("financial year and a chosen daily candle can be added", () => {
+  const marks = priorMarks(candles, { day: false, week: false, month: false, year: true, custom: 3, high: true, low: true, open: true, close: true });
+  const byId = Object.fromEntries(marks.map((mark) => [mark.id, mark]));
+  assert.equal(byId.FYH.price, 90);
+  assert.equal(byId.FYL.price, 30);
+  assert.equal(byId.FYO.price, 32);
+  assert.equal(byId.FYC.price, 80);
+  assert.equal(byId["3H"].price, 120);
+  assert.equal(byId["3O"].price, 100);
 });

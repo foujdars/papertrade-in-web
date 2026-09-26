@@ -50,8 +50,8 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
   }
   const groups = favorites.length ? [{ label: "Favorites", values: favorites }, ...timeframeGroups] : timeframeGroups;
   return (
-    <div className="chart-function-backdrop" role="presentation" onPointerDown={onClose}>
-      <section className="chart-function-menu timeframe-menu" role="dialog" aria-modal="true" aria-label="Choose chart timeframe" onPointerDown={(event) => event.stopPropagation()}>
+    <div className="chart-function-backdrop indicator-studio-backdrop timeframe-sheet-backdrop" role="presentation" onPointerDown={onClose}>
+      <section className="chart-function-menu timeframe-menu indicator-studio timeframe-sheet" role="dialog" aria-modal="true" aria-label="Choose chart timeframe" onPointerDown={(event) => event.stopPropagation()}>
         <header><div><Clock3 size={18} /><span><b>Timeframe</b><small>Choose the candle interval</small></span></div><button onClick={onClose} aria-label="Close timeframe selector"><X size={18} /></button></header>
         <div className="timeframe-groups">
           {groups.map(({ label, values }) => (

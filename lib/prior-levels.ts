@@ -1,21 +1,22 @@
 import type { Candle } from "./market";
-import { previousDayLevels } from "./previous-day.ts";
 
 const IST_OFFSET_SECONDS = 19_800;
-const OPEN_MINUTE = 9 * 60 + 15;
-const CLOSE_MINUTE = 15 * 60 + 30;
 
-type Bar = Pick<Candle, "time" | "high" | "low" | "close">;
-export type PriorSpan = { high: number; low: number; highTime: number; lowTime: number };
-export type PriorLevels = { day: PriorSpan | null; week: PriorSpan | null; month: PriorSpan | null };
+type Bar = Pick<Candle, "time" | "open" | "high" | "low" | "close">;
+export type PriorTone = "day" | "week" | "month" | "year" | "custom";
+export type PriorMark = { id: string; label: string; price: number; time: number; tone: PriorTone };
+export type PriorOptions = { day: boolean; week: boolean; month: boolean; year: boolean; custom: number; high: boolean; low: boolean; open: boolean; close: boolean };
+
+const DEFAULTS: PriorOptions = { day: true, week: true, month: true, year: false, custom: 0, high: true, low: true, open: false, close: false };
+
+export function priorOptionsFromInputs(inputs?: Record<string, number>): PriorOptions {
+  if (!inputs || !("day" in inputs)) return DEFAULTS;
+  const on = (key: "day" | "week" | "month" | "year" | "high" | "low" | "open" | "close") => inputs[key] !== 0;
+  return { day: on("day"), week: on("week"), month: on("month"), year: on("year"), custom: Math.max(0, Math.floor(inputs.custom || 0)), high: on("high"), low: on("low"), open: on("open"), close: on("close") };
+}
 
 function istDate(epochSeconds: number) {
   return new Date((epochSeconds + IST_OFFSET_SECONDS) * 1000).toISOString().slice(0, 10);
-}
-
-function istMinutes(epochSeconds: number) {
-  const clock = new Date((epochSeconds + IST_OFFSET_SECONDS) * 1000);
-  return clock.getUTCHours() * 60 + clock.getUTCMinutes();
 }
 
 function addDays(date: string, days: number) {
@@ -31,51 +32,65 @@ function weekStart(date: string) {
   return utc.toISOString().slice(0, 10);
 }
 
-function span(bars: Bar[]): PriorSpan {
-  let highBar = bars[0];
-  let lowBar = bars[0];
-  for (const bar of bars) {
-    if (bar.high > highBar.high) highBar = bar;
-    if (bar.low < lowBar.low) lowBar = bar;
-  }
-  return { high: highBar.high, low: lowBar.low, highTime: highBar.time, lowTime: lowBar.time };
+function previousFinancialYear(today: string) {
+  const [year, month] = today.split("-").map(Number);
+  const endYear = month >= 4 ? year : year - 1;
+  return { start: `${endYear - 1}-04-01`, end: `${endYear}-03-31` };
 }
 
-/** Previous completed day, week and month highs and lows, in IST. A period is used only when the loaded candles start on or before it. */
-export function priorHighLows(candles: Bar[], timeframe: string, session = true): PriorLevels | null {
-  if (timeframe === "1Y") return null;
-  const rows = candles.filter((candle) => [candle.time, candle.high, candle.low, candle.close].every(Number.isFinite));
-  if (rows.length < 2) return null;
-  const today = istDate(rows.at(-1)!.time);
-  const first = istDate(rows[0].time);
-  const intraday = !["1D", "1W", "1M"].includes(timeframe);
-  const source = intraday && session ? rows.filter((candle) => { const minutes = istMinutes(candle.time); return minutes >= OPEN_MINUTE && minutes < CLOSE_MINUTE; }) : rows;
-  const dayLevels = timeframe === "1W" || timeframe === "1M" ? null : previousDayLevels(rows, timeframe, session);
-  const dayBars = dayLevels ? source.filter((candle) => istDate(candle.time) === dayLevels.date) : [];
-  const day = dayBars.length ? span(dayBars) : null;
+function between(rows: Bar[], start: string, end: string) {
+  return rows.filter((candle) => { const date = istDate(candle.time); return date >= start && date <= end; });
+}
 
-  let week: PriorSpan | null = null;
-  let month: PriorSpan | null = null;
-  if (timeframe === "1W") {
-    const current = weekStart(today);
-    const previous = [...source].reverse().find((candle) => istDate(candle.time) < current);
-    week = previous ? span([previous]) : null;
-  } else if (timeframe !== "1M") {
-    const current = weekStart(today);
-    const start = addDays(current, -7);
-    const end = addDays(current, -1);
-    const bars = source.filter((candle) => { const date = istDate(candle.time); return date >= start && date <= end; });
-    if (first <= start && bars.length) week = span(bars);
+function marksFor(prefix: string, tone: PriorTone, bars: Bar[], options: PriorOptions): PriorMark[] {
+  if (!bars.length) return [];
+  const marks: PriorMark[] = [];
+  if (options.high) {
+    const bar = bars.reduce((best, candle) => candle.high > best.high ? candle : best);
+    marks.push({ id: `${prefix}H`, label: `${prefix}H`, price: bar.high, time: bar.time, tone });
   }
-  if (timeframe === "1M") {
-    const previous = source.slice(0, -1).at(-1);
-    month = previous ? span([previous]) : null;
-  } else {
+  if (options.low) {
+    const bar = bars.reduce((best, candle) => candle.low < best.low ? candle : best);
+    marks.push({ id: `${prefix}L`, label: `${prefix}L`, price: bar.low, time: bar.time, tone });
+  }
+  if (options.open) {
+    const bar = bars[0];
+    marks.push({ id: `${prefix}O`, label: `${prefix}O`, price: bar.open, time: bar.time, tone });
+  }
+  if (options.close) {
+    const bar = bars.at(-1)!;
+    marks.push({ id: `${prefix}C`, label: `${prefix}C`, price: bar.close, time: bar.time, tone });
+  }
+  return marks;
+}
+
+/** Levels from daily candles. Each mark keeps the time of the candle that printed it. */
+export function priorMarks(candles: Bar[], options: PriorOptions = DEFAULTS): PriorMark[] {
+  const rows = candles.filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)).slice().sort((a, b) => a.time - b.time);
+  if (rows.length < 2) return [];
+  const today = istDate(rows.at(-1)!.time);
+  const past = rows.filter((candle) => istDate(candle.time) < today);
+  if (!past.length) return [];
+  const marks: PriorMark[] = [];
+  if (options.day) {
+    const date = istDate(past.at(-1)!.time);
+    marks.push(...marksFor("PD", "day", past.filter((candle) => istDate(candle.time) === date), options));
+  }
+  if (options.week) {
+    const start = addDays(weekStart(today), -7);
+    marks.push(...marksFor("PW", "week", between(past, start, addDays(start, 6)), options));
+  }
+  if (options.month) {
     const start = `${addDays(`${today.slice(0, 7)}-01`, -1).slice(0, 7)}-01`;
-    const end = addDays(`${today.slice(0, 7)}-01`, -1);
-    const bars = source.filter((candle) => { const date = istDate(candle.time); return date >= start && date <= end; });
-    if (first <= start && bars.length) month = span(bars);
+    marks.push(...marksFor("PM", "month", between(past, start, addDays(`${today.slice(0, 7)}-01`, -1)), options));
   }
-  if (!day && !week && !month) return null;
-  return { day, week, month };
+  if (options.year) {
+    const year = previousFinancialYear(today);
+    marks.push(...marksFor("FY", "year", between(past, year.start, year.end), options));
+  }
+  if (options.custom > 0) {
+    const bar = past.at(-options.custom);
+    if (bar) marks.push(...marksFor(String(options.custom), "custom", [bar], options));
+  }
+  return marks;
 }
