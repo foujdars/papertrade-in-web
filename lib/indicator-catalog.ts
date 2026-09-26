@@ -72,7 +72,14 @@ export const STUDIES:StudyDefinition[]=[
  make('sar','Parabolic SAR','Trend',true,[num('start','Start',.02,.001,1,.01),num('increment','Increment',.02,.001,1,.01),num('maximum','Maximum',.2,.01,1,.01)]),
  make('pivots','Pivot Points Standard','Price',true,[length(3,'Support/resistance levels','levels')],{note:'Classic pivots from the previous complete IST session. Daily charts use the previous daily candle.'}),
  make('opening-range','Opening Range','Price',true,[],{note:'9:15–9:30 IST high and low, extended to 15:30. Needs a 15-minute chart or lower.'}),
- make('previous-day','Previous day','Price',true,[],{note:'Yesterday’s high, low and close. Tap a label to set a price alert at that level.'}),
+ make('entry','Entry setups','Price',true,[
+  {key:'pullback',label:'Trend pullback',value:1,min:0,max:1,step:1},
+  {key:'level',label:'Prior level break',value:1,min:0,max:1,step:1},
+  {key:'open',label:'Opening range',value:1,min:0,max:1,step:1},
+  {key:'momentum',label:'RSI and MACD',value:1,min:0,max:1,step:1},
+  {key:'squeeze',label:'Bollinger squeeze',value:1,min:0,max:1,step:1},
+  {key:'vwap',label:'VWAP filter',value:1,min:0,max:1,step:1},
+ ],{note:'EMA 21, EMA 50 and session VWAP, with a dot only when an entry rule agrees. Green is long, red is short. The forming candle is not marked.'}),
  make('prior-levels','Prior highs and lows','Price',true,[
   {key:'day',label:'Previous day',value:1,min:0,max:1,step:1},
   {key:'week',label:'Previous week',value:1,min:0,max:1,step:1},
@@ -124,7 +131,7 @@ export type StudyConfig={inputs:Record<string,number>;source:string;smoothing:st
 export const STUDY_COLORS=['#8054da','#e89824','#12a58a','#ec5475','#289cdb','#ac69bb','#536987'];
 export const SOURCES=['close','open','high','low','hl2','hlc3','ohlc4'];
 export const TIMEFRAMES=['1m','3m','5m','15m','30m','1h','1D','1W','1M','1Y'];
-export function studyDefaults(id:string):StudyConfig {const d=STUDIES.find(s=>s.id===id),colors=[...STUDY_COLORS];const primary:Record<string,string>={ema5:'#0ea5e9',ema21:'#ff8a00',ema30:'#22c55e',ema50:'#8b5cf6',ema100:'#f97316',ema200:'#e11d48',sma20:'#14b8a6',sma50:'#64748b',sma200:'#8291aa',vwap:'#d946ef',macd:'#2563eb'};if(primary[id])colors[0]=primary[id];if(['supertrend','volume','net-volume','awesome'].includes(id)){colors[0]='#12a58a';colors[1]='#ec5475';}if(id==='volume')colors[2]='#c69759';return {inputs:Object.fromEntries((d?.fields??[]).map(f=>[f.key,f.value])),source:'close',smoothing:id==='rsi'?'SMA':'None',hidden:false,timeframes:[],colors,width:1,dash:0,showValue:!id.startsWith('ema'),opacity:100};}
+export function studyDefaults(id:string):StudyConfig {const d=STUDIES.find(s=>s.id===id),colors=[...STUDY_COLORS];const primary:Record<string,string>={ema5:'#0ea5e9',ema21:'#ff8a00',ema30:'#22c55e',ema50:'#8b5cf6',ema100:'#f97316',ema200:'#e11d48',sma20:'#14b8a6',sma50:'#64748b',sma200:'#8291aa',vwap:'#d946ef',macd:'#2563eb'};if(primary[id])colors[0]=primary[id];if(['supertrend','volume','net-volume','awesome'].includes(id)){colors[0]='#12a58a';colors[1]='#ec5475';}if(id==='volume')colors[2]='#c69759';if(id==='entry'){colors[0]='#ff8a00';colors[1]='#8b5cf6';colors[2]='#d946ef';colors[3]='#12a58a';colors[4]='#ec5475';}return {inputs:Object.fromEntries((d?.fields??[]).map(f=>[f.key,f.value])),source:'close',smoothing:id==='rsi'?'SMA':'None',hidden:false,timeframes:[],colors,width:1,dash:0,showValue:id==='entry'?false:!id.startsWith('ema'),opacity:100};}
 export function normalizeStudy(id:string,value:unknown):StudyConfig {
  const base=studyDefaults(id),v={...(value&&typeof value==='object'?value:{})} as Partial<StudyConfig>,d=STUDIES.find(s=>s.id===id);
  if(typeof v.showValue!=='boolean')v.showValue=base.showValue;

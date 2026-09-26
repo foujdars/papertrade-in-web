@@ -156,8 +156,6 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         else if(g.type==="text")labels.push({text:g.text,x:g.position.x,y:g.position.y,align:g.align,color:g.color});
       }
       paintDrawingLabels(ctx,labels,size.width,size.height);
-      const box=this.positionBox(viewport);
-      if(box){const x=(box.left+box.end)/2;ctx.beginPath();ctx.arc(x,box.entry.y,7,0,Math.PI*2);ctx.fillStyle=plotSize?.().dark?"#0c142b":"#fff";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=plotSize?.().dark?"#f0b429":"#e39b12";ctx.stroke();}
       if(["selected","editing","hovered"].includes(this.state))for(const p of this.getControlPoints(viewport)){ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#8657d9";ctx.stroke();}
       ctx.restore();
     })})}];}

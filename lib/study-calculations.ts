@@ -1,5 +1,6 @@
 import type { Candle } from './market';
 import { STUDIES, type StudyConfig } from './indicator-catalog.ts';
+import { entryPlots } from './entry-signals.ts';
 export type StudyPlot={name:string;values:number[];histogram?:boolean;colors?:string[];offset?:number;points?:boolean};
 export type StudyResult={plots:StudyPlot[];levels?:number[];range?:[number,number];message?:string};
 const N=Number.NaN;
@@ -136,6 +137,7 @@ export function computeStudy(id:string,data:Candle[],c:StudyConfig,comparison?:C
  case 'klinger':{let trend=1,cm=0,prevDm=0,prevSum=0;const force=data.map((b,i)=>{const total=b.high+b.low+b.close,dm=b.high-b.low,next=total>prevSum?1:-1;cm=i&&next===trend?cm+dm:prevDm+dm;trend=next;prevSum=total;prevDm=dm;return vol[i]*Math.abs(2*(div(dm,cm,0)-1))*trend*100;}),v=zip(E(force,p.fast),E(force,p.slow),(a,b)=>a-b);add('KVO',v);add('Signal',E(v,p.signal));levels=[0];break;}
  case 'asi':{const si=data.map((b,i)=>{if(!i)return 0;const prev=data[i-1],a=Math.abs(b.high-prev.close),d=Math.abs(b.low-prev.close),e=Math.abs(b.high-b.low),f=Math.abs(prev.close-prev.open),r=a>=Math.max(d,e)?a-d/2+f/4:d>=Math.max(a,e)?d-a/2+f/4:e+f/4;return 50*div((b.close-prev.close)+(b.close-b.open)/2+(prev.close-prev.open)/4,r,0)*Math.max(a,d)/p.limit;});add('ASI',cumulative(si));break;}
  case 'sar':{let up=data.length>1?close[1]>=close[0]:true,sar=up?lo[0]:hi[0],extreme=up?hi[0]:lo[0],af=p.start;const vals=close.map((_,i)=>{if(!i)return N;sar+=af*(extreme-sar);sar=up?Math.min(sar,lo[i-1],lo[Math.max(0,i-2)]):Math.max(sar,hi[i-1],hi[Math.max(0,i-2)]);if(up?lo[i]<sar:hi[i]>sar){sar=extreme;up=!up;extreme=up?hi[i]:lo[i];af=p.start;}else if(up?hi[i]>extreme:lo[i]<extreme){extreme=up?hi[i]:lo[i];af=Math.min(p.maximum,af+p.increment);}return sar;});add('SAR',vals,{points:true});break;}
+ case 'entry':{const marks=entryPlots(data,p);add('EMA 21',marks.ema21);add('EMA 50',marks.ema50);add('VWAP',marks.vwap);add('Long',marks.long,{points:true});add('Short',marks.short,{points:true});break;}
  default:return {plots:[],message:'This indicator is not implemented.'};
  }
  return {plots,levels,range,message:plots.length&&plots.every(s=>!s.values.some(Number.isFinite))?'More candle history is needed for these settings.':undefined};
