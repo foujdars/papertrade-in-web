@@ -19,6 +19,7 @@ export type PsbbSetup = {
   target1: number;
   target2: number;
   shifted: boolean;
+  extended: boolean;
 };
 
 const rma = (values: number[], length: number) => {
@@ -82,7 +83,7 @@ function outcome(candles: Bar[], from: number, side: "long" | "short", entry: nu
   return { status: shifted ? "formed" : "active", end: candles.length - 1, shifted };
 }
 
-/** Positive divergence: price lower low, RSI higher low. Negative: price higher high, RSI lower high. Entry is the structure shift. */
+/** Bread and Butter: divergence is not a trade until the swing between the two points breaks. That break is the entry. */
 export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
   const last = Math.max(0, candles.length - 1);
   const span = Math.max(1, inputs.left || 3);
@@ -91,39 +92,48 @@ export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<st
   const firstMultiple = inputs.target1 || 1;
   const secondMultiple = inputs.target2 || 1.5;
   const setups: PsbbSetup[] = [];
-  const blank = (side: "long" | "short", older: number, newer: number, entry = Number.NaN, entryTime = candles[newer].time, stop = Number.NaN, stopTime = candles[newer].time, from = newer) => {
-    const risk = Math.abs(entry - stop);
-    const target1 = Number.isFinite(risk) && risk > 0 ? side === "long" ? entry + firstMultiple * risk : entry - firstMultiple * risk : Number.NaN;
-    const target2 = Number.isFinite(risk) && risk > 0 ? side === "long" ? entry + secondMultiple * risk : entry - secondMultiple * risk : Number.NaN;
-    const result = Number.isFinite(stop) ? outcome(candles, from, side, entry, stop, target1) : { status: "active" as const, end: newer, shifted: false };
-    setups.push({
-      side, status: result.status, shifted: result.shifted,
-      firstTime: candles[older].time, secondTime: candles[newer].time, end: candles[result.end].time,
-      firstPrice: side === "long" ? candles[older].low : candles[older].high,
-      secondPrice: side === "long" ? candles[newer].low : candles[newer].high,
-      firstRsi: momentum[older], secondRsi: momentum[newer],
-      entry, entryTime, stop, stopTime, target1, target2,
-    });
-  };
   const lows = pivotIndexes(candles, "low", span, last);
   const highs = pivotIndexes(candles, "high", span, last);
+  const extended = (indexes: number[], pair: number, down: boolean) => {
+    let count = 2;
+    let cursor = pair;
+    while (cursor > 1 && (down ? candles[indexes[cursor - 2]].low > candles[indexes[cursor - 1]].low : candles[indexes[cursor - 2]].high < candles[indexes[cursor - 1]].high)) {
+      count += 1;
+      cursor -= 1;
+    }
+    return count >= 3;
+  };
+  const add = (side: "long" | "short", older: number, newer: number, entryIndex: number, isExtended: boolean) => {
+    const entry = side === "long" ? candles[entryIndex].high : candles[entryIndex].low;
+    const stop = side === "long" ? candles[newer].low : candles[newer].high;
+    if (!(side === "long" ? entry > stop : stop > entry)) return;
+    const risk = Math.abs(entry - stop);
+    const target1 = side === "long" ? entry + firstMultiple * risk : entry - firstMultiple * risk;
+    const target2 = side === "long" ? entry + secondMultiple * risk : entry - secondMultiple * risk;
+    const result = outcome(candles, newer + span, side, entry, stop, target1);
+    setups.push({
+      side, status: result.status, shifted: result.shifted, extended: isExtended,
+      firstTime: candles[older].time, secondTime: candles[newer].time, end: candles[result.end].time,
+      firstPrice: side === "long" ? candles[older].low : candles[older].high,
+      secondPrice: stop, firstRsi: momentum[older], secondRsi: momentum[newer],
+      entry, entryTime: candles[entryIndex].time, stop, stopTime: candles[newer].time, target1, target2,
+    });
+  };
   for (let pair = 1; pair < lows.length; pair += 1) {
     const older = lows[pair - 1];
     const newer = lows[pair];
-    if (!(candles[newer].low < candles[older].low) || !(momentum[newer] > momentum[older]) || !(Math.min(momentum[older], momentum[newer]) <= oversold)) continue;
-    const entryIndex = highs.find((index) => index > newer);
-    const stopIndex = entryIndex == null ? undefined : lows.find((index) => index > entryIndex && candles[index].low > candles[newer].low);
-    if (entryIndex == null || stopIndex == null) blank("long", older, newer, entryIndex == null ? Number.NaN : candles[entryIndex].high, entryIndex == null ? candles[newer].time : candles[entryIndex].time);
-    else blank("long", older, newer, candles[entryIndex].high, candles[entryIndex].time, candles[stopIndex].low, candles[stopIndex].time, stopIndex + span);
+    const between = highs.filter((index) => index > older && index < newer);
+    if (!between.length || !(candles[newer].low < candles[older].low) || !(momentum[newer] > momentum[older]) || !(Math.min(momentum[older], momentum[newer]) <= oversold)) continue;
+    const entryIndex = between.reduce((best, index) => candles[index].high > candles[best].high ? index : best);
+    add("long", older, newer, entryIndex, extended(lows, pair, true));
   }
   for (let pair = 1; pair < highs.length; pair += 1) {
     const older = highs[pair - 1];
     const newer = highs[pair];
-    if (!(candles[newer].high > candles[older].high) || !(momentum[newer] < momentum[older]) || !(Math.max(momentum[older], momentum[newer]) >= overbought)) continue;
-    const entryIndex = lows.find((index) => index > newer);
-    const stopIndex = entryIndex == null ? undefined : highs.find((index) => index > entryIndex && candles[index].high < candles[newer].high);
-    if (entryIndex == null || stopIndex == null) blank("short", older, newer, entryIndex == null ? Number.NaN : candles[entryIndex].low, entryIndex == null ? candles[newer].time : candles[entryIndex].time);
-    else blank("short", older, newer, candles[entryIndex].low, candles[entryIndex].time, candles[stopIndex].high, candles[stopIndex].time, stopIndex + span);
+    const between = lows.filter((index) => index > older && index < newer);
+    if (!between.length || !(candles[newer].high > candles[older].high) || !(momentum[newer] < momentum[older]) || !(Math.max(momentum[older], momentum[newer]) >= overbought)) continue;
+    const entryIndex = between.reduce((best, index) => candles[index].low < candles[best].low ? index : best);
+    add("short", older, newer, entryIndex, extended(highs, pair, false));
   }
   return setups.sort((a, b) => a.secondTime - b.secondTime).slice(-4);
 }

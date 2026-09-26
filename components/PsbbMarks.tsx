@@ -65,13 +65,13 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   };
   const ry1 = rsiY(setup.firstRsi);
   const ry2 = rsiY(setup.secondRsi);
-  const levels = Number.isFinite(setup.entry) && Number.isFinite(setup.stop) ? [
+  const levels = setup.shifted && Number.isFinite(setup.entry) && Number.isFinite(setup.stop) ? [
     ["SL", setup.stop, "stop"],
     ["E", setup.entry, "entry"],
     ["T1", setup.target1, "target"],
     ["T2", setup.target2, "target"],
   ] as const : [];
-  const levelX = xOf(setup.entryTime) ?? x2 ?? 0;
+  const levelX = xOf(Math.max(setup.entryTime, setup.secondTime)) ?? x2 ?? 0;
   return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} ${setup.side} divergence`}>
     {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
@@ -79,7 +79,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
       const y = yOf(price);
       if (y == null) return null;
       return <g key={name}>
-        <line className={`chart-psbb-level ${tone}`} x1={levelX} y1={y} x2={plotWidth - 28} y2={y} />
+        <line className={`chart-psbb-level ${tone}${setup.extended && name === "E" ? " extended" : ""}`} x1={levelX} y1={y} x2={plotWidth - 28} y2={y} />
         <text className={`chart-psbb-level ${tone}`} x={plotWidth - 26} y={y + 3}>{name}</text>
       </g>;
     })}
