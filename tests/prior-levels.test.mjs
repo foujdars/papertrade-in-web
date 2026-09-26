@@ -16,9 +16,18 @@ test("daily candles mark the previous day, week and month", () => {
     bar("2026-09-25T09:15:00Z", 150, 100),
   ];
   const levels = priorHighLows(candles, "1D", true);
-  assert.deepEqual(levels?.day, { high: 130, low: 88 });
-  assert.deepEqual(levels?.week, { high: 140, low: 90 });
-  assert.deepEqual(levels?.month, { high: 100, low: 60 });
+  assert.equal(levels?.day?.high, 130);
+  assert.equal(levels?.day?.low, 88);
+  assert.equal(levels?.day?.highTime, at("2026-09-24T09:15:00Z"));
+  assert.equal(levels?.day?.lowTime, at("2026-09-24T09:15:00Z"));
+  assert.equal(levels?.week?.high, 140);
+  assert.equal(levels?.week?.low, 90);
+  assert.equal(levels?.week?.highTime, at("2026-09-18T09:15:00Z"));
+  assert.equal(levels?.week?.lowTime, at("2026-09-14T09:15:00Z"));
+  assert.equal(levels?.month?.high, 100);
+  assert.equal(levels?.month?.low, 60);
+  assert.equal(levels?.month?.highTime, at("2026-08-31T09:15:00Z"));
+  assert.equal(levels?.month?.lowTime, at("2026-08-31T09:15:00Z"));
 });
 
 test("a short intraday chart marks yesterday only", () => {
