@@ -184,6 +184,8 @@
 .chart-psbb-level.stop { stroke: #e24b4b; }
 .chart-psbb-level.entry { stroke: #753bce; }
 .chart-psbb-level.entry.extended { stroke-dasharray: 4 3; }
+.chart-psbb-level.waiting { stroke-dasharray: 3 4; opacity: .7; }
+.chart-psbb text.chart-psbb-point { fill: #b48100; text-anchor: middle; }
 .chart-psbb-level.target { stroke: #0f9f6e; }
 .chart-psbb text { font-size: 9px; font-weight: 700; }
 .chart-psbb text.stop { fill: #e24b4b; }

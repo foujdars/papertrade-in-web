@@ -2,6 +2,8 @@ import type { Candle } from "./market";
 
 type Bar = Pick<Candle, "time" | "open" | "high" | "low" | "close">;
 export type PsbbStatus = "active" | "formed" | "passed" | "failed";
+export const PSBB_TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"] as const;
+export type PsbbAnchor = { side: "long" | "short"; time: number; price: number; rsi: number };
 export type PsbbSetup = {
   side: "long" | "short";
   status: PsbbStatus;
@@ -12,12 +14,17 @@ export type PsbbSetup = {
   secondPrice: number;
   firstRsi: number;
   secondRsi: number;
-  entry: number;
-  entryTime: number;
-  stop: number;
-  stopTime: number;
-  target1: number;
-  target2: number;
+  confirmedTime: number;
+  phase: "waiting-structure" | "waiting-mss" | "entered";
+  structureCase: "before" | "after" | null;
+  entry: number | null;
+  entryTime: number | null;
+  mssTime: number | null;
+  stop: number | null;
+  stopTime: number | null;
+  target1: number | null;
+  target2: number | null;
+  target1Hit: boolean;
   shifted: boolean;
   extended: boolean;
 };
@@ -51,94 +58,141 @@ function rsi(closes: number[], length: number) {
   });
 }
 
-function pivotIndexes(candles: Bar[], side: "low" | "high", span: number, last: number) {
-  const indexes: number[] = [];
-  for (let index = span; index + span < last; index += 1) {
-    const value = candles[index][side];
-    let extreme = true;
-    for (let cursor = index - span; cursor <= index + span; cursor += 1) {
-      if (cursor === index) continue;
-      const worse = side === "low" ? candles[cursor].low <= value : candles[cursor].high >= value;
-      if (worse) { extreme = false; break; }
-    }
-    if (extreme) indexes.push(index);
+function isPivot(candles: Bar[], side: "low" | "high", index: number, span: number) {
+  if (index < span) return false;
+  const value = candles[index][side];
+  if (!Number.isFinite(value)) return false;
+  for (let cursor = index - span; cursor <= index + span; cursor += 1) {
+    if (cursor === index) continue;
+    const other = candles[cursor][side];
+    if (!Number.isFinite(other) || (side === "low" ? other <= value : other >= value)) return false;
   }
-  return indexes;
+  return true;
 }
 
-function outcome(candles: Bar[], from: number, side: "long" | "short", entry: number, stop: number, target: number): { status: PsbbStatus; end: number; shifted: boolean } {
-  let shifted = false;
-  for (let index = from; index < candles.length; index += 1) {
-    const bar = candles[index];
-    const broke = side === "long" ? bar.close > entry : bar.close < entry;
-    const stopped = side === "long" ? bar.low <= stop : bar.high >= stop;
-    const won = side === "long" ? bar.high >= target : bar.low <= target;
-    if (!shifted) {
-      if (!broke) continue;
-      shifted = true;
-    }
-    if (won && !stopped) return { status: "passed", end: index, shifted };
-    if (stopped) return { status: "failed", end: index, shifted };
-  }
-  return { status: shifted ? "formed" : "active", end: candles.length - 1, shifted };
+function updateOutcome(setup: PsbbSetup, bar: Bar) {
+  if (setup.status !== "formed" || setup.stop === null || setup.target1 === null || setup.target2 === null) return;
+  setup.end = bar.time;
+  // Close-confirmed MSS cannot claim a target/stop touched earlier on the entry
+  // candle. Later candles that touch both are conservatively stop-first.
+  const stopped = setup.side === "long" ? bar.low <= setup.stop : bar.high >= setup.stop;
+  if (stopped) { setup.status = "failed"; return; }
+  if (setup.side === "long" ? bar.high >= setup.target1 : bar.low <= setup.target1) setup.target1Hit = true;
+  if (setup.side === "long" ? bar.high >= setup.target2 : bar.low <= setup.target2) setup.status = "passed";
 }
 
-/** Bread and Butter: divergence is not a trade until the swing between the two points breaks. That break is the entry. */
-export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
+type Episode = { first: number; extreme: number; pushes: number; setup?: PsbbSetup; structure?: number };
+
+/**
+ * D1 is the first strict RSI threshold crossing, not a price pivot. Divergence
+ * tracks a new extreme relative to D1. A newer extreme replaces a pending one.
+ * Swings become usable only after `left` closed candles on BOTH sides. Case A
+ * uses the most recent opposite swing strictly between D1 and the extreme;
+ * Case B waits for the first opposite swing after it. Only a subsequent close
+ * through that level confirms MSS. The final (still-forming) candle is excluded.
+ */
+function scanPsbb(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}) {
   const last = Math.max(0, candles.length - 1);
-  const span = Math.max(1, inputs.left || 3);
+  const span = Math.max(1, Math.floor(inputs.left || 3));
   const oversold = inputs.oversold ?? 30;
   const overbought = inputs.overbought ?? 70;
   const firstMultiple = inputs.target1 || 1;
   const secondMultiple = inputs.target2 || 1.5;
   const setups: PsbbSetup[] = [];
-  const lows = pivotIndexes(candles, "low", span, last);
-  const highs = pivotIndexes(candles, "high", span, last);
-  const extended = (indexes: number[], pair: number, down: boolean) => {
-    let count = 2;
-    let cursor = pair;
-    while (cursor > 1 && (down ? candles[indexes[cursor - 2]].low > candles[indexes[cursor - 1]].low : candles[indexes[cursor - 2]].high < candles[indexes[cursor - 1]].high)) {
-      count += 1;
-      cursor -= 1;
+  const pivots: Record<"low" | "high", number[]> = { low: [], high: [] };
+  const episodes: Partial<Record<"long" | "short", Episode>> = {};
+  for (let index = 0; index < last; index += 1) {
+    const bar = candles[index];
+    for (const setup of setups) updateOutcome(setup, bar);
+    const confirmed = index - span;
+    for (const kind of ["low", "high"] as const) {
+      if (isPivot(candles, kind, confirmed, span)) pivots[kind].push(confirmed);
     }
-    return count >= 3;
-  };
-  const add = (side: "long" | "short", older: number, newer: number, entryIndex: number, isExtended: boolean) => {
-    const entry = side === "long" ? candles[entryIndex].high : candles[entryIndex].low;
-    const stop = side === "long" ? candles[newer].low : candles[newer].high;
-    if (!(side === "long" ? entry > stop : stop > entry)) return;
-    const risk = Math.abs(entry - stop);
-    const target1 = side === "long" ? entry + firstMultiple * risk : entry - firstMultiple * risk;
-    const target2 = side === "long" ? entry + secondMultiple * risk : entry - secondMultiple * risk;
-    const result = outcome(candles, newer + span, side, entry, stop, target1);
-    setups.push({
-      side, status: result.status, shifted: result.shifted, extended: isExtended,
-      firstTime: candles[older].time, secondTime: candles[newer].time, end: candles[result.end].time,
-      firstPrice: side === "long" ? candles[older].low : candles[older].high,
-      secondPrice: stop, firstRsi: momentum[older], secondRsi: momentum[newer],
-      entry, entryTime: candles[entryIndex].time, stop, stopTime: candles[newer].time, target1, target2,
-    });
-  };
-  for (let pair = 1; pair < lows.length; pair += 1) {
-    const older = lows[pair - 1];
-    const newer = lows[pair];
-    const between = highs.filter((index) => index > older && index < newer);
-    if (!between.length || !(candles[newer].low < candles[older].low) || !(momentum[newer] > momentum[older]) || !(Math.min(momentum[older], momentum[newer]) <= oversold)) continue;
-    const entryIndex = between.reduce((best, index) => candles[index].high > candles[best].high ? index : best);
-    add("long", older, newer, entryIndex, extended(lows, pair, true));
+    for (const side of ["long", "short"] as const) {
+      const long = side === "long", extremeKind = long ? "low" : "high", structureKind = long ? "high" : "low";
+      const previous = momentum[index - 1], current = momentum[index];
+      const crossed = Number.isFinite(previous) && Number.isFinite(current) && (long
+        ? previous >= oversold && current < oversold
+        : previous <= overbought && current > overbought);
+      if (!episodes[side] && crossed) episodes[side] = { first: index, extreme: index, pushes: 0 };
+      const episode = episodes[side];
+      if (!episode) continue;
+      const makesExtreme = long ? bar.low < candles[episode.extreme].low : bar.high > candles[episode.extreme].high;
+      if (makesExtreme) {
+        episode.extreme = index;
+        episode.setup = undefined;
+        episode.structure = undefined;
+      }
+      const { first, extreme } = episode;
+      if (confirmed === extreme && pivots[extremeKind].at(-1) === extreme) {
+        episode.pushes += 1;
+        const divergence = extreme > first && Number.isFinite(momentum[extreme]) && (long
+          ? momentum[extreme] > momentum[first]
+          : momentum[extreme] < momentum[first]);
+        if (divergence) {
+          episode.structure = pivots[structureKind].findLast((pivot) => pivot > first && pivot < extreme);
+          episode.setup = {
+            side, status: "active", phase: "waiting-structure", structureCase: null,
+            shifted: false, extended: episode.pushes >= 3,
+            firstTime: candles[first].time, firstPrice: candles[first][extremeKind], firstRsi: momentum[first],
+            secondTime: candles[extreme].time, secondPrice: candles[extreme][extremeKind], secondRsi: momentum[extreme],
+            confirmedTime: bar.time, end: bar.time, entry: null, entryTime: null, mssTime: null,
+            stop: null, stopTime: null, target1: null, target2: null, target1Hit: false,
+          };
+        }
+      }
+      const setup = episode.setup;
+      if (!setup) continue;
+      setup.end = bar.time;
+      // A Case B level is locked to the FIRST new swing, not a later better fit.
+      if (episode.structure === undefined) episode.structure = pivots[structureKind].find((pivot) => pivot > extreme);
+      const structure = episode.structure;
+      if (structure === undefined) continue;
+      setup.phase = "waiting-mss";
+      setup.structureCase = structure < extreme ? "before" : "after";
+      setup.entry = candles[structure][structureKind];
+      setup.entryTime = candles[structure].time;
+      // The most recently confirmed opposing swing may be a newer lower high /
+      // higher low, so the stop must not be pinned to the divergence extreme.
+      const stopIndex = pivots[extremeKind].at(-1)!;
+      setup.stop = candles[stopIndex][extremeKind];
+      setup.stopTime = candles[stopIndex].time;
+      const risk = long ? setup.entry - setup.stop : setup.stop - setup.entry;
+      if (!(risk > 0)) continue;
+      setup.target1 = setup.entry + (long ? 1 : -1) * firstMultiple * risk;
+      setup.target2 = setup.entry + (long ? 1 : -1) * secondMultiple * risk;
+      const priorClose = candles[index - 1]?.close;
+      const broke = index > extreme && index > structure && (long
+        ? priorClose <= setup.entry && bar.close > setup.entry
+        : priorClose >= setup.entry && bar.close < setup.entry);
+      if (!broke) continue;
+      setup.phase = "entered";
+      setup.status = "formed";
+      setup.shifted = true;
+      setup.mssTime = bar.time;
+      setups.push(setup);
+      delete episodes[side];
+    }
   }
-  for (let pair = 1; pair < highs.length; pair += 1) {
-    const older = highs[pair - 1];
-    const newer = highs[pair];
-    const between = lows.filter((index) => index > older && index < newer);
-    if (!between.length || !(candles[newer].high > candles[older].high) || !(momentum[newer] < momentum[older]) || !(Math.max(momentum[older], momentum[newer]) >= overbought)) continue;
-    const entryIndex = between.reduce((best, index) => candles[index].low < candles[best].low ? index : best);
-    add("short", older, newer, entryIndex, extended(highs, pair, false));
+  for (const episode of Object.values(episodes)) if (episode?.setup) setups.push(episode.setup);
+  const anchors: PsbbAnchor[] = [];
+  for (const side of ["long", "short"] as const) {
+    const episode = episodes[side];
+    if (episode) anchors.push({ side, time: candles[episode.first].time, price: candles[episode.first][side === "long" ? "low" : "high"], rsi: momentum[episode.first] });
   }
-  return setups.sort((a, b) => a.secondTime - b.secondTime).slice(-4);
+  return { setups: setups.sort((a, b) => a.secondTime - b.secondTime).slice(-4), anchors };
 }
 
-export function psbbPlots(candles: Bar[], inputs: Record<string, number> = {}) {
+export function psbbSetups(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}): PsbbSetup[] {
+  return scanPsbb(candles, momentum, inputs).setups;
+}
+
+export function psbbAnalysis(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {
+  if (timeframe && !PSBB_TIMEFRAMES.some((allowed) => allowed === timeframe)) return { setups: [], anchors: [] };
   const momentum = rsi(candles.map((bar) => bar.close), Math.max(2, inputs.length || 14));
-  return psbbSetups(candles, momentum, inputs);
+  return scanPsbb(candles, momentum, inputs);
+}
+
+export function psbbPlots(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {
+  return psbbAnalysis(candles, inputs, timeframe).setups;
 }

@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "test:psbb": "node --experimental-strip-types --test tests/psbb.test.mjs",
     "test:price-actions": "node --experimental-strip-types --test tests/price-actions.test.mjs",
     "test:global-orders": "node --experimental-strip-types --test tests/global-order-engine.test.mjs tests/global-markets.test.mjs tests/global-option-orders.test.mjs tests/market-directory.test.mjs",
     "posttest": "npm run test:price-actions && node --experimental-strip-types --test tests/smc-live.test.mjs tests/live-feed-lifecycle.test.mjs tests/chart-view-preferences.test.mjs tests/chart-style.test.mjs tests/pnl-analytics.test.mjs tests/ipo-explorer.test.mjs tests/technical-alerts.test.mjs tests/technical-alerts-server.test.mjs tests/technical-alerts-dispatch.test.mjs tests/study-calculations.test.mjs tests/home-attention.test.mjs tests/home-preferences.test.mjs tests/global-markets.test.mjs tests/global-option-orders.test.mjs",
