@@ -168,3 +168,10 @@
 .chart-pd-line.low { color: #e24b4b; }
 .chart-pd-line.close { color: #7437dc; }
 .chart-pd-line button { position: absolute; left: 8px; top: 0; transform: translateY(-50%); pointer-events: auto; padding: 1px 6px; border: 1px solid currentColor; border-radius: 6px; background: color-mix(in srgb, var(--surface, #fff) 92%, transparent); color: inherit; font: inherit; font-size: 10px; font-weight: 750; line-height: 1.4; white-space: nowrap; }
+.chart-prior-line.week-high { color: #1d6fbf; }
+.chart-prior-line.week-low { color: #c26a12; }
+.chart-prior-line.month-high { color: #6a4cc7; }
+.chart-prior-line.month-low { color: #9a3d78; }
+.chart-prior-line button { border-radius: 0; font-weight: 500; padding: 0 4px; }
+.chart-prior-line.week-high button, .chart-prior-line.week-low button { left: 78px; }
+.chart-prior-line.month-high button, .chart-prior-line.month-low button { left: 148px; }

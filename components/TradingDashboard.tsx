@@ -11,7 +11,6 @@ import { TRANSIENT_BACK_EVENT, useTransientBack } from "@/components/useTransien
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 import { ChartHistoryControls } from "./ChartHistoryControls";
-import { ChartScriptBox } from "./ChartScriptBox";
 import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
 
 import {
@@ -510,9 +509,6 @@ export function TradingDashboard() {
   const [coachOpen, setCoachOpen] = useState(false);
   const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
   const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
-  const [chartScript, setChartScript] = useState("");
-  const [scriptOpen, setScriptOpen] = useState(false);
-  useEffect(() => { setChartScript(window.localStorage.getItem("papertrade.chart-script") ?? ""); }, []);
   const toolkitBackRef = useRef<(() => void) | null>(null);
   useEffect(() => { toolkitBackRef.current = pendingDeleteIds ? () => setPendingDeleteIds(null) : replayInstrument ? () => { setReplayInstrument(null); setReplayReviewTimeframe(null); } : coachOpen ? () => setCoachOpen(false) : null; }, [pendingDeleteIds, replayInstrument, coachOpen]);
   const [coachTab, setCoachTab] = useState<CoachTab>("journal");
@@ -2972,8 +2968,6 @@ export function TradingDashboard() {
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
                 onFeedStatus={handleFeedStatus}
-                chartScript={chartScript}
-                onEditScript={() => setScriptOpen(true)}
                 replayCandles={replayOnChart && chartReplay.candles.length ? chartReplay.visible : undefined}
                 replaySelecting={replayOnChart && chartReplay.selecting}
                 replayPlaying={replayOnChart && chartReplay.playing}
@@ -2986,9 +2980,8 @@ export function TradingDashboard() {
             )}
           </div>
           {replayOnChart && <ChartReplayBar replay={chartReplay} onExit={exitChartReplay} />}
-          {scriptOpen && <ChartScriptBox candles={[]} script={chartScript} onClose={() => setScriptOpen(false)} onRun={(next) => { setChartScript(next); window.localStorage.setItem("papertrade.chart-script", next); }} />}
           <div className={`chart-statusbar feed-${feedStatus.mode}`} title={feedStatus.mode === "error" ? feedStatus.message : undefined}>
-            <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} onScript={() => setScriptOpen((open) => !open)} />
+            <ChartHistoryControls request={chartHistory} onChange={request => { if (request?.years) chooseTimeframe("1D"); setChartHistory(request); }} />
             <button type="button" className="chart-statusbar-replay" onClick={() => setReplayInstrument(selected)} aria-label={`Bar replay for ${selected.symbol}`} title="Bar replay"><StepBack size={15} /></button>
             <div ref={setChartIndicatorHost} className="chart-indicator-slot" role="group" aria-label="Active chart functions" tabIndex={0}/>
             {feedStatus.mode === "error" && <div className="chart-feed-warning" role="status">{feedStatus.message}</div>}

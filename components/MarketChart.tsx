@@ -5,6 +5,7 @@ import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
 import { PreviousDayLevels } from "./PreviousDayLevels";
+import { PriorLevels } from "./PriorLevels";
 import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
 import { useTransientBack } from "./useTransientBack";
@@ -492,8 +493,6 @@ export function MarketChart({
   onRemoveIndicator,
   onChartTap,
   onPrice,
-  chartScript = "",
-  onEditScript,
   liveTick,
   onFeedStatus,
 }: {
@@ -539,8 +538,6 @@ export function MarketChart({
   onRemoveIndicator?: (id: string) => void;
   onChartTap?: () => void;
   onPrice?: (value: number, timestampMs: number) => void;
-  chartScript?: string;
-  onEditScript?: () => void;
   liveTick?: CandleTick;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -611,8 +608,6 @@ export function MarketChart({
   const [chartGeneration, setChartGeneration] = useState(0);
   const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string; edges: Array<{ x: number; label: string }> }>>([]);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
-  const chartScriptRef = useRef(chartScript);
-  chartScriptRef.current = chartScript;
   const drawingManager = useRef<DrawingManager | null>(null);
   const drawingRegistry = useRef<ReturnType<typeof createChartDrawingRegistry> | null>(null);
   const draftRef = useRef<DraftDrawing | null>(null);
@@ -667,6 +662,7 @@ export function MarketChart({
   const patternRefreshRef = useRef<(() => void) | null>(null);
   const openingRangeRefreshRef = useRef<(() => void) | null>(null);
   const previousDayRefreshRef = useRef<(() => void) | null>(null);
+  const priorLevelsRefreshRef = useRef<(() => void) | null>(null);
   const avwapSeries = useRef<AnchoredVwapOverlay | null>(null);
   const [avwapAnchor, setAvwapAnchor] = useState<number | null>(null);
   const avwapAnchorRef = useRef<number | null>(null);
@@ -846,6 +842,7 @@ export function MarketChart({
       patternRefreshRef.current?.();
       openingRangeRefreshRef.current?.();
       previousDayRefreshRef.current?.();
+      priorLevelsRefreshRef.current?.();
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
@@ -1075,15 +1072,13 @@ export function MarketChart({
     const old = studyRenderer.current.signature;
     studyRenderer.current.comparisons=comparisonRef.current;
     studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data);
-    const scriptLayout = studyRenderer.current.syncScript(chartScriptRef.current, data);
     if (compareModeRef.current === "pane" && compareSeries.current.size) {
       const comparePane = Math.max(1, ...studyRenderer.current.bundles.map((bundle) => bundle.pane + 1));
       overlayComparedRef.current.forEach((item,index) => compareSeries.current.get(item.instrumentKey)?.moveToPane(comparePane+index));
     }
-    if (old !== studyRenderer.current.signature || scriptLayout) fitStudyPanes();
+    if (old !== studyRenderer.current.signature) fitStudyPanes();
     refreshStudyHeaders();
   }
-  useEffect(() => { syncIndicatorData(); }, [chartScript]);
   function syncIndicators(next: ChartIndicators) {
     indicatorsRef.current = next;
     syncIndicatorData();
@@ -2609,10 +2604,9 @@ export function MarketChart({
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
-  const indicatorLegend = (activeStudies.length || indicators.patterns || chartScript.trim()) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+  const indicatorLegend = (activeStudies.length || indicators.patterns) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
     {indicators.patterns && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => activateStudyRef.current("patterns", event.clientX, event.clientY)} aria-label="Candlestick pattern actions" title="Tap for function actions"><i style={{ background: "var(--purple, #8054d9)" }} />Patterns</button>}
-    {chartScript.trim() && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={() => onEditScript?.()} aria-label="Edit chart script" title="Edit script"><i style={{ background: "var(--purple, #8054d9)" }} />Script</button>}
-    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "anchored-vwap"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
+    {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "prior-levels", "anchored-vwap"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
@@ -2641,6 +2635,7 @@ export function MarketChart({
         {indicators.patterns && <CandlePatterns key={`${instrument.instrumentKey}:${timeframe}:patterns`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} replay={isReplay} refreshRef={patternRefreshRef} />}
         {indicators["opening-range"] && !studySettings["opening-range"]?.hidden && <OpeningRange key={`${instrument.instrumentKey}:${timeframe}:opening-range`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} refreshRef={openingRangeRefreshRef} />}
         {indicators["previous-day"] && !studySettings["previous-day"]?.hidden && <PreviousDayLevels key={`${instrument.instrumentKey}:${timeframe}:previous-day`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={previousDayRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
+        {indicators["prior-levels"] && !studySettings["prior-levels"]?.hidden && <PriorLevels key={`${instrument.instrumentKey}:${timeframe}:prior-levels`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} session={instrument.exchange === "NSE"} refreshRef={priorLevelsRefreshRef} onAlert={onPriceAction ? (price) => onPriceAction(price, "alert") : undefined} />}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: Math.max(28, (priceCursor?.y ?? 88) - 16) }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}

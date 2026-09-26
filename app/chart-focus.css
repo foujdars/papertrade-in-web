@@ -79,21 +79,6 @@
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:not(:has(.chart-indicator-strip)) { display: none; }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-indicator-slot:has(.chart-indicator-strip) { grid-column: 1 / -1; border-bottom: 1px solid var(--line, #e3e6ee); }
 .terminal-shell .chart-statusbar:has(.chart-history-controls) .chart-feed-warning { grid-column: 1 / -1; }
-.chart-script-box { display: grid; grid-template-rows: auto minmax(148px, 28vh) auto; margin: 0; border-top: 1px solid var(--line); background: var(--surface, #fff); color: var(--ink); }
-.chart-script-box header, .chart-script-box footer { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; }
-.chart-script-box header b { font-size: 12px; font-weight: 550; letter-spacing: -.1px; }
-.chart-script-box header select { min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font: inherit; font-size: 11px; }
-.chart-script-box header button { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
-.chart-script-box header button[type="submit"] { margin-left: auto; color: #fff; background: var(--purple, #753bce); border-color: var(--purple, #753bce); }
-.chart-script-editor { display: grid; grid-template-columns: 36px minmax(0, 1fr); min-height: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--soft, #f6f7fb); }
-.chart-script-gutter, .chart-script-box textarea { margin: 0; overflow: auto; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.chart-script-gutter { display: grid; align-content: start; padding: 8px 0; color: var(--muted); text-align: right; user-select: none; }
-.chart-script-gutter span { padding-right: 8px; }
-.chart-script-gutter span.bad { color: var(--red, #d94064); }
-.chart-script-box textarea { width: 100%; height: 100%; resize: none; padding: 8px; border: 0; background: transparent; color: var(--ink); white-space: pre; }
-.chart-script-box footer { display: grid; gap: 4px; align-items: start; }
-.chart-script-box small, .chart-script-error { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
-.chart-script-error { color: var(--red, #d94064); }
 .terminal-shell .chart-statusbar .chart-indicator-strip::before { content: "Active"; margin-right: 2px; color: var(--muted); font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .chart-indicator-slot::-webkit-scrollbar { display: none; }
 .chart-indicator-slot:focus-visible { outline: 1px solid var(--purple); outline-offset: -1px; }
