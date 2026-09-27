@@ -33,13 +33,13 @@ for (const inverse of [false, true]) {
     assert.equal(setup.firstTime,3);assert.equal(setup.secondTime,8);
     assert.equal(setup.entryTime,6);assert.equal(setup.entry,inverse?195:105);
     assert.equal(setup.structureCase,'before');assert.equal(setup.shifted,false);
-    // Same chart, later excursion: retire the old pending setup and move D1
-    // to this visit's RSI extreme, even though its price is below the old D2.
+    // A later trip above 70 still replaces a bullish anchor. A bearish anchor stays.
     candles[14]=bar(14,134,122);momentum[14]=72;
     candles[15]=bar(15,138,125);momentum[15]=80;
     candles[16]=bar(16,136,120);momentum[16]=69;
     const fresh=analyze(candles,momentum);
-    assert.equal(fresh.anchors[0].time,15);assert.equal(fresh.setups.length,0);
+    if (inverse) { assert.equal(fresh.anchors[0].time,15); assert.equal(fresh.setups.length,0); }
+    else { assert.equal(fresh.anchors[0].time,3); assert.equal(fresh.setups.length,1); }
   });
   test(`${side}: an unqualified later excursion replaces D1 instead of keeping a stale reference`, () => {
     const candles=flat(13), momentum=Array(13).fill(55);
@@ -50,16 +50,16 @@ for (const inverse of [false, true]) {
     candles[7]=bar(7,125,118);momentum[7]=79;
     candles[8]=bar(8,124,115);momentum[8]=68;
     const result=analyze(candles.slice(0,10),momentum.slice(0,10));
-    assert.equal(result.anchors[0].time,7);assert.equal(result.setups.length,0);
+    assert.equal(result.anchors[0].time, inverse ? 7 : 2);assert.equal(result.setups.length,0);
     candles[11]=bar(11,135,125);momentum[11]=66;
-    assert.equal(analyze(candles,momentum).setups.at(-1).firstTime,7);
+    assert.equal(analyze(candles,momentum).setups.at(-1).firstTime, inverse ? 7 : 2);
   });
   test(`${side}: a stronger RSI peak replaces D1 and a forming bar cannot move it`, () => {
     const candles=flat(8), momentum=[55,72,84,75,60,73,89,90];
     candles[1]=bar(1,124,117);candles[2]=bar(2,130,120);
     candles[5]=bar(5,133,125);candles[6]=bar(6,140,128);candles[7]=bar(7,145,130);
-    assert.equal(analyze(candles,momentum,false).anchors[0].time,6);
-    assert.equal(analyze(candles,momentum,true).anchors[0].time,7);
+    assert.equal(analyze(candles,momentum,false).anchors[0].time, inverse ? 6 : 2);
+    assert.equal(analyze(candles,momentum,true).anchors[0].time, inverse ? 7 : 2);
     assert.equal(analyze(candles,momentum,true).setups.length,0);
   });
 }
@@ -190,7 +190,7 @@ test("negative divergence is not a trade when the low between the highs never br
   assert.equal(setup.shifted, false);
 });
 
-test("a later RSI threshold visit starts a fresh D1 rather than inheriting earlier pushes", () => {
+test("a later cross back above 70 keeps the first bearish anchor", () => {
   const candles = flat(28);
   candles[4] = bar(4, 130, 118, 124);
   candles[6] = bar(6, 122, 100, 108);
@@ -203,8 +203,8 @@ test("a later RSI threshold visit starts a fresh D1 rather than inheriting earli
   rsi[10] = 74;
   rsi[16] = 68;
   const setup = psbbSetups(candles, rsi, { left: 2, overbought: 70 }).at(-1);
-  assert.equal(setup.firstTime, 10);
-  assert.equal(setup.extended, false);
+  assert.equal(setup.firstTime, 4);
+  assert.equal(setup.secondTime, 16);
   assert.equal(setup.shifted, false);
 });
 
