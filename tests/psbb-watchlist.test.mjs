@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TRADING_TIMEFRAMES, indiaMonth, monthWindow, monthlySetups, psbbHistoryPlan, nseCandleEnd, buildTradingReport } from '../lib/psbb-watchlist.ts';
+import { TRADING_TIMEFRAMES, indiaMonth, indiaDay, monthWindow, monthlySetups, psbbHistoryPlan, nseCandleEnd, buildTradingReport, buildTodayDivergenceReport } from '../lib/psbb-watchlist.ts';
 import { psbbSetups } from '../lib/psbb.ts';
 import { tradingUniverse, TRADING_GROUPS } from '../lib/trading-universes.ts';
 const epoch = (text) => Date.parse(text) / 1000;
@@ -84,6 +84,18 @@ test('scanner evaluates all closed candles, omits forming bars, and uses highest
   assert.equal(report.rows[0].setup.entry, 75);
   assert.equal(report.rows[0].setup.target1, 20);
   assert.equal(report.coverage, 'limited');
+});
+test('live divergence reports only confirmation on the current IST day and omits entry outcomes', () => {
+  const candles = realCandles(), end = candles.at(-1).time + 60;
+  const settings = { length: 2, left: 1, oversold: 1, overbought: 99 };
+  const today = buildTodayDivergenceReport('NSE_EQ|TEST', '1m', candles, settings, end * 1000);
+  const pending = buildTodayDivergenceReport('NSE_EQ|TEST', '1m', candles, settings, (today.rows[0].confirmedTime + 60) * 1000 - 1);
+  assert.equal(pending.rows.length, 0);
+  assert.equal(today.rows.length, 1);
+  assert.deepEqual(Object.keys(today.rows[0]).sort(), ['confirmedTime', 'firstTime', 'id', 'secondTime', 'side']);
+  assert.equal(today.date, indiaDay(end * 1000));
+  const tomorrow = buildTodayDivergenceReport('NSE_EQ|TEST', '1m', candles, settings, Date.parse('2026-09-02T09:15:00+05:30'));
+  assert.equal(tomorrow.rows.length, 0);
 });
 test('1R success is final, stop/target same-bar is failed, and next-month prices cannot alter past results', () => {
   const candles = realCandles();

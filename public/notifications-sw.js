@@ -1,7 +1,7 @@
 // Push only: no page cache, PAN storage or app-open polling.
 self.addEventListener("install",()=>self.skipWaiting());
 function store(mode,operation){return new Promise((resolve,reject)=>{const request=indexedDB.open("papertrade-push-v3",1);request.onupgradeneeded=()=>request.result.createObjectStore("state");request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction("state",mode);let result;operation(tx.objectStore("state"),value=>{result=value;});tx.oncomplete=()=>{db.close();resolve(result);};tx.onerror=()=>{db.close();reject(tx.error);};};});}
-function safePath(path){return typeof path==="string"&&(/^\/\?screen=(ipo|pnl)$/.test(path)||/^\/\?symbol=[A-Za-z0-9%_.~!()*'\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|1D)$/.test(path)||/^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(path))?path:"/";}
+function safePath(path){return typeof path==="string"&&(/^\/\?screen=(ipo|pnl)$/.test(path)||/^\/\?symbol=[A-Za-z0-9%_.~!()*'\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|4H|1D)$/.test(path)||/^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(path))?path:"/";}
 self.addEventListener("message",event=>{if(event.data?.type==="preferences")event.waitUntil(store("readwrite",state=>state.put(event.data.preferences,"preferences")));});
 self.addEventListener("push",event=>{event.waitUntil((async()=>{
   let payload;try{payload=event.data.json();}catch{return;}
