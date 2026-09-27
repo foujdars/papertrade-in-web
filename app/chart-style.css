@@ -179,6 +179,7 @@
 .terminal-shell .timeframe-sheet .timeframe-groups { min-height: 0; flex: 1; overflow: auto; }
 .chart-prior-label { position: absolute; transform: translateY(-50%); border: 0; background: transparent; padding: 0; color: inherit; font: inherit; font-size: 10px; font-weight: 500; line-height: 1; white-space: nowrap; pointer-events: auto; cursor: pointer; }
 .chart-psbb { position: absolute; inset: 0 auto auto 0; z-index: 5; overflow: hidden; pointer-events: none; }
+.chart-ema21-entries { position: absolute; inset: 0 auto auto 0; z-index: 5; overflow: visible; pointer-events: none; }
 .chart-psbb-diverge { stroke: #e0a100; stroke-width: 1.5; fill: none; }
 .chart-psbb-level { stroke-width: 1; }
 .chart-psbb-level.stop { stroke: #e24b4b; }

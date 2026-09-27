@@ -6,7 +6,7 @@ const make=(id:string,name:string,group:string,overlay=false,fields:StudyField[]
 export const STUDIES:StudyDefinition[]=[
  make('smc','SMC Learner','Learning',true,[],{note:'Structure and zone filters are in SMC Learn. No SMC alerts are added.'}),
  make('patterns','Candlestick patterns','Price',true,[],{note:'Classic candle shapes on closed bars. Labels describe the shape only. They are not trade signals.'}),
- ...[5,21,30,50,100,200].map(n=>make(`ema${n}`,`EMA ${n}`,'Trend',true,[length(n)])),
+ ...[5,21,30,50,100,200].map(n=>make(`ema${n}`,`EMA ${n}`,'Trend',true,[length(n)],n===21?{note:'On BTC, ETH and gold 5m/15m charts, arrows mark EMA 21 pullback entry candles. The other Entry setups indicator is independent.'}:{})),
  ...[20,50,200].map(n=>make(`sma${n}`,`SMA ${n}`,'Trend',true,[length(n)])),
  make('ad','Accumulation/Distribution','Volume',false,[],{volume:true}),
  make('asi','Accumulative Swing Index','Momentum',false,[num('limit','Limit move',3,.01,100000,.01)]),
