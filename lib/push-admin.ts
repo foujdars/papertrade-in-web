@@ -31,6 +31,9 @@ export async function removeUserPushDevices(userId: string) {
   }
   const outbox = await db.collection("technicalOutbox").where("userId", "==", userId).get();
   for (const item of outbox.docs) await item.ref.delete();
+  const globalOutbox = await db.collection("globalAlertOutbox").where("userId", "==", userId).get();
+  for (const item of globalOutbox.docs) await item.ref.delete();
+  await db.doc(`globalAlertAccounts/${userId}`).delete();
   await db.doc(`technicalAccounts/${userId}`).delete();
   await db.doc(`technicalPushTests/${userId}`).delete();
   const registry = db.doc("technicalSystem/registry");
