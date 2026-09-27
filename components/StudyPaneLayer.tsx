@@ -84,9 +84,9 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
         const x = line.presentation?.extendLeft ? 0 : Math.min(from.x, to.x);
         const right = line.presentation?.extendRight ? width : Math.max(from.x,to.x);
         const y = Math.min(from.y, to.y);
-        return wrap(<rect className={selectedLine ? "selected" : undefined} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
+        return wrap(<rect className={selectedLine ? "selected" : undefined} style={line.presentation?.color ? {stroke:line.presentation.color} : undefined} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
       }
-      return wrap(<line className={selectedLine ? "selected" : undefined} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
+      return wrap(<line className={selectedLine ? "selected" : undefined} style={line.presentation?.color ? {stroke:line.presentation.color} : undefined} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
     })}
     </svg>
     {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width, background: cursor.color, color: cursor.color ? "#fff" : undefined }}>{cursor.text}</b>}
