@@ -66,7 +66,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     const x = xOf(anchor.time), y = yOf(anchor.price);
     return x === null || y === null || !visible(x,y) ? null : <text key={`${anchor.side}:${anchor.time}`} className="chart-psbb-point" x={x} y={y + (anchor.side === "short" ? -8 : 14)}>D1</text>;
   });
-  if (!setup) return <><div className="chart-or-note">{analysis.anchors.length ? "PSBB · D1 marked · Waiting for divergence" : "PSBB · Waiting for RSI to cross 70 or 30"}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label="PSBB threshold anchors">{anchorMarks}</svg></>;
+  if (!setup) return divergenceOnly ? <div className="chart-or-note">{analysis.anchors.length ? "PSBB · waiting for divergence" : "PSBB · waiting for RSI 30 or 70"}</div> : <><div className="chart-or-note">{analysis.anchors.length ? "PSBB · D1 marked · Waiting for divergence" : "PSBB · Waiting for RSI to cross 70 or 30"}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label="PSBB threshold anchors">{anchorMarks}</svg></>;
   const x1 = xOf(setup.firstTime);
   const x2 = xOf(setup.secondTime);
   const y1 = yOf(setup.firstPrice);
@@ -80,6 +80,10 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   };
   const ry1 = rsiY(setup.firstRsi);
   const ry2 = rsiY(setup.secondRsi);
+  if (divergenceOnly) return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} ${setup.side} divergence`}>
+    {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
+    {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
+  </svg>;
   const levels = !divergenceOnly && setup.shifted && setup.entry !== null && setup.stop !== null && setup.target1 !== null && setup.target2 !== null ? [
     ["SL", setup.stop, "stop"],
     ["Entry", setup.entry, "entry"],
