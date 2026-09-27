@@ -23,6 +23,8 @@
 .tw-monthly th, .tw-monthly td { padding: 7px 3px; text-align: right; border-bottom: 1px solid var(--line); }
 .tw-monthly th:first-child { text-align: left; }
 .tw-monthly th button { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 650; padding: 4px; }
+.tw-monthly th .tw-frame-refresh { display: inline-flex; vertical-align: middle; align-items: center; justify-content: center; width: 24px; height: 24px; color: #8054da; }
+.tw-monthly button:disabled, .tw-actions button:disabled { opacity: .45; cursor: default; }
 .tw-monthly tr.selected { background: #8054da0c; }
 .tw-monthly p { font-size: 10px; line-height: 1.5; margin: 9px 0 0; }
 .tw-progress { margin: 12px 0; line-height: 1.5; }
