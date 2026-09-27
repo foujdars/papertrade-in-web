@@ -108,9 +108,9 @@ function moveD1(episode: Episode, index: number) {
  * D1 before replacing it: price HH + RSI LH (or LL + HL) preserves the reference
  * for D2. A non-divergent visit becomes the new D1. After divergence is already
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
- * Swings need `left` closed candles on the right. Entry requires the
- * lowest swing low for shorts or highest swing high for longs strictly
- * between D1 and the divergence extreme.
+ * Swings need `left` closed candles on the right. Entry uses the most recent
+ * confirmed swing high before SL for longs or swing low before SH for shorts,
+ * strictly between D1 and the divergence extreme.
  * A touch of a known intervening level also confirms D2 without waiting
  * extra right-hand pivot bars.
  * The first subsequent candle whose high/low reaches the structure level
@@ -182,13 +182,7 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       const divergence = extreme > first && Number.isFinite(momentum[extreme]) && (long
         ? momentum[extreme] > momentum[first]
         : momentum[extreme] < momentum[first]);
-      let before: number | undefined;
-      for (const pivot of pivots[structureKind]) {
-        if (pivot <= first || pivot >= extreme) continue;
-        if (before === undefined || (long
-          ? candles[pivot].high > candles[before].high
-          : candles[pivot].low < candles[before].low)) before = pivot;
-      }
+      const before = pivots[structureKind].findLast(pivot => pivot > first && pivot < extreme);
       // Reaching an already-confirmed intervening swing is itself MSS
       // confirmation. Do not wait additional right-hand pivot bars and miss
       // that crossing. Nothing is backdated or read from future candles.
