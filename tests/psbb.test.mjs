@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from 'node:fs';
-import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
+import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, psbbDivergenceLinesFromRsi, currentPsbbSetup, PSBB_TIMEFRAMES } from "../lib/psbb.ts";
 
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
@@ -382,4 +382,24 @@ test('intervening-swing rules are the same on every supported timeframe', () => 
     assert.equal(setup.mssTime,7,timeframe);
   }
   assert.deepEqual(psbbPlots(candles,{},'2m'),[]);
+});
+
+test("every qualifying swing pair is a divergence, not only the latest", () => {
+  const candles = Array.from({ length: 16 }, (_, time) => bar(time, 110, 100, 105));
+  const peak = (center, close) => {
+    candles[center] = bar(center, close + 4, close - 8, close);
+    for (const step of [1, 2]) {
+      candles[center - step] = bar(center - step, close - step * 3, close - 12, close - step * 4);
+      candles[center + step] = bar(center + step, close - step * 3, close - 12, close - step * 4);
+    }
+  };
+  peak(3, 128);
+  peak(8, 136);
+  peak(13, 146);
+  const rsi = Array(16).fill(50);
+  rsi[3] = 80;
+  rsi[8] = 74;
+  rsi[13] = 68;
+  const lines = psbbDivergenceLinesFromRsi(candles, rsi, { left: 2, overbought: 70 }, true);
+  assert.deepEqual(lines.map((line) => [line.firstTime, line.secondTime]), [[3, 8], [3, 13], [8, 13]]);
 });

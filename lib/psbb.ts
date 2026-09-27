@@ -256,3 +256,54 @@ export function psbbAnalysis(candles: Bar[], inputs: Record<string, number> = {}
 export function psbbPlots(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string) {
   return psbbAnalysis(candles, inputs, timeframe).setups;
 }
+
+export type PsbbDivergenceLine = {
+  side: "long" | "short";
+  firstTime: number;
+  secondTime: number;
+  firstPrice: number;
+  secondPrice: number;
+  firstRsi: number;
+  secondRsi: number;
+};
+
+/** Every regular divergence between swing pairs, not only the latest anchor. */
+export function psbbDivergenceLinesFromRsi(candles: Bar[], momentum: number[], inputs: Record<string, number> = {}, allCandlesClosed = false): PsbbDivergenceLine[] {
+  const last = Math.max(0, candles.length - (allCandlesClosed ? 0 : 1));
+  const span = Math.max(1, Math.floor(inputs.left || 3));
+  const oversold = inputs.oversold ?? 30;
+  const overbought = inputs.overbought ?? 70;
+  const highs: number[] = [];
+  const lows: number[] = [];
+  for (let index = span; index + span < last; index += 1) {
+    if (isPivot(candles, "high", index, span, index - span, "body")) highs.push(index);
+    if (isPivot(candles, "low", index, span, index - span, "body")) lows.push(index);
+  }
+  const lines: PsbbDivergenceLine[] = [];
+  const push = (side: "long" | "short", older: number, newer: number, kind: "high" | "low") => lines.push({
+    side, firstTime: candles[older].time, secondTime: candles[newer].time,
+    firstPrice: bodyPrice(candles[older], kind), secondPrice: bodyPrice(candles[newer], kind),
+    firstRsi: momentum[older], secondRsi: momentum[newer],
+  });
+  for (let newer = 1; newer < highs.length; newer += 1) {
+    for (let older = newer - 1; older >= Math.max(0, newer - 4); older -= 1) {
+      const left = highs[older], right = highs[newer];
+      if (right - left > 80) continue;
+      if (bodyPrice(candles[right], "high") > bodyPrice(candles[left], "high") && momentum[right] < momentum[left] && Math.max(momentum[left], momentum[right]) >= overbought) push("short", left, right, "high");
+    }
+  }
+  for (let newer = 1; newer < lows.length; newer += 1) {
+    for (let older = newer - 1; older >= Math.max(0, newer - 4); older -= 1) {
+      const left = lows[older], right = lows[newer];
+      if (right - left > 80) continue;
+      if (bodyPrice(candles[right], "low") < bodyPrice(candles[left], "low") && momentum[right] > momentum[left] && Math.min(momentum[left], momentum[right]) <= oversold) push("long", left, right, "low");
+    }
+  }
+  return lines.sort((a, b) => a.secondTime - b.secondTime || a.firstTime - b.firstTime);
+}
+
+export function psbbDivergenceLines(candles: Bar[], inputs: Record<string, number> = {}, timeframe?: string, allCandlesClosed = false) {
+  if (timeframe && !PSBB_TIMEFRAMES.some((allowed) => allowed === timeframe)) return [];
+  const momentum = rsi(candles.map((bar) => bar.close), Math.max(2, inputs.length || 14));
+  return psbbDivergenceLinesFromRsi(candles, momentum, inputs, allCandlesClosed);
+}
