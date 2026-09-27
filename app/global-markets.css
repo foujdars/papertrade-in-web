@@ -203,6 +203,9 @@
   gap: 12px;
   margin: 14px 0;
 }
+.global-alerts label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; }
+.global-alerts input { max-width: 100%; box-sizing: border-box; }
+.price-action-sheet .global-alerts .global-ticket { margin-top: 0; padding: 10px; border: 0; background: transparent; }
 .global-markets label {
   display: flex;
   flex-direction: column;

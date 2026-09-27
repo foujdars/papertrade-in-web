@@ -18,6 +18,7 @@ import {
   cancelPerpOrder,
 } from "../lib/global-markets.ts";
 import { evaluateGlobalAlert, globalAlertError } from "../lib/global-alerts.ts";
+import { psbbAnalysis } from "../lib/psbb.ts";
 const now = 1800000000000;
 const spec = {
   symbol: "BTCUSD",
@@ -280,6 +281,26 @@ test("global alerts run outside NSE hours, use post-arm prices and do not re-fir
   );
   assert.ok(globalAlertError({ ...rule, kind: "volume-spike", value: 1 }));
   assert.ok(globalAlertError({ ...rule, kind: "rsi-cross-up", value: 101 }));
+});
+test("BTC, ETH and gold PSBB alerts fire only for newly confirmed closed-candle divergence", () => {
+  const points = [[110,90,108],[120,95,100],[115,80,90],[112,75,80],[118,85,100],[130,100,110],[125,99,105],[118,90,94],[122,96,115],[116,94,100],[112,75,88]];
+  const start = 1800000000, inputs = { length: 2, left: 1, oversold: 1, overbought: 99 };
+  const bars = [...Array.from({length:60}, () => [100,90,95]), ...points].map(([high,low,close],i) => ({time:start+i*60,open:close,high,low,close,volume:100}));
+  const setup = psbbAnalysis(bars, inputs, '1m', true).setups[0];
+  assert.ok(setup);
+  const history = bars.filter(bar => bar.time <= setup.confirmedTime);
+  const at = (setup.confirmedTime + 60) * 1000 + 6000;
+  const rule = { id: 'psbb', symbol: 'BTCUSD', kind: 'psbb-divergence', value: 0, length: 14,
+    timeframe: '1m', psbbInputs: inputs, createdAt: at - 120000, expiresAt: at + 86400000 };
+  for (const symbol of ['BTCUSD', 'ETHUSD', 'XAUTUSD']) {
+    assert.equal(globalAlertError({ ...rule, symbol }), null);
+    assert.equal(evaluateGlobalAlert({ ...rule, symbol }, undefined, history, at), true);
+  }
+  assert.ok(globalAlertError({ ...rule, symbol: 'BRENT' }));
+  assert.equal(evaluateGlobalAlert(rule, undefined, history, at - 2000), false, 'five-second finalisation buffer');
+  assert.equal(evaluateGlobalAlert({ ...rule, createdAt: at }, undefined, history, at), false, 'no replay before arming');
+  assert.equal(evaluateGlobalAlert({ ...rule, triggeredAt: at }, undefined, history, at), false, 'no repeat after trigger');
+  assert.equal(evaluateGlobalAlert(rule, undefined, history, at + 180001), false, 'stale candles cannot alert');
 });
 
 test("technical alerts require confirmed post-arm bars, real crossings and contiguous history", () => {

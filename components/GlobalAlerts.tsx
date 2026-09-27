@@ -4,8 +4,14 @@ import { createPortal } from "react-dom";
 import { ModernSelect } from "./ModernSelect";
 import { Bell, X } from "lucide-react";
 import { addPaperTradeNotification } from "@/lib/notification-center";
+import { getNativeTradeAlert } from "@/lib/native-alert";
+import { Capacitor } from "@capacitor/core";
+import { useIndicatorSettings } from "@/lib/indicator-settings";
+import { studyDefaults } from "@/lib/indicator-catalog";
 import {
   GLOBAL_ALERT_KINDS,
+  GLOBAL_DIVERGENCE_SYMBOLS,
+  GLOBAL_DIVERGENCE_FRAMES,
   globalAlertError,
   evaluateGlobalAlert,
   type GlobalAlert,
@@ -19,26 +25,55 @@ const labels: Record<GlobalAlert["kind"], string> = {
   "rsi-cross-up": "RSI crosses above",
   "rsi-cross-down": "RSI crosses below",
   "volume-spike": "Volume exceeds average ×",
+  "psbb-divergence": "PSBB divergence confirmed",
 };
+const GLOBAL_ALERT_CHANGE_EVENT = "papertrade:global-alerts-change";
 export function GlobalAlerts({
   owner,
   visible,
   symbol,
   host,
+  embedded = false,
+  monitor = true,
+  defaultTimeframe,
+  onActiveCount,
 }: {
   owner: string;
   visible: boolean;
   symbol: PerpSymbol;
   host: HTMLElement | null;
+  embedded?: boolean;
+  monitor?: boolean;
+  defaultTimeframe?: string;
+  onActiveCount?: (count: number) => void;
 }) {
+  const { settings } = useIndicatorSettings();
   const key = `papertrade-global-alerts-v1:${owner}`,
     [rules, setRules] = useState<GlobalAlert[]>([]),
     [message, setMessage] = useState(""),
     [expanded, setExpanded] = useState(false),
     [kind, setKind] = useState<GlobalAlert["kind"]>("price-above"),
     [value, setValue] = useState(""),
-    [length, setLength] = useState("14");
+    [length, setLength] = useState("14"),
+    [timeframe, setTimeframe] = useState<keyof typeof GLOBAL_DIVERGENCE_FRAMES>("5m");
+  const [notificationAllowed, setNotificationAllowed] = useState(false);
   const alive = useRef(true);
+  useEffect(() => {
+    if (embedded && visible) {
+      setKind("psbb-divergence");
+      if (defaultTimeframe && Object.hasOwn(GLOBAL_DIVERGENCE_FRAMES, defaultTimeframe)) setTimeframe(defaultTimeframe as keyof typeof GLOBAL_DIVERGENCE_FRAMES);
+    }
+  }, [embedded, visible, defaultTimeframe]);
+  useEffect(() => { if (typeof Notification !== "undefined" && Notification.permission === "granted") setNotificationAllowed(true); }, []);
+  const enableNotifications = async () => {
+    try {
+      const allowed = Capacitor.getPlatform() === "android"
+        ? (await getNativeTradeAlert().requestPermission())?.granted !== false
+        : typeof Notification !== "undefined" && (Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission) === "granted";
+      setNotificationAllowed(allowed);
+      if (!allowed) setMessage("Phone notifications are disabled; the app alert center remains available.");
+    } catch { setMessage("Phone notification permission is unavailable; the app alert center remains available."); }
+  };
   function read() {
     const raw = JSON.parse(localStorage.getItem(key) ?? "[]");
     if (
@@ -64,6 +99,7 @@ export function GlobalAlerts({
         const next = fn(read());
         localStorage.setItem(key, JSON.stringify(next));
         setRules(next);
+        window.dispatchEvent(new CustomEvent(GLOBAL_ALERT_CHANGE_EVENT, { detail: key }));
       });
       return true;
     } catch (e) {
@@ -87,16 +123,22 @@ export function GlobalAlerts({
         }
     };
     window.addEventListener("storage", storage);
+    const changed = (event: Event) => { if ((event as CustomEvent).detail === key) {
+      try { setRules(read()); } catch { setMessage("Alert data unavailable."); }
+    } };
+    window.addEventListener(GLOBAL_ALERT_CHANGE_EVENT, changed);
     return () => {
       alive.current = false;
       window.removeEventListener("storage", storage);
+      window.removeEventListener(GLOBAL_ALERT_CHANGE_EVENT, changed);
     };
   }, [key]);
   const active = rules.some(
     (r) => !r.cancelled && !r.triggeredAt && r.expiresAt > Date.now(),
   );
+  useEffect(() => { onActiveCount?.(rules.filter(r => !r.cancelled && !r.triggeredAt && r.expiresAt > Date.now()).length); }, [rules, onActiveCount]);
   useEffect(() => {
-    if (!active) return;
+    if (!active || !monitor) return;
     let stopped = false,
       busy = false;
     const controller = new AbortController();
@@ -108,9 +150,6 @@ export function GlobalAlerts({
           (r) => !r.cancelled && !r.triggeredAt && r.expiresAt > Date.now(),
         );
         for (const s of [...new Set(pending.map((r) => r.symbol))]) {
-          const technical = pending.some(
-            (r) => r.symbol === s && !r.kind.startsWith("price"),
-          );
           const get = async (url: string) => {
             const r = await fetch(url, { signal: controller.signal });
             const p = await r.json();
@@ -120,12 +159,13 @@ export function GlobalAlerts({
               );
             return p;
           };
-          const [snapshot, history] = await Promise.all([
+          const forSymbol = pending.filter(r => r.symbol === s);
+          const frames = [...new Set(forSymbol.filter(r => !r.kind.startsWith("price")).map(r => r.kind === "psbb-divergence" ? r.timeframe! : "5m"))];
+          const [snapshot, ...histories] = await Promise.all([
             get(`/api/global-markets?symbol=${s}`),
-            technical
-              ? get(`/api/global-markets?symbol=${s}&mode=candles&timeframe=5m`)
-              : Promise.resolve({ candles: [] }),
+            ...frames.map(frame => get(`/api/global-markets?symbol=${s}&mode=candles&timeframe=${frame}`)),
           ]);
+          const candlesByFrame = new Map(frames.map((frame, index) => [frame, histories[index].candles]));
           if (stopped) return;
           const triggered: GlobalAlert[] = [];
           const saved = await change((current) =>
@@ -135,7 +175,7 @@ export function GlobalAlerts({
                 !evaluateGlobalAlert(
                   rule,
                   snapshot.quote,
-                  history.candles,
+                  candlesByFrame.get(rule.kind === "psbb-divergence" ? rule.timeframe! : "5m") ?? [],
                   Date.now(),
                 )
               )
@@ -147,16 +187,32 @@ export function GlobalAlerts({
           );
           if (!saved) continue;
           for (const rule of triggered) {
-            const body = `${s} · ${labels[rule.kind]} ${rule.kind.startsWith("ema") ? rule.length : rule.value}${rule.kind.startsWith("price") ? " USD" : " · 5m confirmed candle"}`;
+            const body = rule.kind === "psbb-divergence"
+              ? `${s} · PSBB divergence confirmed · ${rule.timeframe} closed candle. Open the chart to review.`
+              : `${s} · ${labels[rule.kind]} ${rule.kind.startsWith("ema") ? rule.length : rule.value}${rule.kind.startsWith("price") ? " USD" : " · 5m confirmed candle"}`;
+            const title = rule.kind === "psbb-divergence" ? `${s} · PSBB divergence` : "Global market alert";
+            const url = rule.kind === "psbb-divergence" ? `/?symbol=${s}&timeframe=${rule.timeframe}` : "/";
             try {
               addPaperTradeNotification({
                 id: `global:${owner}:${rule.id}`,
                 kind: "market",
-                title: "Global market alert",
+                title,
                 body,
+                url,
               });
             } catch {
               /* Durable triggered status remains. */
+            }
+            if (rule.kind === "psbb-divergence") {
+              try {
+                if (Capacitor.getPlatform() === "android") await getNativeTradeAlert().show({ title, body, notificationId: `global:${owner}:${rule.id}`, kind: "trade", url });
+                else if ("Notification" in window && Notification.permission === "granted") {
+                  if ("serviceWorker" in navigator) {
+                    const registration = await navigator.serviceWorker.register("/notifications-sw.js", { scope: "/notifications/" });
+                    await registration.showNotification(title, { body, tag: `global:${owner}:${rule.id}`, data: { url } });
+                  } else new Notification(title, { body, tag: `global:${owner}:${rule.id}` });
+                }
+              } catch { /* The in-app notification remains available. */ }
             }
             setMessage(body);
           }
@@ -177,11 +233,11 @@ export function GlobalAlerts({
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [active, key]);
+  }, [active, key, monitor]);
   if (!visible || !host) return null;
   return createPortal(
     <section className="global-alerts">
-      <button
+      {!embedded && <button
         className="global-entry"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
@@ -196,27 +252,23 @@ export function GlobalAlerts({
           }{" "}
           active
         </span>
-      </button>
-      {expanded && (
+      </button>}
+      {(expanded || embedded) && (
         <div className="global-ticket">
           <h3>{symbol} alert</h3>
-          <p className="global-disclosure">
-            Once only · expires in 7 days · app open and visible only.
-            Technicals use completed 5-minute candles. No SMC alerts or
-            closed-app push.
-          </p>
+          <p className="global-disclosure">Once only · expires in 7 days · app open and visible only. PSBB alerts fire when divergence is confirmed on a closed candle, without an entry trigger. No closed-app push.</p>
           <div className="global-input-grid">
             <ModernSelect
               label="Condition"
               ariaLabel="Global alert condition"
               value={kind}
               onChange={setKind}
-              choices={GLOBAL_ALERT_KINDS.map((value) => ({
+              choices={GLOBAL_ALERT_KINDS.filter(value => value !== "psbb-divergence" || GLOBAL_DIVERGENCE_SYMBOLS.some(eligible => eligible === symbol)).map((value) => ({
                 value,
                 label: labels[value],
               }))}
             />
-            {!kind.startsWith("ema") && (
+            {kind !== "psbb-divergence" && !kind.startsWith("ema") && (
               <label>
                 Threshold / multiplier
                 <input
@@ -227,7 +279,7 @@ export function GlobalAlerts({
                 />
               </label>
             )}
-            {!kind.startsWith("price") && (
+            {kind !== "psbb-divergence" && !kind.startsWith("price") && (
               <label>
                 Indicator / average length
                 <input
@@ -239,7 +291,9 @@ export function GlobalAlerts({
                 />
               </label>
             )}
+            {kind === "psbb-divergence" && <ModernSelect label="Timeframe" ariaLabel="PSBB alert timeframe" value={timeframe} onChange={value => setTimeframe(value as keyof typeof GLOBAL_DIVERGENCE_FRAMES)} choices={Object.keys(GLOBAL_DIVERGENCE_FRAMES).map(value => ({ value, label: value }))} />}
           </div>
+          {kind === "psbb-divergence" && !notificationAllowed && <button type="button" onClick={() => void enableNotifications()}>Enable phone notifications</button>}
           <button
             onClick={() =>
               void change((current) => {
@@ -257,13 +311,19 @@ export function GlobalAlerts({
                     id: crypto.randomUUID(),
                     symbol,
                     kind,
-                    value: kind.startsWith("ema") ? 0 : Number(value),
-                    length: Number(length),
+                    value: kind === "psbb-divergence" || kind.startsWith("ema") ? 0 : Number(value),
+                    length: kind === "psbb-divergence" ? 14 : Number(length),
+                    ...(kind === "psbb-divergence" ? { timeframe, psbbInputs: {
+                      length: settings.psbb?.inputs.length ?? studyDefaults("psbb").inputs.length,
+                      left: settings.psbb?.inputs.left ?? studyDefaults("psbb").inputs.left,
+                      oversold: settings.psbb?.inputs.oversold ?? studyDefaults("psbb").inputs.oversold,
+                      overbought: settings.psbb?.inputs.overbought ?? studyDefaults("psbb").inputs.overbought,
+                    } } : {}),
                     createdAt: at,
                     expiresAt: at + 7 * 86400000,
                   };
                 const invalid = globalAlertError(rule);
-                if (invalid || (!value && !kind.startsWith("ema")))
+                if (invalid || (!value && !kind.startsWith("ema") && kind !== "psbb-divergence"))
                   throw new Error(invalid ?? "Enter a threshold.");
                 setMessage("Alert created.");
                 return [...current, rule];
@@ -282,7 +342,7 @@ export function GlobalAlerts({
                     {r.symbol} · {labels[r.kind]}
                   </b>
                   <small>
-                    {r.kind.startsWith("ema") ? `EMA ${r.length}` : r.value} ·{" "}
+                    {r.kind === "psbb-divergence" ? `${r.timeframe} · divergence only` : r.kind.startsWith("ema") ? `EMA ${r.length}` : r.value} ·{" "}
                     {r.cancelled
                       ? "Cancelled"
                       : r.triggeredAt
