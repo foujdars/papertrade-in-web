@@ -75,20 +75,25 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     const y = rsiSeries?.priceToCoordinate(value);
     return y == null ? null : y + rsiBase;
   };
-  if (divergenceOnly) return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} RSI divergences`}>
-    {lines.map((line) => {
-      const x1 = xOf(line.firstTime);
-      const x2 = xOf(line.secondTime);
-      const y1 = yOf(line.firstPrice);
-      const y2 = yOf(line.secondPrice);
-      const ry1 = rsiY(line.firstRsi);
-      const ry2 = rsiY(line.secondRsi);
-      return <g key={`${line.side}:${line.firstTime}:${line.secondTime}`}>
-        {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" x1={x1} y1={y1} x2={x2} y2={y2} />}
-        {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
-      </g>;
-    })}
-  </svg>;
+  if (divergenceOnly) {
+    const palette = ["#e0a100", "#e24b4b", "#3b6fd8", "#7c3aed", "#0f9f6e", "#f97316", "#db2777", "#0e7490"];
+    const colorOf = new Map([...new Set(lines.map((line) => line.firstTime))].sort((a, b) => a - b).map((time, index) => [time, palette[index % palette.length]]));
+    return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} RSI divergences`}>
+      {lines.map((line) => {
+        const x1 = xOf(line.firstTime);
+        const x2 = xOf(line.secondTime);
+        const y1 = yOf(line.firstPrice);
+        const y2 = yOf(line.secondPrice);
+        const ry1 = rsiY(line.firstRsi);
+        const ry2 = rsiY(line.secondRsi);
+        const color = colorOf.get(line.firstTime);
+        return <g key={`${line.side}:${line.firstTime}:${line.secondTime}`}>
+          {x1 != null && x2 != null && y1 != null && y2 != null && <line className="chart-psbb-diverge" style={{ stroke: color }} x1={x1} y1={y1} x2={x2} y2={y2} />}
+          {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" style={{ stroke: color }} x1={x1} y1={ry1} x2={x2} y2={ry2} />}
+        </g>;
+      })}
+    </svg>;
+  }
   if (!setup) return null;
   const x1 = xOf(setup.firstTime);
   const x2 = xOf(setup.secondTime);
