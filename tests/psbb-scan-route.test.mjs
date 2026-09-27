@@ -47,3 +47,13 @@ test('route rejects daily scans, unsupported symbols, invalid months and bad set
   assert.equal((await r.get('&length=NaN')).status, 400);
   assert.deepEqual(r.paths, []);
 });
+test('today scan uses the current IST day without a month selector or outcome fields', async () => {
+  const r = route();
+  const response = await r.raw(new Request('https://example.test/api/market/psbb-scan?instrumentKey=NSE_EQ%7CINE002A01018&timeframe=5m&today=1'));
+  assert.equal(response.status, 200);
+  const { report } = await response.json();
+  assert.equal(report.date, watchlist.indiaDay());
+  assert.equal(report.timeframe, '5m');
+  assert.equal(report.rows.length, 0);
+  assert.equal('counts' in report, false);
+});

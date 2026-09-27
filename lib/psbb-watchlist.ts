@@ -6,6 +6,7 @@ export const TRADING_TIMEFRAMES = ['1m', '5m', '15m', '1H', '4H'] as const;
 export type TradingTimeframe = typeof TRADING_TIMEFRAMES[number];
 export type TradingStatus = 'pending' | 'active' | 'failed' | 'success';
 export const PSBB_SCAN_VERSION = 'rsi-visit-reset-nearest-swing-mss-1r-v10';
+export const LIVE_DIVERGENCE_VERSION = 'today-confirmed-divergence-v1';
 export const FRAME_SECONDS: Record<TradingTimeframe, number> = { '1m': 60, '5m': 300, '15m': 900, '1H': 3600, '4H': 14400 };
 const DAY = 86400, IST = 19800;
 export type TradingSetup = { id: string; status: TradingStatus; setup: PsbbSetup };
@@ -17,6 +18,19 @@ export type TradingReport = {
 
 export const emptyTradingCounts = (): Record<TradingStatus, number> => ({ pending: 0, active: 0, failed: 0, success: 0 });
 export function indiaMonth(now = Date.now()) { return new Date(now + IST * 1000).toISOString().slice(0, 7); }
+export function indiaDay(now = Date.now()) { return new Date(now + IST * 1000).toISOString().slice(0, 10); }
+export type TodayDivergence = { id: string; side: PsbbSetup['side']; firstTime: number; secondTime: number; confirmedTime: number };
+export type TodayDivergenceReport = { instrumentKey: string; timeframe: TradingTimeframe; date: string; rows: TodayDivergence[]; lastCandleAt: number | null; scannedAt: number; coverage: 'available' | 'limited' };
+export function buildTodayDivergenceReport(instrumentKey: string, timeframe: TradingTimeframe, candles: Candle[], inputs: Record<string, number> = {}, now = Date.now()): TodayDivergenceReport {
+  const date = indiaDay(now), cutoff = now / 1000;
+  const closed = [...new Map(candles.map(bar => [bar.time, bar])).values()]
+    .filter(bar => bar.time < cutoff && nseCandleEnd(bar.time, timeframe) <= cutoff).sort((a, b) => a.time - b.time);
+  const rows = psbbAnalysis(closed, inputs, timeframe, true).setups
+    .filter(setup => indiaDay(setup.confirmedTime * 1000) === date)
+    .map(setup => ({ id: `${setup.side}:${setup.firstTime}:${setup.secondTime}`, side: setup.side, firstTime: setup.firstTime, secondTime: setup.secondTime, confirmedTime: setup.confirmedTime }));
+  return { instrumentKey, timeframe, date, rows, lastCandleAt: closed.at(-1)?.time ?? null, scannedAt: now,
+    coverage: closed.length < Math.max(50, (inputs.length || 14) * 5) ? 'limited' : 'available' };
+}
 export function monthWindow(month: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Choose a valid month.');
   const [year, m] = month.split('-').map(Number);
