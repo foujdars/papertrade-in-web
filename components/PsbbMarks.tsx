@@ -27,7 +27,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const [, redraw] = useState(0);
   const arrowId = `psbb-entry-${useId().replace(/:/g, '')}`;
   const closed = candles.at(-2);
-  const stamp = `${candles.length}:${candles.at(-1)?.time}:${closed?.high}:${closed?.low}:${closed?.close}`;
+  const stamp = `${candles.length}:${candles.at(-1)?.time}:${closed?.open}:${closed?.high}:${closed?.low}:${closed?.close}`;
   const inputs = useMemo(() => ({ ...studyDefaults("psbb").inputs, ...config?.inputs }), [config?.inputs]);
   const allowed = PSBB_TIMEFRAMES.some((value) => value === timeframe) && (!config?.timeframes.length || config.timeframes.includes(timeframe));
   // Candle arrays can be updated in place by the live feed; the closed-bar stamp

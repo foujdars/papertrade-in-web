@@ -1,6 +1,7 @@
 import type { Candle } from "./market";
 
 type Bar = Pick<Candle, "time" | "open" | "high" | "low" | "close">;
+const bodyPrice = (bar: Bar, side: "low" | "high") => side === "high" ? Math.max(bar.open, bar.close) : Math.min(bar.open, bar.close);
 export type PsbbStatus = "active" | "formed" | "passed" | "failed";
 export const PSBB_TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"] as const;
 export type PsbbAnchor = { side: "long" | "short"; time: number; price: number; rsi: number };
@@ -64,13 +65,14 @@ function rsi(closes: number[], length: number) {
   });
 }
 
-function isPivot(candles: Bar[], side: "low" | "high", index: number, span: number, legStart = index - span) {
+function isPivot(candles: Bar[], side: "low" | "high", index: number, span: number, legStart = index - span, source: "wick" | "body" = "wick") {
   if (legStart < 0 || index <= legStart) return false;
-  const value = candles[index][side];
+  const price = (bar: Bar) => source === "body" ? bodyPrice(bar, side) : bar[side];
+  const value = price(candles[index]);
   if (!Number.isFinite(value)) return false;
   for (let cursor = Math.max(legStart, index - span); cursor <= index + span; cursor += 1) {
     if (cursor === index) continue;
-    const other = candles[cursor][side];
+    const other = price(candles[cursor]);
     if (!Number.isFinite(other) || (side === "low" ? other <= value : other >= value)) return false;
   }
   return true;
@@ -106,7 +108,9 @@ function moveD1(episode: Episode, index: number) {
  * A threshold crossing starts a visit; D1 follows its RSI peak (>70) or trough
  * (<30), never the first crossing by default. Every new threshold visit
  * replaces an unentered D1; its RSI extreme becomes the new anchor. Price
- * divergence after that anchor can form D2 until another threshold visit.
+ * divergence after that anchor uses body highs/lows for D1 and D2; wicks
+ * do not create or disqualify price divergence. Another threshold visit
+ * replaces the anchor before an entry.
  * Swings need `left` closed candles on the right. Entry uses the most recent
  * confirmed swing high before SL for longs or swing low before SH for shorts,
  * strictly between D1 and the divergence extreme.
@@ -159,7 +163,7 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       } else if (visit && Number.isFinite(current)) {
         episode.visit = undefined;
       }
-      const makesExtreme = long ? bar.low < candles[episode.extreme].low : bar.high > candles[episode.extreme].high;
+      const makesExtreme = long ? bodyPrice(bar, "low") < bodyPrice(candles[episode.extreme], "low") : bodyPrice(bar, "high") > bodyPrice(candles[episode.extreme], "high");
       if (makesExtreme) {
         episode.extreme = index;
         episode.setup = undefined;
@@ -176,15 +180,15 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       const earlyMss = divergence && before !== undefined && index > extreme && (long
         ? bar.high >= candles[before].high
         : bar.low <= candles[before].low);
-      if (!episode.setup && ((confirmed === extreme && pivots[extremeKind].at(-1) === extreme) || earlyMss)) {
+      if (!episode.setup && ((confirmed === extreme && isPivot(candles, extremeKind, confirmed, span, confirmed - span, "body")) || earlyMss)) {
         episode.pushes += 1;
         if (divergence) {
           episode.structure = before;
           episode.setup = {
             side, status: "active", phase: "waiting-structure", structureCase: null,
             shifted: false, extended: episode.pushes >= 3,
-            firstTime: candles[first].time, firstPrice: candles[first][extremeKind], firstRsi: momentum[first],
-            secondTime: candles[extreme].time, secondPrice: candles[extreme][extremeKind], secondRsi: momentum[extreme],
+            firstTime: candles[first].time, firstPrice: bodyPrice(candles[first], extremeKind), firstRsi: momentum[first],
+            secondTime: candles[extreme].time, secondPrice: bodyPrice(candles[extreme], extremeKind), secondRsi: momentum[extreme],
             confirmedTime: bar.time, end: bar.time, entry: null, entryTime: null, mssTime: null,
             stop: null, stopTime: null, target1: null, target2: null, target1Hit: false,
           };
@@ -225,7 +229,7 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
   const anchors: PsbbAnchor[] = [];
   for (const side of ["long", "short"] as const) {
     const episode = episodes[side];
-    if (episode) anchors.push({ side, time: candles[episode.first].time, price: candles[episode.first][side === "long" ? "low" : "high"], rsi: momentum[episode.first] });
+    if (episode) anchors.push({ side, time: candles[episode.first].time, price: bodyPrice(candles[episode.first], side === "long" ? "low" : "high"), rsi: momentum[episode.first] });
   }
   // Monthly statistics need the full history, not just the last four setups.
   return { setups: setups.sort((a, b) => a.secondTime - b.secondTime), anchors };
