@@ -63,7 +63,7 @@ test('monthly selection retains more than four trades and distinguishes all four
 
 test('PSBB engine retains all entries for a monthly ledger', () => {
   const candles = [], momentum = [];
-  const points = [[100,90,95,50],[110,100,105,75],[120,110,115,72],[130,120,125,65],[125,115,120,60],[118,100,106,50],[122,108,116,55],[116,104,110,50],[112,95,98,40],[110,65,75,45]];
+  const points = [[100,90,95,50],[110,100,105,75],[108,94,100,60],[118,104,110,65],[115,98,107,55],[130,120,125,65],[125,110,115,55],[117,96,97,45],[110,95,100,50]];
   for (let cycle = 0; cycle < 8; cycle++) for (const [high, low, close, rsi] of points) { candles.push(bar(candles.length, high, low, close)); momentum.push(rsi); }
   candles.push(bar(candles.length, 100, 90, 95)); momentum.push(50);
   assert.equal(psbbSetups(candles, momentum, { left: 1 }).filter((setup) => setup.shifted).length, 8);
@@ -71,7 +71,7 @@ test('PSBB engine retains all entries for a monthly ledger', () => {
 
 function realCandles() {
   const start = epoch('2026-09-01T09:15:00+05:30');
-  const pattern = [[110,90,108],[120,95,100],[130,100,110],[125,99,105],[118,90,94],[122,96,115],[116,94,100],[112,85,88]];
+  const pattern = [[110,90,108],[120,95,100],[115,80,90],[112,75,80],[118,85,100],[130,100,110],[125,99,105],[118,90,94],[122,96,115],[116,94,100],[112,75,88]];
   return [...Array.from({ length: 20 }, () => [100,90,95]), ...pattern].map(([h,l,c],i) => bar(start + i * 60, h,l,c));
 }
 test('scanner evaluates all closed candles, omits forming bars, and uses highest swing + 1R', () => {
@@ -81,17 +81,17 @@ test('scanner evaluates all closed candles, omits forming bars, and uses highest
   const report = run(end);
   assert.equal(report.counts.active, 1);
   assert.equal(report.rows[0].setup.stop, 130);
-  assert.equal(report.rows[0].setup.entry, 90);
-  assert.equal(report.rows[0].setup.target1, 50);
+  assert.equal(report.rows[0].setup.entry, 75);
+  assert.equal(report.rows[0].setup.target1, 20);
   assert.equal(report.coverage, 'limited');
 });
 test('1R success is final, stop/target same-bar is failed, and next-month prices cannot alter past results', () => {
   const candles = realCandles();
   const next = candles.at(-1).time + 60;
   const run = (data, now = (next + 300) * 1000) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', data, { length: 2, left: 1, oversold: 1, overbought: 99 }, now);
-  assert.equal(run([...candles, bar(next, 110, 45, 48)]).counts.success, 1);
-  assert.equal(run([...candles, bar(next, 135, 45, 80)]).counts.failed, 1);
-  const future = bar(epoch('2026-10-01T09:15:00+05:30'), 110, 45, 48);
+  assert.equal(run([...candles, bar(next, 110, 15, 18)]).counts.success, 1);
+  assert.equal(run([...candles, bar(next, 135, 15, 80)]).counts.failed, 1);
+  const future = bar(epoch('2026-10-01T09:15:00+05:30'), 110, 15, 18);
   const frozen = run([...candles, future], Date.parse('2026-10-02'));
   assert.equal(frozen.counts.success, 0);
   assert.equal(frozen.counts.active, 1);

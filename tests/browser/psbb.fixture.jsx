@@ -17,7 +17,7 @@ function Fixture({ view }) {
   const timeframe = view.timeframe;
   const appliedConfig = view.actual ? studyDefaults('psbb') : config;
   useEffect(() => {
-    const outcome = view.outcome ? [view.outcome === 'passed' ? [95, 49, 90] : [131, 85, 90], [100, 85, 90], [100, 85, 90], [100, 85, 90]] : [];
+    const outcome = view.outcome ? [view.outcome === 'passed' ? [95, 30, 90] : [131, 85, 90], [100, 85, 90], [100, 85, 90], [100, 85, 90]] : [];
     const rows = [...Array.from({ length: 20 }, () => [100, 90, 95]), ...pattern, ...outcome].slice(0, view.count);
     const candles = view.actual ? actualRows.map(([time,open,high,low,close]) => ({time,open,high,low,close,volume:100})) : rows.map(([high, low, close], i) => ({
       time: 1700000000 + i * seconds[timeframe], high: view.long ? 200 - low : high,

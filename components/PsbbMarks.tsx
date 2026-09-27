@@ -92,11 +92,11 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const waitingY = setup.entry === null ? null : yOf(setup.entry);
   const waitingX = setup.entryTime === null ? null : xOf(setup.entryTime);
   const swing = setup.side === "short" ? "swing low" : "swing high";
-  const status = setup.phase === "waiting-structure" ? `Waiting for new ${swing}`
+  const status = setup.phase === "waiting-structure" ? `No ${swing} between D1 and divergence`
     : setup.phase === "waiting-mss" ? "Waiting for entry level"
     : setup.status === "passed" ? "Success · 1R reached" : setup.status === "failed" ? "Failed · stop reached"
     : "Active · MSS confirmed";
-  const description = `${timeframe} PSBB · ${setup.side === "short" ? "Bearish" : "Bullish"}${setup.structureCase ? ` · Case ${setup.structureCase === "before" ? "A" : "B"}` : ""} · ${status}`;
+  const description = `${timeframe} PSBB · ${setup.side === "short" ? "Bearish" : "Bullish"} · ${status}`;
   return <><div className="chart-or-note">{description}</div><svg className="chart-psbb" width={plotWidth} height={height} aria-label={description}>
     <defs><marker id={arrowId} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#753bce" /></marker></defs>
     {anchorMarks}
