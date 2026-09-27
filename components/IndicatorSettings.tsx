@@ -12,7 +12,8 @@ const PRIOR_PRICES=[['high','High'],['low','Low'],['open','Open'],['close','Clos
 function EntryInputs({draft,onChange}:{draft:ReturnType<typeof studyDefaults>;onChange:(next:ReturnType<typeof studyDefaults>)=>void}){
  const toggle=(key:string)=>onChange({...draft,inputs:{...draft.inputs,[key]:draft.inputs[key]===0?1:0}});
  const rules=[['pullback','Trend pullback'],['level','Level break'],['open','Opening range'],['momentum','RSI and MACD'],['squeeze','Squeeze'],['vwap','VWAP filter']] as const;
- return <><p className="indicator-help">EMA 21, EMA 50 and VWAP stay on the chart. A green dot is a long and a red dot is a short, only when that rule agrees. The last candle is left unmarked.</p><div className="indicator-choices" aria-label="Entry rules">{rules.map(([key,label])=><button key={key} type="button" aria-pressed={draft.inputs[key]!==0} onClick={()=>toggle(key)}>{label}</button>)}</div></>;
+ const lines=[['line5','EMA 5'],['line21','EMA 21'],['line50','EMA 50'],['lineVwap','VWAP']] as const;
+ return <><p className="indicator-help">Choose each line separately. A green dot is a long and a red dot is a short when an entry rule agrees. The forming candle is left unmarked.</p><div className="indicator-choices" aria-label="Displayed lines">{lines.map(([key,label])=><button key={key} type="button" aria-pressed={draft.inputs[key]!==0} onClick={()=>toggle(key)}>{label}</button>)}</div><div className="indicator-choices" aria-label="Entry rules">{rules.map(([key,label])=><button key={key} type="button" aria-pressed={draft.inputs[key]!==0} onClick={()=>toggle(key)}>{label}</button>)}</div></>;
 }
 function PriorInputs({draft,onChange}:{draft:ReturnType<typeof studyDefaults>;onChange:(next:ReturnType<typeof studyDefaults>)=>void}){
  const toggle=(key:string)=>onChange({...draft,inputs:{...draft.inputs,[key]:draft.inputs[key]===0?1:0}});

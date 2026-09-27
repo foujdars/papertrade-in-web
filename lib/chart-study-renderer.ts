@@ -5,6 +5,7 @@ import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
 import { buildVolumeProfile } from './volume-profile';
 
 type Bundle={id:string;config:StudyConfig;signature:string;series:ISeriesApi<'Line'|'Histogram'>[];pane:number;result:StudyResult;primitive?:{update:(data:Candle[])=>void}};
+const entryColorIndex=(name:string)=>({'EMA 5':0,'EMA 21':1,'EMA 50':2,VWAP:3,Long:4,Short:5})[name as 'EMA 5'|'EMA 21'|'EMA 50'|'VWAP'|'Long'|'Short']??0;
 class VisibleProfile implements ISeriesPrimitive<Time>{
  chart?:IChartApi;series?:ISeriesApi<'Line'>;request?:()=>void;data:Candle[]=[];config:StudyConfig;
  constructor(config:StudyConfig){this.config=config;}
@@ -50,7 +51,7 @@ export class ChartStudyRenderer {
     // Preserve an empty pane/series when history is unavailable so later live data can fill it.
     const plots=result.plots.length?result.plots:[{name:d.name,values:[]}];
     for(let i=0;i<plots.length;i++){
-     const plot=plots[i],isVolume=d.id==='volume',color=(isVolume&&i===1?c.colors[2]:c.colors[i%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
+     const plot=plots[i],isVolume=d.id==='volume',color=(isVolume&&i===1?c.colors[2]:c.colors[(d.id==='entry'?entryColorIndex(plot.name):i)%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
      const oscillator=d.id==='rsi';
      const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:(oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:(oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0),crosshairMarkerVisible:oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
      if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:oscillator?'#8054da66':'#8c849b80',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});series.push(s);
