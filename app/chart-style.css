@@ -204,6 +204,13 @@
 .terminal-shell:has(.drawing-settings[open]) .permanent-trade-footer { visibility:hidden; pointer-events:none; }
 .drawing-settings label { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; font-size:13px; }
 .drawing-settings input:not([type=checkbox]),.drawing-settings select { min-width:0; width:60%; padding:9px; border:1px solid var(--line,#ddd); border-radius:8px; color:inherit; background:transparent; font-size:16px; }
+.drawing-settings-color { margin:12px 0 16px; font-size:13px; }
+.drawing-settings-color > span { display:block; margin-bottom:10px; }
+.drawing-settings-swatches { display:flex; flex-wrap:wrap; gap:9px; }
+.drawing-settings-swatches button { width:31px; height:31px; border:1px solid var(--line,#ddd); border-radius:50%; box-shadow:0 0 0 1px #0002; cursor:pointer; }
+.drawing-settings-swatches button.active { outline:2px solid var(--purple,#8054da); outline-offset:2px; }
+.drawing-settings .drawing-settings-custom-color { margin:12px 0 0; }
+.drawing-settings .drawing-settings-custom-color input[type=color] { width:60px; height:38px; padding:3px; cursor:pointer; }
 .drawing-settings p { font-size:11px; line-height:1.5; color:var(--muted,#777); }
 .drawing-settings footer { display:flex; flex-shrink:0; gap:10px; justify-content:flex-end; padding-top:12px; }
 .drawing-settings footer button { min-height:44px; padding:10px 18px; border:1px solid var(--line,#ddd); border-radius:8px; background:transparent; color:inherit; }
