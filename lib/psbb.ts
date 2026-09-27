@@ -107,7 +107,9 @@ function moveD1(episode: Episode, index: number) {
 /**
  * A threshold crossing starts a visit; D1 follows its RSI peak (>70) or trough
  * (<30), never the first crossing by default. Every new threshold visit
- * replaces an unentered D1; its RSI extreme becomes the new anchor. Price
+ * replaces an unentered D1 unless the new visit already makes a higher body
+ * high with lower RSI than the bearish anchor; that is a divergence candidate.
+ * Its RSI extreme becomes the new anchor otherwise. Price
  * divergence after that anchor uses body highs/lows for D1 and D2; wicks
  * do not create or disqualify price divergence. Another threshold visit
  * replaces the anchor before an entry.
@@ -149,7 +151,14 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
         ? previous >= oversold && current < oversold
         : previous <= overbought && current > overbought);
       if (crossed) {
-        episodes[side] = { first: index, extreme: index, pushes: 0, visit: { peak: index } };
+        const prior = episodes[side];
+        // A brief dip below 70 can separate the two highs in a bearish
+        // divergence. Keep the highest-RSI D1 if this new overbought candle
+        // already has a higher body high at a lower RSI reading.
+        const continuesBearishDivergence = !long && prior && !prior.setup && current < momentum[prior.first]
+          && bodyPrice(bar, "high") > bodyPrice(candles[prior.first], "high");
+        if (continuesBearishDivergence) prior.visit = { peak: prior.first };
+        else episodes[side] = { first: index, extreme: index, pushes: 0, visit: { peak: index } };
       }
       const episode = episodes[side];
       if (!episode) continue;

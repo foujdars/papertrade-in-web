@@ -64,6 +64,29 @@ for (const inverse of [false, true]) {
   });
 }
 
+test('bearish: later higher RSI peak is D1 and a new above-70 visit with a higher body high and lower RSI confirms divergence', () => {
+  const candles = flat(17), momentum = Array(17).fill(55);
+  candles[2] = bar(2, 128, 118, 123); momentum[2] = 75;
+  candles[3] = bar(3, 134, 120, 130); momentum[3] = 77;
+  candles[4] = bar(4, 131, 118, 125); momentum[4] = 72;
+  candles[5] = bar(5, 124, 106, 118); momentum[5] = 67;
+  candles[6] = bar(6, 132, 115, 127); momentum[6] = 69;
+  candles[7] = bar(7, 142, 120, 138); momentum[7] = 74;
+  candles[8] = bar(8, 132, 110, 118); momentum[8] = 62;
+  const before = psbbAnalysisFromRsi(candles.slice(0, 7), momentum.slice(0, 7), {left:1}, true);
+  assert.equal(before.anchors.find(anchor=>anchor.side==='short')?.time, 3);
+  assert.equal(before.anchors.find(anchor=>anchor.side==='short')?.rsi, 77);
+  const result = psbbAnalysisFromRsi(candles.slice(0, 11), momentum.slice(0, 11), {left:1}, true);
+  const setup = result.setups.find(item=>item.side==='short');
+  assert.ok(setup);
+  assert.equal(setup.firstTime, 3);
+  assert.equal(setup.firstRsi, 77);
+  assert.equal(setup.secondTime, 7);
+  assert.equal(setup.secondRsi, 74);
+  assert.equal(setup.firstPrice, 130);
+  assert.equal(setup.secondPrice, 138);
+});
+
 test('a newer D1 replaces old chart levels without deleting the trade ledger', () => {
   const old = { firstTime: 3, secondTime: 8, status: 'failed' };
   const analysis = { setups: [old], anchors: [{ time: 12, side: 'short' }] };
@@ -101,13 +124,12 @@ test('bullish D1 follows the lowest RSI below 30 and a later non-divergent visit
   assert.equal(divergence.target1, 160);
 });
 
-for (const bullish of [true, false]) test(`${bullish ? 'bullish' : 'bearish'} fresh RSI visit replaces D1 even when it would diverge against the old anchor`, () => {
+test('bullish fresh RSI visit replaces D1 even when it would diverge against the old anchor', () => {
   const candles = flat(13), momentum = Array(13).fill(50);
   candles[1] = bar(1, 115, 100); momentum[1] = 20;
   candles[6] = bar(6, 112, 90); momentum[6] = 25;
   candles[7] = bar(7, 130, 102); momentum[7] = 40;
-  const transform = (bars, values) => bullish ? { candles: bars, momentum: values }
-    : { candles: bars.map(c => ({...c, open: 250-c.open, close: 250-c.close, high: 250-c.low, low: 250-c.high})), momentum: values.map(value => 100-value) };
+  const transform = (bars, values) => ({ candles: bars, momentum: values });
   const early = transform(candles.slice(0,9), momentum.slice(0,9));
   const replacement = psbbAnalysisFromRsi(early.candles, early.momentum, {left:1}, true);
   assert.equal(replacement.anchors[0].time, 6);
@@ -172,7 +194,7 @@ test("a later RSI threshold visit starts a fresh D1 rather than inheriting earli
   const candles = flat(28);
   candles[4] = bar(4, 130, 118, 124);
   candles[6] = bar(6, 122, 100, 108);
-  candles[10] = bar(10, 136, 120, 128);
+  candles[10] = bar(10, 136, 120, 122);
   candles[12] = bar(12, 124, 102, 110);
   candles[16] = bar(16, 142, 128, 136);
   candles[18] = bar(18, 126, 104, 112);
