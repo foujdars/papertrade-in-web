@@ -1773,6 +1773,7 @@ export function MarketChart({
       };
       let rsiScalePurple = false;
       let rsiLastHidden = false;
+      let pointerInPricePane = false;
       const rsiCursorColor = (studyId: string | undefined) => {
         if (studyId !== "rsi") return undefined;
         const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
@@ -1815,6 +1816,7 @@ export function MarketChart({
         return { studyId: bundle.id, value, y: top + localY };
       };
       crosshairMove = (event) => {
+        if (pointerInPricePane && event.paneIndex !== 0) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
@@ -2202,6 +2204,24 @@ export function MarketChart({
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
+        if (!tool && !studyEdit && pointers.has(event.pointerId)) {
+          const bounds = host.getBoundingClientRect();
+          const x = event.clientX - bounds.left;
+          const y = event.clientY - bounds.top;
+          const priceHeight = chart.panes()[0]?.getHeight() ?? 0;
+          pointerInPricePane = y >= 0 && y < priceHeight && x >= 0 && x <= chart.timeScale().width();
+          if (pointerInPricePane) {
+            const time = chart.timeScale().coordinateToTime(x);
+            const price = series.coordinateToPrice(y);
+            if (time != null && price != null) {
+              chart.setCrosshairPosition(price, time, series);
+              setPriceCursor({ price: Math.round(price * 100) / 100, y });
+              paintRsiCrosshair(undefined);
+              setStudyCursor((current) => current ? null : current);
+              setRsiLastVisible(true);
+            }
+          }
+        }
         if (tool && !CONTINUOUS_TOOLS.has(tool)) {
           if (gesture?.pointerId === event.pointerId && gesture.moved) aim(event);
           event.preventDefault(); event.stopPropagation(); return;
@@ -2226,6 +2246,7 @@ export function MarketChart({
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         pointers.delete(event.pointerId);
+        if (!pointers.size) pointerInPricePane = false;
         if(studyEdit?.pointerId===event.pointerId) {
           const edit=studyEdit;studyEdit=null;
           const next=event.type==='pointercancel'?studyDrawingsRef.current.map(item=>item.id===edit.original.id?edit.original:item):studyDrawingsRef.current;

@@ -69,7 +69,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
   const stopToolbar = (event: ReactPointerEvent) => event.stopPropagation();
   return <>
     <svg className="chart-study-drawings" width={width} height={height} aria-hidden="true">
-    {cursor && <line className="chart-study-crosshair" style={cursor.color ? { stroke: cursor.color } : undefined} x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
+    {cursor && !cursor.color && <line className="chart-study-crosshair" x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
     {drawings.map((line) => {
       const from = point(line.studyId, line.a);
       const to = point(line.studyId, line.b);
