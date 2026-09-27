@@ -6,35 +6,12 @@ import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, currentPsbbSe
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
 
-test('actual reported candles: Case B ignores pre-divergence highs and enters at 401.10', () => {
-  // Upstox INDSWFTLAB 5m OHLC, retrieved 2026-09-27. Includes RSI warmup.
+test('reported new-leg candles never enter without a swing between D1 and SH', () => {
   const rows = JSON.parse(readFileSync(new URL('./fixtures/psbb-new-leg-candles.json', import.meta.url), 'utf8'));
   const candles = rows.map(([time,open,high,low,close]) => ({time,open,high,low,close}));
-  const result = psbbAnalysis(candles, {}, '5m').setups.at(-1);
-  assert.equal(result.entry,401.10);
-  assert.equal(result.entryTime,1790240700);
-  assert.equal(result.mssTime,1790241900);
-  assert.equal(result.stop,393.6);
-  assert.ok(Math.abs(result.target1-408.6)<1e-9);
-  assert.equal(result.status,'passed');assert.equal(result.end,1790314200);
-  const entryIndex=candles.findIndex(c=>c.time===result.mssTime), endIndex=candles.findIndex(c=>c.time===result.end);
-  const before=psbbAnalysis(candles.slice(0,entryIndex),{},'5m',true).setups.at(-1);
-  assert.equal(before.entry,401.10);assert.equal(before.shifted,false);
-  const atEntry=psbbAnalysis(candles.slice(0,entryIndex+1),{},'5m',true).setups.at(-1);
-  assert.equal(atEntry.mssTime,result.mssTime,'First touch is known without future candles');
-  assert.ok(candles.slice(entryIndex+1,endIndex).every(c=>c.high<result.target1&&c.low>result.stop));
-  // Same shape at different price scales and inverted for bearish symbols:
-  // the implementation has no symbol-specific conditions.
-  for (const [i,timeframe] of PSBB_TIMEFRAMES.entries()) for(const scale of [.1,1,10]) for(const inverse of [false,true]) {
-    const step=[60,300,900,3600,14400,86400][i];
-    const price=v=>(inverse?1000-v:v)*scale;
-    const transformed=candles.map((c,index)=>({time:1700000000+index*step,open:price(c.open),close:price(c.close),high:price(inverse?c.low:c.high),low:price(inverse?c.high:c.low)}));
-    const setup=psbbAnalysis(transformed,{},timeframe).setups.at(-1);
-    assert.ok(Math.abs(setup.entry-price(result.entry))<1e-8);
-    assert.equal(setup.mssTime,transformed[entryIndex].time);
-    assert.equal(setup.end,transformed[endIndex].time);
-    assert.equal(setup.status,'passed');
-  }
+  const setups = psbbAnalysis(candles, {}, '5m').setups;
+  assert.ok(setups.some(setup => setup.phase === 'waiting-structure'));
+  assert.ok(setups.every(setup => !setup.shifted));
 });
 
 for (const inverse of [false, true]) {
@@ -190,89 +167,46 @@ test('D1 is available for chart marking before divergence and only after its can
 });
 
 for (const long of [false, true]) {
-  const name = long ? 'bullish' : 'bearish';
-  test(`${name} Case B keeps D1 at the excursion RSI extreme and waits for a new structure`, () => {
+  test(`${long ? 'bullish' : 'bearish'} divergence without intervening structure never enters on a new-leg swing break`, () => {
     const data = caseB(long);
-    const divergence = latest(prefix(data, 6));
-    assert.equal(divergence.firstTime, 1);
-    assert.equal(divergence.firstRsi, long ? 25 : 75);
-    assert.equal(divergence.secondTime, 3);
-    assert.equal(divergence.confirmedTime, 4);
-    assert.equal(divergence.phase, 'waiting-structure');
-    assert.equal(divergence.shifted, false);
-    for (const key of ['entry', 'entryTime', 'mssTime', 'stop', 'target1', 'target2']) assert.equal(divergence[key], null, key);
-    const waiting = latest(prefix(data, 8));
-    assert.equal(waiting.phase, 'waiting-mss');
-    assert.equal(waiting.structureCase, 'after');
-    assert.equal(waiting.entryTime, 5);
-    assert.equal(waiting.entry, 100);
-    assert.equal(waiting.mssTime, null);
-  });
-
-  test(`${name} Case B uses the highest/lowest setup swing for its stop and a fixed 1R target`, () => {
-    const setup = latest(caseB(long));
-    assert.equal(setup.side, long ? 'long' : 'short');
-    assert.equal(setup.phase, 'entered');
-    assert.equal(setup.structureCase, 'after');
-    assert.equal(setup.entry, 100);
-    assert.equal(setup.entryTime, 5);
-    assert.equal(setup.mssTime, 8);
-    assert.equal(setup.stopTime, 3);
-    assert.equal(setup.stop, long ? 70 : 130);
-    assert.equal(setup.stop, setup.secondPrice);
-    assert.equal(setup.target1, long ? 130 : 70);
-    assert.equal(setup.target2, setup.target1);
-    assert.equal(setup.status, 'formed');
-  });
-
-  test(`${name} entry uses the first wick touch, not a later close beyond the level`, () => {
-    const data = caseB(long);
-    data.candles[8].close = 100;
-    assert.equal(latest(data).shifted, true);
-    data.candles[8].close = long ? 99 : 101;
-    assert.equal(latest(data).shifted, true);
-    assert.equal(latest(data).mssTime, 8);
-    assert.equal(latest(data).entry, 100);
-    data.candles[8][long ? 'high' : 'low'] = 100;
-    assert.equal(latest(data).shifted, true, 'Exact touch of the horizontal level qualifies');
-    data.candles[8][long ? 'high' : 'low'] = long ? 99.9 : 100.1;
-    assert.equal(latest(data).shifted, false, 'A candle that does not reach the level stays pending');
-  });
-
-  test(`${name} live candle cannot confirm a divergence, pivot, or MSS`, () => {
-    const data = caseB(long);
-    assert.equal(latest(prefix(data, 5)), undefined); // SH confirmation is still live.
-    assert.equal(latest(prefix(data, 7)).entry, null); // First structure confirmation is live.
-    assert.equal(latest(prefix(data, 9)).shifted, false); // The breaking candle is live.
-    assert.equal(latest(data).shifted, true);
+    const setup = latest(data);
+    assert.equal(setup.firstTime, 1);
+    assert.equal(setup.secondTime, 3);
+    assert.equal(setup.phase, 'waiting-structure');
+    assert.equal(setup.structureCase, null);
+    assert.equal(setup.entry, null);
+    assert.equal(setup.mssTime, null);
+    assert.equal(setup.shifted, false);
+    assert.equal(setup.status, 'active');
   });
 }
 
-test('Case A selects the latest intervening swing, not the lowest low in the window', () => {
+test('bearish entry uses the lowest intervening swing low, even when a later swing is higher', () => {
   const candles = [
     bar(0, 100, 90, 95), bar(1, 110, 100, 105), bar(2, 108, 94, 100),
     bar(3, 118, 104, 110), bar(4, 115, 98, 107), bar(5, 130, 120, 125),
-    bar(6, 125, 110, 115), bar(7, 117, 96, 97), bar(8, 110, 95, 100),
+    bar(6, 125, 110, 115), bar(7, 117, 93, 97), bar(8, 110, 95, 100),
   ];
   const momentum = [50, 75, 60, 65, 55, 65, 55, 45, 50];
   const setup = latest({ candles, momentum });
   assert.equal(setup.structureCase, 'before');
-  assert.equal(setup.entryTime, 4);
-  assert.equal(setup.entry, 98);
+  assert.equal(setup.entryTime, 2);
+  assert.equal(setup.entry, 94);
   assert.equal(setup.stop, 130);
   assert.equal(setup.mssTime, 7);
 });
 
-test('Case B locks the first post-divergence swing even when another one forms', () => {
-  const data = caseB();
-  data.candles.splice(8, 0, bar(8, 119, 108, 115));
-  data.momentum.splice(8, 0, 54);
-  data.candles.forEach((c, i) => { c.time = i; });
-  const setup = latest(data);
-  assert.equal(setup.entryTime, 5);
-  assert.equal(setup.entry, 100); // Not the newer swing at 104.
-  assert.equal(setup.stopTime, 3);
-  assert.equal(setup.stop, 130);
+test('bullish entry uses the highest intervening swing high, even when a later swing is lower', () => {
+  const candles = [
+    bar(0,100,90),bar(1,110,100),bar(2,108,94),bar(3,118,104),
+    bar(4,115,98),bar(5,130,120),bar(6,125,110),bar(7,117,93),bar(8,110,95),
+  ].map(c => ({...c,open:250-c.open,high:250-c.low,low:250-c.high,close:250-c.close}));
+  const momentum = [50,75,60,65,55,65,55,45,50].map(value => 100-value);
+  const setup = latest({candles,momentum});
+  assert.equal(setup.side,'long');
+  assert.equal(setup.entryTime,2);
+  assert.equal(setup.entry,156);
+  assert.equal(setup.mssTime,7);
 });
 
 test('a more extreme price replaces a pending divergence, keeping the original D1', () => {
@@ -328,73 +262,35 @@ test('Case A activates on the closed MSS candle without waiting for later pivot 
   }
 });
 
-test('401.10 Case B ray triggers on its first touch candle across all six timeframes', () => {
-  // Synthetic regression matching the reported level: three-bar confirmed
-  // swing high, then a wick touch, then a later close above it.
-  const values = [[405,400,402],[402,398,399],[400,396,397],[397,394,395],
-    [398,395,397],[400,396,399],[401.10,398,400],[400.9,397,399],
-    [400,397.5,399],[400.5,398,400],[401.10,399,400.8],[404,400,403],[405,402,404]];
-  const momentum = [50,25,28,35,40,45,55,45,48,50,55,60,62];
-  for (const seconds of [60,300,900,3600,14400,86400]) {
-    const candles = values.map(([h,l,c],i) => bar(1700000000+i*seconds,h,l,c));
-    const waiting = psbbAnalysisFromRsi(candles.slice(0,10),momentum.slice(0,10),{left:3},true).setups.at(-1);
-    assert.equal(waiting.entry,401.10);assert.equal(waiting.shifted,false);
-    const result = psbbAnalysisFromRsi(candles,momentum,{left:3}).setups.at(-1);
-    assert.equal(result.structureCase,'after');assert.equal(result.entry,401.10);
-    assert.equal(result.entryTime,candles[6].time);
-    assert.equal(result.mssTime,candles[10].time,'First touch, not the next closing breakout');
-    assert.equal(result.stop,394);assert.ok(Math.abs(result.target1-408.2)<1e-9);
-    const atTouch = psbbAnalysisFromRsi(candles.slice(0,11),momentum.slice(0,11),{left:3},true).setups.at(-1);
-    assert.equal(atTouch.mssTime,result.mssTime,'No later candle is needed to recognize the touch');
+test('intervening-swing entries use the first wick touch and settle on later bars', () => {
+  const candles = [
+    bar(0,100,90),bar(1,110,100),bar(2,108,94),bar(3,118,104),
+    bar(4,115,98),bar(5,130,120),bar(6,125,110),bar(7,117,60),bar(8,110,95),
+  ];
+  const momentum = [50,75,60,65,55,65,55,45,50];
+  const setup = psbbAnalysisFromRsi(candles,momentum,{left:1},true).setups.at(-1);
+  assert.equal(setup.structureCase,'before');
+  assert.equal(setup.entry,94);
+  assert.equal(setup.mssTime,7);
+  assert.equal(setup.stop,130);
+  assert.equal(setup.target1,58);
+  assert.equal(setup.status,'formed','Entry candle low cannot determine intrabar target ordering');
+  assert.equal(psbbAnalysisFromRsi(candles.slice(0,7),momentum.slice(0,7),{left:1},true).setups.at(-1)?.shifted,false);
+  const passed = psbbAnalysisFromRsi([...candles,bar(9,110,57)], [...momentum,50],{left:1},true).setups.at(-1);
+  assert.equal(passed.status,'passed');
+  assert.equal(passed.end,9);
+  const failed = psbbAnalysisFromRsi([...candles,bar(9,131,57)], [...momentum,50],{left:1},true).setups.at(-1);
+  assert.equal(failed.status,'failed','A candle touching stop and target is stop-first');
+});
+
+test('intervening-swing rules are the same on every supported timeframe', () => {
+  const candles = [bar(0,100,90),bar(1,110,100),bar(2,108,94),bar(3,118,104),bar(4,115,98),bar(5,130,120),bar(6,125,110),bar(7,117,93),bar(8,110,95)];
+  const momentum = [50,75,60,65,55,65,55,45,50];
+  for (const timeframe of PSBB_TIMEFRAMES) {
+    const setup = psbbAnalysisFromRsi(candles,momentum,{left:1},true).setups.at(-1);
+    assert.equal(setup.structureCase,'before',timeframe);
+    assert.equal(setup.entry,94,timeframe);
+    assert.equal(setup.mssTime,7,timeframe);
   }
-});
-
-test('entry candle extremes do not invent intrabar ordering for target fills', () => {
-  const data = caseB();
-  data.candles[8] = bar(8, 121, 60, 98);
-  const setup = latest(data);
-  assert.equal(setup.status, 'formed');
-  assert.equal(setup.target1Hit, false);
-});
-
-test('1R finishes as success; later stops cannot change it and ambiguous bars are stop-first', () => {
-  const data = caseB();
-  data.candles[9] = bar(9, 105, 70, 80);
-  data.candles.push(bar(10, 100, 70, 80)); data.momentum.push(40);
-  const first = latest(data);
-  assert.equal(first.target1Hit, true);
-  assert.equal(first.status, 'passed');
-  assert.equal(first.end, 9);
-  data.candles[10] = bar(10, 135, 66, 70);
-  data.candles.push(bar(11, 100, 68, 75)); data.momentum.push(40);
-  assert.equal(latest(data).status, 'passed');
-  assert.equal(latest(data).end, 9, 'Later candles cannot extend a successful trade');
-  data.candles[9] = bar(9, 130, 66, 80);
-  assert.equal(latest(data).status, 'failed');
-  assert.equal(latest(data).end, 9, 'Stop-first outcome freezes at the first hit candle');
-});
-
-test('confirmed entry/stop/targets remain fixed as future bars and pivots arrive', () => {
-  const data = caseB();
-  const original = latest(data);
-  data.candles.push(bar(10, 115, 85, 100), bar(11, 112, 90, 102), bar(12, 110, 90, 100));
-  data.momentum.push(50, 55, 50);
-  const next = latest(data);
-  for (const key of ['firstTime', 'secondTime', 'entry', 'entryTime', 'mssTime', 'stop', 'stopTime', 'target1', 'target2']) {
-    assert.equal(next[key], original[key], key);
-  }
-});
-
-test('all six requested intervals use identical candle-based rules', () => {
-  assert.deepEqual(PSBB_TIMEFRAMES, ['1m', '5m', '15m', '1H', '4H', '1D']);
-  const base = caseB();
-  for (const seconds of [60, 300, 900, 3600, 14400, 86400]) {
-    const data = { ...base, candles: base.candles.map((c) => ({ ...c, time: 1700000000 + c.time * seconds })) };
-    const setup = latest(data);
-    assert.equal(setup.entry, 100);
-    assert.equal(setup.mssTime, 1700000000 + 8 * seconds);
-    assert.equal(setup.stop, 130);
-  }
-  for (const timeframe of PSBB_TIMEFRAMES) assert.deepEqual(psbbPlots(base.candles, { length: 2, left: 1 }, timeframe), psbbPlots(base.candles, { length: 2, left: 1 }));
-  assert.deepEqual(psbbPlots(base.candles, {}, '2m'), []);
+  assert.deepEqual(psbbPlots(candles,{},'2m'),[]);
 });

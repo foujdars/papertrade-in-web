@@ -39,16 +39,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.waitForFunction(()=>document.querySelectorAll('.chart-psbb-point').length===0);
     for (const timeframe of ['1m', '5m', '15m', '1H', '4H', '1D']) {
       for (const long of [false, true]) {
-        await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 25 });
-        await page.getByText(new RegExp(`^${timeframe} PSBB.*Waiting for new swing ${long ? 'high' : 'low'}$`)).waitFor();
-        assert.equal(await page.locator('.chart-psbb-level.entry').count(), 0);
-        await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 27 });
-        await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*Waiting for entry level$`)).waitFor();
+        await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 28 });
+        await page.getByText(new RegExp(`^${timeframe} PSBB.*Waiting for entry level$`)).waitFor();
         assert.match(await page.locator('.chart-psbb text.entry').textContent(), /^Entry .*pending$/);
         assert.equal(await page.locator('.chart-psbb text.target').count(), 0);
         await page.waitForFunction(endpointsMatch);
-        await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 29 });
-        await page.getByText(new RegExp(`^${timeframe} PSBB.*Case B.*MSS confirmed$`)).waitFor();
+        await page.evaluate((view) => window.psbbView(view), { timeframe, long, count: 32 });
+        await page.getByText(new RegExp(`^${timeframe} PSBB.*MSS confirmed$`)).waitFor();
         const levelNames = await page.locator('.chart-psbb text.chart-psbb-level').allTextContents();
         assert.equal(levelNames.length, 3);
         assert.match(levelNames[0], /^SL /); assert.match(levelNames[1], /^Entry /); assert.match(levelNames[2], /^Target 1R /);
@@ -64,39 +61,27 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         assert.ok(Math.abs(geometry.x - geometry.expectedX) < 1, 'Entry starts at actual MSS candle');
         await page.waitForFunction(endpointsMatch);
         for (const outcome of ['passed', 'failed']) {
-          await page.evaluate(view => window.psbbView(view), { timeframe, long, count: 33, outcome });
+          await page.evaluate(view => window.psbbView(view), { timeframe, long, count: 36, outcome });
           await page.getByText(new RegExp(`^${timeframe} PSBB.*${outcome === 'passed' ? 'Success' : 'Failed'}`)).waitFor();
           await page.waitForFunction(endpointsMatch);
           assert.equal(await page.evaluate(() => window.psbbQa.analysis.setups.at(-1).end),
-            await page.evaluate(() => window.psbbQa.candles[29].time), 'Endpoint is the first outcome candle, not later candles');
+            await page.evaluate(() => window.psbbQa.candles[31].time), 'Endpoint is the first outcome candle, not later candles');
           // Endpoint and labels follow that candle through pan/zoom and blank future space.
-          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 20, to: 42 }));
+          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 23, to: 45 }));
           await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
           await page.waitForFunction(endpointsMatch);
-          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 25, to: 36 }));
+          await page.evaluate(() => window.psbbQa.chart.timeScale().setVisibleLogicalRange({ from: 28, to: 39 }));
           await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
           await page.waitForFunction(endpointsMatch);
         }
       }
     }
     await page.evaluate(() => window.psbbView({timeframe:'5m',actual:true}));
-    await page.getByText(/^5m PSBB.*Success/).waitFor();
-    await page.evaluate(() => {
-      const { chart, candles }=window.psbbQa;
-      const entry=candles.findIndex(c=>c.time===1790241900), end=candles.findIndex(c=>c.time===1790314200);
-      chart.timeScale().setVisibleLogicalRange({from:entry-9,to:end+5});
-    });
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.waitForFunction(endpointsMatch);
-    await page.waitForFunction(() => {
-      const {chart,series}=window.psbbQa, dot=document.querySelector('.chart-psbb-entry-point');
-      return dot && Math.abs(+dot.getAttribute('cx')-chart.timeScale().timeToCoordinate(1790241900+19800))<1
-        && Math.abs(+dot.getAttribute('cy')-series.priceToCoordinate(401.10))<1;
-    });
-    assert.match(await page.locator('.chart-psbb text.entry').textContent(),/401.10/);
-    assert.match(await page.locator('.chart-psbb text.target').textContent(),/408.60/);
+    await page.getByText(/^5m PSBB.*No swing low between D1 and divergence$/).waitFor();
+    assert.equal(await page.locator('.chart-psbb-level.entry').count(), 0);
+    assert.equal(await page.evaluate(() => window.psbbQa.analysis.setups.at(-1).shifted), false);
     assert.deepEqual(errors, []);
     if (process.env.PSBB_SCREENSHOT) await page.screenshot({ path: process.env.PSBB_SCREENSHOT });
-    console.log('PSBB mobile chart: D1, pending/active levels and first target/stop candle endpoints stay aligned through pan/zoom on all six intervals, both directions.');
+    console.log('PSBB mobile chart: intervening swing entries align across all six intervals, and new-leg-only setups remain unentered.');
   } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

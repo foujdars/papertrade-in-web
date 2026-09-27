@@ -16,7 +16,7 @@ export type PsbbSetup = {
   secondRsi: number;
   confirmedTime: number;
   phase: "waiting-structure" | "waiting-mss" | "entered";
-  structureCase: "before" | "after" | null;
+  structureCase: "before" | null;
   entry: number | null;
   entryTime: number | null;
   mssTime: number | null;
@@ -108,11 +108,11 @@ function moveD1(episode: Episode, index: number) {
  * D1 before replacing it: price HH + RSI LH (or LL + HL) preserves the reference
  * for D2. A non-divergent visit becomes the new D1. After divergence is already
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
- * Swings need `left` closed candles on the right. Case A
- * uses the most recent opposite swing strictly between D1 and the extreme;
- * Case B waits for the first opposite swing in the NEW leg after it: its left
- * comparison cannot include candles before the divergence extreme. A touch of a known
- * Case A level also confirms D2 without waiting extra right-hand pivot bars.
+ * Swings need `left` closed candles on the right. Entry requires the
+ * lowest swing low for shorts or highest swing high for longs strictly
+ * between D1 and the divergence extreme.
+ * A touch of a known intervening level also confirms D2 without waiting
+ * extra right-hand pivot bars.
  * The first subsequent candle whose high/low reaches the structure level
  * triggers entry AT that level, without requiring its close to cross. The
  * final (still-forming) candle is excluded from this confirmed history.
@@ -182,7 +182,13 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       const divergence = extreme > first && Number.isFinite(momentum[extreme]) && (long
         ? momentum[extreme] > momentum[first]
         : momentum[extreme] < momentum[first]);
-      const before = pivots[structureKind].findLast(pivot => pivot > first && pivot < extreme);
+      let before: number | undefined;
+      for (const pivot of pivots[structureKind]) {
+        if (pivot <= first || pivot >= extreme) continue;
+        if (before === undefined || (long
+          ? candles[pivot].high > candles[before].high
+          : candles[pivot].low < candles[before].low)) before = pivot;
+      }
       // Reaching an already-confirmed intervening swing is itself MSS
       // confirmation. Do not wait additional right-hand pivot bars and miss
       // that crossing. Nothing is backdated or read from future candles.
@@ -206,15 +212,10 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
       const setup = episode.setup;
       if (!setup) continue;
       setup.end = bar.time;
-      // Case B is a new leg, not a global pivot. A high/low from BEFORE D2
-      // must not reject its first new-leg swing and move entry to a later one.
-      // Confirm using only the available left-hand bars since D2, plus the
-      // configured right-hand bars. Lock the first such swing permanently.
-      if (episode.structure === undefined && confirmed > extreme && isPivot(candles, structureKind, confirmed, span, extreme)) episode.structure = confirmed;
       const structure = episode.structure;
       if (structure === undefined) continue;
       setup.phase = "waiting-mss";
-      setup.structureCase = structure < extreme ? "before" : "after";
+      setup.structureCase = "before";
       setup.entry = candles[structure][structureKind];
       setup.entryTime = candles[structure].time;
       // The episode extreme is the highest high / lowest low since D1. Keep
