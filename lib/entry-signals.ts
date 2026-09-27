@@ -57,6 +57,7 @@ function istMinutes(time: number) {
 export function entryPlots(candles: Bar[], inputs: Record<string, number> = {}) {
   const on = (key: string) => inputs[key] !== 0;
   const close = candles.map((bar) => bar.close);
+  const ema5 = ema(close, 5);
   const ema21 = ema(close, 21);
   const ema50 = ema(close, 50);
   const fast = ema(close, 12);
@@ -162,5 +163,5 @@ export function entryPlots(candles: Bar[], inputs: Record<string, number> = {}) 
     if (buy && !sell && allowedLong) long[index] = bar.low;
     else if (sell && !buy && allowedShort) short[index] = bar.high;
   }
-  return { ema21, ema50, vwap, long, short };
+  return { ema5, ema21, ema50, vwap, long, short };
 }

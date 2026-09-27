@@ -62,7 +62,7 @@ export const STUDIES:StudyDefinition[]=[
  make('kama','Moving Average Adaptive','Trend',true,[length(10),length(2,'Fast length','fast'),length(30,'Slow length','slow')]),
  make('ma-channel','Moving Average Channel','Trend',true,[length(20)]),
  make('ma-double','Moving Average Double','Trend',true,[length(9,'First length','fast'),length(21,'Second length','slow')]),
- make('ema','Moving Average Exponential','Trend',true,[length(9)]),
+ make('ema','EMA (custom length)','Trend',true,[length(5)]),
  make('hamming','Moving Average Hamming','Trend',true,[length(14)]),
  make('ma-multiple','Moving Average Multiple','Trend',true,[length(9,'First length','fast'),length(21,'Second length','slow'),length(50,'Third length','length'),length(200,'Fourth length','fourth')]),
  make('ma-triple','Moving Average Triple','Trend',true,[length(9,'First length','fast'),length(21,'Second length','slow'),length(50,'Third length')]),
@@ -79,7 +79,11 @@ export const STUDIES:StudyDefinition[]=[
   {key:'momentum',label:'RSI and MACD',value:1,min:0,max:1,step:1},
   {key:'squeeze',label:'Bollinger squeeze',value:1,min:0,max:1,step:1},
   {key:'vwap',label:'VWAP filter',value:1,min:0,max:1,step:1},
- ],{note:'EMA 21, EMA 50 and session VWAP, with a dot only when an entry rule agrees. Green is long, red is short. The forming candle is not marked.'}),
+  {key:'line5',label:'Show EMA 5',value:1,min:0,max:1,step:1},
+  {key:'line21',label:'Show EMA 21',value:0,min:0,max:1,step:1},
+  {key:'line50',label:'Show EMA 50',value:0,min:0,max:1,step:1},
+  {key:'lineVwap',label:'Show session VWAP',value:0,min:0,max:1,step:1},
+ ],{note:'Show EMA 5, EMA 21, EMA 50 and VWAP independently. The standalone EMA 21 shows entry arrows on BTC, ETH and gold 5m/15m charts.'}),
  make('zing-inside','Inside Candle','Strategies',true,[{...length(35,'Max chase %','chase'),max:100},num('reward','Reward multiple',2,.2,10,.1)],{note:'Zing marketplace rule. A close outside the mother candle, within 35% of its range. Stop is the far side of the mother candle. Target is 2 times that risk.'}),
  make('zing-traffic','Traffic Light','Strategies',true,[length(15),num('reward','Reward multiple',1.2,.2,10,.1),num('buffer','Stop buffer %',.01,0,1,.01)],{note:'Zing marketplace rule. Opposite-colour pair, then a close through that pair and the 15 SMA. Stop is the far side plus 0.01%. Target is the pair range times 1.2.'}),
  make('zing-ema','EMA Cross strategy','Strategies',true,[length(9,'Fast EMA','fast'),length(21,'Slow EMA','slow'),num('stop','Stop points',10,.1,100000,.1),num('target','Target points',12,.1,100000,.1)],{note:'Zing marketplace rule. One signal on the EMA 9 and 21 cross. Default stop is 10 points and target is 12, as published for Nifty.'}),
@@ -135,7 +139,7 @@ export type StudyConfig={inputs:Record<string,number>;source:string;smoothing:st
 export const STUDY_COLORS=['#8054da','#e89824','#12a58a','#ec5475','#289cdb','#ac69bb','#536987'];
 export const SOURCES=['close','open','high','low','hl2','hlc3','ohlc4'];
 export const TIMEFRAMES=['1m','3m','5m','15m','30m','1h','1D','1W','1M','1Y'];
-export function studyDefaults(id:string):StudyConfig {const d=STUDIES.find(s=>s.id===id),colors=[...STUDY_COLORS];const primary:Record<string,string>={ema5:'#0ea5e9',ema21:'#ff8a00',ema30:'#22c55e',ema50:'#8b5cf6',ema100:'#f97316',ema200:'#e11d48',sma20:'#14b8a6',sma50:'#64748b',sma200:'#8291aa',vwap:'#d946ef',macd:'#2563eb'};if(primary[id])colors[0]=primary[id];if(['supertrend','volume','net-volume','awesome'].includes(id)){colors[0]='#12a58a';colors[1]='#ec5475';}if(id==='volume')colors[2]='#c69759';if(id==='entry'){colors[0]='#ff8a00';colors[1]='#8b5cf6';colors[2]='#d946ef';colors[3]='#12a58a';colors[4]='#ec5475';}if(id.startsWith('zing-')){colors[0]='#7c3aed';colors[1]='#ec5475';colors[2]='#12a58a';colors[3]='#12a58a';colors[4]='#ec5475';}if(id==='psbb'){colors[0]='#7c3aed';colors[1]='#ec5475';colors[2]='#12a58a';colors[3]='#86efac';colors[4]='#12a58a';colors[5]='#ec5475';}return {inputs:Object.fromEntries((d?.fields??[]).map(f=>[f.key,f.value])),source:'close',smoothing:id==='rsi'?'SMA':'None',hidden:false,timeframes:[],colors,width:1,dash:0,showValue:id==='entry'||id.startsWith('zing-')||id==='psbb'?false:!id.startsWith('ema'),opacity:100};}
+export function studyDefaults(id:string):StudyConfig {const d=STUDIES.find(s=>s.id===id),colors=[...STUDY_COLORS];const primary:Record<string,string>={ema5:'#0ea5e9',ema21:'#ff8a00',ema30:'#22c55e',ema50:'#8b5cf6',ema100:'#f97316',ema200:'#e11d48',sma20:'#14b8a6',sma50:'#64748b',sma200:'#8291aa',vwap:'#d946ef',macd:'#2563eb'};if(primary[id])colors[0]=primary[id];if(['supertrend','volume','net-volume','awesome'].includes(id)){colors[0]='#12a58a';colors[1]='#ec5475';}if(id==='volume')colors[2]='#c69759';if(id==='entry'){colors[0]='#0ea5e9';colors[1]='#ff8a00';colors[2]='#8b5cf6';colors[3]='#d946ef';colors[4]='#12a58a';colors[5]='#ec5475';}if(id.startsWith('zing-')){colors[0]='#7c3aed';colors[1]='#ec5475';colors[2]='#12a58a';colors[3]='#12a58a';colors[4]='#ec5475';}if(id==='psbb'){colors[0]='#7c3aed';colors[1]='#ec5475';colors[2]='#12a58a';colors[3]='#86efac';colors[4]='#12a58a';colors[5]='#ec5475';}return {inputs:Object.fromEntries((d?.fields??[]).map(f=>[f.key,f.value])),source:'close',smoothing:id==='rsi'?'SMA':'None',hidden:false,timeframes:[],colors,width:1,dash:0,showValue:id==='entry'||id.startsWith('zing-')||id==='psbb'?false:!id.startsWith('ema'),opacity:100};}
 export function normalizeStudy(id:string,value:unknown):StudyConfig {
  const base=studyDefaults(id),v={...(value&&typeof value==='object'?value:{})} as Partial<StudyConfig>,d=STUDIES.find(s=>s.id===id);
  if(typeof v.showValue!=='boolean')v.showValue=base.showValue;
