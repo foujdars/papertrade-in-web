@@ -272,7 +272,7 @@ export function GlobalMarketsWorkspace({
       if (stopped || running || document.hidden) return;
       running = true;
       const results = await Promise.allSettled(
-        (["BTCUSD", "XAUTUSD"] as const).map(async (s) => {
+        (["BTCUSD", "ETHUSD", "XAUTUSD"] as const).map(async (s) => {
           const r = await fetch(`/api/global-markets?symbol=${s}`, {
             cache: "no-store",
             signal: controller.signal,
@@ -300,8 +300,8 @@ export function GlobalMarketsWorkspace({
             (a) =>
               advancePerps(
                 a,
-                { BTCUSD: next.BTCUSD?.quote, XAUTUSD: next.XAUTUSD?.quote },
-                { BTCUSD: next.BTCUSD?.spec, XAUTUSD: next.XAUTUSD?.spec },
+                { BTCUSD: next.BTCUSD?.quote, ETHUSD: next.ETHUSD?.quote, XAUTUSD: next.XAUTUSD?.quote },
+                { BTCUSD: next.BTCUSD?.spec, ETHUSD: next.ETHUSD?.spec, XAUTUSD: next.XAUTUSD?.spec },
                 Date.now(),
               ),
             true,
@@ -376,6 +376,8 @@ export function GlobalMarketsWorkspace({
       name:
         symbol === "BTCUSD"
           ? "Bitcoin"
+          : symbol === "ETHUSD"
+            ? "Ethereum"
           : symbol === "XAUTUSD"
             ? "Tether Gold"
             : "Brent",
@@ -433,6 +435,7 @@ export function GlobalMarketsWorkspace({
         visible={open && symbol !== "BRENT"}
         host={alertHost}
         symbol={symbol === "BRENT" ? "BTCUSD" : symbol}
+        monitor={false}
       />
       {open && (
         <section
@@ -473,6 +476,8 @@ export function GlobalMarketsWorkspace({
                 <b>
                   {i.symbol === "BTCUSD"
                     ? "Bitcoin"
+                    : i.symbol === "ETHUSD"
+                      ? "Ethereum"
                     : i.symbol === "XAUTUSD"
                       ? "Gold"
                       : "Brent"}

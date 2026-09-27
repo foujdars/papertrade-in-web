@@ -14,7 +14,7 @@ function paneTop(chart: IChartApi, index: number) {
   return top;
 }
 
-export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRef, studyRenderer }: {
+export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRef, studyRenderer, divergenceOnly = false }: {
   candles: Candle[];
   chart: IChartApi | null;
   series: Pick<ISeriesApi<"Candlestick">, "priceToCoordinate" | "attachPrimitive" | "detachPrimitive"> | null;
@@ -22,6 +22,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   config?: StudyConfig;
   refreshRef: MutableRefObject<(() => void) | null>;
   studyRenderer: RefObject<ChartStudyRenderer | null>;
+  divergenceOnly?: boolean;
 }) {
   const [, redraw] = useState(0);
   const arrowId = `psbb-entry-${useId().replace(/:/g, '')}`;
@@ -79,7 +80,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   };
   const ry1 = rsiY(setup.firstRsi);
   const ry2 = rsiY(setup.secondRsi);
-  const levels = setup.shifted && setup.entry !== null && setup.stop !== null && setup.target1 !== null && setup.target2 !== null ? [
+  const levels = !divergenceOnly && setup.shifted && setup.entry !== null && setup.stop !== null && setup.target1 !== null && setup.target2 !== null ? [
     ["SL", setup.stop, "stop"],
     ["Entry", setup.entry, "entry"],
     ["Target 1R", setup.target1, "target"],
@@ -92,7 +93,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
   const waitingY = setup.entry === null ? null : yOf(setup.entry);
   const waitingX = setup.entryTime === null ? null : xOf(setup.entryTime);
   const swing = setup.side === "short" ? "swing low" : "swing high";
-  const status = setup.phase === "waiting-structure" ? `No ${swing} between D1 and divergence`
+  const status = divergenceOnly ? 'Divergence confirmed' : setup.phase === "waiting-structure" ? `No ${swing} between D1 and divergence`
     : setup.phase === "waiting-mss" ? "Waiting for entry level"
     : setup.status === "passed" ? "Success · 1R reached" : setup.status === "failed" ? "Failed · stop reached"
     : "Active · MSS confirmed";
@@ -104,7 +105,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     {x1 != null && x2 != null && ry1 != null && ry2 != null && <line className="chart-psbb-diverge" x1={x1} y1={ry1} x2={x2} y2={ry2} />}
     {x1 != null && y1 != null && visible(x1,y1) && <text className="chart-psbb-point" x={x1} y={y1 + (setup.side === "short" ? -8 : 14)}>D1</text>}
     {x2 != null && y2 != null && visible(x2,y2) && <text className="chart-psbb-point" x={x2} y={y2 + (setup.side === "short" ? -8 : 14)}>{setup.side === "short" ? "SH" : "SL"}</text>}
-    {!setup.shifted && waitingX != null && waitingY != null && levelEndX != null && <g>
+    {!divergenceOnly && !setup.shifted && waitingX != null && waitingY != null && levelEndX != null && <g>
       <line className="chart-psbb-level entry waiting" markerEnd={`url(#${arrowId})`} x1={waitingX} y1={waitingY} x2={levelEndX} y2={waitingY} />
       <text className="chart-psbb-level entry" textAnchor="end" x={levelEndX - 2} y={waitingY - 4}>Entry {setup.entry?.toFixed(2)} · pending</text>
     </g>}

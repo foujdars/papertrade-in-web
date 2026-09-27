@@ -4,7 +4,7 @@ import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine"
 import { isDeltaOptionSymbol, normalizeDeltaOptionSpec } from "./global-contracts.ts";
 import type { OptionEvent, OptionOrder, OptionPosition } from "./global-option-orders.ts";
 
-export const GLOBAL_SYMBOLS = ["BTCUSD", "XAUTUSD", "BRENT"] as const;
+export const GLOBAL_SYMBOLS = ["BTCUSD", "ETHUSD", "XAUTUSD", "BRENT"] as const;
 export type GlobalSymbol = (typeof GLOBAL_SYMBOLS)[number];
 export type PerpSymbol = string;
 export const isDeltaPerpSymbol = (value: string): value is PerpSymbol =>
@@ -13,6 +13,14 @@ export const GLOBAL_INSTRUMENTS = [
   {
     symbol: "BTCUSD",
     name: "Bitcoin",
+    subtitle: "Delta India · perpetual",
+    categories: ["Crypto"],
+    price: 0,
+    changePercent: 0,
+  },
+  {
+    symbol: "ETHUSD",
+    name: "Ethereum",
     subtitle: "Delta India · perpetual",
     categories: ["Crypto"],
     price: 0,
@@ -49,6 +57,18 @@ export const GLOBAL_CHART_INSTRUMENTS: Instrument[] = [
     assetType: "FUTURE",
     lotSize: 1,
     underlyingSymbol: "BTC",
+  },
+  {
+    symbol: "ETHUSD",
+    name: "Ethereum perpetual",
+    exchange: "DELTA",
+    price: 0,
+    change: 0,
+    instrumentKey: "DELTA|ETHUSD",
+    categories: ["GLOBAL", "CRYPTO"],
+    assetType: "FUTURE",
+    lotSize: 1,
+    underlyingSymbol: "ETH",
   },
   {
     symbol: "XAUTUSD",

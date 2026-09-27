@@ -8,6 +8,7 @@ import { AlarmClock, ArrowDown, ArrowUp, Check, CircleSlash, Clock3, Search, X, 
 import { StockLogo } from "@/components/StockLogo";
 import { useTechnicalAlerts } from "./useTechnicalAlerts";
 import { TechnicalAlertForm } from "./TechnicalAlertForm";
+import { GlobalAlerts } from "./GlobalAlerts";
 import { TECHNICAL_FRAMES, technicalDescription, defaultTechnicalConfig, type TechnicalRule } from "@/lib/technical-alerts";
 import { ModernSelect } from "./ModernSelect";
 import { alertAttention, type HomeAlertSnapshot, type HomeAlertRequest } from '@/lib/home-attention';
@@ -15,7 +16,7 @@ import { AndroidDeliveryTest } from "./AndroidDeliveryTest";
 import type { Instrument } from "@/lib/market";
 const KEY = "papertrade-price-tasks-v1";
 const money = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", onOpenTechnical, onHomeAlertsChange, homeAlertRequest }: {
+export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", globalSymbol, onOpenTechnical, onHomeAlertsChange, homeAlertRequest }: {
   onHomeAlertsChange?:(snapshot:HomeAlertSnapshot)=>void;homeAlertRequest?:HomeAlertRequest|null;
   request: PriceRequest | null; onClose: () => void; onFill: (task: PriceTask, price: number) => string | null;
   onValidate?: (task: PriceTask) => string | null;
@@ -24,10 +25,13 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
   onCreateAlert?: () => void;
   onTasksChange?: (tasks: PriceTask[]) => void;
   timeframe?: string;
+  globalSymbol?: string | null;
   onOpenTechnical?: (instrument: Instrument, timeframe: string) => void;
 }) {
   const technical = useTechnicalAlerts(ownerId, marketOpen, onNotice);
   const [editingTechnical, setEditingTechnical] = useState<TechnicalRule>();
+  const [globalAlertHost, setGlobalAlertHost] = useState<HTMLDivElement | null>(null);
+  const [globalActiveCount, setGlobalActiveCount] = useState(0);
   useEffect(() => {
     const open = (event: Event) => {
       const detail = (event as CustomEvent).detail;
@@ -154,18 +158,20 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
   const familyVisible = (price: boolean) => filter === "all" || (price ? filter === "alert" : filter === "technical");
   const matchingRules = (tab === "list" ? technicalList : archivedRules).filter(r => (!homeFocus||r.id===homeFocus)&&familyVisible(r.family === "price") && `${r.instrument.symbol} ${r.instrument.name} ${technicalDescription(r)} ${r.timeframe} ${r.status}`.toLowerCase().includes(query));
   const matchingEvents = tab === "log" ? technical.events.filter(e => (!homeFocus||e.id===homeFocus)&&familyVisible(e.description.startsWith("Price ")) && `${e.instrument.symbol} ${e.description} ${e.timeframe} ${e.detail}`.toLowerCase().includes(query)) : [];
-  const activeCount = tasks.filter(t => t.status === "pending").length + technical.rules.filter(r => r.status === "active").length;
+  const activeCount = tasks.filter(t => t.status === "pending").length + technical.rules.filter(r => r.status === "active").length + globalActiveCount;
   const technicalForm = editingTechnical || (request && mode === "technical");
+  const globalTechnical = Boolean(request && mode === "technical" && ['BTCUSD', 'ETHUSD', 'XAUTUSD'].includes(request.instrument.symbol) && request.instrument.instrumentKey === `DELTA|${request.instrument.symbol}`);
   function openTechnicalChart(instrument: Instrument, frame: string) { setManage(false); setEditingTechnical(undefined); onClose(); onOpenTechnical?.(instrument, frame); }
   const matching = tasks.filter(t => (!homeFocus||t.id===homeFocus)&&(tab === "list" ? t.status === "pending" : t.status !== "pending") && (filter === "all" || t.kind === filter) && `${t.instrument.symbol} ${t.instrument.name} ${t.price} ${money(t.price)} ${t.condition} ${t.status} ${t.message ?? ""}`.toLowerCase().includes(search.toLowerCase().trim())).sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt));
   return <>
+    <GlobalAlerts owner={ownerId} symbol={globalTechnical ? request!.instrument.symbol : globalSymbol ?? 'BTCUSD'} visible={globalTechnical} host={globalAlertHost} embedded defaultTimeframe={timeframe} onActiveCount={setGlobalActiveCount} />
     {visible && triggerHost && createPortal(<button className="price-tasks-button" aria-label={`Open alerts${activeCount ? `, ${activeCount} active` : ""}`} title="Alerts and paper orders" onClick={() => {setHomeFocus(undefined);setManage(true);}}><AlarmClock size={20} strokeWidth={1.8} aria-hidden="true" />{activeCount > 0 && <span className="price-tasks-count">{activeCount}</span>}</button>, triggerHost)}
     {(request || manage) && <div className="price-action-backdrop" onClick={dismiss}><section ref={sheetRef} tabIndex={-1} className={`price-action-sheet ${!request && !editingTechnical ? "price-alert-manager" : "price-alert-form"}`} role="dialog" aria-modal="true" aria-label={request || editingTechnical ? "Price action" : "Alerts"} onClick={e => e.stopPropagation()}>
       <div className="price-sheet-handle" aria-hidden="true" />
       <header><div className="price-sheet-title"><AlarmClock size={23} /><div><h2>{request?.instrument.symbol ?? "Alerts"}</h2><small>{request ? request.instrument.name : "Your levels. Your attention."}</small></div></div><button className="price-icon-button" onClick={dismiss} aria-label="Close price actions"><X size={21} /></button></header>
       {!request&&homeFocus&&<button className="home-alert-clear" onClick={()=>setHomeFocus(undefined)}>Show all alerts</button>}
       {request && request.mode !== "order" && <div className="price-alert-tabs" aria-label="Alert type"><button aria-pressed={mode === "alert"} aria-selected={mode === "alert"} onClick={() => setMode("alert")}><AlarmClock size={16} />Price</button><button aria-pressed={mode === "technical"} aria-selected={mode === "technical"} onClick={() => setMode("technical")}><Activity size={16} />Technical</button></div>}
-      {technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical?.family === "price" ? "Server price alert saved" : "Technical alert saved · watching new candle closes"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
+      {globalTechnical ? <div ref={setGlobalAlertHost} /> : technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical?.family === "price" ? "Server price alert saved" : "Technical alert saved · watching new candle closes"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
         {mode === "alert" && <><ModernSelect label="Monitoring" value={delivery} choices={[{value:"device",label:"While app is open"},{value:"server",label:"Even when app is closed"}]} onChange={setDelivery}/>{delivery === "server" && <div className="technical-summary"><div><b>{technical.cloudMessage}</b><p>Requires sign-in and trade notifications on this Android phone.</p><button type="button" onClick={async()=>{const failure=await technical.enablePush();setError(failure??"Notifications connected.");}}>Connect notifications</button></div></div>}</>}
         <label>{mode === "alert" ? "Alert price" : orderType === "Market" ? "Last seen price · estimate" : orderType === "SL" ? "Stop trigger price" : "Limit price"} (₹)<input autoFocus={orderType !== "Market"} type="number" min="0.01" step="0.01" value={price} readOnly={mode === "order" && orderType === "Market"} onChange={e => setPrice(e.target.value)} /></label>
         {mode === "alert" ? <fieldset className="price-condition"><legend>Notify when</legend><div role="radiogroup" aria-label="Alert condition">{(["above", "below"] as const).map(value => <button type="button" role="radio" aria-checked={condition === value} key={value} onClick={() => setCondition(value)} onKeyDown={e => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); setCondition(value === "above" ? "below" : "above"); (e.currentTarget.parentElement?.querySelector(`[data-condition="${value === "above" ? "below" : "above"}"]`) as HTMLElement)?.focus(); } }} data-condition={value}>{value === "above" ? <ArrowUp size={20} /> : <ArrowDown size={20} />}<span><b>{value === "above" ? "At or above" : "At or below"}</b><small>{value === "above" ? "Price rises to your level" : "Price falls to your level"}</small></span>{condition === value && <Check size={16} />}</button>)}</div></fieldset> : <>
