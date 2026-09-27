@@ -74,6 +74,33 @@ test('a newer D1 replaces old chart levels without deleting the trade ledger', (
   assert.equal(currentPsbbSetup(analysis), pending);
 });
 
+test('bullish D1 follows the lowest RSI below 30 and a later non-divergent visit replaces it', () => {
+  const candles = flat(15), momentum = Array(15).fill(50);
+  candles[1] = bar(1, 117, 100); momentum[1] = 29;
+  candles[2] = bar(2, 115, 98); momentum[2] = 27;
+  candles[3] = bar(3, 112, 97); momentum[3] = 26;
+  const first = psbbAnalysisFromRsi(candles.slice(0,5), momentum.slice(0,5), {left:1}, true);
+  assert.equal(first.anchors[0].time, 3);
+  assert.equal(first.anchors[0].rsi, 26);
+  candles[6] = bar(6, 119, 105); momentum[6] = 28;
+  candles[7] = bar(7, 116, 104); momentum[7] = 27;
+  candles[8] = bar(8, 130, 108); momentum[8] = 35;
+  const replaced = psbbAnalysisFromRsi(candles.slice(0,10), momentum.slice(0,10), {left:1}, true);
+  assert.equal(replaced.anchors[0].time, 7);
+  assert.equal(replaced.anchors[0].rsi, 27);
+  assert.equal(replaced.setups.length, 0);
+  candles[10] = bar(10, 118, 100); momentum[10] = 29;
+  candles[11] = bar(11, 117, 106); momentum[11] = 36;
+  const divergence = psbbAnalysisFromRsi(candles.slice(0,12), momentum.slice(0,12), {left:1}, true).setups.at(-1);
+  assert.equal(divergence.firstTime, 7);
+  assert.equal(divergence.firstRsi, 27);
+  assert.equal(divergence.secondTime, 10);
+  assert.equal(divergence.entryTime, 8);
+  assert.equal(divergence.entry, 130);
+  assert.equal(divergence.stop, 100);
+  assert.equal(divergence.target1, 160);
+});
+
 test('opposite threshold replaces pending D1 symmetrically, never reviving the earlier setup', () => {
   for (const inverse of [false,true]) {
     const candles=flat(18);
@@ -181,7 +208,7 @@ for (const long of [false, true]) {
   });
 }
 
-test('bearish entry uses the lowest intervening swing low, even when a later swing is higher', () => {
+test('bearish entry uses the swing low nearest SH, even when an earlier swing is lower', () => {
   const candles = [
     bar(0, 100, 90, 95), bar(1, 110, 100, 105), bar(2, 108, 94, 100),
     bar(3, 118, 104, 110), bar(4, 115, 98, 107), bar(5, 130, 120, 125),
@@ -190,13 +217,13 @@ test('bearish entry uses the lowest intervening swing low, even when a later swi
   const momentum = [50, 75, 60, 65, 55, 65, 55, 45, 50];
   const setup = latest({ candles, momentum });
   assert.equal(setup.structureCase, 'before');
-  assert.equal(setup.entryTime, 2);
-  assert.equal(setup.entry, 94);
+  assert.equal(setup.entryTime, 4);
+  assert.equal(setup.entry, 98);
   assert.equal(setup.stop, 130);
   assert.equal(setup.mssTime, 7);
 });
 
-test('bullish entry uses the highest intervening swing high, even when a later swing is lower', () => {
+test('bullish entry uses the swing high nearest SL, even when an earlier swing is higher', () => {
   const candles = [
     bar(0,100,90),bar(1,110,100),bar(2,108,94),bar(3,118,104),
     bar(4,115,98),bar(5,130,120),bar(6,125,110),bar(7,117,93),bar(8,110,95),
@@ -204,8 +231,8 @@ test('bullish entry uses the highest intervening swing high, even when a later s
   const momentum = [50,75,60,65,55,65,55,45,50].map(value => 100-value);
   const setup = latest({candles,momentum});
   assert.equal(setup.side,'long');
-  assert.equal(setup.entryTime,2);
-  assert.equal(setup.entry,156);
+  assert.equal(setup.entryTime,4);
+  assert.equal(setup.entry,152);
   assert.equal(setup.mssTime,7);
 });
 
@@ -270,16 +297,16 @@ test('intervening-swing entries use the first wick touch and settle on later bar
   const momentum = [50,75,60,65,55,65,55,45,50];
   const setup = psbbAnalysisFromRsi(candles,momentum,{left:1},true).setups.at(-1);
   assert.equal(setup.structureCase,'before');
-  assert.equal(setup.entry,94);
+  assert.equal(setup.entry,98);
   assert.equal(setup.mssTime,7);
   assert.equal(setup.stop,130);
-  assert.equal(setup.target1,58);
+  assert.equal(setup.target1,66);
   assert.equal(setup.status,'formed','Entry candle low cannot determine intrabar target ordering');
   assert.equal(psbbAnalysisFromRsi(candles.slice(0,7),momentum.slice(0,7),{left:1},true).setups.at(-1)?.shifted,false);
-  const passed = psbbAnalysisFromRsi([...candles,bar(9,110,57)], [...momentum,50],{left:1},true).setups.at(-1);
+  const passed = psbbAnalysisFromRsi([...candles,bar(9,110,65)], [...momentum,50],{left:1},true).setups.at(-1);
   assert.equal(passed.status,'passed');
   assert.equal(passed.end,9);
-  const failed = psbbAnalysisFromRsi([...candles,bar(9,131,57)], [...momentum,50],{left:1},true).setups.at(-1);
+  const failed = psbbAnalysisFromRsi([...candles,bar(9,131,65)], [...momentum,50],{left:1},true).setups.at(-1);
   assert.equal(failed.status,'failed','A candle touching stop and target is stop-first');
 });
 
@@ -289,7 +316,7 @@ test('intervening-swing rules are the same on every supported timeframe', () => 
   for (const timeframe of PSBB_TIMEFRAMES) {
     const setup = psbbAnalysisFromRsi(candles,momentum,{left:1},true).setups.at(-1);
     assert.equal(setup.structureCase,'before',timeframe);
-    assert.equal(setup.entry,94,timeframe);
+    assert.equal(setup.entry,98,timeframe);
     assert.equal(setup.mssTime,7,timeframe);
   }
   assert.deepEqual(psbbPlots(candles,{},'2m'),[]);
