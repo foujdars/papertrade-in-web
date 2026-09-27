@@ -58,8 +58,8 @@ for (const inverse of [false, true]) {
     const candles=flat(8), momentum=[55,72,84,75,60,73,89,90];
     candles[1]=bar(1,124,117);candles[2]=bar(2,130,120);
     candles[5]=bar(5,133,125);candles[6]=bar(6,140,128);candles[7]=bar(7,145,130);
-    assert.equal(analyze(candles,momentum,false).anchors[0].time, inverse ? 6 : 2);
-    assert.equal(analyze(candles,momentum,true).anchors[0].time, inverse ? 7 : 2);
+    assert.equal(analyze(candles,momentum,false).anchors[0].time,6);
+    assert.equal(analyze(candles,momentum,true).anchors[0].time,7);
     assert.equal(analyze(candles,momentum,true).setups.length,0);
   });
 }
@@ -249,8 +249,8 @@ for (const bullish of [false, true]) test(`${bullish ? 'bullish' : 'bearish'} di
   assert.equal(setup.firstPrice, bullish ? 190 : 110);
   assert.equal(setup.secondPrice, bullish ? 180 : 120);
   assert.equal(setup.phase, 'waiting-structure');
-  const wickOnly = candles.map(c => ({ ...c }));
-  wickOnly[6] = { ...wickOnly[6], open: 100, close: 105, high: 155 };
+  const wickOnly = candles.map(c => ({ ...c, open: c.time === 2 ? c.open : 100, close: c.time === 2 ? c.close : 104 }));
+  wickOnly[6] = { time: 6, open: 100, close: 105, high: 155, low: 100 };
   const ignored = psbbAnalysisFromRsi(bullish ? inverse(wickOnly) : wickOnly, values, { left: 1 }, true);
   assert.equal(ignored.setups.length, 0, 'a higher wick with no higher body is not divergence');
 });

@@ -73,7 +73,10 @@ function isPivot(candles: Bar[], side: "low" | "high", index: number, span: numb
   for (let cursor = Math.max(legStart, index - span); cursor <= index + span; cursor += 1) {
     if (cursor === index) continue;
     const other = price(candles[cursor]);
-    if (!Number.isFinite(other) || (side === "low" ? other <= value : other >= value)) return false;
+    const beaten = source === "body"
+      ? (side === "low" ? other < value : other > value)
+      : (side === "low" ? other <= value : other >= value);
+    if (!Number.isFinite(other) || beaten) return false;
   }
   return true;
 }
@@ -106,8 +109,9 @@ function moveD1(episode: Episode, index: number) {
 
 /**
  * A threshold crossing starts a visit; D1 follows its RSI peak (>70) or trough
- * (<30), never the first crossing by default. A later cross back above 70 does
- * not replace a bearish anchor. Price
+ * (<30), never the first crossing by default. A later cross back above 70
+ * keeps the bearish anchor unless that visit prints a higher RSI. An equal
+ * body does not cancel the swing. Price
  * divergence after that anchor uses body highs/lows for D1 and D2; wicks
  * do not create or disqualify price divergence. Another threshold visit
  * replaces the anchor before an entry.
@@ -150,9 +154,10 @@ export function psbbAnalysisFromRsi(candles: Bar[], momentum: number[], inputs: 
         : previous <= overbought && current > overbought);
       if (crossed) {
         const prior = episodes[side];
-        // Crossing back above 70 must not start a new bearish anchor. The
-        // first overbought visit keeps D1 until that episode ends.
+        // A weaker cross back above 70 does not replace the bearish anchor.
+        // A higher RSI during that visit still becomes D1.
         if (!prior || long) episodes[side] = { first: index, extreme: index, pushes: 0, visit: { peak: index } };
+        else if (!prior.setup) prior.visit = { peak: prior.first };
       }
       const episode = episodes[side];
       if (!episode) continue;
