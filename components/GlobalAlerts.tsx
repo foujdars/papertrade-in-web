@@ -12,6 +12,9 @@ import {
   GLOBAL_ALERT_KINDS,
   GLOBAL_DIVERGENCE_SYMBOLS,
   GLOBAL_DIVERGENCE_FRAMES,
+  GLOBAL_EMA21_FRAMES,
+  isEma21EntryKind,
+  ema21EntrySignal,
   globalAlertError,
   evaluateGlobalAlert,
   type GlobalAlert,
@@ -26,6 +29,9 @@ const labels: Record<GlobalAlert["kind"], string> = {
   "rsi-cross-down": "RSI crosses below",
   "volume-spike": "Volume exceeds average ×",
   "psbb-divergence": "PSBB divergence confirmed",
+  "ema21-entry-either": "21 EMA entry · bullish or bearish",
+  "ema21-entry-bullish": "21 EMA entry · bullish",
+  "ema21-entry-bearish": "21 EMA entry · bearish",
 };
 const GLOBAL_ALERT_CHANGE_EVENT = "papertrade:global-alerts-change";
 export function GlobalAlerts({
@@ -160,7 +166,7 @@ export function GlobalAlerts({
             return p;
           };
           const forSymbol = pending.filter(r => r.symbol === s);
-          const frames = [...new Set(forSymbol.filter(r => !r.kind.startsWith("price")).map(r => r.kind === "psbb-divergence" ? r.timeframe! : "5m"))];
+          const frames = [...new Set(forSymbol.filter(r => !r.kind.startsWith("price")).map(r => r.kind === "psbb-divergence" || isEma21EntryKind(r.kind) ? r.timeframe! : "5m"))];
           const [snapshot, ...histories] = await Promise.all([
             get(`/api/global-markets?symbol=${s}`),
             ...frames.map(frame => get(`/api/global-markets?symbol=${s}&mode=candles&timeframe=${frame}`)),
@@ -175,12 +181,15 @@ export function GlobalAlerts({
                 !evaluateGlobalAlert(
                   rule,
                   snapshot.quote,
-                  candlesByFrame.get(rule.kind === "psbb-divergence" ? rule.timeframe! : "5m") ?? [],
+                  candlesByFrame.get(rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind) ? rule.timeframe! : "5m") ?? [],
                   Date.now(),
                 )
               )
                 return rule;
-              const fired = { ...rule, triggeredAt: Date.now() };
+              const triggerSide = isEma21EntryKind(rule.kind)
+                ? ema21EntrySignal(candlesByFrame.get(rule.timeframe!) ?? [], snapshot.quote, rule.timeframe as keyof typeof GLOBAL_EMA21_FRAMES, Date.now())
+                : null;
+              const fired = { ...rule, triggeredAt: Date.now(), ...(triggerSide ? { triggerSide } : {}) };
               triggered.push(fired);
               return fired;
             }),
@@ -189,9 +198,11 @@ export function GlobalAlerts({
           for (const rule of triggered) {
             const body = rule.kind === "psbb-divergence"
               ? `${s} · PSBB divergence confirmed · ${rule.timeframe} closed candle. Open the chart to review.`
+              : isEma21EntryKind(rule.kind)
+              ? `${s} · ${rule.triggerSide ?? "21 EMA"} entry · ${rule.timeframe} · EMA 21 pullback and reference-candle break.`
               : `${s} · ${labels[rule.kind]} ${rule.kind.startsWith("ema") ? rule.length : rule.value}${rule.kind.startsWith("price") ? " USD" : " · 5m confirmed candle"}`;
-            const title = rule.kind === "psbb-divergence" ? `${s} · PSBB divergence` : "Global market alert";
-            const url = rule.kind === "psbb-divergence" ? `/?symbol=${s}&timeframe=${rule.timeframe}` : "/";
+            const title = rule.kind === "psbb-divergence" ? `${s} · PSBB divergence` : isEma21EntryKind(rule.kind) ? `${s} · 21 EMA entry` : "Global market alert";
+            const url = rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind) ? `/?symbol=${s}&timeframe=${rule.timeframe}` : "/";
             try {
               addPaperTradeNotification({
                 id: `global:${owner}:${rule.id}`,
@@ -203,7 +214,7 @@ export function GlobalAlerts({
             } catch {
               /* Durable triggered status remains. */
             }
-            if (rule.kind === "psbb-divergence") {
+            if (rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind)) {
               try {
                 if (Capacitor.getPlatform() === "android") await getNativeTradeAlert().show({ title, body, notificationId: `global:${owner}:${rule.id}`, kind: "trade", url });
                 else if ("Notification" in window && Notification.permission === "granted") {
@@ -256,14 +267,14 @@ export function GlobalAlerts({
       {(expanded || embedded) && (
         <div className="global-ticket">
           <h3>{symbol} alert</h3>
-          <p className="global-disclosure">Once only · expires in 7 days · app open and visible only. PSBB alerts fire when divergence is confirmed on a closed candle, without an entry trigger. No closed-app push.</p>
+          <p className="global-disclosure">Once only · expires in 7 days · monitored while the app is open and visible. PSBB alerts fire on confirmed divergence; 21 EMA alerts fire when a fresh quote crosses the pullback candle level. No closed-app push.</p>
           <div className="global-input-grid">
             <ModernSelect
               label="Condition"
               ariaLabel="Global alert condition"
               value={kind}
               onChange={setKind}
-              choices={GLOBAL_ALERT_KINDS.filter(value => value !== "psbb-divergence" || GLOBAL_DIVERGENCE_SYMBOLS.some(eligible => eligible === symbol)).map((value) => ({
+              choices={GLOBAL_ALERT_KINDS.filter(value => (value !== "psbb-divergence" && !isEma21EntryKind(value)) || GLOBAL_DIVERGENCE_SYMBOLS.some(eligible => eligible === symbol)).map((value) => ({
                 value,
                 label: labels[value],
               }))}
@@ -279,7 +290,7 @@ export function GlobalAlerts({
                 />
               </label>
             )}
-            {kind !== "psbb-divergence" && !kind.startsWith("price") && (
+            {kind !== "psbb-divergence" && !isEma21EntryKind(kind) && !kind.startsWith("price") && (
               <label>
                 Indicator / average length
                 <input
@@ -292,8 +303,10 @@ export function GlobalAlerts({
               </label>
             )}
             {kind === "psbb-divergence" && <ModernSelect label="Timeframe" ariaLabel="PSBB alert timeframe" value={timeframe} onChange={value => setTimeframe(value as keyof typeof GLOBAL_DIVERGENCE_FRAMES)} choices={Object.keys(GLOBAL_DIVERGENCE_FRAMES).map(value => ({ value, label: value }))} />}
+            {isEma21EntryKind(kind) && <ModernSelect label="Timeframe" ariaLabel="21 EMA alert timeframe" value={Object.hasOwn(GLOBAL_EMA21_FRAMES, timeframe) ? timeframe : "5m"} onChange={value => setTimeframe(value as keyof typeof GLOBAL_DIVERGENCE_FRAMES)} choices={Object.keys(GLOBAL_EMA21_FRAMES).map(value => ({ value, label: value }))} />}
           </div>
-          {kind === "psbb-divergence" && !notificationAllowed && <button type="button" onClick={() => void enableNotifications()}>Enable phone notifications</button>}
+          {isEma21EntryKind(kind) && <p className="global-disclosure">A 5m or 15m candle closes across EMA 21; within two candles an opposite-colour candle closes on the new side. Entry alerts when a matching-colour candle breaks that candle’s high or low within the next three candles.</p>}
+          {(kind === "psbb-divergence" || isEma21EntryKind(kind)) && !notificationAllowed && <button type="button" onClick={() => void enableNotifications()}>Enable phone notifications</button>}
           <button
             onClick={() =>
               void change((current) => {
@@ -312,7 +325,8 @@ export function GlobalAlerts({
                     symbol,
                     kind,
                     value: kind === "psbb-divergence" || kind.startsWith("ema") ? 0 : Number(value),
-                    length: kind === "psbb-divergence" ? 14 : Number(length),
+                    length: kind === "psbb-divergence" ? 14 : isEma21EntryKind(kind) ? 21 : Number(length),
+                    ...(isEma21EntryKind(kind) ? { timeframe: Object.hasOwn(GLOBAL_EMA21_FRAMES, timeframe) ? timeframe : "5m" } : {}),
                     ...(kind === "psbb-divergence" ? { timeframe, psbbInputs: {
                       length: settings.psbb?.inputs.length ?? studyDefaults("psbb").inputs.length,
                       left: settings.psbb?.inputs.left ?? studyDefaults("psbb").inputs.left,
@@ -342,7 +356,7 @@ export function GlobalAlerts({
                     {r.symbol} · {labels[r.kind]}
                   </b>
                   <small>
-                    {r.kind === "psbb-divergence" ? `${r.timeframe} · divergence only` : r.kind.startsWith("ema") ? `EMA ${r.length}` : r.value} ·{" "}
+                    {r.kind === "psbb-divergence" ? `${r.timeframe} · divergence only` : isEma21EntryKind(r.kind) ? `${r.timeframe} · EMA 21` : r.kind.startsWith("ema") ? `EMA ${r.length}` : r.value} ·{" "}
                     {r.cancelled
                       ? "Cancelled"
                       : r.triggeredAt
