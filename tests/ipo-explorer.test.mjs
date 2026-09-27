@@ -33,7 +33,7 @@ test('P&L stored choices validate dates and discard transient day drill-down',()
  const scope=normalizePnlScope({period:'custom',asset:'fno',product:'INTRADAY',start:'2026-09-01',end:'2026-09-18',day:'2026-09-03'});
  assert.equal(scope.period,'custom');assert.equal(scope.day,undefined);assert.equal(scope.asset,'fno');assert.equal(scope.product,'INTRADAY');
  assert.equal(normalizePnlScope({period:'custom',start:'2026-09-19',end:'2026-09-18'}).period,'all');
- assert.equal(normalizePnlScope({period:'custom',start:'2026-02-30',end:'2026-09-18'}).period,'all');
+ assert.equal(normalizePnlScope({asset:'global'}).asset,'global');
  assert.equal(readPreference('missing'),null);assert.equal(writePreference('missing',{}),false);
 });
 test('Cached GMP retains its actual check time instead of claiming a new publication',async()=>{

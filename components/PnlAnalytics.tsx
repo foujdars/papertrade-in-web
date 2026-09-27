@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { ArrowDownRight, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import type { ClosedPaperTrade } from "@/lib/trade-analytics";
 import type { PaperOrder } from "@/lib/paper-trading";
@@ -11,12 +11,19 @@ import { PNL_BREAKDOWN_KEY, readPreference, writePreference } from "@/lib/interf
 import { PNL_DIMENSIONS, groupPnl, pnlBounds, pnlCurve, pnlDay, pnlDistribution, pnlOutcome, rollingPnl, summarisePnl, type PnlDimension, type PnlScope } from "@/lib/pnl-analytics";
 
 export type PnlTab = "overview" | "insights" | "trades";
+export type PnlCurrency = "INR" | "USD";
+function moneyFor(currency: PnlCurrency) {
+  const symbol = currency === "USD" ? "$" : "₹";
+  const rupees = (n: number | null) => n === null ? "—" : `${n < -.004 ? "−" : ""}${symbol}${Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const compact = (n: number) => `${n < 0 ? "−" : ""}${symbol}${Math.abs(n) >= 100000 ? `${(Math.abs(n) / 100000).toFixed(1)}L` : Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}k` : Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return { rupees, compact, symbol };
+}
+const PnlMoneyContext = createContext(moneyFor("INR"));
+function usePnlMoney() { return useContext(PnlMoneyContext); }
 function readBreakdown() {
   const saved = readPreference(PNL_BREAKDOWN_KEY) as { dimension?: PnlDimension; measure?: string } | null;
   return { dimension: saved && PNL_DIMENSIONS.includes(saved.dimension!) ? saved.dimension! : "Symbol" as PnlDimension, measure: saved?.measure === "average" ? "average" as const : "total" as const };
 }
-const rupees = (n: number | null) => n === null ? "—" : `${n < -.004 ? "−" : ""}₹${Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const compact = (n: number) => `${n < 0 ? "−" : ""}₹${Math.abs(n) >= 100000 ? `${(Math.abs(n) / 100000).toFixed(1)}L` : Math.abs(n) >= 1000 ? `${(Math.abs(n) / 1000).toFixed(1)}k` : Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const dateText = (time: number | null) => time ? new Date(time).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" }) : "Period start";
 const signClass = (value: number) => pnlOutcome(value) === "profit" ? "positive" : pnlOutcome(value) === "loss" ? "negative" : "";
 type Drill = (ids: string[], label: string) => void;
@@ -24,6 +31,7 @@ type Point = { time: number; value: number; ids: string[]; label?: string };
 
 function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly = false, focus = "end" }: { points: Point[]; label: string; onSelect: Drill; baseline?: boolean; negativeOnly?: boolean; focus?: "end" | "largest" }) {
   const uid = useId().replace(/:/g, ""), [selected, setSelected] = useState<number | null>(null);
+  const { rupees, compact } = usePnlMoney();
   useEffect(() => setSelected(null), [points]);
   const left = 60, right = 388, top = 14, bottom = 157;
   const low = Math.min(0, ...points.map(p => p.value)), high = Math.max(0, ...points.map(p => p.value)), span = high - low || 1;
@@ -50,6 +58,7 @@ function PnlLineChart({ points, label, onSelect, baseline = false, negativeOnly 
 
 export function PnlBreakdown({ trades, orders, journal, onSelect }: { trades: ClosedPaperTrade[]; orders: PaperOrder[]; journal: Record<string, TradeJournalEntry>; onSelect: Drill }) {
   const [dimension, setDimension] = useState<PnlDimension>(() => readBreakdown().dimension), [measure, setMeasure] = useState<"total" | "average">(() => readBreakdown().measure);
+  const { rupees } = usePnlMoney();
   const groups = useMemo(() => groupPnl(trades, orders, journal, dimension).sort((a, b) => (measure === "total" ? b.net - a.net : (b.average ?? 0) - (a.average ?? 0))), [trades, orders, journal, dimension, measure]);
   const max = Math.max(1, ...groups.map(g => Math.abs(measure === "total" ? g.net : g.average ?? 0)));
   return <section className="pnl-a-card pnl-breakdown"><header><div><span className="pnl-kicker">Where results come from</span><h3>Performance breakdown</h3></div><SlidersHorizontal size={18} /></header>
@@ -57,7 +66,7 @@ export function PnlBreakdown({ trades, orders, journal, onSelect }: { trades: Cl
     {dimension === "Entry time" && <p className="pnl-help">Entry time in IST. Delivery / carry-forward trades stay separate.</p>}
     <div className="pnl-ranked-list">{groups.map(g => { const value = measure === "total" ? g.net : g.average ?? 0; return <button className="pnl-ranked-row" key={g.label} onClick={() => onSelect(g.trades.map(t => t.id), `${dimension}: ${g.label}`)}><span className="pnl-ranked-heading"><b>{g.label}</b><strong className={signClass(value)}>{rupees(value)}</strong></span><span className="pnl-diverging-track"><i style={{ left: `${value >= 0 ? 50 : 50 - Math.abs(value) / max * 50}%`, width: `${Math.abs(value) / max * 50}%`, background: value >= 0 ? "var(--green)" : "var(--red)" }} /></span><small>{g.count} trade{g.count === 1 ? "" : "s"} · Avg {rupees(g.average)}{g.count >= 10 ? ` · ${g.winRate?.toFixed(0)}% wins` : ""}</small></button>; })}</div>
     {!groups.length && <p className="pnl-chart-empty">No trades match these filters.</p>}
-    <p className="pnl-help">A group needs 10 exits before its win rate is shown. Position size changes the rupee result.</p>
+    <p className="pnl-help">A group needs 10 exits before its win rate is shown. Position size changes the result.</p>
   </section>;
 }
 
@@ -69,6 +78,7 @@ function PnlFindings({ trades, orders, onSelect }: { trades: ClosedPaperTrade[];
   const autoNet = auto.reduce((sum, trade) => sum + trade.netPnl, 0);
   const worstShare = stats.worst && stats.net < 0 && stats.worst.netPnl < 0 ? Math.abs(stats.worst.netPnl) / Math.abs(stats.net) * 100 : null;
   const worstOrder = stats.worst ? [stats.worst.id, ...stats.worst.sourceOrderIds].map(id => ordersById.get(id)).find(order => order?.instrumentKey || order?.underlyingKey) : undefined;
+  const { rupees } = usePnlMoney();
   if (!trades.length) return null;
   return <section className="pnl-a-card pnl-findings"><header><div><span className="pnl-kicker">What changed the result</span></div></header>
     <div className="pnl-finding-list">
@@ -100,17 +110,18 @@ function PnlInsights({ trades, orders, journal, onSelect }: { trades: ClosedPape
   const flowMax = Math.max(1, ...steps.map(step => Math.abs(step.change)));
   const maxCount = Math.max(1, ...distribution.bins.map(b => b.trades.length)), hx = (v: number) => 32 + (v - distribution.min) / (distribution.max - distribution.min) * 344;
   const [selectedBin, setSelectedBin] = useState<number | null>(null);
+  const { rupees, compact, symbol } = usePnlMoney();
   useEffect(() => setSelectedBin(null), [trades]);
   return <div className="pnl-insight-grid">
     <PnlFindings trades={trades} orders={orders} onSelect={onSelect} />
-    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Before costs → after costs</span><h3>How the rupees add up</h3></div></header>
+    <section className="pnl-a-card"><header><div><span className="pnl-kicker">Before costs → after costs</span><h3>How the {symbol === "$" ? "dollars" : "rupees"} add up</h3></div></header>
       <div className="pnl-flow">{steps.map(step => <button key={step.label} type="button" onClick={() => onSelect(step.ids, step.label)}><span className="pnl-flow-top"><b>{step.label}</b><strong className={step.tone === "cost" ? "pnl-cost" : signClass(step.change)}>{rupees(step.change)}</strong></span><span className="pnl-flow-track" aria-hidden="true"><i className={step.tone} style={{ width: `${Math.abs(step.change) / flowMax * 100}%` }} /></span></button>)}</div>
       <p className="pnl-help">{stats.costReversals ? `${stats.costReversals} gross winner${stats.costReversals === 1 ? "" : "s"} became a loss after charges.` : "Charges did not turn any winner into a loss."}</p>
     </section>
     <section className="pnl-a-card"><header><div><span className="pnl-kicker">Beyond your win rate</span><h3>Trade-result distribution</h3></div></header>
       <svg className="pnl-distribution" viewBox="0 0 400 188" role="img" aria-label="Number of completed trades in each net profit or loss range"><text x="32" y="14">Trade count · max {maxCount}</text>{distribution.bins.map((bin, i) => { const height = bin.trades.length / maxCount * 112; return <g key={i} role="button" tabIndex={0} aria-label={`${rupees(bin.from)} to ${rupees(bin.to)}: ${bin.trades.length} trades`} onClick={() => setSelectedBin(i)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedBin(i); } }}><rect x={33 + i * 43} y={146 - height} width="39" height={Math.max(2, height)} rx="3" fill={i < 4 ? "var(--red)" : "var(--green)"} opacity={selectedBin === i ? 1 : .55} /><text x={52 + i * 43} y={138 - height} textAnchor="middle">{bin.trades.length || ""}</text></g>; })}
         {[{ value: stats.averageWin, color: "var(--green)" }, { value: stats.averageLoss, color: "var(--red)" }, { value: stats.median, color: "var(--purple)" }].filter(m => m.value !== null).map((m, i) => <line key={i} x1={hx(m.value!)} x2={hx(m.value!)} y1="24" y2="148" stroke={m.color} strokeDasharray="3 4" />)}
-        <text x="32" y="174">{compact(distribution.min)}</text><text x="204" y="174" textAnchor="middle">₹0</text><text x="376" y="174" textAnchor="end">{compact(distribution.max)}</text>
+        <text x="32" y="174">{compact(distribution.min)}</text><text x="204" y="174" textAnchor="middle">{symbol}0</text><text x="376" y="174" textAnchor="end">{compact(distribution.max)}</text>
       </svg>
       {selectedBin !== null && <div className="pnl-chart-readout"><span>{rupees(distribution.bins[selectedBin].from)} to {rupees(distribution.bins[selectedBin].to)}</span><button onClick={() => onSelect(distribution.bins[selectedBin].trades.map(t => t.id), "Selected result range")}>View {distribution.bins[selectedBin].trades.length} trades</button></div>}
       <div className="pnl-distribution-markers"><span className="positive">Avg win <b>{rupees(stats.averageWin)}</b></span><span className="negative">Avg loss <b>{rupees(stats.averageLoss)}</b></span><span>Median <b>{rupees(stats.median)}</b></span></div>
@@ -132,26 +143,29 @@ function PnlCalendar({ trades, scope, onScope, now, onSelect }: { trades: Closed
   const selectMonth = (value: string) => { if (!/^\d{4}-\d{2}$/.test(value)) return; const [y, m] = value.split("-").map(Number); setMonth(value); onScope({ ...scope, period: "custom", start: `${value}-01`, end: `${value}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`, day: null }); };
   const move = (delta: number) => selectMonth(new Date(Date.UTC(year, monthNumber - 1 + delta, 1)).toISOString().slice(0, 7));
   const selected = scope.day ? daily.get(scope.day) ?? [] : null;
+  const { rupees, compact, symbol } = usePnlMoney();
   return <section className="pnl-a-card pnl-calendar-card"><header><div><h3>Calendar</h3></div><div className="pnl-calendar-controls"><button aria-label="Previous P&L month" onClick={() => move(-1)}><ChevronLeft size={16} /></button><input aria-label="Calendar month" type="month" value={month} onChange={e => selectMonth(e.target.value)} /><button aria-label="Next P&L month" onClick={() => move(1)}><ChevronRight size={16} /></button></div></header>
     <div className="pnl-calendar-weekdays">{["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={i}>{d}</span>)}</div>
     <div className="pnl-calendar-grid">{Array.from({ length: first }, (_, i) => <span key={`blank-${i}`} />)}{Array.from({ length: days }, (_, i) => { const key = `${month}-${String(i + 1).padStart(2, "0")}`, items = daily.get(key), net = items ? summarisePnl(items).net : 0, outcome = items ? pnlOutcome(net) : "no-trade"; const excluded = !bounds.valid || Boolean(bounds.start && key < bounds.start || bounds.end && key > bounds.end); return <button key={key} disabled={excluded} className={`pnl-calendar-day ${outcome} ${scope.day === key ? "selected" : ""}`} aria-label={`${key}: ${items ? `${rupees(net)}, ${items.length} trades` : "No trades"}`} aria-pressed={scope.day === key} style={{ "--day-strength": items ? .12 + .48 * Math.abs(net) / max : 0 } as CSSProperties} onClick={() => onScope({ ...scope, day: scope.day === key ? null : key })}><b>{i + 1}</b><small>{items ? compact(net) : ""}</small></button>; })}</div>
-    <p className="pnl-help pnl-calendar-legend"><span className="positive">Profit</span><span className="negative">Loss</span><span>Breakeven ₹0</span><span>Blank = no trades</span></p>
+    <p className="pnl-help pnl-calendar-legend"><span className="positive">Profit</span><span className="negative">Loss</span><span>Breakeven {symbol}0</span><span>Blank = no trades</span></p>
     {selected && <div className="pnl-day-detail"><span><b>{scope.day}</b>{selected.length} exits · Net {rupees(summarisePnl(selected).net)} · Charges {rupees(summarisePnl(selected).charges)}</span><button onClick={() => onSelect(selected.map(t => t.id), `Trades on ${scope.day}`)}>View trades<ChevronRight size={14} /></button></div>}
   </section>;
 }
 
-export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now }: { trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number }) {
+export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now, currency = "INR" }: { trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number; currency?: PnlCurrency }) {
   const stats = useMemo(() => summarisePnl(trades), [trades]), curve = useMemo(() => pnlCurve(trades), [trades]);
+  const money = useMemo(() => moneyFor(currency), [currency]);
+  const { rupees } = money;
   const points = useMemo(() => curve.points.map(p => ({ time: p.time, value: p.value, ids: [p.trade.id], label: `${p.trade.symbol} · ${dateText(p.time)}` })), [curve]);
   const drawdown = useMemo(() => curve.points.map(p => ({ time: p.time, value: -p.drawdown, ids: [p.trade.id] })), [curve]);
   const [journal, setJournal] = useState<Record<string, TradeJournalEntry>>({});
   useEffect(() => { const refresh = () => setJournal(readTradeJournal()); refresh(); window.addEventListener(CLOUD_CHANGE_EVENT, refresh); window.addEventListener("storage", refresh); return () => { window.removeEventListener(CLOUD_CHANGE_EVENT, refresh); window.removeEventListener("storage", refresh); }; }, []);
   const bounds = pnlBounds(scope, now), allIds = trades.map(t => t.id);
   const setScope = (patch: Partial<PnlScope>) => onScope({ ...scope, ...patch, day: null });
-  return <div className="pnl-analytics">
+  return <PnlMoneyContext.Provider value={money}><div className="pnl-analytics">
     <div className="pnl-scope-controls">
       <ModernSelect label="Period" ariaLabel="P&L period" value={scope.period} choices={[{ value: "all", label: "All time", description: "Every recorded completed exit" }, { value: "month", label: "This month", description: "From the first of this month, in IST" }, { value: "30d", label: "Last 30 days", description: "A rolling window including today" }, { value: "custom", label: "Custom dates", description: "Choose your own start and end dates" }]} onChange={period => setScope({ period, start: scope.start || `${pnlDay(now).slice(0, 7)}-01`, end: scope.end || pnlDay(now) })} />
-      <ModernSelect label="Market" ariaLabel="P&L market" value={scope.asset} choices={[{ value: "all", label: "All markets" }, { value: "stocks", label: "Stocks" }, { value: "fno", label: "F&O", description: "Options and futures" }]} onChange={asset => setScope({ asset })} />
+      <ModernSelect label="Market" ariaLabel="P&L market" value={scope.asset} choices={[{ value: "all", label: "All markets", description: "Indian stocks and F&O" }, { value: "stocks", label: "Stocks" }, { value: "fno", label: "F&O", description: "Options and futures" }, { value: "global", label: "Global", description: "BTC, ETH, gold and options · USD" }]} onChange={asset => setScope({ asset })} />
       <ModernSelect label="Product" ariaLabel="P&L product" value={scope.product} choices={[{ value: "all", label: "All products" }, { value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery / carry" }]} onChange={product => setScope({ product })} />
     </div>
     {scope.period === "custom" && <div className="pnl-custom-dates"><label>From<input type="date" value={scope.start} onChange={e => setScope({ start: e.target.value })} /></label><label>Through<input type="date" value={scope.end} onChange={e => setScope({ end: e.target.value })} /></label></div>}
@@ -171,5 +185,5 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
       <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div>
     </section><PnlCalendar trades={calendarTrades} scope={scope} onScope={onScope} now={now} onSelect={onSelect} /></div>}
     {tab === "insights" && <PnlInsights trades={trades} orders={orders} journal={journal} onSelect={onSelect} />}
-  </div>;
+  </div></PnlMoneyContext.Provider>;
 }

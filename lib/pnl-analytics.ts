@@ -2,7 +2,7 @@ import type { PaperOrder } from "./paper-trading";
 import type { ClosedPaperTrade } from "./trade-analytics";
 import type { TradeJournalEntry } from "./trading-coach";
 
-export type PnlScope = { period: "all" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "stocks" | "fno"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
+export type PnlScope = { period: "all" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "stocks" | "fno" | "global"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
 export const DEFAULT_PNL_SCOPE: PnlScope = { period: "all", start: "", end: "", asset: "all", product: "all" };
 export type PnlDimension = "Symbol" | "Strategy" | "Market" | "Product" | "Direction" | "Entry time" | "Holding duration";
 export const PNL_DIMENSIONS: PnlDimension[] = ["Symbol", "Strategy", "Market", "Product", "Direction", "Entry time", "Holding duration"];

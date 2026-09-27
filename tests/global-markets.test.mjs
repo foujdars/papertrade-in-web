@@ -17,6 +17,7 @@ import {
   normalizeGlobalCandles,
   cancelPerpOrder,
 } from "../lib/global-markets.ts";
+import { globalClosedTrades } from "../lib/global-pnl.ts";
 import { evaluateGlobalAlert, globalAlertError } from "../lib/global-alerts.ts";
 import { psbbAnalysis } from "../lib/psbb.ts";
 const now = 1800000000000;
@@ -83,6 +84,17 @@ test("partial close releases proportional margin; reduce-only cannot reverse a p
   assert.ok(b.wallet > a.wallet);
   assert.throws(() => closePerp(b, "BTCUSD", quote, 7, now), /quantity/);
   assert.throws(() => openPerp(a, spec, quote, "SELL", 1, 10, now), /opposite/);
+});
+test("global P&L uses closed perpetual exits in dollars, including the entry fee", () => {
+  const opened = openPerp(newPerpAccount(), spec, quote, "BUY", 10, 10, now);
+  const closed = closePerp(opened, "BTCUSD", { ...quote, at: now + 86_400_000, bid: 101000, ask: 101000.5, mark: 101000 }, 10, now + 86_400_000);
+  const [trade] = globalClosedTrades(closed);
+  assert.equal(trade.symbol, "BTCUSD");
+  assert.equal(trade.direction, "LONG");
+  assert.equal(trade.product, "DELIVERY");
+  assert.equal(trade.quantity, 10);
+  assert.ok(trade.netPnl < trade.grossPnl);
+  assert.equal(trade.id.startsWith("global:perp:"), true);
 });
 test("limits reserve funds, require marketable quotes, and cancel releases the reservation", () => {
   const a = openPerp(

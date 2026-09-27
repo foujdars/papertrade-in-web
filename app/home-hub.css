@@ -75,7 +75,7 @@
 .home-hub button:focus-visible { outline:2px solid var(--purple);outline-offset:3px; }
 .home-alert-clear { min-height:44px;border:0;background:var(--purple-soft);color:var(--purple);border-radius:10px;padding:10px;margin-bottom:10px; }
 .home-portfolio-actions { display:flex;align-items:center;gap:4px; }
-.home-portfolio-actions button:first-child { display:grid;place-items:center;min-width:44px;color:var(--purple); }
+.home-portfolio-actions button:first-child { display:inline-flex;align-items:center;gap:4px;min-width:44px;min-height:36px;padding:0 8px;border:0;background:transparent;color:var(--purple);font-size:12px;font-weight:650; }
 .home-reminder-actions { display:flex;gap:8px;flex-wrap:wrap;padding:0 0 10px 40px; }
 .home-reminder-actions button,.home-hidden-reminder button,.home-hidden-toggle { display:flex;align-items:center;gap:5px;min-height:44px;border:0;border-radius:10px;padding:8px 10px;background:var(--soft);color:var(--purple);font-size:11px; }
 .home-hidden-toggle { width:100%;justify-content:center;margin:6px 0; }

@@ -183,6 +183,8 @@
 .terminal-shell .home-hub.home-studio .home-session-board > button { min-height: 32px; height: 32px; border: 0; background: var(--soft); }
 .terminal-shell .home-hub.home-studio .home-portfolio-card > header { min-height: 40px; }
 .terminal-shell .home-hub.home-studio .home-portfolio-card > header svg { display: none; }
+.terminal-shell .home-hub.home-studio .home-portfolio-actions .home-balance-toggle,
+.terminal-shell .home-hub.home-studio .home-portfolio-actions .home-balance-toggle svg { display: inline-flex; }
 .terminal-shell .home-hub.home-studio .home-portfolio-value { padding: 2px 16px 8px; }
 .terminal-shell .home-hub.home-studio .home-portfolio-value small { font-size: 10px; letter-spacing: .08em; }
 .terminal-shell .home-hub.home-studio .home-portfolio-value strong { font-size: 34px; font-weight: 680; letter-spacing: -.045em; line-height: 1.05; }
