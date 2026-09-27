@@ -83,25 +83,32 @@ export function ema21EntrySignal(candles: Candle[], quote: PerpQuote, timeframe:
   const closed = bars.filter(c => c.time < currentTime && (c.time + seconds) * 1000 + 5000 <= now);
   if (closed.length < 24 || closed.at(-1)!.time + seconds !== currentTime) return null;
   const values = average(closed.map(c => c.close), 21, "EMA");
+  return ema21EntryAt([...closed, current], closed.length, values, seconds, quote.last, quote.last, quote.last);
+}
+
+/** The same EMA 21 entry rule powers the global alert and its chart arrows. */
+export function ema21EntryAt(bars: Candle[], index: number, values: number[], seconds: number,
+  observedHigh: number, observedLow: number, colourPrice: number): "bullish" | "bearish" | null {
+  const current = bars[index];
+  if (!current) return null;
   for (let redDistance = 1; redDistance <= 3; redDistance++) {
-    const redIndex = closed.length - redDistance;
-    const reference = closed[redIndex];
+    const redIndex = index - redDistance;
+    const reference = bars[redIndex];
     for (let crossDistance = 1; crossDistance <= 2; crossDistance++) {
       const crossIndex = redIndex - crossDistance;
       if (crossIndex < 21 || !Number.isFinite(values[crossIndex - 1])) continue;
       // Require every candle in the sequence to belong to this timeframe.
-      if (closed.slice(crossIndex - 1, redIndex + 1).some((c, i, arr) => i > 0 && c.time - arr[i - 1].time !== seconds)) continue;
-      if (closed.slice(redIndex + 1).some((c, i, arr) => c.time !== reference.time + (i + 1) * seconds)) continue;
-      const cross = closed[crossIndex], prior = closed[crossIndex - 1];
+      if (bars.slice(crossIndex - 1, index + 1).some((c, i, arr) => i > 0 && c.time - arr[i - 1].time !== seconds)) continue;
+      const cross = bars[crossIndex], prior = bars[crossIndex - 1];
       const bullish = prior.close <= values[crossIndex - 1] && cross.open <= values[crossIndex] && cross.close > values[crossIndex]
         && reference.close < reference.open && reference.close > values[redIndex]
-        && quote.last > current.open && quote.last > reference.high
-        && !closed.slice(redIndex + 1).some(c => c.close > c.open && c.high > reference.high);
+        && colourPrice > current.open && observedHigh > reference.high
+        && !bars.slice(redIndex + 1, index).some(c => c.close > c.open && c.high > reference.high);
       if (bullish) return "bullish";
       const bearish = prior.close >= values[crossIndex - 1] && cross.open >= values[crossIndex] && cross.close < values[crossIndex]
         && reference.close > reference.open && reference.close < values[redIndex]
-        && quote.last < current.open && quote.last < reference.low
-        && !closed.slice(redIndex + 1).some(c => c.close < c.open && c.low < reference.low);
+        && colourPrice < current.open && observedLow < reference.low
+        && !bars.slice(redIndex + 1, index).some(c => c.close < c.open && c.low < reference.low);
       if (bearish) return "bearish";
     }
   }

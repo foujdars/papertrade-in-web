@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ema21EntrySignal, evaluateGlobalAlert, globalAlertError } from '../lib/global-alerts.ts';
+import { ema21EntrySignal, ema21EntryAt, evaluateGlobalAlert, globalAlertError } from '../lib/global-alerts.ts';
+import { average } from '../lib/study-calculations.ts';
 
 function scenario(seconds, { redDelay = 1, entryDelay = 1, bearish = false } = {}) {
   const closes = Array.from({length: 24}, () => ({open:100, high:101, low:99, close:100}));
@@ -61,4 +62,15 @@ test('EMA wick touches, wrong candle colour, stale quotes and missed first entri
   const later=scenario(300,{entryDelay:2});
   const first=later.candles.at(-2);
   assert.equal(evaluateGlobalAlert(later.rule,later.quote,later.candles.map(c=>c===first?{...c,open:101,close:105,high:105}:c),later.now),false);
+});
+
+test('EMA 21 chart arrow marks the green candle that breaks the red candle high, even if it closes below that high', () => {
+  const {candles}=scenario(300);
+  const last=candles.length-1;
+  const values=average(candles.map(c=>c.close),21,'EMA');
+  const trigger={...candles[last],close:103,high:105};
+  const rows=[...candles.slice(0,-1),trigger];
+  assert.equal(ema21EntryAt(rows,last,values,300,trigger.high,trigger.low,trigger.close),'bullish');
+  assert.equal(ema21EntryAt(rows,last,values,300,103,103,103),null,'forming candle waits for a live break');
+  assert.equal(ema21EntryAt(rows,last,values,300,105,105,105),'bullish','forming green candle shows an arrow at the entry');
 });
