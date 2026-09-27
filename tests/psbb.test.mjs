@@ -25,8 +25,8 @@ for (const inverse of [false, true]) {
     candles[3]=bar(3,130,121);momentum[3]=84;
     candles[4]=bar(4,128,120);momentum[4]=77;
     candles[5]=bar(5,127,115);candles[6]=bar(6,126,105);candles[7]=bar(7,128,118);
-    candles[8]=bar(8,140,125);momentum[8]=78;
-    candles[9]=bar(9,138,123);momentum[9]=73;
+    candles[8]=bar(8,140,125);momentum[8]=69;
+    candles[9]=bar(9,138,123);momentum[9]=65;
     const before=analyze(candles.slice(0,8),momentum.slice(0,8));
     assert.equal(before.anchors[0].time,3);assert.equal(before.anchors[0].rsi,inverse?16:84);
     const setup=analyze(candles.slice(0,13),momentum.slice(0,13)).setups.at(-1);
@@ -89,7 +89,7 @@ test('bullish D1 follows the lowest RSI below 30 and a later non-divergent visit
   assert.equal(replaced.anchors[0].time, 7);
   assert.equal(replaced.anchors[0].rsi, 27);
   assert.equal(replaced.setups.length, 0);
-  candles[10] = bar(10, 118, 100); momentum[10] = 29;
+  candles[10] = bar(10, 118, 100); momentum[10] = 31;
   candles[11] = bar(11, 117, 106); momentum[11] = 36;
   const divergence = psbbAnalysisFromRsi(candles.slice(0,12), momentum.slice(0,12), {left:1}, true).setups.at(-1);
   assert.equal(divergence.firstTime, 7);
@@ -99,6 +99,24 @@ test('bullish D1 follows the lowest RSI below 30 and a later non-divergent visit
   assert.equal(divergence.entry, 130);
   assert.equal(divergence.stop, 100);
   assert.equal(divergence.target1, 160);
+});
+
+for (const bullish of [true, false]) test(`${bullish ? 'bullish' : 'bearish'} fresh RSI visit replaces D1 even when it would diverge against the old anchor`, () => {
+  const candles = flat(13), momentum = Array(13).fill(50);
+  candles[1] = bar(1, 115, 100); momentum[1] = 20;
+  candles[6] = bar(6, 112, 90); momentum[6] = 25;
+  candles[7] = bar(7, 130, 102); momentum[7] = 40;
+  const transform = (bars, values) => bullish ? { candles: bars, momentum: values }
+    : { candles: bars.map(c => ({...c, open: 250-c.open, close: 250-c.close, high: 250-c.low, low: 250-c.high})), momentum: values.map(value => 100-value) };
+  const early = transform(candles.slice(0,9), momentum.slice(0,9));
+  const replacement = psbbAnalysisFromRsi(early.candles, early.momentum, {left:1}, true);
+  assert.equal(replacement.anchors[0].time, 6);
+  assert.equal(replacement.setups.length, 0, 'Old D1 cannot form divergence with the fresh RSI visit');
+  candles[10] = bar(10, 118, 85); momentum[10] = 35;
+  const data = transform(candles, momentum);
+  const setup = psbbAnalysisFromRsi(data.candles, data.momentum, {left:1}, true).setups.at(-1);
+  assert.equal(setup.firstTime, 6);
+  assert.equal(setup.secondTime, 10);
 });
 
 test('opposite threshold replaces pending D1 symmetrically, never reviving the earlier setup', () => {
@@ -122,7 +140,7 @@ test("positive divergence has no entry until price reaches the high between the 
   candles[12] = bar(12, 110, 95, 104);
   const rsi = Array.from({ length: 20 }, () => 50);
   rsi[5] = 22;
-  rsi[12] = 28;
+  rsi[12] = 31;
   const waiting = psbbSetups(candles, rsi, { left: 2, oversold: 30, target1: 1, target2: 1.5 }).at(-1);
   assert.equal(waiting.shifted, false);
   assert.equal(waiting.entry, 130);
@@ -150,7 +168,7 @@ test("negative divergence is not a trade when the low between the highs never br
   assert.equal(setup.shifted, false);
 });
 
-test("a third push in the same direction is the lower-probability divergence", () => {
+test("a later RSI threshold visit starts a fresh D1 rather than inheriting earlier pushes", () => {
   const candles = flat(28);
   candles[4] = bar(4, 130, 118, 124);
   candles[6] = bar(6, 122, 100, 108);
@@ -163,7 +181,8 @@ test("a third push in the same direction is the lower-probability divergence", (
   rsi[10] = 74;
   rsi[16] = 68;
   const setup = psbbSetups(candles, rsi, { left: 2, overbought: 70 }).at(-1);
-  assert.equal(setup.extended, true);
+  assert.equal(setup.firstTime, 10);
+  assert.equal(setup.extended, false);
   assert.equal(setup.shifted, false);
 });
 
