@@ -108,7 +108,7 @@ function moveD1(episode: Episode, index: number) {
  * D1 before replacing it: price HH + RSI LH (or LL + HL) preserves the reference
  * for D2. A non-divergent visit becomes the new D1. After divergence is already
  * established, a fresh threshold visit starts a fresh setup, not a stale one.
- * Swings need `left` closed candles on the right. Entry requires the most
+ * Swings need `left` closed candles on the right. Entry requires the
  * lowest swing low for shorts or highest swing high for longs strictly
  * between D1 and the divergence extreme.
  * A touch of a known intervening level also confirms D2 without waiting
