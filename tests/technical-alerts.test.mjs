@@ -158,3 +158,17 @@ test('volume directional events use candle body, dojis excluded; bad history wai
   assert.match(evaluateTechnical(defaults('volume'), data.filter((_, i) => i !== 10), [], now).state, /uninterrupted/);
   assert.match(evaluateTechnical(defaults('volume'), data.slice(-10), [], now).state, /Warming/);
 });
+
+test('PSBB divergence is a technical alert and fires only on its confirmation close', () => {
+  assert.equal(technicalConfigError(defaults('psbb')), null);
+  assert.equal(defaults('psbb', '3m').timeframe, '5m');
+  assert.match(technicalConfigError({ ...defaults('psbb'), timeframe: '3m' }), /1m, 5m, 15m/);
+  const closes = [100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,103,106,109,112,115,118,116,114,112,110,108,106,108,110,112,114,116,118,120,122,120,118,116];
+  const data = closes.map((close, i) => ({ time: start + i * 300, open: i ? closes[i - 1] : close, high: Math.max(close, closes[i - 1] ?? close) + 0.5, low: Math.min(close, closes[i - 1] ?? close) - 0.5, close, volume: 1000 }));
+  const now = (data.at(-1).time + 310) * 1000;
+  const bearish = { ...defaults('psbb'), condition: 'bearish', timeframe: '5m' };
+  assert.equal(evaluateTechnical(bearish, data, [], now).hit, true);
+  assert.equal(evaluateTechnical({ ...bearish, condition: 'bullish' }, data, [], now).hit, false);
+  const later = [...data, { time: data.at(-1).time + 300, open: 116, high: 116.5, low: 113.5, close: 114, volume: 1000 }];
+  assert.equal(evaluateTechnical(bearish, later, [], (later.at(-1).time + 310) * 1000).hit, false);
+});

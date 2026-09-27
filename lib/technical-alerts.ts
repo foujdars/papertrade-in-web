@@ -1,8 +1,9 @@
 import { bollingerBands, ema, macd, rsi, sma, supertrend, vwap, type Candle, type Instrument } from "./market";
+import { psbbAnalysis } from "./psbb.ts";
 
 export const TECHNICAL_FRAMES = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1H": 3600, "1D": 86400 } as const;
 export type TechnicalFrame = keyof typeof TECHNICAL_FRAMES;
-export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume", price: "Price level" } as const;
+export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume", psbb: "PSBB divergence", price: "Price level" } as const;
 export type TechnicalFamily = keyof typeof TECHNICAL_FAMILIES;
 export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number; delivery?: "device" | "server" };
 export type TechnicalRule = TechnicalConfig & { id: string; revision: string; instrument: Instrument; createdAt: number; armedAt: number; expiresAt: number; status: "active" | "paused" | "completed" | "expired"; lastBar?: number; lastTriggeredAt?: number };
@@ -17,11 +18,13 @@ export function technicalChoices(family: TechnicalFamily) {
   if (family === "macd") return [{ value: "signalUp", label: "MACD crosses above signal" }, { value: "signalDown", label: "MACD crosses below signal" }, { value: "zeroUp", label: "Histogram crosses above zero" }, { value: "zeroDown", label: "Histogram crosses below zero" }];
   if (family === "supertrend") return [{ value: "up", label: "Turns bullish" }, { value: "down", label: "Turns bearish" }];
   if (family === "previousDay") return [{ value: "up", label: "Close breaks previous-day high" }, { value: "down", label: "Close breaks previous-day low" }];
+  if (family === "psbb") return [{ value: "either", label: "Bullish or bearish divergence" }, { value: "bullish", label: "Bullish divergence" }, { value: "bearish", label: "Bearish divergence" }];
   return [{ value: "up", label: family === "rsi" ? "Crosses above threshold" : "Price crosses above VWAP" }, { value: "down", label: family === "rsi" ? "Crosses below threshold" : "Price crosses below VWAP" }];
 }
 export function defaultTechnicalConfig(family: TechnicalFamily = "ema", timeframe: TechnicalFrame = "5m"): TechnicalConfig {
   if (family === "price") return { ...defaultTechnicalConfig("ema", "1m"), family, condition: "above", threshold: 100, delivery: "server" };
-  return { family, timeframe, condition: technicalChoices(family)[0].value, period: family === "rsi" ? 14 : family === "supertrend" ? 10 : family === "macd" ? 12 : 20, slow: family === "macd" ? 26 : 50, signal: 9, threshold: 70, multiplier: family === "supertrend" ? 3 : 2, repeat: "once", cooldown: 0, days: 7 };
+  const frame = family === "psbb" && !["1m", "5m", "15m", "1H", "1D"].includes(timeframe) ? "5m" : timeframe;
+  return { family, timeframe: frame, condition: technicalChoices(family)[0].value, period: family === "rsi" || family === "psbb" ? 14 : family === "supertrend" ? 10 : family === "macd" ? 12 : 20, slow: family === "macd" ? 26 : 50, signal: 9, threshold: 70, multiplier: family === "supertrend" ? 3 : 2, repeat: "once", cooldown: 0, days: 7 };
 }
 export function technicalConfigError(c: TechnicalConfig): string | null {
   if (!c || !Object.hasOwn(TECHNICAL_FAMILIES, c.family) || !Object.hasOwn(TECHNICAL_FRAMES, c.timeframe)) return "Choose a supported indicator and timeframe.";
@@ -32,6 +35,9 @@ export function technicalConfigError(c: TechnicalConfig): string | null {
   if (c.family === "price") {
     if (c.delivery !== "server" || c.repeat !== "once" || c.timeframe !== "1m") return "Price monitoring uses the server, once only, with minute-level checks.";
     if (!Number.isFinite(c.threshold) || c.threshold < .01 || c.threshold > 1e9 || Math.abs(c.threshold * 100 - Math.round(c.threshold * 100)) > .00001) return "Enter a positive alert price with at most two decimal places.";
+  } else if (c.family === "psbb") {
+    if (!["1m", "5m", "15m", "1H", "1D"].includes(c.timeframe)) return "PSBB divergence alerts use 1m, 5m, 15m, 1H or 1D.";
+    if (!Number.isFinite(c.threshold) || c.threshold < 50 || c.threshold > 99) return "Overbought must be from 50 to 99.";
   } else if (!Number.isFinite(c.threshold) || c.threshold <= 0 || c.threshold >= 100) return "RSI threshold must be between 0 and 100.";
   if (!Number.isFinite(c.multiplier) || c.multiplier < 0.1 || c.multiplier > 10) return "Multiplier must be between 0.1 and 10.";
   if (c.family === "volume" && (c.condition === "dry" ? c.multiplier >= 1 : c.multiplier <= 1)) return c.condition === "dry" ? "Low-volume multiplier must be below 1×." : "High-volume multiplier must be above 1×.";
@@ -43,7 +49,7 @@ export function technicalDescription(c: TechnicalConfig) {
   if (c.family === "price") return `Price ${c.condition === "above" ? "at or above" : "at or below"} ₹${c.threshold.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (c.family === "volume") return `Volume (${c.period} prior bars · ${c.multiplier}×) · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
   const name = TECHNICAL_FAMILIES[c.family];
-  const parameters = ["ema", "sma"].includes(c.family) ? `${c.period}${c.condition.startsWith("average") ? ` / ${c.slow}` : ""}` : c.family === "rsi" ? `${c.period} · ${c.threshold}` : c.family === "macd" ? `${c.period}, ${c.slow}, ${c.signal}` : ["supertrend", "bollinger"].includes(c.family) ? `${c.period}, ${c.multiplier}` : "";
+  const parameters = ["ema", "sma"].includes(c.family) ? `${c.period}${c.condition.startsWith("average") ? ` / ${c.slow}` : ""}` : c.family === "rsi" || c.family === "psbb" ? `${c.period} · ${c.threshold}` : c.family === "macd" ? `${c.period}, ${c.slow}, ${c.signal}` : ["supertrend", "bollinger"].includes(c.family) ? `${c.period}, ${c.multiplier}` : "";
   return `${name}${parameters ? ` (${parameters})` : ""} · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
 }
 export function parseTechnicalStore(raw: string | null): TechnicalStore {
@@ -99,7 +105,13 @@ export function evaluateTechnical(rule: TechnicalConfig, raw: Candle[], daily: C
   if (now - end > 180) return { state: "Waiting for a fresh candle close" };
   const baseline = { barTime: last.time, end, price: last.close };
   const required = rule.family === "volume" ? rule.period + 2 : rule.family === "macd" ? rule.slow + rule.signal + 1 : rule.family === "rsi" ? rule.period + 2 : ["ema", "sma", "supertrend", "bollinger"].includes(rule.family) ? (rule.condition.startsWith("average") ? rule.slow : rule.period) + 1 : 2;
-  if (data.length < required) return { state: `Warming up · ${data.length}/${required} closed candles` };
+  if (data.length < required && rule.family !== "psbb") return { state: `Warming up · ${data.length}/${required} closed candles` };
+  if (rule.family === "psbb") {
+    const needed = Math.max(60, rule.period * 5);
+    if (data.length < needed) return { state: `Warming up · ${data.length}/${needed} closed candles` };
+    const setup = psbbAnalysis(data, { length: rule.period, left: 3, oversold: 30, overbought: rule.threshold }, rule.timeframe, true).setups.find((item) => item.confirmedTime === last.time && (rule.condition === "either" || (rule.condition === "bullish" ? item.side === "long" : item.side === "short")));
+    return { ...baseline, state: "Watching closed candles", hit: Boolean(setup), detail: setup ? `${setup.side === "long" ? "Bullish" : "Bearish"} RSI divergence confirmed` : "No new PSBB divergence on this close" };
+  }
   if (rule.family === "volume") {
     // Compare each bar with strictly PRIOR bars, never its own volume or future data.
     const window = data.slice(-required);
