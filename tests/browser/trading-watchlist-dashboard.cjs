@@ -45,10 +45,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const options = page.locator('.watchlist-selector-options button');
     assert.equal(await options.nth(1).locator('b').textContent(), 'Trading watchlist');
     await options.nth(1).click();
+    await page.getByRole('button',{name:'Refresh 5m',exact:true}).first().click();
     await page.locator('.tw-row').first().waitFor();
     await page.getByLabel('Trading stock universe').selectOption('Indices');
+    await page.getByRole('button',{name:'Refresh 5m',exact:true}).first().click();
     await page.getByRole('status').filter({ hasText: '3/3 stocks scanned' }).waitFor();
     await page.getByRole('tab', { name: '4H', exact: true }).click();
+    await page.getByRole('button',{name:'Refresh 4H',exact:true}).first().click();
     await page.getByRole('status').filter({ hasText: '3/3 stocks scanned' }).waitFor();
     const last = page.getByRole('button', { name: 'Open SENSEX 4H success chart' });
     await last.scrollIntoViewIfNeeded();
