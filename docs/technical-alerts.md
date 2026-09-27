@@ -1,5 +1,28 @@
 # Technical alerts
 
+## BTC, ETH and gold closed-app alerts
+
+In the global chart, open Alerts and choose **PSBB divergence confirmed** or
+**21 EMA entry** on BTCUSD, ETHUSD or XAUTUSD. Select **Monitoring → Even when
+app is closed**, sign in and connect Trade notifications. Rules created in this
+mode live in the account's server store; existing app-open rules stay on the
+device and are not copied to the server. Cancel server rules from the global
+alert list. Each rule is once-only and expires after seven days.
+
+The existing `/api/technical-alerts/dispatch` minute-level job runs these
+global checks in addition to NSE technical checks, including outside NSE hours.
+No new cron secret or job is needed. Firestore collections `globalAlertAccounts`,
+`globalAlertOutbox`, and `globalAlertSystem` must deny client access; only the
+server uses them. Server creation requires a healthy recent global and technical
+heartbeat and an opted-in notification device. The initial dispatcher handles
+at most ten global accounts and twelve distinct symbol/timeframe groups.
+
+PSBB uses fresh confirmed candles; 21 EMA uses a fresh quote to observe an
+intrabar break. A once-per-minute poll can miss a brief touch that reverses
+between checks. Feed outages and phone restrictions can also delay or prevent
+delivery. Test one signed-in phone after deployment; a server send acknowledgement
+does not establish that the phone displayed the notification.
+
 Open the alarm-clock icon → Create alert → Technical. The selected chart supplies
 the symbol and initial timeframe; the saved alert then keeps its own settings.
 Opening another chart, hiding indicators, or switching to P&L does not alter it.
