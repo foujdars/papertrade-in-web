@@ -6,11 +6,11 @@ import { psbbSetups, psbbPlots, psbbAnalysis, psbbAnalysisFromRsi, currentPsbbSe
 const bar = (time, high, low, close = (high + low) / 2) => ({ time, open: close, high, low, close });
 const flat = (count) => Array.from({ length: count }, (_, time) => bar(time, 120, 110, 115));
 
-test('reported new-leg candles never enter without a swing between D1 and SH', () => {
+test('old wick-based new-leg fixture cannot create a body divergence or entry', () => {
   const rows = JSON.parse(readFileSync(new URL('./fixtures/psbb-new-leg-candles.json', import.meta.url), 'utf8'));
   const candles = rows.map(([time,open,high,low,close]) => ({time,open,high,low,close}));
   const setups = psbbAnalysis(candles, {}, '5m').setups;
-  assert.ok(setups.some(setup => setup.phase === 'waiting-structure'));
+  assert.equal(setups.length, 0);
   assert.ok(setups.every(setup => !setup.shifted));
 });
 
@@ -112,7 +112,7 @@ for (const bullish of [true, false]) test(`${bullish ? 'bullish' : 'bearish'} fr
   const replacement = psbbAnalysisFromRsi(early.candles, early.momentum, {left:1}, true);
   assert.equal(replacement.anchors[0].time, 6);
   assert.equal(replacement.setups.length, 0, 'Old D1 cannot form divergence with the fresh RSI visit');
-  candles[10] = bar(10, 118, 85); momentum[10] = 35;
+  candles[10] = bar(10, 118, 85, 95); momentum[10] = 35;
   const data = transform(candles, momentum);
   const setup = psbbAnalysisFromRsi(data.candles, data.momentum, {left:1}, true).setups.at(-1);
   assert.equal(setup.firstTime, 6);
@@ -123,7 +123,7 @@ test('opposite threshold replaces pending D1 symmetrically, never reviving the e
   for (const inverse of [false,true]) {
     const candles=flat(18);
     candles[3]=bar(3,112,95,100);candles[6]=bar(6,130,110,125);
-    candles[9]=bar(9,120,100,110);candles[12]=bar(12,140,112,125);
+    candles[9]=bar(9,120,100,110);candles[12]=bar(12,140,112,130);
     const momentum=Array(18).fill(50);momentum[3]=20;momentum[6]=80;momentum[12]=65;
     const bars=inverse?candles.map(c=>({...c,high:250-c.low,low:250-c.high,open:250-c.open,close:250-c.close})):candles;
     const result=psbbSetups(bars,inverse?momentum.map(r=>100-r):momentum,{left:1});
@@ -207,9 +207,30 @@ const prefix = (data, count) => ({ candles: data.candles.slice(0, count), moment
 test('D1 is available for chart marking before divergence and only after its candle closes', () => {
   const candles = [...Array.from({ length: 20 }, (_, i) => bar(i, 100, 90, 95)), bar(20, 110, 90, 108), bar(21, 120, 95, 100)];
   const pending = psbbAnalysis(candles, { length: 2, left: 1 }, '5m');
-  assert.deepEqual(pending.anchors, [{ side: 'short', time: 20, price: 110, rsi: 100 }]);
+  assert.deepEqual(pending.anchors, [{ side: 'short', time: 20, price: 108, rsi: 100 }]);
   assert.deepEqual(pending.setups, []);
   assert.deepEqual(psbbAnalysis(candles.slice(0, -1), { length: 2, left: 1 }, '5m').anchors, []);
+});
+
+for (const bullish of [false, true]) test(`${bullish ? 'bullish' : 'bearish'} divergence compares bodies, ignoring the longer D1 wick`, () => {
+  const candles = flat(12), momentum = Array(12).fill(50);
+  candles[2] = { time: 2, open: 105, close: 110, high: 150, low: 100 }; momentum[2] = 80;
+  candles[6] = { time: 6, open: 115, close: 120, high: 140, low: 105 }; momentum[6] = 65;
+  const inverse = (bars) => bars.map(c => ({ ...c, open: 300-c.open, close: 300-c.close, high: 300-c.low, low: 300-c.high }));
+  const bars = bullish ? inverse(candles) : candles;
+  const values = bullish ? momentum.map(r => 100-r) : momentum;
+  const result = psbbAnalysisFromRsi(bars, values, { left: 1 }, true);
+  const setup = result.setups.at(-1);
+  assert.ok(setup, 'the second body makes a new price extreme even though its wick does not');
+  assert.equal(setup.firstTime, 2);
+  assert.equal(setup.secondTime, 6);
+  assert.equal(setup.firstPrice, bullish ? 190 : 110);
+  assert.equal(setup.secondPrice, bullish ? 180 : 120);
+  assert.equal(setup.phase, 'waiting-structure');
+  const wickOnly = candles.map(c => ({ ...c }));
+  wickOnly[6] = { ...wickOnly[6], open: 100, close: 105, high: 155 };
+  const ignored = psbbAnalysisFromRsi(bullish ? inverse(wickOnly) : wickOnly, values, { left: 1 }, true);
+  assert.equal(ignored.setups.length, 0, 'a higher wick with no higher body is not divergence');
 });
 
 for (const long of [false, true]) {
@@ -263,7 +284,7 @@ test('a more extreme price replaces a pending divergence, keeping the original D
   const setup = latest(data);
   assert.equal(setup.firstTime, 1);
   assert.equal(setup.secondTime, 7);
-  assert.equal(setup.secondPrice, 135);
+  assert.equal(setup.secondPrice, 130);
   assert.equal(setup.secondRsi, 62);
   assert.equal(setup.entryTime, 5);
   assert.equal(setup.structureCase, 'before');

@@ -74,15 +74,15 @@ function realCandles() {
   const pattern = [[110,90,108],[120,95,100],[115,80,90],[112,75,80],[118,85,100],[130,100,110],[125,99,105],[118,90,94],[122,96,115],[116,94,100],[112,75,88]];
   return [...Array.from({ length: 20 }, () => [100,90,95]), ...pattern].map(([h,l,c],i) => bar(start + i * 60, h,l,c));
 }
-test('scanner evaluates all closed candles, omits forming bars, and uses highest swing + 1R', () => {
+test('scanner evaluates closed candles with body divergence and a 1R level', () => {
   const candles = realCandles(), end = candles.at(-1).time + 60;
   const run = (now) => buildTradingReport('NSE_EQ|TEST', '1m', '2026-09', candles, { length: 2, left: 1, oversold: 1, overbought: 99 }, now * 1000);
   assert.equal(run(end - 1).counts.active, 0);
   const report = run(end);
   assert.equal(report.counts.active, 1);
-  assert.equal(report.rows[0].setup.stop, 130);
-  assert.equal(report.rows[0].setup.entry, 75);
-  assert.equal(report.rows[0].setup.target1, 20);
+  assert.equal(report.rows[0].setup.stop, 122);
+  assert.equal(report.rows[0].setup.entry, 90);
+  assert.equal(report.rows[0].setup.target1, 58);
   assert.equal(report.coverage, 'limited');
 });
 test('live divergence reports only confirmation on the current IST day and omits entry outcomes', () => {
