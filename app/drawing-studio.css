@@ -55,6 +55,8 @@ html, body { touch-action: pan-x pan-y; }
   }
   /* A scrolling toolbar clips its absolutely positioned symbol list. */
   .terminal-shell .trade-cockpit .chart-controls:has(.desktop-symbol-menu) { overflow: visible; }
+  /* Android moves fixed controls above the keyboard while search is focused. */
+  .terminal-shell:has(.desktop-symbol-menu input:focus) .permanent-trade-footer { visibility: hidden; pointer-events: none; }
   .terminal-shell .trade-cockpit .chart-controls::-webkit-scrollbar { display: none; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol { flex: 1 1 auto; min-width: 0; gap: 0; height: 36px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger {
