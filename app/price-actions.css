@@ -10,20 +10,8 @@
 .price-action-sheet .price-action-primary { background: #7050df; color: #fff; text-align: center; font-weight: 600; }
 .price-action-sheet article { display: grid; gap: 6px; padding-block: 10px; border-bottom: 1px solid #8883; }
 .price-action-sheet article small { overflow-wrap: anywhere; }
-.chart-price-plus { position: absolute; right: 0; z-index: 26; height: 20px; margin: 0; padding: 0 6px 0 5px; border: 0; border-radius: 3px; background: #252b3d; color: #fff; display: flex; align-items: center; gap: 4px; transform: translateY(-50%); font-size: 11px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; touch-action: manipulation; }
-.chart-price-plus span { width: auto; height: auto; border: 0; border-radius: 0; background: transparent; color: inherit; font-size: 13px; font-weight: 500; line-height: 1; box-shadow: none; }
-.chart-price-plus b { font-weight: 650; color: inherit; }
-[data-theme="neon"] .chart-price-plus { background: #252b3d; color: #fff; }
-.chart-crosshair-tag { position: absolute; z-index: 30; top: 0; left: 0; display: flex; align-items: center; height: 20px; margin: 0; padding: 0 6px 0 0; border: 0; border-radius: 3px; background: #252b3d; color: #fff; font: 650 11px/1 Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; touch-action: manipulation; visibility: hidden; pointer-events: auto; overflow: hidden; }
-.chart-crosshair-tag i { flex: 0 0 18px; width: 18px; display: grid; place-items: center; font-style: normal; font-size: 15px; font-weight: 650; }
-.chart-crosshair-tag b { font-weight: 650; }
-[data-theme="neon"] .chart-crosshair-tag { background: #342353; color: #fff; }
 .price-tasks-button { position: fixed; right: 12px; bottom: 132px; z-index: 35; border: 1px solid #7c6caa55; border-radius: 8px; min-height: 28px; background: var(--panel, #fff); color: var(--text, #443166); padding: 4px 8px; font-size: 11px; }
 @media (min-width: 769px) { .price-action-backdrop { align-items: center; } .price-action-sheet { border-radius: 18px; } .price-tasks-button { bottom: 18px; right: 330px; } }
-.price-action-backdrop:has(.price-crosshair-sheet),
-.price-crosshair-backdrop { z-index: 1400; align-items: flex-end; justify-content: center; padding: 12px 0 calc(72px + env(safe-area-inset-bottom, 0px)); }
-.price-crosshair-sheet { width: min(100%, 560px); max-height: min(78dvh, 640px); border-radius: 22px 22px 0 0; }
-@media (min-width: 941px) { .price-action-backdrop:has(.price-crosshair-sheet), .price-crosshair-backdrop { padding-bottom: 18px; } }
 [data-theme="neon"] .price-action-sheet, [data-theme="neon"] .price-tasks-button { background: #101a35; color: #e7e9fa; }
 
 /* Alerts: quiet chart annotations and a focused, searchable bottom sheet. */
