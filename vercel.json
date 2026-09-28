@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "next build && node scripts/verify-coach-assets.mjs"
+  "buildCommand": "next build && node scripts/verify-coach-assets.mjs",
+  "ignoreCommand": "if grep -q chart-crosshair-tag components/MarketChart.tsx; then exit 0; else exit 1; fi"
 }
