@@ -16,7 +16,10 @@
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger { width: 48px; min-width: 48px; flex-basis: 48px; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger small { display: none; }
 .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger + .compact-selector-trigger b { display: block; font-size: 12px; }
-.terminal-shell .trade-cockpit .desktop-symbol-menu { z-index: 110; width: min(380px, calc(100vw - 20px)); max-width: calc(100vw - 20px); left: 0; right: auto; }
+.terminal-shell .trade-cockpit .desktop-chart-symbol { position: relative; }
+.terminal-shell .trade-cockpit .desktop-symbol-menu { position: absolute; top: 100%; left: 0; right: auto; z-index: 140; width: min(420px, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: min(70dvh, calc(100svh - 130px)); }
+.terminal-shell .trade-cockpit .desktop-symbol-menu > div { max-height: min(62dvh, calc(100svh - 180px)); }
+.terminal-shell:has(.desktop-symbol-menu) .permanent-trade-footer { visibility: hidden; pointer-events: none; }
 /* Chart annotations float without opaque cards; forms retain their surfaces. */
 .terminal-shell .chart-selected-drawing { position: absolute; z-index: 24; transform: none; display: flex; gap: 0; padding: 0; border: 1px solid var(--line, #d7dbe6); border-radius: 0; background: var(--surface, #fff); box-shadow: none; }
 .terminal-shell .chart-selected-drawing button { width: 28px; height: 26px; min-height: 26px; padding: 0; display: grid; place-items: center; border: 0; border-right: 1px solid var(--line, #d7dbe6); border-radius: 0; background: var(--surface, #fff); box-shadow: none; }
