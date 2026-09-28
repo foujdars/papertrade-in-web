@@ -66,11 +66,9 @@ export function GlobalAlerts({
     [value, setValue] = useState(""),
     [length, setLength] = useState("14"),
     [timeframe, setTimeframe] = useState<keyof typeof GLOBAL_DIVERGENCE_FRAMES>("5m");
-  const [notificationAllowed, setNotificationAllowed] = useState(false);
-  const [delivery, setDelivery] = useState<"device" | "server">("device");
+  const [, setCloudReady] = useState(false);
   const [cloudRules, setCloudRules] = useState<CloudGlobalRule[]>([]);
-  const [cloudReady, setCloudReady] = useState(false);
-  const [cloudMessage, setCloudMessage] = useState("Checking server monitoring…");
+  const [, setCloudMessage] = useState("Checking server monitoring…");
   const alive = useRef(true);
   useEffect(() => {
     if (embedded && visible) {
@@ -78,16 +76,6 @@ export function GlobalAlerts({
       if (defaultTimeframe && Object.hasOwn(GLOBAL_DIVERGENCE_FRAMES, defaultTimeframe)) setTimeframe(defaultTimeframe as keyof typeof GLOBAL_DIVERGENCE_FRAMES);
     }
   }, [embedded, visible, defaultTimeframe]);
-  useEffect(() => { if (typeof Notification !== "undefined" && Notification.permission === "granted") setNotificationAllowed(true); }, []);
-  const enableNotifications = async () => {
-    try {
-      const allowed = Capacitor.getPlatform() === "android"
-        ? (await getNativeTradeAlert().requestPermission())?.granted !== false
-        : typeof Notification !== "undefined" && (Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission) === "granted";
-      setNotificationAllowed(allowed);
-      if (!allowed) setMessage("Phone notifications are disabled; the app alert center remains available.");
-    } catch { setMessage("Phone notification permission is unavailable; the app alert center remains available."); }
-  };
   const cloudRequest = useCallback(async (body?: unknown) => {
     const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
     if (!session || session.user.id !== owner) throw new Error("Sign in to use closed-app alerts.");
@@ -104,7 +92,7 @@ export function GlobalAlerts({
       const known = new Set(readPaperTradeNotifications().map(n => n.id));
       for (const rule of next) if (rule.triggeredAt && Date.now() - rule.triggeredAt < 86400000) {
         const id = `global:${owner}:${rule.id}`;
-        if (!known.has(id)) try { addPaperTradeNotification({ id, kind: "market", title: `${rule.symbol} · ${isEma21EntryKind(rule.kind) ? "21 EMA entry" : "PSBB divergence"}`, body: `${rule.symbol} · ${rule.timeframe} · ${isEma21EntryKind(rule.kind) ? `${rule.triggerSide ?? "21 EMA"} entry` : "divergence confirmed"}`, url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}` }); } catch { /* The server retains status. */ }
+        if (!known.has(id)) try { addPaperTradeNotification({ id, kind: "market", title: isEma21EntryKind(rule.kind) ? `📈 ${rule.symbol} ${rule.timeframe} kissed the 21 EMA — entry is live` : `⚡ ${rule.symbol} ${rule.timeframe} divergence just confirmed — take a look`, body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}` }); } catch { /* The server retains status. */ }
       }
       setCloudRules(next);
     } catch (error) { setCloudReady(false); setCloudMessage(error instanceof Error ? error.message : "Server monitoring unavailable."); }
@@ -136,14 +124,20 @@ export function GlobalAlerts({
   async function createAlert() {
     try {
       const rule = draftRule();
-      if (delivery === "server" && (kind === "psbb-divergence" || isEma21EntryKind(kind))) {
-        if (!cloudReady) throw new Error(cloudMessage);
-        await connectPush(true);
-        const result = await cloudRequest({ action: "create", rule });
-        setCloudRules(result.rules); setMessage("Closed-app alert created.");
-      } else await change(current => {
+      const closedApp = kind === "psbb-divergence" || isEma21EntryKind(kind);
+      if (closedApp) {
+        try {
+          await connectPush(true);
+          const result = await cloudRequest({ action: "create", rule });
+          setCloudRules(result.rules);
+          setMessage(`📈 ${symbol} is watched — it rings even when the app is closed`);
+          return;
+        } catch { /* Keep a local watch if closed-app setup is not available. */ }
+      }
+      await change(current => {
         if (current.filter(r => !r.cancelled && !r.triggeredAt && r.expiresAt > Date.now()).length >= 20) throw new Error("Maximum 20 active global alerts.");
-        setMessage("Alert created."); return [...current, rule];
+        setMessage(closedApp ? `📈 ${symbol} is watched here — sign in so it also pings when the app is closed` : `💰 ${symbol} alert is on`);
+        return [...current, rule];
       });
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create alert."); }
   }
@@ -263,19 +257,18 @@ export function GlobalAlerts({
           );
           if (!saved) continue;
           for (const rule of triggered) {
-            const body = rule.kind === "psbb-divergence"
-              ? `${s} · PSBB divergence confirmed · ${rule.timeframe} closed candle. Open the chart to review.`
+            const title = rule.kind === "psbb-divergence"
+              ? `⚡ ${s} ${rule.timeframe} divergence just confirmed — take a look`
               : isEma21EntryKind(rule.kind)
-              ? `${s} · ${rule.triggerSide ?? "21 EMA"} entry · ${rule.timeframe} · EMA 21 pullback and reference-candle break.`
-              : `${s} · ${labels[rule.kind]} ${rule.kind.startsWith("ema") ? rule.length : rule.value}${rule.kind.startsWith("price") ? " USD" : " · 5m confirmed candle"}`;
-            const title = rule.kind === "psbb-divergence" ? `${s} · PSBB divergence` : isEma21EntryKind(rule.kind) ? `${s} · 21 EMA entry` : "Global market alert";
+              ? `📈 ${s} ${rule.timeframe} kissed the 21 EMA — entry is live`
+              : `💰 ${s} just hit your level — take a look`;
             const url = rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind) ? `/?symbol=${s}&timeframe=${rule.timeframe}` : "/";
             try {
               addPaperTradeNotification({
                 id: `global:${owner}:${rule.id}`,
                 kind: "market",
                 title,
-                body,
+                body: "",
                 url,
               });
             } catch {
@@ -283,16 +276,16 @@ export function GlobalAlerts({
             }
             if (rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind)) {
               try {
-                if (Capacitor.getPlatform() === "android") await getNativeTradeAlert().show({ title, body, notificationId: `global:${owner}:${rule.id}`, kind: "trade", url });
+                if (Capacitor.getPlatform() === "android") await getNativeTradeAlert().show({ title, body: "", notificationId: `global:${owner}:${rule.id}`, kind: "trade", url });
                 else if ("Notification" in window && Notification.permission === "granted") {
                   if ("serviceWorker" in navigator) {
                     const registration = await navigator.serviceWorker.register("/notifications-sw.js", { scope: "/notifications/" });
-                    await registration.showNotification(title, { body, tag: `global:${owner}:${rule.id}`, data: { url } });
-                  } else new Notification(title, { body, tag: `global:${owner}:${rule.id}` });
+                    await registration.showNotification(title, { tag: `global:${owner}:${rule.id}`, data: { url } });
+                  } else new Notification(title, { tag: `global:${owner}:${rule.id}` });
                 }
               } catch { /* The in-app notification remains available. */ }
             }
-            setMessage(body);
+            setMessage(title);
           }
         }
       } catch (e) {
@@ -334,7 +327,7 @@ export function GlobalAlerts({
       {(expanded || embedded) && (
         <div className="global-ticket">
           <h3>{symbol} alert</h3>
-          <p className="global-disclosure">Once only · expires in 7 days. Choose server monitoring for closed-app PSBB divergence and 21 EMA entry alerts.</p>
+          <p className="global-disclosure">Once only · expires in 7 days. Setup alerts ping you even when the app is closed 😊</p>
           <div className="global-input-grid">
             <ModernSelect
               label="Condition"
@@ -373,9 +366,7 @@ export function GlobalAlerts({
             {isEma21EntryKind(kind) && <ModernSelect label="Timeframe" ariaLabel="21 EMA alert timeframe" value={Object.hasOwn(GLOBAL_EMA21_FRAMES, timeframe) ? timeframe : "5m"} onChange={value => setTimeframe(value as keyof typeof GLOBAL_DIVERGENCE_FRAMES)} choices={Object.keys(GLOBAL_EMA21_FRAMES).map(value => ({ value, label: value }))} />}
           </div>
           {isEma21EntryKind(kind) && <p className="global-disclosure">A 5m or 15m candle closes across EMA 21; within two candles an opposite-colour candle closes on the new side. Entry alerts when a matching-colour candle breaks that candle’s high or low within the next three candles.</p>}
-          {(kind === "psbb-divergence" || isEma21EntryKind(kind)) && <ModernSelect label="Monitoring" value={delivery} onChange={v => setDelivery(v as "device" | "server")} choices={[{ value: "device", label: "While app is open" }, { value: "server", label: "Even when app is closed" }]} />}
-          {(kind === "psbb-divergence" || isEma21EntryKind(kind)) && delivery === "server" && <p className="global-disclosure">{cloudMessage} Sign in and enable Trade notifications. Server checks run about once a minute; delivery depends on the feed, scheduler and phone connection.</p>}
-          {(kind === "psbb-divergence" || isEma21EntryKind(kind)) && delivery === "device" && !notificationAllowed && <button type="button" onClick={() => void enableNotifications()}>Enable phone notifications</button>}
+          {(kind === "psbb-divergence" || isEma21EntryKind(kind)) && <p className="global-disclosure">We'll ping you even when the app is closed 😊</p>}
           <button onClick={() => void createAlert()}>
             Create global alert
           </button>
