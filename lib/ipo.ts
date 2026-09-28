@@ -24,13 +24,13 @@ export type IpoSummary = {
   gmpPercent: number | null;
   gmpUpdatedAt: string;
   gmpCheckedAt?: string;
-  gmpSource?: "ipoalerts" | "ipogram";
+  gmpSource?: "ipoalerts" | "ipogram" | "investorgain";
 };
 
 export type IpoListResponse = {
   partial?: boolean;
   ok: boolean;
-  source?: "upstox" | "upstox+ipoalerts" | "upstox+ipogram";
+  source?: "upstox" | "upstox+ipoalerts" | "upstox+ipogram" | "upstox+investorgain";
   gmpFeedConfigured?: boolean;
   ipos?: IpoSummary[];
   fetchedAt?: string;
@@ -88,6 +88,12 @@ export function shouldSendDailyGmpAlert(
     && percentage > IPO_GMP_ALERT_THRESHOLD_PERCENT
     && Boolean(today)
     && lastAlertDate !== today;
+}
+
+export function shouldSendGmpMoveAlert(status: IpoStatus, previous: unknown, next: unknown, lastNotified: unknown) {
+  const before = normalizeGmp(previous);
+  const current = normalizeGmp(next);
+  return status === "open" && before !== null && current !== null && Math.abs(current - before) >= 1 && normalizeGmp(lastNotified) !== current;
 }
 
 export function shouldSendIpoClosingAlert(

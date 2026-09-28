@@ -13,6 +13,7 @@ import {
   formatIpoGmp,
   shouldSendIpoClosingAlert,
   shouldSendDailyGmpAlert,
+  shouldSendGmpMoveAlert,
   type IpoListResponse,
   type IpoSummary,
 } from "@/lib/ipo";
@@ -29,7 +30,7 @@ import { IPO_FILTERS, matchesIpoFilter, normalizeIpoChoices, normalizeSavedIpos,
 import { IPO_VIEW_KEY, readPreference, writePreference } from "@/lib/interface-preferences";
 
 const IPO_REFRESH_INTERVAL_MS = 60_000;
-type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string; lastClosingAlertDate?: string }>;
+type AlertState = Record<string, { gmpPercent: number | null; lastAlertDate?: string; lastClosingAlertDate?: string; lastNotifiedGmp?: number | null }>;
 
 function readAlertEnabled() {
   return typeof window !== "undefined" && window.localStorage.getItem(IPO_ALERT_ENABLED_STORAGE_KEY) !== "false";
@@ -77,6 +78,18 @@ function showIpoGmpAlert(ipo: IpoSummary) {
   }
 }
 
+function showIpoGmpMove(ipo: IpoSummary) {
+  const title = `${ipo.name}: GMP updated`;
+  const body = `Current GMP is ${formatIpoGmp(ipo)}. Grey market quotes are unofficial.`;
+  addPaperTradeNotification({ id: `ipo-gmp-move-${ipo.id}-${ipo.gmpPercent}`, kind: "ipo", title, body });
+  navigator.vibrate?.([120, 60, 120]);
+  if (Capacitor.getPlatform() === "android") {
+    void getNativeTradeAlert().show({ title, body, notificationId: `ipo-gmp-move-${ipo.id}-${ipo.gmpPercent}` }).catch(() => undefined);
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-ipo-move-${ipo.id}` });
+  }
+}
+
 function showIpoClosingAlert(ipo: IpoSummary) {
   const today = indiaDateKey();
   const title = `${ipo.name}: last day to apply`;
@@ -100,12 +113,15 @@ function processIpoAlerts(ipos: IpoSummary[]) {
     const current = previous[ipo.id];
     const shouldAlert = shouldSendDailyGmpAlert(ipo.status, ipo.gmpPercent, current?.lastAlertDate, today);
     const shouldClosingAlert = shouldSendIpoClosingAlert(ipo.status, ipo.biddingEndDate, current?.lastClosingAlertDate, today);
+    const moved = shouldSendGmpMoveAlert(ipo.status, current?.gmpPercent, ipo.gmpPercent, current?.lastNotifiedGmp);
     if (shouldClosingAlert) showIpoClosingAlert(ipo);
     else if (shouldAlert) showIpoGmpAlert(ipo);
+    else if (moved) showIpoGmpMove(ipo);
     next[ipo.id] = {
       gmpPercent: ipo.gmpPercent,
       lastAlertDate: shouldAlert && !shouldClosingAlert ? today : current?.lastAlertDate,
       lastClosingAlertDate: shouldClosingAlert ? today : current?.lastClosingAlertDate,
+      lastNotifiedGmp: moved ? ipo.gmpPercent : current?.lastNotifiedGmp,
     };
   }
   window.localStorage.setItem(IPO_ALERT_STATE_STORAGE_KEY, JSON.stringify(next));

@@ -1,5 +1,5 @@
 import { calculateGmpPercent, dedupeIpos, normalizeGmp, normalizeSubscription, type IpoStatus, type IpoSummary } from "@/lib/ipo";
-import { findPublicGmp, loadPublicGmpFeed, type PublicGmpEntry } from "@/lib/ipo-gmp-server";
+import { findPublicGmp, loadLiveGmpFeed, loadPublicGmpFeed, type PublicGmpEntry } from "@/lib/ipo-gmp-server";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 import { loadIpoDetails } from "@/lib/ipo-details-server";
 
@@ -128,27 +128,28 @@ export async function GET(request: Request) {
       .map(normalizeIpo)
       .filter((ipo): ipo is IpoSummary => Boolean(ipo)));
     const gmpApiKey = process.env.IPOALERTS_API_KEY?.trim() ?? "";
+    let liveEntries: PublicGmpEntry[] = [];
     let publicGmpEntries: PublicGmpEntry[] = [];
-    try {
-      publicGmpEntries = await loadPublicGmpFeed();
-    } catch {
-      // The keyed provider can continue independently; the UI shows a truthful temporary fallback.
-    }
+    const [liveResult, publicResult] = await Promise.allSettled([loadLiveGmpFeed(), loadPublicGmpFeed()]);
+    if (liveResult.status === "fulfilled") liveEntries = liveResult.value;
+    if (publicResult.status === "fulfilled") publicGmpEntries = publicResult.value;
     const ipos = await Promise.all(normalizedIpos.map(async (ipo) => {
       if (ipo.status === "listed") return ipo;
-      const keyedGmp = gmpApiKey ? await loadLatestGmp(ipo, gmpApiKey) : null;
-      const publicGmp = findPublicGmp(ipo, publicGmpEntries);
-      const amount = keyedGmp?.amount ?? publicGmp?.amount ?? null;
+      const live = findPublicGmp(ipo, liveEntries);
+      const keyedGmp = !live && gmpApiKey ? await loadLatestGmp(ipo, gmpApiKey) : null;
+      const publicGmp = live || keyedGmp?.amount != null ? null : findPublicGmp(ipo, publicGmpEntries);
+      const amount = live ? live.amount : keyedGmp?.amount ?? publicGmp?.amount ?? null;
       return {
         ...ipo,
+        totalSubscription: live?.subscription != null ? live.subscription : ipo.totalSubscription,
         gmpAmount: amount,
         gmpPercent: calculateGmpPercent(amount, ipo.maximumPrice),
-        gmpUpdatedAt: keyedGmp?.amount != null ? keyedGmp.updatedAt : "",
-        gmpCheckedAt: keyedGmp?.amount != null ? keyedGmp.checkedAt : publicGmp?.checkedAt ?? "",
-        gmpSource: keyedGmp?.amount != null ? "ipoalerts" as const : publicGmp ? "ipogram" as const : undefined,
+        gmpUpdatedAt: live?.updatedAt || (keyedGmp?.amount != null ? keyedGmp.updatedAt : ""),
+        gmpCheckedAt: live ? new Date().toISOString() : keyedGmp?.amount != null ? keyedGmp.checkedAt : publicGmp?.checkedAt ?? "",
+        gmpSource: live ? "investorgain" as const : keyedGmp?.amount != null ? "ipoalerts" as const : publicGmp ? "ipogram" as const : undefined,
       };
     }));
-    const gmpFeedConfigured = Boolean(gmpApiKey || publicGmpEntries.length);
+    const gmpFeedConfigured = Boolean(gmpApiKey || liveEntries.length || publicGmpEntries.length);
     if (includeDetails) {
       // Recent records first, but don't infer listing age from the bidding end date.
       const queue = [...ipos].sort((a, b) => b.biddingEndDate.localeCompare(a.biddingEndDate));
@@ -166,7 +167,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         ok: true,
-        source: gmpApiKey ? "upstox+ipoalerts" : publicGmpEntries.length ? "upstox+ipogram" : "upstox",
+        source: liveEntries.length ? "upstox+investorgain" : gmpApiKey ? "upstox+ipoalerts" : publicGmpEntries.length ? "upstox+ipogram" : "upstox",
         gmpFeedConfigured,
         partial,
         ipos,

@@ -32,7 +32,7 @@ function GmpSummary({ ipo }: { ipo: IpoSummary }) {
 }
 function GmpSource({ ipo }: { ipo: IpoSummary }) {
   if (ipo.gmpAmount == null) return null;
-  const source = ipo.gmpSource === "ipoalerts" ? "IPOAlerts" : ipo.gmpSource === "ipogram" ? "IPOGram" : "External source";
+  const source = ipo.gmpSource === "ipoalerts" ? "IPOAlerts" : ipo.gmpSource === "investorgain" ? "InvestorGain" : ipo.gmpSource === "ipogram" ? "IPOGram" : "External source";
   return <p className="ipo-gmp-source">{source}{ipoTimestamp(ipo.gmpUpdatedAt) ? ` · Reported ${ipoTimestamp(ipo.gmpUpdatedAt)}` : ipoTimestamp(ipo.gmpCheckedAt) ? ` · Checked ${ipoTimestamp(ipo.gmpCheckedAt)} · source update time unavailable` : " · update time unavailable"}</p>;
 }
 

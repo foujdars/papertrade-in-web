@@ -25,7 +25,7 @@ export async function loadIpoChances(name: string): Promise<IpoChances | null> {
     const ratios = parseIpoChances(html + decoder.decode(), name);
     const result = ratios ? { ...ratios, sourceUrl, checkedAt: new Date().toISOString() } : null;
     if (cache.size >= 200) cache.delete(cache.keys().next().value!);
-    cache.set(key, { expires: Date.now() + 300_000, result });
+    cache.set(key, { expires: Date.now() + 120_000, result });
     return result;
   })();
   pending.set(key, task);

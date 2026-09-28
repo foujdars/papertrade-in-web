@@ -8,9 +8,10 @@ import {
   normalizeSubscription,
   shouldSendIpoClosingAlert,
   shouldSendDailyGmpAlert,
+  shouldSendGmpMoveAlert,
   sortIposByClosingDate,
 } from "../lib/ipo.ts";
-import { findPublicGmp, parsePublicGmpHtml } from "../lib/ipo-gmp-server.ts";
+import { findPublicGmp, parseLiveGmpRows, parseBoardUpdatedAt, parsePublicGmpHtml } from "../lib/ipo-gmp-server.ts";
 import { ipoStage, isRecentListing, listingReturn, gmpTone, compactIpoName, sortIposByLifecycle } from "../lib/ipo-lifecycle.ts";
 import { parseKfinIssuers, reportedAllotmentOut, ipoPublicationSlug } from "../lib/ipo-publication.ts";
 
@@ -156,6 +157,19 @@ test("parses and matches the public GMP feed by IPO name", () => {
   `);
   assert.deepEqual(entries, [{ name: "Asset Reconstruction Co.", amount: 30.5 }]);
   assert.equal(findPublicGmp(ipo({ name: "Asset Reconstruction Co. (India) IPO" }), entries)?.amount, 30.5);
+});
+
+test("live GMP board keeps the source time and ignores an unpublished premium", () => {
+  const entries = parseLiveGmpRows([{ "~ipo_name": "Orient Cables", GMP: "&#8377;<b>90</b> (33.09%)", Sub: "2.07x", "Updated-On": "28-Sep 7:37" }, { "~ipo_name": "Sai Urja Indo", GMP: "&#8377;<b>--</b> (0.00%)", Sub: "-", "Updated-On": "28-Sep 7:28" }], 2026);
+  assert.equal(entries[0].amount, 90);
+  assert.equal(entries[0].subscription, 2.07);
+  assert.equal(entries[0].updatedAt, "2026-09-28T02:07:00.000Z");
+  assert.equal(parseBoardUpdatedAt("28-Sep 7:37", 2026), entries[0].updatedAt);
+  assert.equal(entries[1].amount, null);
+  assert.equal(entries[1].subscription, null);
+  assert.equal(shouldSendGmpMoveAlert("open", 32, 33.09, 32), true);
+  assert.equal(shouldSendGmpMoveAlert("open", 33, 33.4, 33), false);
+  assert.equal(shouldSendGmpMoveAlert("open", null, 33, null), false);
 });
 
 test("deduplicates IPOs by id and keeps the newest higher subscription value", () => {
