@@ -1779,7 +1779,8 @@ export function MarketChart({
       };
       let rsiScalePurple = false;
       let rsiLastHidden = false;
-      let pointerInPricePane = false;
+      let followPane = -1;
+      let crosshairOwner = -1;
       const rsiCursorColor = (studyId: string | undefined) => {
         if (studyId !== "rsi") return undefined;
         const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
@@ -1802,9 +1803,9 @@ export function MarketChart({
         chart.applyOptions({
           crosshair: {
             horzLine: {
-              visible: !purple && !normalizeTool(activeToolRef.current),
-              labelVisible: !purple,
-              color: purple ? label : (neon ? "#bf9aff" : "#8c96aa"),
+              visible: !normalizeTool(activeToolRef.current),
+              labelVisible: true,
+              color: neon ? "#bf9aff" : "#8c96aa",
               labelBackgroundColor: label,
             },
           },
@@ -1822,7 +1823,7 @@ export function MarketChart({
         return { studyId: bundle.id, value, y: top + localY };
       };
       crosshairMove = (event) => {
-        if (pointerInPricePane && event.paneIndex !== 0) return;
+        if (followPane >= 0 && event.paneIndex !== followPane) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
@@ -2211,20 +2212,39 @@ export function MarketChart({
         }
         const tool = normalizeTool(activeToolRef.current);
         if (!tool && !studyEdit && pointers.has(event.pointerId)) {
-          const bounds = host.getBoundingClientRect();
-          const x = event.clientX - bounds.left;
-          const y = event.clientY - bounds.top;
-          const priceHeight = chart.panes()[0]?.getHeight() ?? 0;
-          pointerInPricePane = y >= 0 && y < priceHeight && x >= 0 && x <= chart.timeScale().width();
-          if (pointerInPricePane) {
+          const x = event.clientX - host.getBoundingClientRect().left;
+          const width = chart.timeScale().width();
+          const panes = chart.panes();
+          const hit = x >= 0 && x <= width ? panes.findIndex((pane) => {
+            const rect = pane.getHTMLElement()?.getBoundingClientRect();
+            return Boolean(rect && event.clientY >= rect.top && event.clientY < rect.bottom);
+          }) : -1;
+          followPane = hit;
+          if (crosshairOwner < 0) crosshairOwner = hit;
+          if (hit >= 0 && hit !== crosshairOwner) event.stopPropagation();
+          if (hit === 0) {
+            const price = series.coordinateToPrice(event.clientY - (panes[0].getHTMLElement()?.getBoundingClientRect().top ?? 0));
             const time = chart.timeScale().coordinateToTime(x);
-            const price = series.coordinateToPrice(y);
             if (time != null && price != null) {
               chart.setCrosshairPosition(price, time, series);
-              setPriceCursor({ price: Math.round(price * 100) / 100, y });
+              setPriceCursor({ price: Math.round(price * 100) / 100, y: event.clientY - host.getBoundingClientRect().top });
               paintRsiCrosshair(undefined);
               setStudyCursor((current) => current ? null : current);
               setRsiLastVisible(true);
+            }
+          } else if (hit > 0) {
+            const bundle = studyRenderer.current?.bundles.find((item) => item.pane === hit && item.series[0]);
+            const line = bundle?.series[0];
+            const localY = event.clientY - (panes[hit].getHTMLElement()?.getBoundingClientRect().top ?? 0);
+            const value = line?.coordinateToPrice(localY);
+            const time = chart.timeScale().coordinateToTime(x);
+            if (line && time != null && value != null && Number.isFinite(value)) {
+              chart.setCrosshairPosition(value, time, line);
+              setPriceCursor(null);
+              paintRsiCrosshair(bundle?.id);
+              setStudyCursor(null);
+              setRsiLastVisible(bundle?.id !== "rsi");
+              event.stopPropagation();
             }
           }
         }
@@ -2252,7 +2272,7 @@ export function MarketChart({
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         pointers.delete(event.pointerId);
-        if (!pointers.size) pointerInPricePane = false;
+        if (!pointers.size) { followPane = -1; crosshairOwner = -1; }
         if(studyEdit?.pointerId===event.pointerId) {
           const edit=studyEdit;studyEdit=null;
           const next=event.type==='pointercancel'?studyDrawingsRef.current.map(item=>item.id===edit.original.id?edit.original:item):studyDrawingsRef.current;
