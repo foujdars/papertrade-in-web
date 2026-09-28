@@ -1826,9 +1826,15 @@ export function MarketChart({
         if (followPane >= 0 && event.paneIndex !== followPane) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
-        if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
+        if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0) {
           const price = series.coordinateToPrice(event.point.y);
-          if (price !== null) { lastCrosshairAnchorRef.current = { time: event.time, price }; setPriceCursor({ price: Math.round(price * 100) / 100, y: event.point.y }); }
+          if (price !== null) {
+            if (event.time !== undefined) lastCrosshairAnchorRef.current = { time: event.time, price };
+            const nextPrice = Math.round(price * 100) / 100;
+            setPriceCursor((current) => current?.price === nextPrice && Math.abs(current.y - event.point!.y) < 0.5 ? current : { price: nextPrice, y: event.point!.y });
+          }
+        } else if (!normalizeTool(activeToolRef.current) && event.paneIndex !== 0) {
+          setPriceCursor((current) => current ? null : current);
         }
         if (event.point) {
           // Lightweight Charts reports the crosshair point inside the hovered pane, not from the top of the chart.
@@ -2124,6 +2130,19 @@ export function MarketChart({
       const onPointerMove = (event: PointerEvent) => {
         scheduleOverlayRefresh();
         if (pinching) return;
+        // The library does not always emit a crosshair event on the price scale.
+        // Follow the pointer there too, and never leave a price action on an RSI/ADX pane.
+        if (activeToolRef.current === "cursor" && event.pointerType === "mouse") {
+          const pane = chart.panes()[0]?.getHTMLElement()?.getBoundingClientRect();
+          if (pane && event.clientY >= pane.top && event.clientY < pane.bottom) {
+            const y = event.clientY - pane.top;
+            const price = series.coordinateToPrice(y);
+            if (price !== null) {
+              const nextPrice = Math.round(price * 100) / 100;
+              setPriceCursor((current) => current?.price === nextPrice && Math.abs(current.y - y) < 0.5 ? current : { price: nextPrice, y });
+            }
+          } else setPriceCursor((current) => current ? null : current);
+        }
         if(studyEdit?.pointerId===event.pointerId) {
           const hit=studyAt(event),edit=studyEdit;
           if(hit&&hit.studyId===edit.original.studyId) {
@@ -3071,7 +3090,7 @@ export function MarketChart({
   </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
-      <div className="price-chart-wrap lightweight-chart-wrap">
+      <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={() => setPriceCursor(null)}>
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
         {sessionShades.flatMap((shade) => shade.edges.map((edge) => <span key={`${shade.key}-${edge.label}-${edge.x}`} className="chart-session-edge" style={{ left: edge.x }}>{edge.label}</span>))}
