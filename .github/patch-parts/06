@@ -1,0 +1,82 @@
+rade"&&p.hideAmounts)notice.body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
++      if(p&&p.pausedUntil>Date.now()){done(false);return;}
++      if(notice.kind==="trade"&&p&&p.hideAmounts){
++        notice.title=String(notice.title).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
++        notice.body=String(notice.body).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
++      }
+       const seen=state.get("seen");seen.onsuccess=()=>{const ids=seen.result||[];if(ids.includes(notice.id)){done(false);return;}state.put([...ids.slice(-199),notice.id],"seen");done(true);};
+     };
+   });
+@@ -20,7 +22,9 @@
+   const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true}),visible=clients.filter(client=>client.visibilityState==="visible");
+   if(visible.length){visible.forEach(client=>client.postMessage({type:"papertrade-push",notice}));return;}
+   const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
+-  await self.registration.showNotification(notice.title,{body:notice.body,icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}});
++  const options={icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}};
++  if(notice.body)options.body=notice.body;
++  await self.registration.showNotification(notice.title,options);
+ })());});
+ self.addEventListener("notificationclick",event=>{
+   event.notification.close();
+--- a/app/api/notifications/dispatch/route.ts
++++ b/app/api/notifications/dispatch/route.ts
+@@ -35,7 +35,11 @@
+     const newResults = saved.exists ? allotments.allotments.filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
+     const released = allotmentNotice(newResults, now); if (released) events.push(released);
+     const listings = ipos.filter(ipo => saved.exists && ipo.status === "listed" && ipo.details?.listingDate === day && ipo.details.listingPrice && ipo.details.issuePrice && !saved.data()?.listed?.[ipo.id]);
+-    if (listings.length) events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: "From GMP to reality: today’s listings", body: listings.slice(0,3).map(ipo => `${ipo.name}: ₹${ipo.details!.listingPrice}, ${((ipo.details!.listingPrice! / ipo.details!.issuePrice! - 1) * 100).toFixed(2)}% vs issue price`).join("; "), url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
++    if (listings.length) {
++      const lead = listings[0].name.replace(/\s+IPO$/i, "");
++      const pct = ((listings[0].details!.listingPrice! / listings[0].details!.issuePrice! - 1) * 100).toFixed(0);
++      events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: listings.length === 1 ? `🚀 ${lead} listed ${pct}% — the print is in` : `🚀 ${listings.length} listings just printed — go see the move`, body: "", url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
++    }
+     const refs = events.map(event => db.collection("notificationOutbox").doc(hash(event.id)));
+     await db.runTransaction(async tx => {
+       const existing = await Promise.all(refs.map(ref => tx.get(ref)));
+@@ -71,15 +75,15 @@
+       }
+       if (preferences.pausedUntil > now) continue;
+       if (data.preferences?.pausedUntil > 0 && data.preferences.pausedUntil <= now) {
+-        for (const [topic,on] of [["papertrade-ipo-v3",preferences.ipo],["papertrade-allotment-v3",preferences.allotment],["papertrade-sessions-v1",preferences.sessions]] as const) if(on) {
++        for (const topic of ["papertrade-ipo-v3","papertrade-allotment-v3","papertrade-sessions-v1"]) {
+           const result = await messaging.subscribeToTopic(data.token,topic);
+           if (result.failureCount) throw new Error("Could not resume notifications");
+         }
+-        await device.ref.update({ "preferences.pausedUntil":0 });
++        await device.ref.update({ "preferences.pausedUntil": 0, "preferences.ipo": true, "preferences.allotment": true, "preferences.sessions": true, "preferences.trades": true, "preferences.reviews": true, "preferences.practice": true, "preferences.hideAmounts": false });
+       }
+-      if (preferences.ipo && calendarCount >= 2) continue;
+-      let notice = preferences.reviews ? reviewNotice(data.reviewCount, data.reviewDate, now) : null;
+-      if (!notice && preferences.practice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:"No catch-up needed. Just one candle.",body:"Pick a past chart and practise your next decision in replay.",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
++      if (calendarCount >= 2) continue;
++      let notice = reviewNotice(data.reviewCount, data.reviewDate, now);
++      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:"🎯 One candle, one decision — your replay is waiting",body:"",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
+       if (!notice || data.lastNotice === notice.id || now-data.lastActive < 10*60000) continue;
+       // Claim before sending, preventing repeated notifications on overlapping runs.
+       await device.ref.update({lastNotice:notice.id});
+--- a/app/api/notifications/device/route.ts
++++ b/app/api/notifications/device/route.ts
+@@ -21,9 +21,9 @@
+     const { db, messaging } = await pushServices(), id = createHash("sha256").update(body.token).digest("hex"), ref = db.collection("notificationDevices").doc(id);
+     const existing = await ref.get();
+     if (existing.exists && existing.data()?.userId !== data.user.id) return Response.json({error:"This device registration belongs to another session. Sign out and reconnect."},{status:403});
+-    const preferences = notificationPreferences(body.preferences), paused = preferences.pausedUntil > Date.now();
+-    for (const [topic, on] of [["papertrade-ipo-v3", preferences.ipo], ["papertrade-allotment-v3", preferences.allotment], ["papertrade-sessions-v1", preferences.sessions]] as const) {
+-      const result = !body.remove && on && !paused
++    const preferences = notificationPreferences({ ...(body.preferences ?? {}), ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false }), paused = preferences.pausedUntil > Date.now();
++    for (const topic of ["papertrade-ipo-v3", "papertrade-allotment-v3", "papertrade-sessions-v1"]) {
++      const result = !body.remove && !paused
+         ? await messaging.subscribeToTopic(body.token, topic)
+         : await messaging.unsubscribeFromTopic(body.token, topic);
+       if (result.failureCount) throw new Error("Topic registration failed");
+--- a/app/api/technical-alerts/dispatch/route.ts
++++ b/app/api/technical-alerts/dispatch/route.ts
+@@ -98,10 +98,10 @@
+         let delivered = 0;
+         for (const device of devices.docs) {
+           const target = device.data(), prefs = notificationPreferences(target.preferences);
+-          if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
++          if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+           const event = queued.event;
+           const isPrice = rule.family === "price";
+-          const notice: PushNotice = { id: event.id, kind: "trade", title: `${event.instrument.symbol} · ${isPrice ? "price" : "technical"} alert`, body: prefs.hideAmounts ? (i
