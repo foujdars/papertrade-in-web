@@ -53,6 +53,8 @@ html, body { touch-action: pan-x pan-y; }
     overflow-x: auto;
     scrollbar-width: none;
   }
+  /* A scrolling toolbar clips its absolutely positioned symbol list. */
+  .terminal-shell .trade-cockpit .chart-controls:has(.desktop-symbol-menu) { overflow: visible; }
   .terminal-shell .trade-cockpit .chart-controls::-webkit-scrollbar { display: none; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol { flex: 1 1 auto; min-width: 0; gap: 0; height: 36px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger {
