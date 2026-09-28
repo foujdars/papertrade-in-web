@@ -1,1 +1,433 @@
-PLACEHOLDER_WILL_FAIL
+--- a/lib/notification-preferences.ts
++++ b/lib/notification-preferences.ts
+@@ -1,13 +1,16 @@
+ "use client";
+ import { notificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from "./notification-policy";
+ export const NOTIFICATION_SETTINGS_EVENT = "papertrade:notification-settings";
+-const KEY = "papertrade-notification-preferences-v3";
++const KEY = "papertrade-notification-preferences-v4";
++const LEGACY = "papertrade-notification-preferences-v3";
+ export function readNotificationPreferences() {
+   if (typeof window === "undefined") return { ...DEFAULT_NOTIFICATION_PREFERENCES };
+   try {
+     const saved = localStorage.getItem(KEY);
+     if (saved) return notificationPreferences(JSON.parse(saved));
+-    return { ...DEFAULT_NOTIFICATION_PREFERENCES, ipo: localStorage.getItem("papertrade-ipo-alerts-enabled-v1") !== "false", allotment: localStorage.getItem("papertrade-ipo-allotment-alerts-v1") !== "0" };
++    const legacy = localStorage.getItem(LEGACY);
++    const pausedUntil = legacy ? notificationPreferences(JSON.parse(legacy)).pausedUntil : 0;
++    return { ...DEFAULT_NOTIFICATION_PREFERENCES, pausedUntil };
+   } catch { return { ...DEFAULT_NOTIFICATION_PREFERENCES }; }
+ }
+ export function saveNotificationPreferences(preferences: NotificationPreferences) {
+--- a/lib/notification-policy.ts
++++ b/lib/notification-policy.ts
+@@ -2,7 +2,7 @@
+ import type { IpoAllotment } from "./ipo-allotment";
+ 
+ export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; hideAmounts: boolean; pausedUntil: number };
+-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: false, practice: false, sessions: true, hideAmounts: true, pausedUntil: 0 };
++export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false, pausedUntil: 0 };
+ export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
+ export function notificationPreferences(value: unknown): NotificationPreferences {
+   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+@@ -31,17 +31,21 @@
+   const rows = (slot === "closing" ? closing : open.filter(ipo => closing.includes(ipo) || (freshGmp(ipo, now) && ipo.gmpPercent! >= 15)))
+     .sort((a,b) => Number(b.biddingEndDate === day) - Number(a.biddingEndDate === day) || (b.gmpPercent ?? -Infinity) - (a.gmpPercent ?? -Infinity));
+   if (!rows.length) return null;
+-  const body = rows.slice(0, 3).map(ipo => `${ipo.name.replace(/\s+IPO$/i, "")}${ipo.issueType === "sme" ? " (SME)" : ""}: ${freshGmp(ipo, now) ? `GMP ${ipo.gmpPercent!.toFixed(2)}%` : "GMP not current"}${ipo.biddingEndDate === day ? ", closes today" : ""}`).join("; ");
+-  return { id: `ipo-${slot}-${day}`, kind: "ipo", title: slot === "closing" ? "Your afternoon IPO reminder ⏳" : `Today's IPO spotlight 👀 · ${rows.length} issue${rows.length === 1 ? "" : "s"}`, body: `${body}. ${slot === "closing" ? "Check your broker’s cutoff. " : ""}GMP is unofficial—not assured profit.`, url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
++  const lead = rows[0].name.replace(/\s+IPO$/i, "");
++  const extra = rows.length > 1 ? ` +${rows.length - 1}` : "";
++  const title = slot === "closing" ? `⏳ ${lead} closes today${extra} — last call to bid` : `👀 ${lead} is live today${extra} — tap before it runs`;
++  return { id: `ipo-${slot}-${day}`, kind: "ipo", title, body: "", url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
+ }
+ export function allotmentNotice(items: IpoAllotment[], now: number): PushNotice | null {
+   const published = items.filter(item => item.state === "published" && !!item.evidenceUrl);
+   if (!published.length) return null;
+   const first = published[0];
+-  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title: published.length === 1 ? `The wait is over—${first.name.replace(/\s+IPO$/i, "")} allotment is out 🔔` : `Allotments are out 🔔 · ${published.length} IPOs`, body: published.length === 1 ? "Applied? Check your result securely on the official registrar website. Enter your PAN only there." : `${published.slice(0,3).map(item => item.name).join(", ")}. Check the official registrar links in the app.`, url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
++  const name = first.name.replace(/\s+IPO$/i, "");
++  const title = published.length === 1 ? `🔔 ${name} allotment is out — go check yours` : `🔔 ${published.length} allotments just dropped — check yours now`;
++  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title, body: "", url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
+ }
+ export function reviewNotice(count: number, date: string, now: number): PushNotice | null {
+   const { day, minutes, weekday } = indiaClock(now);
+   if (date !== day || count < 1 || minutes < 1035 || minutes >= 1045 || weekday === 0 || weekday === 6) return null;
+-  return { id: `review-${day}`, kind: "portfolio", title: "The market has closed. Your lesson hasn’t.", body: `${count} paper trade${count === 1 ? "" : "s"} today. Revisit one decision in a two-minute replay.`, url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
++  return { id: `review-${day}`, kind: "portfolio", title: `✨ ${count} paper trade${count === 1 ? "" : "s"} today — replay one while it's fresh`, body: "", url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
+ }
+--- a/lib/market-sessions.ts
++++ b/lib/market-sessions.ts
+@@ -21,11 +21,6 @@
+   return { weekday: get("weekday"), date: `${get("year")}-${get("month")}-${get("day")}`, minutes: Number(get("hour")) * 60 + Number(get("minute")) };
+ }
+ 
+-function clockLabel(hour: number, minute: number) {
+-  const suffix = hour < 12 ? "am" : "pm";
+-  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${suffix}`;
+-}
+-
+ function addDays(dateKey: string, days: number) {
+   const [year, month, day] = dateKey.split("-").map(Number);
+   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+@@ -143,12 +138,11 @@
+     if (session.id === "india" && NSE_HOLIDAYS[local.date]) continue;
+     const open = session.openHour * 60 + session.openMinute;
+     if (local.minutes < open || local.minutes >= open + SESSION_OPEN_WINDOW_MINUTES) continue;
+-    const ist = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hourCycle: "h12" }).format(date);
+     return {
+       id: `session-${session.id}-${local.date}`,
+       kind: "session",
+-      title: `${session.name} session is open`,
+-      body: `${session.name} opened at ${clockLabel(session.openHour, session.openMinute)} local time. It is ${ist} IST.`,
++      title: `🟢 ${session.name} just opened — the session is live`,
++      body: "",
+       url: "/",
+       expiresAt: now + 30 * 60_000,
+       silent: false,
+--- a/lib/global-alerts-server.ts
++++ b/lib/global-alerts-server.ts
+@@ -80,9 +80,9 @@
+       let delivered = 0;
+       for (const device of devices.docs) {
+         const target = device.data(), prefs = notificationPreferences(target.preferences);
+-        if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
++        if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+         const isEma = isEma21EntryKind(rule.kind);
+-        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: `${rule.symbol} · ${isEma ? "21 EMA entry" : "PSBB divergence"}`, body: `${rule.symbol} · ${rule.timeframe} · ${isEma ? `${rule.triggerSide ?? "21 EMA"} entry` : "divergence confirmed"}. Open the chart to review.`, url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
++        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: isEma ? `📈 ${rule.symbol} ${rule.timeframe} kissed the 21 EMA — entry is live` : `⚡ ${rule.symbol} ${rule.timeframe} divergence just confirmed — take a look`, body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+         await sendPush(notice, { token: target.token }); delivered++;
+       }
+       await item.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;
+--- a/components/NotificationSettings.tsx
++++ b/components/NotificationSettings.tsx
+@@ -1,23 +1,10 @@
+ "use client";
+ import { useEffect, useState } from "react";
+-import { readNotificationPreferences, saveNotificationPreferences } from "@/lib/notification-preferences";
+-import { connectPush, syncPushDevice } from "@/lib/push-client";
+-import type { NotificationPreferences } from "@/lib/notification-policy";
+ 
+ export function NotificationSettings() {
+-  const [preferences,setPreferences]=useState<NotificationPreferences>(()=>readNotificationPreferences());
+-  const [status,setStatus]=useState("Enable background delivery to receive updates without opening the app.");
+-  const [busy,setBusy]=useState(false);
+-  useEffect(()=>{void fetch("/api/notifications/config").then(response=>response.json()).then(data=>{if(!data.enabled)setStatus("Background delivery setup is pending. These preferences are saved on this device.");}).catch(()=>setStatus("Delivery status could not be checked."));},[]);
+-  async function update(next: NotificationPreferences) {
+-    saveNotificationPreferences(next);setPreferences(next);setStatus("Preferences saved on this device.");
+-    try { await syncPushDevice(); } catch { setStatus("Saved locally. Connect background delivery to sync these preferences."); }
+-  }
+-  return <details className="notification-settings"><summary>Notification preferences</summary>
+-    <p>IPO updates go to everyone who enables them. All times are IST.</p>
+-    {([["ipo","IPO spotlight & closing reminders","9:05 am and 1:30 pm on closing days"],["allotment","Allotment results","Once publication is verified; silent overnight"],["sessions","Market session opens","Sydney, Tokyo, India, London and New York, when each session starts"],["trades","My trade events","Only your target, stop-loss and paper exits"],["reviews","My daily review","5:15 pm, only after a trading day with activity"],["practice","Gentle practice reminder","At most once weekly"],["hideAmounts","Hide trade amounts on lock screen","Keep your paper-trading results private"]] as const).map(([key,label,description])=><label key={key}><span><b>{label}</b><small>{description}</small></span><input type="checkbox" checked={preferences[key]} onChange={event=>void update({...preferences,[key]:event.target.checked})}/></label>)}
+-<button type="button" onClick={()=>void update({...preferences,pausedUntil:preferences.pausedUntil>0?0:Date.now()+7*86400000})}>{preferences.pausedUntil>0?"Resume notifications":"Pause notifications for a week"}</button>
+-    <button type="button" disabled={busy} onClick={async()=>{setBusy(true);try{await connectPush(true);setStatus("Background delivery connected. Phone permissions and network availability still apply.");}catch(error){setStatus(error instanceof Error?error.message:"Could not connect notifications.");}finally{setBusy(false);}}}>{busy?"Connecting…":"Enable / reconnect background delivery"}</button>
+-    <p role="status">{status}</p><small>Session opens still alert overnight. Other alerts stay quiet from 9 pm–8 am. GMP is unofficial and can change.</small>
+-  </details>;
++  const [denied, setDenied] = useState(false);
++  useEffect(() => {
++    setDenied(typeof Notification !== "undefined" && Notification.permission === "denied");
++  }, []);
++  return <p className="notification-settings" role="status">{denied ? "Notifications are blocked — allow them in your phone settings 🔔" : "Your alerts reach you even when the app is closed 😊"}</p>;
+ }
+--- a/components/PushNotificationBridge.tsx
++++ b/components/PushNotificationBridge.tsx
+@@ -11,7 +11,15 @@
+   useEffect(()=>{
+     if(!userId)return;
+     let disposed=false;
+-    const connect=()=>{if(document.visibilityState==="visible")void connectPush(false).catch(()=>undefined);};
++    const connect=()=>{
++      if(document.visibilityState!=="visible"||Capacitor.getPlatform()==="android")return;
++      if(typeof Notification!=="undefined"&&Notification.permission==="granted")void connectPush(false).catch(()=>undefined);
++    };
++    const ask=()=>{
++      window.removeEventListener("pointerdown",ask);
++      if(Capacitor.getPlatform()==="android"){void connectPush(true).catch(()=>undefined);return;}
++      if(typeof Notification!=="undefined"&&Notification.permission==="default")void connectPush(true).catch(()=>undefined);
++    };
+     const consume=async()=>{
+       if(Capacitor.getPlatform()!=="android")return;
+       try{const result=await getNativeTradeAlert().consumeNotifications();if(!disposed)for(const item of result?.notifications||[])addPaperTradeNotification({...item,kind:item.kind==="allotment"?"ipo":item.kind==="practice"||item.kind==="session"?"market":item.kind});}catch{/* Older Android app: no repeated prompts. */}
+@@ -23,8 +31,9 @@
+     };
+     const message=(event:MessageEvent)=>{if(event.data?.type==="papertrade-push"){const item=event.data.notice;if(item?.id&&item?.title)addPaperTradeNotification({...item,kind:item.kind==="allotment"?"ipo":item.kind==="practice"||item.kind==="session"?"market":item.kind});}};
+     connect();changed();void consume();const timer=setInterval(()=>{if(document.visibilityState==="visible"){void consume();void syncPushDevice().catch(()=>undefined);}},60000);
++    window.addEventListener("pointerdown",ask,{once:true});
+     window.addEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.addEventListener("visibilitychange",connect);navigator.serviceWorker?.addEventListener("message",message);
+-    return()=>{disposed=true;clearInterval(timer);window.removeEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.removeEventListener("visibilitychange",connect);navigator.serviceWorker?.removeEventListener("message",message);};
++    return()=>{disposed=true;clearInterval(timer);window.removeEventListener("pointerdown",ask);window.removeEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.removeEventListener("visibilitychange",connect);navigator.serviceWorker?.removeEventListener("message",message);};
+   },[userId]);
+   return null;
+ }
+--- a/components/NotificationCenter.tsx
++++ b/components/NotificationCenter.tsx
+@@ -77,7 +77,7 @@
+             <NotificationSettings />
+             {items.map((item) => <article key={item.id} className={`notification-item kind-${item.kind}`}>
+               {item.kind === "trade" && item.symbol ? <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} size={32} /> : <span className="notification-item-icon"><NotificationIcon item={item} /></span>}
+-              <div><b>{item.title}</b><p>{item.body}</p><small>{formatNotificationTime(item.createdAt)} IST</small>
++              <div><b>{item.title}</b>{item.body ? <p>{item.body}</p> : null}<small>{formatNotificationTime(item.createdAt)} IST</small>
+                 {item.url && <a className="allotment-result-link notification-result-link" href={item.url}>View update <ExternalLink size={14}/></a>}
+                 {item.timeframe && item.instrument && <button className="allotment-result-link notification-result-link" onClick={() => { window.dispatchEvent(new CustomEvent("papertrade:open-technical-chart", { detail: { instrument: item.instrument, timeframe: item.timeframe } })); setOpen(false); }}>Open {item.timeframe} chart <ExternalLink size={14} /></button>}
+                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
+--- a/components/SessionOpenAlerts.tsx
++++ b/components/SessionOpenAlerts.tsx
+@@ -33,7 +33,7 @@
+ 
+ export function deliverSessionOpen(now = Date.now()) {
+   const preferences = readNotificationPreferences();
+-  if (preferences.pausedUntil > now || !preferences.sessions) return;
++  if (preferences.pausedUntil > now) return;
+   const notice = sessionOpenNotice(now);
+   if (!notice || !remember(notice.id)) return;
+   addPaperTradeNotification({ id: notice.id, kind: "market", title: notice.title, body: notice.body });
+--- a/components/PriceActions.tsx
++++ b/components/PriceActions.tsx
+@@ -10,7 +10,6 @@
+ import { TechnicalAlertForm } from "./TechnicalAlertForm";
+ import { GlobalAlerts } from "./GlobalAlerts";
+ import { TECHNICAL_FRAMES, technicalDescription, defaultTechnicalConfig, type TechnicalRule } from "@/lib/technical-alerts";
+-import { ModernSelect } from "./ModernSelect";
+ import { alertAttention, type HomeAlertSnapshot, type HomeAlertRequest } from '@/lib/home-attention';
+ import { AndroidDeliveryTest } from "./AndroidDeliveryTest";
+ import type { Instrument } from "@/lib/market";
+@@ -51,7 +50,7 @@
+   const [filter, setFilter] = useState<"all" | "alert" | "order" | "technical">("all");
+   const sheetRef = useRef<HTMLElement>(null);
+   const [mode, setMode] = useState("alert");
+-  const [delivery, setDelivery] = useState("device"), [saving, setSaving] = useState(false);
++  const [saving, setSaving] = useState(false);
+   const [price, setPrice] = useState("");
+   const [quantity, setQuantity] = useState("1");
+   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+@@ -113,9 +112,9 @@
+             if (t.product === "INTRADAY" && t.kind === "order" && !callbacks.current.intradayOpen) continue;
+             const failure = t.kind === "order" ? callbacks.current.onFill(t, q.lastPrice) : null;
+             const status = failure ? "rejected" : t.kind === "alert" ? "triggered" : "filled";
+-            const message = failure ?? `${t.instrument.symbol} ${t.kind === "alert" ? "price alert" : "paper order filled"} at ₹${q.lastPrice.toFixed(2)}`;
++            const message = failure ?? (t.kind === "alert" ? `💰 ${t.instrument.symbol} just hit your price — nice catch` : `✅ ${t.instrument.symbol} paper order filled at ₹${q.lastPrice.toFixed(2)}`);
+             save(tasksRef.current.map(item => item.id === t.id ? { ...item, status, message, completedAt: Date.now(), triggeredPrice: q.lastPrice } : item));
+-            addPaperTradeNotification({ id: t.id, kind: "trade", title: t.kind === "alert" ? "Price alert" : "Price order", body: message, symbol: t.instrument.symbol, instrumentKey: t.instrument.instrumentKey });
++            addPaperTradeNotification({ id: t.id, kind: "trade", title: message, body: "", symbol: t.instrument.symbol, instrumentKey: t.instrument.instrumentKey });
+             callbacks.current.onNotice(message);
+             // One fill per cycle: let the portfolio update before testing another order's funds.
+             if (t.kind === "order") break;
+@@ -138,13 +137,22 @@
+     const task: PriceTask = { id: crypto.randomUUID(), instrument: request.instrument, kind: mode as "alert" | "order", price: Number(price), quantity: Number(quantity), side, orderType, product, condition, status: "pending", createdAt: now, expiresAt: product === "INTRADAY" && mode === "order" ? dayEnd.getTime() - 19800000 : now + 7 * 86400000 };
+     const invalid = priceTaskError(task) || (task.kind === "order" ? onValidate?.(task) : null);
+     if (invalid) { setError(invalid); return; }
+-    if (mode === "alert" && delivery === "server") {
++    if (mode === "alert") {
+       setSaving(true);
+       try {
+-        const failure = await technical.save({ ...defaultTechnicalConfig("price"), threshold: Number(price), condition }, request.instrument);
+-        if (failure) { setError(failure); return; }
+-        onNotice("Closed-app price alert saved · minute-level checks"); onClose();
+-      } finally { setSaving(false); }
++        const pushFailure = await technical.enablePush();
++        const failure = await technical.save({ ...defaultTechnicalConfig("price"), threshold: Number(price), condition, delivery: "server" }, request.instrument);
++        if (!failure) {
++          onNotice(pushFailure ? `💰 ${request.instrument.symbol} alert is saved — allow notifications so it can ring when the app is closed` : `💰 ${request.instrument.symbol} alert is on — it rings even when the app is closed`);
++          onClose();
++          return;
++        }
++      } catch { /* Closed-app save failed; keep a local watch. */ }
++      finally { setSaving(false); }
++      if (tasksRef.current.filter(t => t.status === "pending").length >= 30) { setError("Cancel an active item before adding more (maximum 30)."); return; }
++      try { save([task, ...tasksRef.current].slice(0, 100)); } catch { setError("Device storage is unavailable. Nothing was queued."); return; }
++      onNotice(`💰 ${request.instrument.symbol} is watched here — sign in so it also pings when the app is closed`);
++      onClose();
+       return;
+     }
+     if (mode === "order" && product === "INTRADAY" && (!intradayOpen || !marketOpen)) { setError("Intraday orders can only be queued during the trading session."); return; }
+@@ -171,16 +179,15 @@
+       <header><div className="price-sheet-title"><AlarmClock size={23} /><div><h2>{request?.instrument.symbol ?? "Alerts"}</h2><small>{request ? request.instrument.name : "Your levels. Your attention."}</small></div></div><button className="price-icon-button" onClick={dismiss} aria-label="Close price actions"><X size={21} /></button></header>
+       {!request&&homeFocus&&<button className="home-alert-clear" onClick={()=>setHomeFocus(undefined)}>Show all alerts</button>}
+       {request && request.mode !== "order" && <div className="price-alert-tabs" aria-label="Alert type"><button aria-pressed={mode === "alert"} aria-selected={mode === "alert"} onClick={() => setMode("alert")}><AlarmClock size={16} />Price</button><button aria-pressed={mode === "technical"} aria-selected={mode === "technical"} onClick={() => setMode("technical")}><Activity size={16} />Technical</button></div>}
+-      {globalTechnical ? <div ref={setGlobalAlertHost} /> : technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical?.family === "price" ? "Server price alert saved" : "Technical alert saved · watching new candle closes"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
+-        {mode === "alert" && <><ModernSelect label="Monitoring" value={delivery} choices={[{value:"device",label:"While app is open"},{value:"server",label:"Even when app is closed"}]} onChange={setDelivery}/>{delivery === "server" && <div className="technical-summary"><div><b>{technical.cloudMessage}</b><p>Requires sign-in and trade notifications on this Android phone.</p><button type="button" onClick={async()=>{const failure=await technical.enablePush();setError(failure??"Notifications connected.");}}>Connect notifications</button></div></div>}</>}
++      {globalTechnical ? <div ref={setGlobalAlertHost} /> : technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical && editingTechnical.delivery !== "server" ? "📈 Alert updated on this device" : "📈 Alert is on — it rings even when the app is closed"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
+         <label>{mode === "alert" ? "Alert price" : orderType === "Market" ? "Last seen price · estimate" : orderType === "SL" ? "Stop trigger price" : "Limit price"} (₹)<input autoFocus={orderType !== "Market"} type="number" min="0.01" step="0.01" value={price} readOnly={mode === "order" && orderType === "Market"} onChange={e => setPrice(e.target.value)} /></label>
+         {mode === "alert" ? <fieldset className="price-condition"><legend>Notify when</legend><div role="radiogroup" aria-label="Alert condition">{(["above", "below"] as const).map(value => <button type="button" role="radio" aria-checked={condition === value} key={value} onClick={() => setCondition(value)} onKeyDown={e => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); setCondition(value === "above" ? "below" : "above"); (e.currentTarget.parentElement?.querySelector(`[data-condition="${value === "above" ? "below" : "above"}"]`) as HTMLElement)?.focus(); } }} data-condition={value}>{value === "above" ? <ArrowUp size={20} /> : <ArrowDown size={20} />}<span><b>{value === "above" ? "At or above" : "At or below"}</b><small>{value === "above" ? "Price rises to your level" : "Price falls to your level"}</small></span>{condition === value && <Check size={16} />}</button>)}</div></fieldset> : <>
+           <div className="price-form-grid"><label>Side<select value={side} onChange={e => setSide(e.target.value as typeof side)}><option>BUY</option><option>SELL</option></select></label><label>Order type<select value={orderType} onChange={e => setOrderType(e.target.value as typeof orderType)}><option value="Market">Market · next live quote</option><option value="Limit">Limit</option><option value="SL">Stop market</option></select></label></div>
+           <div className="price-form-grid"><label>Quantity<input type="number" min={request.instrument.lotSize || 1} step={request.instrument.lotSize || 1} value={quantity} onChange={e => setQuantity(e.target.value)} /></label><label>Product<select value={product} onChange={e => setProduct(e.target.value as typeof product)}><option value="DELIVERY">{["OPTION", "FUTURE"].includes(request.instrument.assetType ?? "") ? "Carry forward" : "Delivery"}</option><option value="INTRADAY">Intraday · today</option></select></label></div>
+           <p>Estimated order value: ₹{(Math.max(0, Number(price) || 0) * Math.max(0, Number(quantity) || 0)).toLocaleString("en-IN", { maximumFractionDigits: 2 })}. {orderType === "Market" ? "Delivery waits for the next fresh open-market quote while the app is running. The fill price may differ from this estimate." : orderType === "Limit" ? "Fills only at your limit or better." : "Triggers a market fill; the actual fill may differ from your stop price."} Funds, holdings, lot size and trading limits are checked again before filling. Cash is not reserved until a fill.</p>
+         </>}
+-        <p>{mode === "alert" && delivery === "server" ? "Server checks about once a minute during market hours. Brief price touches between checks may be missed. No automatic orders. Expires in 7 days." : "Monitored every 10 seconds while this app is open. No closed-app guarantee. Intraday paper orders expire at market close; other items expire in 7 days."}</p>
+-        {error && <p role="alert">{error}</p>}<button className="price-action-primary" disabled={saving || (mode === "alert" && delivery === "server" && !technical.cloudReady)} onClick={() => void submit()}>{mode === "alert" ? "Create alert" : "Confirm paper order"}</button>
++        <p>{mode === "alert" ? "We'll ping you even when the app is closed 😊" : "Intraday paper orders expire at market close. Other paper orders expire in 7 days."}</p>
++        {error && <p role="alert">{error}</p>}<button className="price-action-primary" disabled={saving} onClick={() => void submit()}>{saving ? "Saving…" : mode === "alert" ? "Create alert" : "Confirm paper order"}</button>
+       </> : <>
+         <label className="price-alert-search"><Search size={18} /><input aria-label={tab === "list" ? "Search alerts" : "Search alert log"} placeholder={tab === "list" ? "Search alerts or symbols" : "Search alert history"} value={search} onChange={e => setSearch(e.target.value)} />{search && <button className="price-icon-button" aria-label="Clear alert search" onClick={() => setSearch("")}><X size={16} /></button>}</label>
+         <div className="price-alert-tabs" role="tablist" aria-label="Alert views">{(["list", "log"] as const).map(value => <button role="tab" id={`alerts-tab-${value}`} aria-controls="alerts-panel" aria-selected={tab === value} key={value} onClick={() => {setHomeFocus(undefined);setTab(value);}}>{value === "list" ? "List" : "Log"}<span>{tasks.filter(t => value === "list" ? t.status === "pending" : t.status !== "pending").length + (value === "list" ? technicalList.length : technical.events.length + archivedRules.length)}</span></button>)}</div>
+@@ -188,12 +195,12 @@
+         {feedError && <p role="status">{feedError}</p>}
+         {technical.error && <p role="alert">{technical.error}</p>}
+         <div className="price-alert-results" id="alerts-panel" role="tabpanel" aria-labelledby={`alerts-tab-${tab}`}>
+-          {!matching.length && !matchingRules.length && !matchingEvents.length && <div className="price-alert-empty"><div>{tab === "log" ? <Clock3 size={38} strokeWidth={1.3} /> : <AlarmClock size={38} strokeWidth={1.3} />}</div><h3>{search ? "No matching items" : tab === "log" ? "No alert activity yet" : "No active alerts"}</h3><p>{search ? "Try another symbol, indicator or price." : tab === "log" ? "Triggered alerts and completed or cancelled items will appear here." : "Watch a price level or technical condition while the app is open."}</p></div>}
++          {!matching.length && !matchingRules.length && !matchingEvents.length && <div className="price-alert-empty"><div>{tab === "log" ? <Clock3 size={38} strokeWidth={1.3} /> : <AlarmClock size={38} strokeWidth={1.3} />}</div><h3>{search ? "No matching items" : tab === "log" ? "No alert activity yet" : "No active alerts"}</h3><p>{search ? "Try another symbol, indicator or price." : tab === "log" ? "Triggered alerts and completed or cancelled items will appear here." : "Watch a price or a setup. We'll ping you even when the app is closed 😊"}</p></div>}
+           {matchingRules.map(r => <article key={r.id} className="price-alert-item technical-rule"><Activity size={22} /><div className="price-alert-item-copy"><b>{r.instrument.symbol} <em>{r.family === "price" ? "Price · server" : `${r.timeframe} · close`}</em></b><span>{technicalDescription(r)}</span><small className="technical-monitor-state">{r.status === "paused" ? "Paused by you" : r.status !== "active" ? `${r.status} · older log details no longer retained` : technical.states[r.id] ?? "Waiting for the next data check"}</small><small>{r.repeat === "once" ? "Once only" : "Each new crossing"}{r.cooldown ? ` · ${r.cooldown} min cooldown` : ""} · expires {new Date(r.expiresAt).toLocaleDateString("en-IN")}</small><div className="technical-rule-actions">{["active", "paused"].includes(r.status) && <button aria-label={`${r.status === "paused" ? "Resume" : "Pause"} technical alert for ${r.instrument.symbol}`} onClick={() => void technical.toggle(r)}>{r.status === "paused" ? <Play size={15} /> : <Pause size={15} />}{r.status === "paused" ? "Resume" : "Pause"}</button>}<button aria-label={`Edit technical alert for ${r.instrument.symbol}`} onClick={() => setEditingTechnical(r)}><Pencil size={15} />Edit</button><button aria-label={`Delete technical alert for ${r.instrument.symbol}`} onClick={() => void technical.remove(r.id)}><Trash2 size={15} />Delete</button></div></div></article>)}
+           {matchingEvents.map(e => <article key={e.id} className="price-alert-item technical-event"><Activity size={22} /><div className="price-alert-item-copy"><b>{e.instrument.symbol} <em>{e.timeframe} · {e.kind === "trigger" ? "Triggered" : "Expired"}</em></b><span>{e.description}</span><small>{e.detail}{e.kind === "trigger" ? ` · ${e.description.startsWith("Price ") ? "quote" : "close"} ₹${money(e.price)}` : ""}</small><small>{e.barTime > 0 ? `${e.description.startsWith("Price ") ? "Quote" : "Candle"} ${new Date(e.barTime * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST · ` : ""}Recorded {new Date(e.createdAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</small><div className="technical-rule-actions">{onOpenTechnical && <button onClick={() => openTechnicalChart(e.instrument, e.timeframe)}>Open chart</button>}{technical.rules.some(r => r.id === e.ruleId) && <button onClick={() => setEditingTechnical(technical.rules.find(r => r.id === e.ruleId))}><Pencil size={15} />Edit / rearm</button>}{technical.rules.some(r => r.id === e.ruleId) && <button aria-label={`Delete saved technical alert for ${e.instrument.symbol}`} onClick={() => void technical.remove(e.ruleId)}><Trash2 size={15} />Delete rule</button>}</div></div></article>)}
+           {matching.map(t => <article key={t.id} className="price-alert-item"><StockLogo {...t.instrument} size={34} /><div className="price-alert-item-copy"><b>{t.instrument.symbol}</b><span>{t.kind === "alert" ? t.condition === "above" ? "At or above" : "At or below" : `${t.side} ${t.quantity} · ${t.orderType}`} <strong>{t.kind === "order" && t.orderType === "Market" ? "Next open-market quote" : `₹${money(t.price)}`}</strong></span><small><i className={`price-alert-status ${t.status}`}>{t.status === "pending" ? "Active" : t.status.charAt(0).toUpperCase() + t.status.slice(1)}</i> · {t.kind === "alert" ? "Price alert" : "Paper order"}{t.completedAt ? ` · ${new Date(t.completedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}</small>{t.message && <p>{t.message}</p>}</div>{t.status === "pending" && <button className="price-icon-button" aria-label={`Cancel ${t.kind} for ${t.instrument.symbol} at ${t.price}`} title="Cancel" onClick={() => { try { save(tasksRef.current.map(item => item.id === t.id ? { ...item, status: "cancelled", completedAt: Date.now() } : item)); onNotice(t.kind === "alert" ? "Alert cancelled" : "Paper order cancelled"); } catch { onNotice("Could not save the change. Please try again."); } }}><CircleSlash size={19} /></button>}</article>)}
+         </div>
+-        <AndroidDeliveryTest key={ownerId} ready={technical.cloudReady}/><footer className="price-alert-footer"><p>Device alerts need the app open. Server price and technical alerts use closed-app monitoring when the scheduler is healthy.</p>{onCreateAlert && <button className="price-action-primary" onClick={onCreateAlert}><AlarmClock size={18} />Create alert</button>}</footer>
++        <AndroidDeliveryTest key={ownerId} ready={technical.cloudReady}/><footer className="price-alert-footer"><p>Alerts reach you even when the app is closed 😊</p>{onCreateAlert && <button className="price-action-primary" onClick={onCreateAlert}><AlarmClock size={18} />Create alert</button>}</footer>
+       </>}
+     </section></div>}
+   </>;
+--- a/components/TechnicalAlertForm.tsx
++++ b/components/TechnicalAlertForm.tsx
+@@ -5,16 +5,15 @@
+ import type { Instrument } from "@/lib/market";
+ import { defaultTechnicalConfig, TECHNICAL_FAMILIES, TECHNICAL_FRAMES, technicalChoices, technicalDescription, type TechnicalConfig, type TechnicalFamily, type TechnicalFrame, type TechnicalRule } from "@/lib/technical-alerts";
+ 
+-export function TechnicalAlertForm({ instrument, timeframe, editing, onSave, onDone, cloudReady = false, cloudMessage = "Closed-app setup required", onEnablePush }: { instrument: Instrument; timeframe: string; editing?: TechnicalRule; onSave: (config: TechnicalConfig, instrument: Instrument, editing?: TechnicalRule) => Promise<string | null>; onDone: () => void; cloudReady?: boolean; cloudMessage?: string; onEnablePush?: () => Promise<string | null> }) {
+-  const [config, setConfig] = useState<TechnicalConfig>(() => editing ?? defaultTechnicalConfig("ema", Object.hasOwn(TECHNICAL_FRAMES, timeframe) ? timeframe as TechnicalFrame : "5m"));
++export function TechnicalAlertForm({ instrument, timeframe, editing, onSave, onDone, onEnablePush }: { instrument: Instrument; timeframe: string; editing?: TechnicalRule; onSave: (config: TechnicalConfig, instrument: Instrument, editing?: TechnicalRule) => Promise<string | null>; onDone: () => void; cloudReady?: boolean; cloudMessage?: string; onEnablePush?: () => Promise<string | null> }) {
++  const [config, setConfig] = useState<TechnicalConfig>(() => editing ?? { ...defaultTechnicalConfig("ema", Object.hasOwn(TECHNICAL_FRAMES, timeframe) ? timeframe as TechnicalFrame : "5m"), delivery: "server" });
+   const [error, setError] = useState(""), [busy, setBusy] = useState(false);
+   const update = <K extends keyof TechnicalConfig>(key: K, value: TechnicalConfig[K]) => setConfig(c => ({ ...c, [key]: value }));
+   const number = (key: "period" | "slow" | "signal" | "threshold" | "multiplier" | "cooldown", label: string, min: number, max: number, step = 1) => <label key={key}>{label}<input type="number" inputMode="decimal" min={min} max={max} step={step} value={Number.isNaN(config[key]) ? "" : config[key]} onChange={e => update(key, e.target.value === "" ? NaN : Number(e.target.value))} /></label>;
+-  return <form className="technical-alert-form" onSubmit={async e => { e.preventDefault(); setBusy(true); try { const failure = await onSave(config, instrument, editing); if (failure) setError(failure); else onDone(); } finally { setBusy(false); } }}>
++  return <form className="technical-alert-form" onSubmit={async e => { e.preventDefault(); setBusy(true); try { await onEnablePush?.(); const failure = await onSave(config, instrument, editing); if (failure) setError(/sign in/i.test(failure) ? "Sign in so this alert can ping you when the app is closed 😊" : failure); else onDone(); } finally { setBusy(false); } }}>
+     <div className="technical-intro"><Activity size={20} /><div><h3>{editing ? "Edit technical alert" : "Watch a technical condition"}</h3><p>{instrument.symbol} · saved independently of your chart settings</p></div></div>
+-    {!editing ? <ModernSelect label="Monitoring" value={config.delivery ?? "device"} choices={[{ value: "device", label: "While app is open" }, { value: "server", label: "Even when app is closed", description: cloudReady ? "Server checks + push notifications" : "Setup required before activation" }]} onChange={value => update("delivery", value)} /> : <p>Monitoring: {editing.delivery === "server" ? "Server · closed-app" : "This device · app open"}. Mode stays fixed when editing.</p>}
+-    {config.delivery === "server" && <div className="technical-summary"><div><b>{cloudMessage}</b><p>Requires sign-in and trade notifications. Rules are stored securely for your account. Device permissions and connectivity affect delivery.</p>{onEnablePush && <button type="button" disabled={busy} onClick={async () => { setBusy(true); try { const failure = await onEnablePush(); setError(failure ?? "Notifications connected. You can now save the server alert."); } finally { setBusy(false); } }}>Connect notifications</button>}</div></div>}
+-    {config.family !== "price" && <div className="price-form-grid"><ModernSelect label="Indicator" value={config.family} choices={Object.entries(TECHNICAL_FAMILIES).filter(([value]) => value !== "price").map(([value, label]) => ({ value: value as TechnicalFamily, label }))} onChange={family => setConfig(c => ({ ...defaultTechnicalConfig(family, c.timeframe), repeat: c.repeat, cooldown: c.cooldown, days: c.days, delivery: c.delivery }))} /><ModernSelect label="Alert timeframe" value={config.timeframe} choices={Object.keys(TECHNICAL_FRAMES).map(value => ({ value: value as TechnicalFrame, label: value }))} onChange={value => update("timeframe", value)} /></div>}
++    <p>{editing && editing.delivery !== "server" ? "This one stays on this device while the app is open." : "We'll ping you even when the app is closed 😊"}</p>
++    {config.family !== "price" && <div className="price-form-grid"><ModernSelect label="Indicator" value={config.family} choices={Object.entries(TECHNICAL_FAMILIES).filter(([value]) => value !== "price").map(([value, label]) => ({ value: value as TechnicalFamily, label }))} onChange={family => setConfig(c => ({ ...defaultTechnicalConfig(family, c.timeframe), repeat: c.repeat, cooldown: c.cooldown, days: c.days, delivery: c.delivery === "device" ? "device" : "server" }))} /><ModernSelect label="Alert timeframe" value={config.timeframe} choices={Object.keys(TECHNICAL_FRAMES).map(value => ({ value: value as TechnicalFrame, label: value }))} onChange={value => update("timeframe", value)} /></div>}
+     <ModernSelect label="Trigger condition" value={config.condition} choices={technicalChoices(config.family)} onChange={value => setConfig(c => ({ ...c, condition: value, ...(c.family === "volume" ? { multiplier: value === "dry" ? 0.5 : 2 } : {}) }))} />
+     <div className="price-form-grid">
+       {!["vwap", "previousDay", "price"].includes(config.family) && number("period", config.family === "macd" || config.condition.startsWith("average") ? "Fast period" : config.family === "supertrend" ? "ATR period" : config.family === "psbb" ? "RSI length" : "Period", 2, 200)}
+@@ -31,8 +30,7 @@
+     <div className="price-form-grid">{config.family !== "price" && <ModernSelect label="Frequency" value={config.repeat} choices={[{ value: "once", label: "Once only" }, { value: "repeat", label: "Each new crossing" }]} onChange={value => update("repeat", value)} />}<ModernSelect label="Expires after" value={String(config.days)} choices={[{ value: "1", label: "1 day" }, { value: "7", label: "7 days" }, { value: "30", label: "30 days" }]} onChange={value => update("days", Number(value))} /></div>
+     {config.repeat === "repeat" && number("cooldown", "Minimum minutes between alerts", 0, 1440)}
+     <div className="technical-summary"><ShieldCheck size={18} /><div><b>{config.family === "price" ? "Fresh quote · approximately once a minute" : "Confirmed candle close only"}</b><p>{technicalDescription(config)} · {config.timeframe}</p><small>{config.family === "price" ? "Once only. Brief price touches between checks may be missed. No automatic orders." : "New signals only. Editing or resuming starts a fresh watch; past signals are not replayed."}</small></div></div>
+-    <p>{config.delivery === "server" ? "Checked by the server about once a minute after setup. Alerts appear in Log and are sent to eligible notification devices, even when the app is closed. Delivery can be delayed or blocked by phone/browser settings. No automatic orders." : "Checked about every 30 seconds while the app is visible and online. Alerts appear in List / Log and the notification centre. No closed-app delivery or automatic orders. Saved on this device for your account."}</p>
+     {error && <p role="alert">{error}</p>}
+-    <button type="submit" disabled={busy || (config.delivery === "server" && !cloudReady)} className="price-action-primary">{busy ? "Saving…" : config.delivery === "server" && !cloudReady ? "Closed-app setup required" : editing ? "Save technical alert" : "Create technical alert"}</button>
++    <button type="submit" disabled={busy} className="price-action-primary">{busy ? "Saving…" : editing ? "Save technical alert" : "Create technical alert"}</button>
+   </form>;
+ }
+--- a/components/useTechnicalAlerts.ts
++++ b/components/useTechnicalAlerts.ts
+@@ -117,9 +117,9 @@
+                 if (changed) write({ ...latest, rules: updated, events: [...deliveries, ...latest.events].slice(0, 200) });
+               });
+               for (const event of deliveries) {
+-                const body = `${event.instrument.symbol} · ${event.timeframe} · ${event.description} · close ₹${event.price.toFixed(2)}`;
+-                try { addPaperTradeNotification({ id: event.id, kind: "trade", title: "Technical alert · confirmed close", body, symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, timeframe: event.timeframe, instrument: event.instrument }); } catch { /* The durable alert log remains available if notification storage fails. */ }
+-                current.current.onNotice(body);
++                const title = `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
++                try { addPaperTradeNotification({ id: event.id, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, timeframe: event.timeframe, instrument: event.instrument }); } catch { /* The durable alert log remains available if notification storage fails. */ }
++                current.current.onNotice(title);
+               }
+             } catch (e) { if (!stopped) setStates(previous => ({ ...previous, ...Object.fromEntries(group.map(r => [r.id, e instanceof Error ? e.message : "Waiting for candle data"])) })); }
+           }
+--- a/components/useCloudTechnicalAlerts.ts
++++ b/components/useCloudTechnicalAlerts.ts
+@@ -21,7 +21,8 @@
+     const parsed = parseTechnicalStore(JSON.stringify(value)); setStore(parsed);
+     const known = new Set(readPaperTradeNotifications().map(n => n.id));
+     for (const event of [...parsed.events].reverse()) if (event.kind === "trigger" && !known.has(event.id) && Date.now() - event.createdAt < 86400000) {
+-      try { addPaperTradeNotification({ id: event.id, createdAt: event.createdAt, kind: "trade", title: "Technical alert · server", body: `${event.instrument.symbol} · ${event.timeframe} · ${event.description}`, symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, instrument: event.instrument, timeframe: event.timeframe }); } catch { /* Server Log is retained even if browser storage is full. */ }
++      const title = event.description.startsWith("Price ") ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
++      try { addPaperTradeNotification({ id: event.id, createdAt: event.createdAt, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, instrument: event.instrument, timeframe: event.timeframe }); } catch { /* Server Log is retained even if browser storage is full. */ }
+     }
+   }
+   async function refresh() {
+--- a/public/notifications-sw.js
++++ b/public/notifications-sw.js
+@@ -10,9 +10,11 @@
+   const accepted=await store("readwrite",(state,done)=>{
+     const prefs=state.get("preferences");prefs.onsuccess=()=>{
+       const p=prefs.result;
+-      const prefKey=notice.kind==="trade"?"trades":notice.kind==="allotment"?"allotment":notice.kind==="portfolio"?"reviews":notice.kind==="practice"?"practice":notice.kind==="session"?"sessions":"ipo";
+-      if(!p||p.pausedUntil>Date.now()||!p[prefKey]){done(false);return;}
+-      if(notice.kind==="trade"&&p.hideAmounts)notice.body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
++      if(p&&p.pausedUntil>Date.now()){done(false);return;}
++      if(notice.kind==="trade"&&p&&p.hideAmounts){
++        notice.title=String(notice.title).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
++        notice.body=String(notice.body).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
++      }
+       const seen=state.get("seen");seen.onsuccess=()=>{const ids=seen.result||[];if(ids.includes(notice.id)){done(false);return;}state.put([...ids.slice(-199),notice.id],"seen");done(true);};
+     };
+   });
+@@ -20,7 +22,9 @@
+   const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true}),visible=clients.filter(client=>client.visibilityState==="visible");
+   if(visible.length){visible.forEach(client=>client.postMessage({type:"papertrade-push",notice}));return;}
+   const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
+-  await self.registration.showNotification(notice.title,{body:notice.body,icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}});
++  const options={icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}};
++  if(notice.body)options.body=notice.body;
++  await self.registration.showNotification(notice.title,options);
+ })());});
+ self.addEventListener("notificationclick",event=>{
+   event.notification.close();
+--- a/app/api/notifications/dispatch/route.ts
++++ b/app/api/notifications/dispatch/route.ts
+@@ -35,7 +35,11 @@
+     const newResults = saved.exists ? allotments.allotments.filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
+     const released = allotmentNotice(newResults, now); if (released) events.push(released);
+     const listings = ipos.filter(ipo => saved.exists && ipo.status === "listed" && ipo.details?.listingDate === day && ipo.details.listingPrice && ipo.details.issuePrice && !saved.data()?.listed?.[ipo.id]);
+-    if (listings.length) events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: "From GMP to reality: today’s listings", body: listings.slice(0,3).map(ipo => `${ipo.name}: ₹${ipo.details!.listingPrice}, ${((ipo.details!.listingPrice! / ipo.details!.issuePrice! - 1) * 100).toFixed(2)}% vs issue price`).join("; "), url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
++    if (listings.length) {
++      const lead = listings[0].name.replace(/\s+IPO$/i, "");
++      const pct = ((listings[0].details!.listingPrice! / listings[0].details!.issuePrice! - 1) * 100).toFixed(0);
++      events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: listings.length === 1 ? `🚀 ${lead} listed ${pct}% — the print is in` : `🚀 ${listings.length} listings just printed — go see the move`, body: "", url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
++    }
+     const refs = events.map(event => db.collection("notificationOutbox").doc(hash(event.id)));
+     await db.runTransaction(async tx => {
+       const existing = await Promise.all(refs.map(ref => tx.get(ref)));
+@@ -71,15 +75,15 @@
+       }
+       if (preferences.pausedUntil > now) continue;
+       if (data.preferences?.pausedUntil > 0 && data.preferences.pausedUntil <= now) {
+-        for (const [topic,on] of [["papertrade-ipo-v3",preferences.ipo],["papertrade-allotment-v3",preferences.allotment],["papertrade-sessions-v1",preferences.sessions]] as const) if(on) {
++        for (const topic of ["papertrade-ipo-v3","papertrade-allotment-v3","papertrade-sessions-v1"]) {
+           const result = await messaging.subscribeToTopic(data.token,topic);
+           if (result.failureCount) throw new Error("Could not resume notifications");
+         }
+-        await device.ref.update({ "preferences.pausedUntil":0 });
++        await device.ref.update({ "preferences.pausedUntil": 0, "preferences.ipo": true, "preferences.allotment": true, "preferences.sessions": true, "preferences.trades": true, "preferences.reviews": true, "preferences.practice": true, "preferences.hideAmounts": false });
+       }
+-      if (preferences.ipo && calendarCount >= 2) continue;
+-      let notice = preferences.reviews ? reviewNotice(data.reviewCount, data.reviewDate, now) : null;
+-      if (!notice && preferences.practice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:"No catch-up needed. Just one candle.",body:"Pick a past chart and practise your next decision in replay.",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
++      if (calendarCount >= 2) continue;
++      let notice = reviewNotice(data.reviewCount, data.reviewDate, now);
++      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:"🎯 One candle, one decision — your replay is waiting",body:"",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
+       if (!notice || data.lastNotice === notice.id || now-data.lastActive < 10*60000) continue;
+       // Claim before sending, preventing repeated notifications on overlapping runs.
+       await device.ref.update({lastNotice:notice.id});
+--- a/app/api/notifications/device/route.ts
++++ b/app/api/notifications/device/route.ts
+@@ -21,9 +21,9 @@
+     const { db, messaging } = await pushServices(), id = createHash("sha256").update(body.token).digest("hex"), ref = db.collection("notificationDevices").doc(id);
+     const existing = await ref.get();
+     if (existing.exists && existing.data()?.userId !== data.user.id) return Response.json({error:"This device registration belongs to another session. Sign out and reconnect."},{status:403});
+-    const preferences = notificationPreferences(body.preferences), paused = preferences.pausedUntil > Date.now();
+-    for (const [topic, on] of [["papertrade-ipo-v3", preferences.ipo], ["papertrade-allotment-v3", preferences.allotment], ["papertrade-sessions-v1", preferences.sessions]] as const) {
+-      const result = !body.remove && on && !paused
++    const preferences = notificationPreferences({ ...(body.preferences ?? {}), ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false }), paused = preferences.pausedUntil > Date.now();
++    for (const topic of ["papertrade-ipo-v3", "papertrade-allotment-v3", "papertrade-sessions-v1"]) {
++      const result = !body.remove && !paused
+         ? await messaging.subscribeToTopic(body.token, topic)
+         : await messaging.unsubscribeFromTopic(body.token, topic);
+       if (result.failureCount) throw new Error("Topic registration failed");
+--- a/app/api/technical-alerts/dispatch/route.ts
++++ b/app/api/technical-alerts/dispatch/route.ts
+@@ -98,10 +98,10 @@
+         let delivered = 0;
+         for (const device of devices.docs) {
+           const target = device.data(), prefs = notificationPreferences(target.preferences);
+-          if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
++          if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+           const event = queued.event;
+           const isPrice = rule.family === "price";
+-          const notice: PushNotice = { id: event.id, kind: "trade", title: `${event.instrument.symbol} · ${isPrice ? "price" : "technical"} alert`, body: prefs.hideAmounts ? (isPrice ? "Your price condition was observed. Open your alert log to review." : "A technical condition was confirmed at candle close. Open your alert log to review.") : `${isPrice ? "Price check" : event.timeframe} · ${event.description} · ${isPrice ? "quote" : "close"} ₹${event.price.toFixed(2)}`, url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
++          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`, body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+           await sendPush(notice, { token: target.token }); delivered++;
+         }
+         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;
