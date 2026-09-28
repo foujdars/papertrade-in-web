@@ -1,0 +1,78 @@
+ notification-result-link" onClick={() => { window.dispatchEvent(new CustomEvent("papertrade:open-technical-chart", { detail: { instrument: item.instrument, timeframe: item.timeframe } })); setOpen(false); }}>Open {item.timeframe} chart <ExternalLink size={14} /></button>}
+                 {item.kind === "ipo" && allotmentLink(item.allotmentRegistrar) && <a className="allotment-result-link notification-result-link" href={allotmentLink(item.allotmentRegistrar)!} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Check allotment <ExternalLink size={14} /></a>}
+--- a/components/SessionOpenAlerts.tsx
++++ b/components/SessionOpenAlerts.tsx
+@@ -33,7 +33,7 @@
+ 
+ export function deliverSessionOpen(now = Date.now()) {
+   const preferences = readNotificationPreferences();
+-  if (preferences.pausedUntil > now || !preferences.sessions) return;
++  if (preferences.pausedUntil > now) return;
+   const notice = sessionOpenNotice(now);
+   if (!notice || !remember(notice.id)) return;
+   addPaperTradeNotification({ id: notice.id, kind: "market", title: notice.title, body: notice.body });
+--- a/components/PriceActions.tsx
++++ b/components/PriceActions.tsx
+@@ -10,7 +10,6 @@
+ import { TechnicalAlertForm } from "./TechnicalAlertForm";
+ import { GlobalAlerts } from "./GlobalAlerts";
+ import { TECHNICAL_FRAMES, technicalDescription, defaultTechnicalConfig, type TechnicalRule } from "@/lib/technical-alerts";
+-import { ModernSelect } from "./ModernSelect";
+ import { alertAttention, type HomeAlertSnapshot, type HomeAlertRequest } from '@/lib/home-attention';
+ import { AndroidDeliveryTest } from "./AndroidDeliveryTest";
+ import type { Instrument } from "@/lib/market";
+@@ -51,7 +50,7 @@
+   const [filter, setFilter] = useState<"all" | "alert" | "order" | "technical">("all");
+   const sheetRef = useRef<HTMLElement>(null);
+   const [mode, setMode] = useState("alert");
+-  const [delivery, setDelivery] = useState("device"), [saving, setSaving] = useState(false);
++  const [saving, setSaving] = useState(false);
+   const [price, setPrice] = useState("");
+   const [quantity, setQuantity] = useState("1");
+   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+@@ -113,9 +112,9 @@
+             if (t.product === "INTRADAY" && t.kind === "order" && !callbacks.current.intradayOpen) continue;
+             const failure = t.kind === "order" ? callbacks.current.onFill(t, q.lastPrice) : null;
+             const status = failure ? "rejected" : t.kind === "alert" ? "triggered" : "filled";
+-            const message = failure ?? `${t.instrument.symbol} ${t.kind === "alert" ? "price alert" : "paper order filled"} at ₹${q.lastPrice.toFixed(2)}`;
++            const message = failure ?? (t.kind === "alert" ? `💰 ${t.instrument.symbol} just hit your price — nice catch` : `✅ ${t.instrument.symbol} paper order filled at ₹${q.lastPrice.toFixed(2)}`);
+             save(tasksRef.current.map(item => item.id === t.id ? { ...item, status, message, completedAt: Date.now(), triggeredPrice: q.lastPrice } : item));
+-            addPaperTradeNotification({ id: t.id, kind: "trade", title: t.kind === "alert" ? "Price alert" : "Price order", body: message, symbol: t.instrument.symbol, instrumentKey: t.instrument.instrumentKey });
++            addPaperTradeNotification({ id: t.id, kind: "trade", title: message, body: "", symbol: t.instrument.symbol, instrumentKey: t.instrument.instrumentKey });
+             callbacks.current.onNotice(message);
+             // One fill per cycle: let the portfolio update before testing another order's funds.
+             if (t.kind === "order") break;
+@@ -138,13 +137,22 @@
+     const task: PriceTask = { id: crypto.randomUUID(), instrument: request.instrument, kind: mode as "alert" | "order", price: Number(price), quantity: Number(quantity), side, orderType, product, condition, status: "pending", createdAt: now, expiresAt: product === "INTRADAY" && mode === "order" ? dayEnd.getTime() - 19800000 : now + 7 * 86400000 };
+     const invalid = priceTaskError(task) || (task.kind === "order" ? onValidate?.(task) : null);
+     if (invalid) { setError(invalid); return; }
+-    if (mode === "alert" && delivery === "server") {
++    if (mode === "alert") {
+       setSaving(true);
+       try {
+-        const failure = await technical.save({ ...defaultTechnicalConfig("price"), threshold: Number(price), condition }, request.instrument);
+-        if (failure) { setError(failure); return; }
+-        onNotice("Closed-app price alert saved · minute-level checks"); onClose();
+-      } finally { setSaving(false); }
++        const pushFailure = await technical.enablePush();
++        const failure = await technical.save({ ...defaultTechnicalConfig("price"), threshold: Number(price), condition, delivery: "server" }, request.instrument);
++        if (!failure) {
++          onNotice(pushFailure ? `💰 ${request.instrument.symbol} alert is saved — allow notifications so it can ring when the app is closed` : `💰 ${request.instrument.symbol} alert is on — it rings even when the app is closed`);
++          onClose();
++          return;
++        }
++      } catch { /* Closed-app save failed; keep a local watch. */ }
++      finally { setSaving(false); }
++      if (tasksRef.current.filter(t => t.status === "pending").length >= 30) { setError("Cancel an active item before adding more (maximum 30)."); return; }
++      try { save([task, ...tasksRef.current].slice(0, 100)); } catch { setError("Device storage is unavailable. Nothing was queued."); return; }
++      onNotice(`💰 ${request.instrument.symbol} is watched here — sign in so it also pings when the app is closed`);
++      onClose();
+       return;
+     }
+     if (mode === "order" && product === "INTRADAY" && (!intradayOpen || !marketOpen)) { setError("Intraday orders can only be queued during the trading session."); return; }
+@@ -171,16 +179,15 @@
+       <header><div className="price-sheet-title"><AlarmClock size={23} /><div><h2>{request?.instrument.symbol ?? "Alerts"}</h2><small>{request ? request.instrument.name : "Your levels. Your attention."}</small></div></div><button className="price-icon-button" onClick={dismiss} aria-label="Close price actions"><X size={21} /></button></header>
+       {!request&&homeFocus&&<button className="home-alert-clear" onClick={()=>setHomeFocus(undefined)}>Show all alerts</button>}
+       {request && request.mode !== "order" && <div className="price-alert-tabs" aria-label="Alert type"><button aria-pressed={mode === "alert"} aria-selected={mode === "alert"} onClick={() => setMode("alert")}><AlarmClock size={16} />Price</button><button aria-pressed={mode === "technical"} aria-selected={mode === "technical"} onClick={() => setMode("technical")}><Activity size={16} />Technical</button></div>}
+-      {globalTechnical ? <div ref={setGlobalAlertHost} /> : technicalForm ? <TechnicalAlertForm key={editingTechnical?.revision ?? request!.instrument.instrumentKey} instrument={editingTechnical?.instrument ?? request!.instrument} timeframe={timeframe} editing={editingTechnical} cloudReady={technical.cloudReady} cloudMessage={technical.cloudMessage} onEnablePush={technical.enablePush} onSave={technical.save} onDone={() => { setEditingTechnical(undefined); onClose(); setManage(true); setTab("list"); setFilter(editingTechnical?.family === "price" ? "alert" : "technical"); setSearch(""); onNotice(editingTechnical?.family === "price" ? "Server price alert saved" : "Technical alert saved · watching new candle closes"); }} /> : request ? <><h3>{mode === "alert" ? "Create price alert" : "Add paper order"}</h3>
+-        {mode === "alert" && <><ModernSelect label="Monitoring" value={delivery} choices={[{value:"device",label:"While app is open"},{value:"server",label:"Even when app is closed"}]} onChange={setDelivery}/>{delivery === "server" && <div className="technical-summary"><div><b>{technical.cloudMessage}</b><p>Requires sign-in and trade notifications on this Android phone.</p><button type="button" onClick={asy
