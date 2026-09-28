@@ -21,11 +21,6 @@ function zonedParts(date: Date, timeZone: string) {
   return { weekday: get("weekday"), date: `${get("year")}-${get("month")}-${get("day")}`, minutes: Number(get("hour")) * 60 + Number(get("minute")) };
 }
 
-function clockLabel(hour: number, minute: number) {
-  const suffix = hour < 12 ? "am" : "pm";
-  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
-
 function addDays(dateKey: string, days: number) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
@@ -143,12 +138,11 @@ export function sessionOpenNotice(now: number): PushNotice | null {
     if (session.id === "india" && NSE_HOLIDAYS[local.date]) continue;
     const open = session.openHour * 60 + session.openMinute;
     if (local.minutes < open || local.minutes >= open + SESSION_OPEN_WINDOW_MINUTES) continue;
-    const ist = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hourCycle: "h12" }).format(date);
     return {
       id: `session-${session.id}-${local.date}`,
       kind: "session",
-      title: `${session.name} session is open`,
-      body: `${session.name} opened at ${clockLabel(session.openHour, session.openMinute)} local time. It is ${ist} IST.`,
+      title: `🟢 ${session.name} just opened — the session is live`,
+      body: "",
       url: "/",
       expiresAt: now + 30 * 60_000,
       silent: false,

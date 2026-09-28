@@ -98,10 +98,10 @@ export async function GET(request: Request) {
         let delivered = 0;
         for (const device of devices.docs) {
           const target = device.data(), prefs = notificationPreferences(target.preferences);
-          if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+          if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
           const isPrice = rule.family === "price";
-          const notice: PushNotice = { id: event.id, kind: "trade", title: `${event.instrument.symbol} · ${isPrice ? "price" : "technical"} alert`, body: prefs.hideAmounts ? (isPrice ? "Your price condition was observed. Open your alert log to review." : "A technical condition was confirmed at candle close. Open your alert log to review.") : `${isPrice ? "Price check" : event.timeframe} · ${event.description} · ${isPrice ? "quote" : "close"} ₹${event.price.toFixed(2)}`, url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`, body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
           await sendPush(notice, { token: target.token }); delivered++;
         }
         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

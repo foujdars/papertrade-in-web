@@ -117,9 +117,9 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
                 if (changed) write({ ...latest, rules: updated, events: [...deliveries, ...latest.events].slice(0, 200) });
               });
               for (const event of deliveries) {
-                const body = `${event.instrument.symbol} · ${event.timeframe} · ${event.description} · close ₹${event.price.toFixed(2)}`;
-                try { addPaperTradeNotification({ id: event.id, kind: "trade", title: "Technical alert · confirmed close", body, symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, timeframe: event.timeframe, instrument: event.instrument }); } catch { /* The durable alert log remains available if notification storage fails. */ }
-                current.current.onNotice(body);
+                const title = `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
+                try { addPaperTradeNotification({ id: event.id, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, timeframe: event.timeframe, instrument: event.instrument }); } catch { /* The durable alert log remains available if notification storage fails. */ }
+                current.current.onNotice(title);
               }
             } catch (e) { if (!stopped) setStates(previous => ({ ...previous, ...Object.fromEntries(group.map(r => [r.id, e instanceof Error ? e.message : "Waiting for candle data"])) })); }
           }

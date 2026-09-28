@@ -33,7 +33,7 @@ async function showSystem(title: string, body: string, id: string) {
 
 export function deliverSessionOpen(now = Date.now()) {
   const preferences = readNotificationPreferences();
-  if (preferences.pausedUntil > now || !preferences.sessions) return;
+  if (preferences.pausedUntil > now) return;
   const notice = sessionOpenNotice(now);
   if (!notice || !remember(notice.id)) return;
   addPaperTradeNotification({ id: notice.id, kind: "market", title: notice.title, body: notice.body });

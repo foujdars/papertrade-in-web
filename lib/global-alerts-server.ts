@@ -80,9 +80,9 @@ export async function dispatchCloudGlobalAlerts(db: Firestore, now = Date.now())
       let delivered = 0;
       for (const device of devices.docs) {
         const target = device.data(), prefs = notificationPreferences(target.preferences);
-        if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+        if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
         const isEma = isEma21EntryKind(rule.kind);
-        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: `${rule.symbol} · ${isEma ? "21 EMA entry" : "PSBB divergence"}`, body: `${rule.symbol} · ${rule.timeframe} · ${isEma ? `${rule.triggerSide ?? "21 EMA"} entry` : "divergence confirmed"}. Open the chart to review.`, url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: isEma ? `📈 ${rule.symbol} ${rule.timeframe} kissed the 21 EMA — entry is live` : `⚡ ${rule.symbol} ${rule.timeframe} divergence just confirmed — take a look`, body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
         await sendPush(notice, { token: target.token }); delivered++;
       }
       await item.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

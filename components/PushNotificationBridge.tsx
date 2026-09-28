@@ -11,7 +11,15 @@ export function PushNotificationBridge({ userId, reviewCount }: { userId?: strin
   useEffect(()=>{
     if(!userId)return;
     let disposed=false;
-    const connect=()=>{if(document.visibilityState==="visible")void connectPush(false).catch(()=>undefined);};
+    const connect=()=>{
+      if(document.visibilityState!=="visible"||Capacitor.getPlatform()==="android")return;
+      if(typeof Notification!=="undefined"&&Notification.permission==="granted")void connectPush(false).catch(()=>undefined);
+    };
+    const ask=()=>{
+      window.removeEventListener("pointerdown",ask);
+      if(Capacitor.getPlatform()==="android"){void connectPush(true).catch(()=>undefined);return;}
+      if(typeof Notification!=="undefined"&&Notification.permission==="default")void connectPush(true).catch(()=>undefined);
+    };
     const consume=async()=>{
       if(Capacitor.getPlatform()!=="android")return;
       try{const result=await getNativeTradeAlert().consumeNotifications();if(!disposed)for(const item of result?.notifications||[])addPaperTradeNotification({...item,kind:item.kind==="allotment"?"ipo":item.kind==="practice"||item.kind==="session"?"market":item.kind});}catch{/* Older Android app: no repeated prompts. */}
@@ -23,8 +31,9 @@ export function PushNotificationBridge({ userId, reviewCount }: { userId?: strin
     };
     const message=(event:MessageEvent)=>{if(event.data?.type==="papertrade-push"){const item=event.data.notice;if(item?.id&&item?.title)addPaperTradeNotification({...item,kind:item.kind==="allotment"?"ipo":item.kind==="practice"||item.kind==="session"?"market":item.kind});}};
     connect();changed();void consume();const timer=setInterval(()=>{if(document.visibilityState==="visible"){void consume();void syncPushDevice().catch(()=>undefined);}},60000);
+    window.addEventListener("pointerdown",ask,{once:true});
     window.addEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.addEventListener("visibilitychange",connect);navigator.serviceWorker?.addEventListener("message",message);
-    return()=>{disposed=true;clearInterval(timer);window.removeEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.removeEventListener("visibilitychange",connect);navigator.serviceWorker?.removeEventListener("message",message);};
+    return()=>{disposed=true;clearInterval(timer);window.removeEventListener("pointerdown",ask);window.removeEventListener(NOTIFICATION_SETTINGS_EVENT,changed);document.removeEventListener("visibilitychange",connect);navigator.serviceWorker?.removeEventListener("message",message);};
   },[userId]);
   return null;
 }

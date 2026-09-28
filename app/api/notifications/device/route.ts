@@ -21,9 +21,9 @@ export async function POST(request: Request) {
     const { db, messaging } = await pushServices(), id = createHash("sha256").update(body.token).digest("hex"), ref = db.collection("notificationDevices").doc(id);
     const existing = await ref.get();
     if (existing.exists && existing.data()?.userId !== data.user.id) return Response.json({error:"This device registration belongs to another session. Sign out and reconnect."},{status:403});
-    const preferences = notificationPreferences(body.preferences), paused = preferences.pausedUntil > Date.now();
-    for (const [topic, on] of [["papertrade-ipo-v3", preferences.ipo], ["papertrade-allotment-v3", preferences.allotment], ["papertrade-sessions-v1", preferences.sessions]] as const) {
-      const result = !body.remove && on && !paused
+    const preferences = notificationPreferences({ ...(body.preferences ?? {}), ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false }), paused = preferences.pausedUntil > Date.now();
+    for (const topic of ["papertrade-ipo-v3", "papertrade-allotment-v3", "papertrade-sessions-v1"]) {
+      const result = !body.remove && !paused
         ? await messaging.subscribeToTopic(body.token, topic)
         : await messaging.unsubscribeFromTopic(body.token, topic);
       if (result.failureCount) throw new Error("Topic registration failed");

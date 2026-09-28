@@ -10,9 +10,11 @@ self.addEventListener("push",event=>{event.waitUntil((async()=>{
   const accepted=await store("readwrite",(state,done)=>{
     const prefs=state.get("preferences");prefs.onsuccess=()=>{
       const p=prefs.result;
-      const prefKey=notice.kind==="trade"?"trades":notice.kind==="allotment"?"allotment":notice.kind==="portfolio"?"reviews":notice.kind==="practice"?"practice":notice.kind==="session"?"sessions":"ipo";
-      if(!p||p.pausedUntil>Date.now()||!p[prefKey]){done(false);return;}
-      if(notice.kind==="trade"&&p.hideAmounts)notice.body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
+      if(p&&p.pausedUntil>Date.now()){done(false);return;}
+      if(notice.kind==="trade"&&p&&p.hideAmounts){
+        notice.title=String(notice.title).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
+        notice.body=String(notice.body).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
+      }
       const seen=state.get("seen");seen.onsuccess=()=>{const ids=seen.result||[];if(ids.includes(notice.id)){done(false);return;}state.put([...ids.slice(-199),notice.id],"seen");done(true);};
     };
   });
@@ -20,7 +22,9 @@ self.addEventListener("push",event=>{event.waitUntil((async()=>{
   const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true}),visible=clients.filter(client=>client.visibilityState==="visible");
   if(visible.length){visible.forEach(client=>client.postMessage({type:"papertrade-push",notice}));return;}
   const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
-  await self.registration.showNotification(notice.title,{body:notice.body,icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}});
+  const options={icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}};
+  if(notice.body)options.body=notice.body;
+  await self.registration.showNotification(notice.title,options);
 })());});
 self.addEventListener("notificationclick",event=>{
   event.notification.close();

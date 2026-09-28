@@ -21,7 +21,8 @@ export function useCloudTechnicalAlerts(ownerId: string) {
     const parsed = parseTechnicalStore(JSON.stringify(value)); setStore(parsed);
     const known = new Set(readPaperTradeNotifications().map(n => n.id));
     for (const event of [...parsed.events].reverse()) if (event.kind === "trigger" && !known.has(event.id) && Date.now() - event.createdAt < 86400000) {
-      try { addPaperTradeNotification({ id: event.id, createdAt: event.createdAt, kind: "trade", title: "Technical alert · server", body: `${event.instrument.symbol} · ${event.timeframe} · ${event.description}`, symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, instrument: event.instrument, timeframe: event.timeframe }); } catch { /* Server Log is retained even if browser storage is full. */ }
+      const title = event.description.startsWith("Price ") ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
+      try { addPaperTradeNotification({ id: event.id, createdAt: event.createdAt, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, instrument: event.instrument, timeframe: event.timeframe }); } catch { /* Server Log is retained even if browser storage is full. */ }
     }
   }
   async function refresh() {

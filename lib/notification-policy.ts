@@ -2,7 +2,7 @@ import type { IpoSummary } from "./ipo";
 import type { IpoAllotment } from "./ipo-allotment";
 
 export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; hideAmounts: boolean; pausedUntil: number };
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: false, practice: false, sessions: true, hideAmounts: true, pausedUntil: 0 };
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false, pausedUntil: 0 };
 export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
 export function notificationPreferences(value: unknown): NotificationPreferences {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
@@ -31,17 +31,21 @@ export function ipoDigest(ipos: IpoSummary[], now: number): PushNotice | null {
   const rows = (slot === "closing" ? closing : open.filter(ipo => closing.includes(ipo) || (freshGmp(ipo, now) && ipo.gmpPercent! >= 15)))
     .sort((a,b) => Number(b.biddingEndDate === day) - Number(a.biddingEndDate === day) || (b.gmpPercent ?? -Infinity) - (a.gmpPercent ?? -Infinity));
   if (!rows.length) return null;
-  const body = rows.slice(0, 3).map(ipo => `${ipo.name.replace(/\s+IPO$/i, "")}${ipo.issueType === "sme" ? " (SME)" : ""}: ${freshGmp(ipo, now) ? `GMP ${ipo.gmpPercent!.toFixed(2)}%` : "GMP not current"}${ipo.biddingEndDate === day ? ", closes today" : ""}`).join("; ");
-  return { id: `ipo-${slot}-${day}`, kind: "ipo", title: slot === "closing" ? "Your afternoon IPO reminder ⏳" : `Today's IPO spotlight 👀 · ${rows.length} issue${rows.length === 1 ? "" : "s"}`, body: `${body}. ${slot === "closing" ? "Check your broker’s cutoff. " : ""}GMP is unofficial—not assured profit.`, url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
+  const lead = rows[0].name.replace(/\s+IPO$/i, "");
+  const extra = rows.length > 1 ? ` +${rows.length - 1}` : "";
+  const title = slot === "closing" ? `⏳ ${lead} closes today${extra} — last call to bid` : `👀 ${lead} is live today${extra} — tap before it runs`;
+  return { id: `ipo-${slot}-${day}`, kind: "ipo", title, body: "", url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
 }
 export function allotmentNotice(items: IpoAllotment[], now: number): PushNotice | null {
   const published = items.filter(item => item.state === "published" && !!item.evidenceUrl);
   if (!published.length) return null;
   const first = published[0];
-  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title: published.length === 1 ? `The wait is over—${first.name.replace(/\s+IPO$/i, "")} allotment is out 🔔` : `Allotments are out 🔔 · ${published.length} IPOs`, body: published.length === 1 ? "Applied? Check your result securely on the official registrar website. Enter your PAN only there." : `${published.slice(0,3).map(item => item.name).join(", ")}. Check the official registrar links in the app.`, url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
+  const name = first.name.replace(/\s+IPO$/i, "");
+  const title = published.length === 1 ? `🔔 ${name} allotment is out — go check yours` : `🔔 ${published.length} allotments just dropped — check yours now`;
+  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title, body: "", url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
 }
 export function reviewNotice(count: number, date: string, now: number): PushNotice | null {
   const { day, minutes, weekday } = indiaClock(now);
   if (date !== day || count < 1 || minutes < 1035 || minutes >= 1045 || weekday === 0 || weekday === 6) return null;
-  return { id: `review-${day}`, kind: "portfolio", title: "The market has closed. Your lesson hasn’t.", body: `${count} paper trade${count === 1 ? "" : "s"} today. Revisit one decision in a two-minute replay.`, url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
+  return { id: `review-${day}`, kind: "portfolio", title: `✨ ${count} paper trade${count === 1 ? "" : "s"} today — replay one while it's fresh`, body: "", url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
 }
