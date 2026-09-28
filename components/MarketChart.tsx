@@ -1187,8 +1187,12 @@ export function MarketChart({
     }
   }
 
+  function magnetArmed() {
+    return magnetRef.current && Boolean(normalizeTool(activeToolRef.current));
+  }
+
   function snapAnchor(rawTime: Time, rawPrice: number): Anchor {
-    if (!magnetRef.current || !dataRef.current.length) return { time: rawTime, price: rawPrice };
+    if (!magnetArmed() || !dataRef.current.length) return { time: rawTime, price: rawPrice };
     const numericTime = timeToTimestamp(rawTime);
     let nearest = dataRef.current[0];
     let distance = Math.abs(Number(chartTimeFromEpoch(Number(nearest.time), timeframe)) - numericTime);
@@ -1433,12 +1437,14 @@ export function MarketChart({
 
   useEffect(() => {
     magnetRef.current = magnet;
+    activeToolRef.current = activeTool;
     const chart = chartApi.current;
     if (!chart) return;
+    const armed = magnet && Boolean(normalizeTool(activeTool));
     void import("lightweight-charts").then(({ CrosshairMode }) => {
-      chart.applyOptions({ crosshair: { mode: magnet ? CrosshairMode.MagnetOHLC : CrosshairMode.Normal } });
+      chart.applyOptions({ crosshair: { mode: armed ? CrosshairMode.MagnetOHLC : CrosshairMode.Normal } });
     });
-  }, [magnet]);
+  }, [magnet, activeTool]);
 
   useEffect(() => {
     activeToolRef.current = activeTool;
@@ -1606,7 +1612,7 @@ export function MarketChart({
           lockVisibleTimeRangeOnResize: true,
         },
         crosshair: {
-          mode: magnetRef.current ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
+          mode: magnetArmed() ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
           vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
           horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
         },
@@ -1701,7 +1707,7 @@ export function MarketChart({
         const time = drawingTimeAtCoordinate(x);
         if (!located || time == null) return null;
         const bundle = studyRenderer.current?.bundles.find(item=>item.id===located.studyId);
-        if (magnetRef.current && bundle?.series[0]) {
+        if (magnetArmed() && bundle?.series[0]) {
           const logical=chart.timeScale().coordinateToLogical(x);
           const point=logical===null?undefined:bundle.series[0].dataByIndex(Math.round(Number(logical)));
           if(point && 'value' in point && typeof point.value==='number' && Number.isFinite(point.value)) {
@@ -1843,7 +1849,7 @@ export function MarketChart({
               let top=0;for(let i=0;i<(rsiBundle()?.pane??0);i++)top+=chart.panes()[i]?.getHeight()??0;
               const globalY=top+y;
               setStudyCursor({y:globalY,text:formatStudyValue(value),color:rsiCursorColor('rsi')});
-              if(onRsi&&studyAimRef.current&&magnetRef.current)studyAimRef.current={...studyAimRef.current,value,y:globalY};
+              if(onRsi&&studyAimRef.current&&magnetArmed())studyAimRef.current={...studyAimRef.current,value,y:globalY};
               if (!normalizeTool(activeToolRef.current)) snapStudyCrosshair(chart, line, event);
             } else setStudyCursor(null);
           } else {
@@ -2190,7 +2196,7 @@ export function MarketChart({
             const original = edit.originalAnchors[edit.anchorIndex];
             const originalX = edit.originalPixels[edit.anchorIndex];
             const next = { time: originalX === null ? original.time : drawingTimeAtCoordinate(originalX + event.clientX - edit.startX) ?? original.time, price: original.price + current.price - edit.start.price };
-            edit.drawing.updateAnchor(edit.anchorIndex, magnetRef.current ? snapAnchor(next.time, next.price) : next);
+            edit.drawing.updateAnchor(edit.anchorIndex, snapAnchor(next.time, next.price));
           } else {
             const priceDelta = current.price - edit.start.price;
             const dx = event.clientX - edit.startX;
@@ -3081,7 +3087,7 @@ export function MarketChart({
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: Math.max(28, (priceCursor?.y ?? 88) - 16) }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
-        {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: Math.max(24, priceCursor.y - 17) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
+        {!candlesOnly && !isReplay && onPriceAction && activeTool === "cursor" && priceCursor && <button className="chart-price-plus" style={{ top: priceCursor.y, right: Math.max(0, (chartApi.current?.priceScale("right").width() ?? 64) - 18) }} aria-label={`Price actions at ${priceCursor.price}`} onPointerDown={e => e.stopPropagation()} onClick={() => setPriceMenu(priceCursor.price)}><span aria-hidden="true">+</span></button>}
         {priceMenu !== null && <div className="price-action-backdrop" onClick={() => setPriceMenu(null)}><section className="price-action-sheet" role="dialog" aria-modal="true" aria-label="Chart price actions" onClick={e => e.stopPropagation()}>
           <header><b>{instrument.symbol} · ₹{priceMenu.toFixed(2)}</b><button aria-label="Close price menu" onClick={() => setPriceMenu(null)}>×</button></header>
           <button onClick={() => { onPriceAction?.(priceMenu, "alert"); setPriceMenu(null); }}>Add price alert at ₹{priceMenu.toFixed(2)}</button>
