@@ -10,9 +10,10 @@
 .price-action-sheet .price-action-primary { background: #7050df; color: #fff; text-align: center; font-weight: 600; }
 .price-action-sheet article { display: grid; gap: 6px; padding-block: 10px; border-bottom: 1px solid #8883; }
 .price-action-sheet article small { overflow-wrap: anywhere; }
-.chart-price-plus { position: absolute; z-index: 26; width: 18px; height: 18px; margin: 0; padding: 0; border: 0; background: transparent; display: grid; place-items: center; transform: translateY(-50%); touch-action: manipulation; }
-.chart-price-plus span { box-sizing: border-box; display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: #252b3d; color: #fff; font-size: 14px; font-weight: 500; line-height: 1; box-shadow: none; }
-[data-theme="neon"] .chart-price-plus span { background: #252b3d; color: #fff; border: 0; }
+.chart-price-plus { position: absolute; right: 0; z-index: 26; height: 20px; margin: 0; padding: 0 6px 0 5px; border: 0; border-radius: 3px; background: #252b3d; color: #fff; display: flex; align-items: center; gap: 4px; transform: translateY(-50%); font-size: 11px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; touch-action: manipulation; }
+.chart-price-plus span { width: auto; height: auto; border: 0; border-radius: 0; background: transparent; color: inherit; font-size: 13px; font-weight: 500; line-height: 1; box-shadow: none; }
+.chart-price-plus b { font-weight: 650; color: inherit; }
+[data-theme="neon"] .chart-price-plus { background: #252b3d; color: #fff; }
 .price-tasks-button { position: fixed; right: 12px; bottom: 132px; z-index: 35; border: 1px solid #7c6caa55; border-radius: 8px; min-height: 28px; background: var(--panel, #fff); color: var(--text, #443166); padding: 4px 8px; font-size: 11px; }
 @media (min-width: 769px) { .price-action-backdrop { align-items: center; } .price-action-sheet { border-radius: 18px; } .price-tasks-button { bottom: 18px; right: 330px; } }
 [data-theme="neon"] .price-action-sheet, [data-theme="neon"] .price-tasks-button { background: #101a35; color: #e7e9fa; }
