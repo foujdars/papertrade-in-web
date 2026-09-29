@@ -132,27 +132,37 @@
 .india-ad .up, .india-vix .up { color:var(--green, #00a67e); }
 .india-ad .down, .india-vix .down { color:var(--red, #f04458); }
 .india-ad-chart { display:block; width:100%; height:220px; }
-.india-flows { padding:12px; border-radius:16px; background:#0e1726; color:#e8eef7; }
+.india-flows { padding:16px; border-radius:18px; background:#101d31; color:#f3f7ff; }
 .india-flow-top { display:grid; gap:10px; }
 .india-flow-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-.india-flow-stats > div { min-width:0; padding:8px; border:1px solid #243044; border-radius:12px; }
-.india-flow-stats span { display:flex; align-items:center; gap:5px; color:#94a3b8; font-size:10px; font-weight:700; }
-.india-flow-stats strong { display:block; margin-top:4px; font-size:14px; letter-spacing:-.03em; }
-.india-flow-stats em { display:block; margin-top:2px; font-size:10px; font-style:normal; }
+.india-flow-stats > div { min-width:0; padding:11px 12px; border:1px solid #35455e; border-radius:12px; background:#17263c; }
+.india-flow-stats span { display:flex; align-items:center; gap:7px; color:#c2d0e4; font-size:12px; font-weight:700; }
+.india-flow-stats strong { display:block; margin-top:6px; font-size:17px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.india-flow-stats em { display:block; margin-top:3px; font-size:12px; font-style:normal; }
 .india-flow-stats i, .india-flow-legend i { width:8px; height:8px; border-radius:99px; display:inline-block; }
-.india-flow-ranges { display:flex; gap:4px; overflow:auto; }
-.india-flow-ranges button { flex:none; min-height:32px; padding:0 10px; border:0; border-radius:10px; background:#162033; color:#cbd5e1; font-size:12px; font-weight:750; }
-.india-flow-ranges button[aria-pressed="true"] { background:#3b82f6; color:#fff; }
-.india-flow-chart { display:block; width:100%; height:230px; margin-top:8px; }
-.india-flow-chart .grid { stroke:#243044; }
-.india-flow-chart text { fill:#94a3b8; font-size:10px; }
+.india-flow-ranges { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; }
+.india-flow-ranges button { min-width:0; min-height:44px; padding:0 3px; border:1px solid #31425b; border-radius:10px; background:#1c2d46; color:#e0e9f8; font-size:13px; font-weight:750; }
+.india-flow-ranges button[aria-pressed="true"] { border-color:#61a8ff; background:#1769db; color:#fff; }
+.india-flow-ranges button:focus-visible, .india-flow-chart g[role="button"]:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.india-flow-visual { margin-top:14px; }
+.india-flow-chart { display:block; width:100%; height:258px; max-width:720px; margin:auto; }
+.india-flow-chart .grid { stroke:#40536b; stroke-width:1; }
+.india-flow-chart text { fill:#d5e1f1; font-size:12px; font-weight:600; }
+.india-flow-chart .flow-hit { fill:transparent; }
+.india-flow-chart g[role="button"] { cursor:pointer; }
+.india-flow-chart g.selected .flow-hit { fill:#ffffff10; }
+.india-flow-chart g.selected rect:not(.flow-hit) { stroke:#fff; stroke-width:1; }
 .india-flow-chart .fii.up { fill:#22c55e; }
 .india-flow-chart .fii.down { fill:#ef4444; }
 .india-flow-chart .dii.up { fill:#3b82f6; }
 .india-flow-chart .dii.down { fill:#fb7185; }
-.india-flow-chart .nifty, .india-flow-chart .nifty-dot { stroke:#f8fafc; fill:none; stroke-width:2; }
+.india-flow-chart .nifty, .india-flow-chart .nifty-dot { stroke:#f8fafc; fill:none; stroke-width:2; pointer-events:none; }
 .india-flow-chart .nifty-dot { fill:#f8fafc; stroke:none; }
-.india-flow-legend { display:flex; flex-wrap:wrap; gap:8px 12px; margin-top:8px; color:#cbd5e1; font-size:10px; }
+.india-flow-detail { display:flex; flex-wrap:wrap; align-items:center; gap:5px 14px; padding:11px 12px; margin-top:7px; border:1px solid #35455e; border-radius:12px; background:#17263c; font-size:12px; font-variant-numeric:tabular-nums; }
+.india-flow-detail > b { width:100%; color:#f3f7ff; font-size:13px; }
+.india-flow-detail strong { font-size:13px; }
+.india-flow-hint { display:block; margin-top:7px; color:#c2d0e4; font-size:11px; line-height:1.4; }
+.india-flow-legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:14px; color:#d5e1f1; font-size:12px; line-height:1.4; }
 .india-flow-legend .fii.up { background:#22c55e; }
 .india-flow-legend .fii.down { background:#ef4444; }
 .india-flow-legend .dii.up { background:#3b82f6; }
@@ -168,13 +178,28 @@
 .india-ad-chart path + path { stroke:var(--green, #00a67e); }
 .india-ad-chart circle.up { fill:var(--green, #00a67e); }
 .india-ad-chart circle.down { fill:var(--red, #f04458); }
-.india-vix { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:72px; padding:10px 12px; border-radius:14px; background:var(--soft); }
-.india-vix strong { display:block; margin-top:2px; font-size:26px; letter-spacing:-.6px; line-height:1; }
-.india-vix-gauge { width:116px; height:56px; }
-.india-vix-gauge path { fill:none; stroke:var(--line); stroke-width:8; stroke-linecap:round; }
-.india-vix-gauge path + path, .india-vix-gauge circle { stroke:var(--purple); fill:none; }
-.india-vix-gauge circle { fill:var(--purple); stroke:none; }
+.india-vix { display:grid; gap:10px; padding:16px; border:1px solid var(--line); border-radius:16px; background:var(--soft); }
+.india-vix-head { display:flex; justify-content:space-between; align-items:start; gap:12px; }
+.india-vix-head > span { color:var(--ink); font-size:14px; font-weight:800; }
+.india-vix-head small { display:block; margin-top:2px; color:var(--muted); font-size:12px; font-weight:500; }
+.india-vix .india-vix-status { flex:none; padding:6px 9px; border-radius:999px; font-size:12px; line-height:1; }
+.india-vix-status.calm { color:#087e5e; background:#d8f5e9; }
+.india-vix-status.watch { color:#805600; background:#fff0bc; }
+.india-vix-status.elevated { color:#9f4319; background:#ffe5d1; }
+.india-vix-status.high { color:#b42343; background:#ffe0e8; }
+.india-vix-value { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 14px; font-variant-numeric:tabular-nums; }
+.india-vix strong { font-size:32px; letter-spacing:-.04em; line-height:1; }
+.india-vix-value b { font-size:13px; }
+.india-vix-range { padding-top:7px; }
+.india-vix-track { position:relative; display:grid; grid-template-columns:repeat(4,1fr); gap:3px; height:12px; }
+.india-vix-track > i { border-radius:99px; }
+.india-vix-track .calm { background:#109f70; }.india-vix-track .watch { background:#d39a20; }.india-vix-track .elevated { background:#e4742a; }.india-vix-track .high { background:#df3d60; }
+.india-vix-track > span { position:absolute; z-index:1; top:50%; width:16px; height:16px; transform:translate(-50%,-50%); border:3px solid var(--surface, #fff); border-radius:50%; background:var(--ink); box-shadow:0 1px 5px #0e203755; }
+.india-vix-labels { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; margin-top:8px; }
+.india-vix-labels span { color:var(--ink); font-size:11px; font-weight:700; line-height:1.3; }
+.india-vix-labels span b { color:var(--muted); font-size:11px; font-weight:600; }
+.india-vix-note { color:var(--muted); font-size:11px; line-height:1.4; }
 .india-pulse-wait { min-height:36px; display:grid; place-items:center; color:var(--muted); font-size:11px; }
-@media (max-width:420px) { .india-vix strong { font-size:22px; } }
+@media (max-width:420px) { .india-flow-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .india-flow-stats > div:last-child { grid-column:1 / -1; } .india-flow-stats > div:last-child strong { display:inline-block; margin-right:8px; } .india-vix strong { font-size:29px; } }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}
