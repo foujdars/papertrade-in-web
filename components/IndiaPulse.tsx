@@ -60,47 +60,35 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
   }, [rows, chartWidth]);
   const selected = plotted.find(row => row.date === selectedDate) ?? plotted.at(-1)!;
   const width = Math.max(300, chartWidth);
-  const height = 196;
-  const left = 52;
-  const right = 54;
-  const top = 24;
-  const bottom = 35;
+  const height = 172;
+  const left = 46;
+  const right = 12;
+  const top = 14;
+  const bottom = 30;
   const flowMax = Math.max(...plotted.flatMap(row => [Math.abs(row.fii), Math.abs(row.dii)]), 1);
-  const niftyValues = plotted.map(row => row.nifty).filter((value): value is number => value !== null && value > 0);
-  const niftyMin = niftyValues.length ? Math.min(...niftyValues) : 0;
-  const niftyMax = niftyValues.length ? Math.max(...niftyValues) : 1;
-  const niftyPad = Math.max(20, (niftyMax - niftyMin) * 0.12);
-  const low = niftyMin - niftyPad;
-  const high = niftyMax + niftyPad;
   const slot = (width - left - right) / plotted.length;
   const barWidth = Math.min(12, Math.max(3, slot * 0.22));
   const yFlow = (value: number) => top + (1 - (value + flowMax) / (flowMax * 2)) * (height - top - bottom);
-  const yNifty = (value: number) => top + (1 - (value - low) / (high - low || 1)) * (height - top - bottom);
   const mid = yFlow(0);
   const labelEvery = Math.max(1, Math.ceil(plotted.length / (width < 440 ? 4 : 6)));
-  const line = niftyValues.length ? plotted.map((row, index) => !row.nifty || row.nifty <= 0 ? null : `${index && plotted[index - 1]?.nifty ? "L" : "M"}${left + index * slot + slot / 2},${yNifty(row.nifty).toFixed(1)}`).filter(Boolean).join(" ") : "";
   const cashTick = (value: number) => value === 0 ? "0" : `${value < 0 ? "−" : ""}${new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 0 }).format(Math.abs(value))}`;
   return <div className="india-flow-visual">
-    <svg ref={chartRef} className="india-flow-chart" viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars with Nifty 50 close line; choose a date for exact figures">
+    <svg ref={chartRef} className="india-flow-chart" viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars; choose a date for exact figures">
     {[-flowMax, 0, flowMax].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={yFlow(value)} y2={yFlow(value)} /><text className="flow-axis" x={left - 8} y={yFlow(value) + 4} textAnchor="end">{cashTick(value)}</text></g>)}
-    {niftyValues.length ? [low, (low + high) / 2, high].map(value => <text key={value} className="nifty-axis" x={width - right + 7} y={yNifty(value) + 4}>{Math.round(value).toLocaleString("en-IN")}</text>) : null}
     {plotted.map((row, index) => {
       const x = left + index * slot + slot / 2;
       const fii = Math.abs(yFlow(row.fii) - mid);
       const dii = Math.abs(yFlow(row.dii) - mid);
-      return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore${row.nifty ? `, Nifty ${Math.round(row.nifty).toLocaleString("en-IN")}` : ""}`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
+      return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
         <title>{row.label} · FII {crore(row.fii)} Cr · DII {crore(row.dii)} Cr</title>
         <rect className="flow-hit" x={x - slot / 2} y={top} width={slot} height={height - top - bottom} />
         <rect className={row.fii >= 0 ? "fii up" : "fii down"} x={x - barWidth - 1} y={row.fii >= 0 ? mid - fii : mid} width={barWidth} height={Math.max(fii, 1)} rx="1" />
         <rect className={row.dii >= 0 ? "dii up" : "dii down"} x={x + 1} y={row.dii >= 0 ? mid - dii : mid} width={barWidth} height={Math.max(dii, 1)} rx="1" />
-        {index % labelEvery === 0 || index === plotted.length - 1 ? <text className="flow-date" x={x} y={height - 8} textAnchor="middle">{row.label.replace(/^[A-Za-z]{3}\s/, "").split(" – ").at(-1)}</text> : null}
+        {(index % labelEvery === 0 && index < plotted.length - 1 - labelEvery / 2) || index === plotted.length - 1 ? <text className="flow-date" x={x} y={height - 8} textAnchor="middle">{row.label.replace(/^[A-Za-z]{3}\s/, "").split(" – ").at(-1)}</text> : null}
       </g>;
     })}
-    {line ? <path className="nifty" d={line} /> : null}
-    {selected.nifty && selected.nifty > 0 ? <circle className="nifty-dot" cx={left + plotted.findIndex(row => row.date === selected.date) * slot + slot / 2} cy={yNifty(selected.nifty)} r="4" /> : null}
     </svg>
-    {plotted.length > 1 ? <div className="india-flow-detail" aria-live="polite"><b>{selected.label}</b><span>FII <strong className={selected.fii < 0 ? "down" : "up"}>{crore(selected.fii)} Cr</strong></span><span>DII <strong className={selected.dii < 0 ? "down" : "up"}>{crore(selected.dii)} Cr</strong></span>{selected.nifty ? <span>Nifty <strong>{Math.round(selected.nifty).toLocaleString("en-IN")}</strong></span> : null}</div> : null}
-    {plotted.length < rows.length ? <small className="india-flow-hint">Nearby sessions grouped; bars show period net totals.</small> : null}
+    {plotted.length > 1 ? <div className="india-flow-detail" aria-live="polite"><b>{selected.label}</b><span>FII <strong className={selected.fii < 0 ? "down" : "up"}>{crore(selected.fii)} Cr</strong></span><span>DII <strong className={selected.dii < 0 ? "down" : "up"}>{crore(selected.dii)} Cr</strong></span></div> : null}
   </div>;
 }
 
@@ -127,8 +115,6 @@ export function IndiaPulse() {
   const windowDays = FLOW_WINDOWS.find(item => item.id === range)?.days ?? 31;
   const series = flowsInRange(pulse?.flows ?? [], windowDays);
   const latest = pulse?.flows[0];
-  const niftyChange = latest?.niftyChange;
-  const niftyPercent = latest?.nifty && niftyChange !== null && niftyChange !== undefined ? (niftyChange / (latest.nifty - niftyChange)) * 100 : null;
   const sessionDate = latestPoint ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(latestPoint.t) : "";
   const latestDate = latest?.date ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${latest.date}T00:00:00Z`)) : "";
   const pcr = pulse?.pcr;
@@ -138,12 +124,12 @@ export function IndiaPulse() {
     <div className="india-pulse-board">
       <div className="india-ad">
         <div>
-          <span>Advance/Decline (NSE) · {pulse?.sessionLive ? "Live" : sessionDate || "Last session"}</span>
+          <span>Advance/Decline (NSE){pulse?.sessionLive ? " · Live" : sessionDate ? ` · ${sessionDate}` : ""}</span>
           <div className="india-ad-bar" aria-hidden="true"><i style={{ width: `${Math.round(advanceShare * 100)}%` }} /></div>
           <div className="india-ad-counts"><b className="up">{advance !== undefined ? advance.toLocaleString("en-IN") : "—"}</b><b className="down">{decline !== undefined ? decline.toLocaleString("en-IN") : "—"}</b></div>
         </div>
         <div className="india-ad-legend"><b className="up"><i />Advance</b><b className="down"><i />Decline</b></div>
-        {pulse && pulse.tape.length ? <SessionChart points={pulse.tape} /> : <div className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Last session chart unavailable"}</div>}
+        {pulse && pulse.tape.length ? <SessionChart points={pulse.tape} /> : <div className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Chart unavailable"}</div>}
       </div>
       <div className="india-vix">
         <div className="india-vix-head"><span>India VIX <small>Expected 30-day volatility</small></span>{pulse?.vix ? <b className={`india-vix-status ${vixBand(pulse.vix.price).tone}`}>{vixBand(pulse.vix.price).label}</b> : null}</div>
@@ -162,9 +148,8 @@ export function IndiaPulse() {
       </div>
       <div className="india-flows">
         <div className="india-flow-top">
-          <div className="india-flow-heading"><b>FII / DII flows</b><span>Latest reported · {latestDate || "—"}</span><details><summary aria-label="Explain FII, DII, and chart colors">?</summary><p>FII is foreign institutional investors; DII is domestic institutional investors. Green/red bars show FII net buying/selling. Blue/pink bars show DII net buying/selling. White line is the Nifty 50 close. Values are ₹ crore; bars below zero mean net selling. Tap a bar for exact figures. Sources: Moneycontrol and historical flow data; Nifty close from Yahoo Finance.</p></details></div>
-          <div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div><div><span>Nifty 50</span><strong>{latest?.nifty ? latest.nifty.toLocaleString("en-IN", { maximumFractionDigits: 0 }) : "—"}</strong>{niftyChange !== null && niftyChange !== undefined && niftyPercent !== null ? <em className={niftyChange < 0 ? "down" : "up"}>{niftyPercent > 0 ? "+" : ""}{niftyPercent.toFixed(2)}%</em> : null}</div></div>
-          <label className="india-flow-range">Chart period <select value={range} onChange={event => setRange(event.target.value as typeof range)}>{FLOW_WINDOWS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+          <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain FII, DII, and chart colors">?</summary><p>FII is foreign institutional investors; DII is domestic institutional investors. Green/red bars show FII net buying/selling; blue/pink bars show DII net buying/selling. Values are ₹ crore; bars below zero mean net selling. For longer ranges, adjacent sessions are grouped and bars show their net totals. Tap a bar for exact figures. Sources: Moneycontrol and historical flow data.</p></details></div>
+          <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><label className="india-flow-range"><span className="sr-only">Chart timeline</span><select aria-label="Chart timeline" value={range} onChange={event => setRange(event.target.value as typeof range)}>{FLOW_WINDOWS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
         </div>
         {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
       </div>

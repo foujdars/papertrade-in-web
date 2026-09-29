@@ -243,5 +243,53 @@
 .india-pcr-labels { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; font-weight:700; }
 .india-pcr-labels span:first-child { color:#2464bd; }
 .india-pcr-labels span:last-child { color:#bc3858; }
+/* The flow card follows the active terminal palette in both themes. */
+.india-flows {
+  --flow-muted:var(--muted);
+  --flow-border:var(--studio-border);
+  --flow-tile:var(--studio-panel);
+  --flow-grid:color-mix(in srgb, var(--ink) 24%, transparent);
+  --flow-buy:#087f60;
+  --flow-sell:#c92e51;
+  --flow-dii-buy:#2875d1;
+  --flow-dii-sell:#cf5380;
+  border:1px solid var(--flow-border);
+  color:var(--ink);
+  background:var(--studio-raised);
+}
+.terminal-shell[data-theme="neon"] .india-flows {
+  --flow-grid:#40536b;
+  --flow-buy:#4ade80;
+  --flow-sell:#fb7185;
+  --flow-dii-buy:#60a5fa;
+  --flow-dii-sell:#fb7185;
+}
+.india-flow-top { gap:7px; }
+.india-flow-heading > b { color:var(--ink); }
+.india-flow-heading > span { color:var(--flow-muted); }
+.india-flow-heading summary { color:var(--ink); }
+.india-flow-heading details p { border-color:var(--flow-border); color:var(--ink); background:var(--flow-tile); box-shadow:0 8px 24px #0003; }
+.india-flow-summary { display:grid; grid-template-columns:minmax(0,1fr) 78px; align-items:stretch; gap:6px; }
+.india-flow-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.india-flow-stats > div, .india-flow-stats > div:last-child { min-width:0; grid-column:auto; padding:6px 8px; border-color:var(--flow-border); background:var(--flow-tile); }
+.india-flow-stats span { color:var(--flow-muted); font-size:11px; }
+.india-flow-stats strong, .india-flow-stats > div:last-child strong { margin-top:2px; font-size:clamp(12px,3.3vw,16px); }
+.india-flow-range { min-width:0; }
+.india-flow-range select { width:100%; min-width:0; min-height:44px; padding:0 7px; border-color:var(--flow-border); color:var(--ink); background:var(--flow-tile); text-align:center; }
+.india-flow-visual { margin-top:2px; }
+.india-flow-chart { height:172px; }
+.india-flow-chart .grid { stroke:var(--flow-grid); }
+.india-flow-chart text { fill:var(--flow-muted); }
+.india-flow-chart g.selected .flow-hit { fill:color-mix(in srgb, var(--ink) 6%, transparent); }
+.india-flow-chart g.selected rect:not(.flow-hit) { stroke:var(--ink); }
+.india-flow-chart .fii.up { fill:var(--flow-buy); }
+.india-flow-chart .fii.down { fill:var(--flow-sell); }
+.india-flow-chart .dii.up { fill:var(--flow-dii-buy); }
+.india-flow-chart .dii.down { fill:var(--flow-dii-sell); }
+.india-flow-detail { margin-top:1px; padding:6px 8px; border-color:var(--flow-border); color:var(--ink); background:var(--flow-tile); }
+.india-flow-detail > b { color:var(--ink); font-size:12px; }
+.india-flows .up { color:var(--flow-buy); }
+.india-flows .down { color:var(--flow-sell); }
+.india-flow-chart g[role="button"]:focus-visible { outline-color:var(--ink); }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}
