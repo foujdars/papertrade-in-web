@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { FLOW_WINDOWS, flowsInRange, sessionBounds, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth } from "@/lib/india-pulse";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FLOW_WINDOWS, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth } from "@/lib/india-pulse";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; flows: FlowPoint[] };
 
@@ -35,54 +35,73 @@ function SessionChart({ points }: { points: AdPoint[] }) {
   </svg>;
 }
 
-function VixGauge({ vix }: { vix: IndiaVix }) {
-  if (vix.low === null || vix.high === null || vix.high <= vix.low) return null;
-  const t = Math.min(1, Math.max(0, (vix.price - vix.low) / (vix.high - vix.low)));
-  const start = Math.PI;
-  const angle = start - t * Math.PI;
-  const point = (radians: number) => [60 + 38 * Math.cos(radians), 50 - 38 * Math.sin(radians)];
-  const [sx, sy] = point(start);
-  const [ex, ey] = point(angle);
-  const large = t > 0.5 ? 1 : 0;
-  return <svg className="india-vix-gauge" viewBox="0 0 120 58" aria-hidden="true"><path d="M22 50 A38 38 0 0 1 98 50" /><path d={`M${sx.toFixed(1)} ${sy.toFixed(1)} A38 38 0 ${large} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} /><circle cx={ex} cy={ey} r="3.5" /></svg>;
-}
-
 function FlowChart({ rows }: { rows: FlowPoint[] }) {
-  const width = 640;
-  const height = 250;
-  const left = 46;
-  const right = 52;
-  const top = 16;
-  const bottom = 28;
-  const flowMax = Math.max(...rows.flatMap(row => [Math.abs(row.fii), Math.abs(row.dii)]), 1);
-  const niftyValues = rows.map(row => row.nifty).filter((value): value is number => value !== null);
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [chartWidth, setChartWidth] = useState(360);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  useEffect(() => {
+    const element = chartRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setChartWidth(Math.round(entry.contentRect.width)));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  // Long ranges retain the net cash total per bucket instead of drawing unreadable 1px daily bars.
+  const plotted = useMemo(() => {
+    const size = Math.ceil(rows.length / (chartWidth < 440 ? 6 : 24));
+    if (size <= 1) return rows;
+    const result: FlowPoint[] = [];
+    for (let i = 0; i < rows.length; i += size) {
+      const group = rows.slice(i, i + size);
+      const last = group[group.length - 1];
+      result.push({ ...last, label: `${group[0].label} – ${last.label}`, fii: group.reduce((sum, row) => sum + row.fii, 0), dii: group.reduce((sum, row) => sum + row.dii, 0) });
+    }
+    return result;
+  }, [rows, chartWidth]);
+  const selected = plotted.find(row => row.date === selectedDate) ?? plotted.at(-1)!;
+  const width = Math.max(300, chartWidth);
+  const height = 258;
+  const left = 52;
+  const right = 54;
+  const top = 24;
+  const bottom = 35;
+  const flowMax = Math.max(...plotted.flatMap(row => [Math.abs(row.fii), Math.abs(row.dii)]), 1);
+  const niftyValues = plotted.map(row => row.nifty).filter((value): value is number => value !== null && value > 0);
   const niftyMin = niftyValues.length ? Math.min(...niftyValues) : 0;
   const niftyMax = niftyValues.length ? Math.max(...niftyValues) : 1;
   const niftyPad = Math.max(20, (niftyMax - niftyMin) * 0.12);
   const low = niftyMin - niftyPad;
   const high = niftyMax + niftyPad;
-  const slot = (width - left - right) / rows.length;
+  const slot = (width - left - right) / plotted.length;
+  const barWidth = Math.min(12, Math.max(3, slot * 0.22));
   const yFlow = (value: number) => top + (1 - (value + flowMax) / (flowMax * 2)) * (height - top - bottom);
   const yNifty = (value: number) => top + (1 - (value - low) / (high - low || 1)) * (height - top - bottom);
   const mid = yFlow(0);
-  const labelEvery = Math.max(1, Math.ceil(rows.length / 6));
-  const line = niftyValues.length ? rows.map((row, index) => row.nifty === null ? null : `${index && rows[index - 1]?.nifty !== null ? "L" : "M"}${left + index * slot + slot / 2},${yNifty(row.nifty).toFixed(1)}`).filter(Boolean).join(" ") : "";
-  return <svg className="india-flow-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="FII and DII net cash with Nifty 50">
-    {[-flowMax, 0, flowMax].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={yFlow(value)} y2={yFlow(value)} /><text className="flow-axis" x={left - 6} y={yFlow(value) + 3} textAnchor="end">{Math.round(value / 1000)}k</text></g>)}
-    {niftyValues.length ? [low, (low + high) / 2, high].map(value => <text key={value} className="nifty-axis" x={width - right + 6} y={yNifty(value) + 3}>{Math.round(value).toLocaleString("en-IN")}</text>) : null}
-    {rows.map((row, index) => {
+  const labelEvery = Math.max(1, Math.ceil(plotted.length / (width < 440 ? 4 : 6)));
+  const line = niftyValues.length ? plotted.map((row, index) => !row.nifty || row.nifty <= 0 ? null : `${index && plotted[index - 1]?.nifty ? "L" : "M"}${left + index * slot + slot / 2},${yNifty(row.nifty).toFixed(1)}`).filter(Boolean).join(" ") : "";
+  const cashTick = (value: number) => value === 0 ? "0" : `${value < 0 ? "−" : ""}${new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 0 }).format(Math.abs(value))}`;
+  return <div className="india-flow-visual">
+    <svg ref={chartRef} className="india-flow-chart" viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars with Nifty 50 close line; choose a date for exact figures">
+    {[-flowMax, 0, flowMax].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={yFlow(value)} y2={yFlow(value)} /><text className="flow-axis" x={left - 8} y={yFlow(value) + 4} textAnchor="end">{cashTick(value)}</text></g>)}
+    {niftyValues.length ? [low, (low + high) / 2, high].map(value => <text key={value} className="nifty-axis" x={width - right + 7} y={yNifty(value) + 4}>{Math.round(value).toLocaleString("en-IN")}</text>) : null}
+    {plotted.map((row, index) => {
       const x = left + index * slot + slot / 2;
       const fii = Math.abs(yFlow(row.fii) - mid);
       const dii = Math.abs(yFlow(row.dii) - mid);
-      return <g key={row.date}>
-        <rect className={row.fii >= 0 ? "fii up" : "fii down"} x={x - 7} y={row.fii >= 0 ? mid - fii : mid} width="6" height={Math.max(fii, 1)} rx="1" />
-        <rect className={row.dii >= 0 ? "dii up" : "dii down"} x={x + 1} y={row.dii >= 0 ? mid - dii : mid} width="6" height={Math.max(dii, 1)} rx="1" />
-        {index % labelEvery === 0 || index === rows.length - 1 ? <text className="flow-date" x={x} y={height - 8} textAnchor="middle">{row.label.replace(/^[A-Za-z]{3}\s/, "")}</text> : null}
+      return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore${row.nifty ? `, Nifty ${Math.round(row.nifty).toLocaleString("en-IN")}` : ""}`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
+        <title>{row.label} · FII {crore(row.fii)} Cr · DII {crore(row.dii)} Cr</title>
+        <rect className="flow-hit" x={x - slot / 2} y={top} width={slot} height={height - top - bottom} />
+        <rect className={row.fii >= 0 ? "fii up" : "fii down"} x={x - barWidth - 1} y={row.fii >= 0 ? mid - fii : mid} width={barWidth} height={Math.max(fii, 1)} rx="1" />
+        <rect className={row.dii >= 0 ? "dii up" : "dii down"} x={x + 1} y={row.dii >= 0 ? mid - dii : mid} width={barWidth} height={Math.max(dii, 1)} rx="1" />
+        {index % labelEvery === 0 || index === plotted.length - 1 ? <text className="flow-date" x={x} y={height - 8} textAnchor="middle">{row.label.replace(/^[A-Za-z]{3}\s/, "").split(" – ").at(-1)}</text> : null}
       </g>;
     })}
     {line ? <path className="nifty" d={line} /> : null}
-    {rows.at(-1)?.nifty !== null && rows.at(-1)?.nifty !== undefined ? <circle className="nifty-dot" cx={left + (rows.length - 1) * slot + slot / 2} cy={yNifty(rows.at(-1)!.nifty!)} r="3.5" /> : null}
-  </svg>;
+    {selected.nifty && selected.nifty > 0 ? <circle className="nifty-dot" cx={left + plotted.findIndex(row => row.date === selected.date) * slot + slot / 2} cy={yNifty(selected.nifty)} r="4" /> : null}
+    </svg>
+    <div className="india-flow-detail" aria-live="polite"><b>{selected.label}</b><span>FII <strong className={selected.fii < 0 ? "down" : "up"}>{crore(selected.fii)} Cr</strong></span><span>DII <strong className={selected.dii < 0 ? "down" : "up"}>{crore(selected.dii)} Cr</strong></span>{selected.nifty ? <span>Nifty <strong>{Math.round(selected.nifty).toLocaleString("en-IN")}</strong></span> : null}</div>
+    <small className="india-flow-hint">{plotted.length < rows.length ? "Nearby sessions grouped; bars show period net totals. " : ""}Tap a bar for figures.</small>
+  </div>;
 }
 
 export function IndiaPulse() {
@@ -123,8 +142,13 @@ export function IndiaPulse() {
         {pulse && pulse.tape.length ? <SessionChart points={pulse.tape} /> : <div className="india-pulse-wait">Session line builds live from 9:15 IST</div>}
       </div>
       <div className="india-vix">
-        <div><span>India VIX</span>{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}%</b></> : <strong>—</strong>}</div>
-        {pulse?.vix && <VixGauge vix={pulse.vix} />}
+        <div className="india-vix-head"><span>India VIX <small>Expected 30-day volatility</small></span>{pulse?.vix ? <b className={`india-vix-status ${vixBand(pulse.vix.price).tone}`}>{vixBand(pulse.vix.price).label}</b> : null}</div>
+        <div className="india-vix-value">{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}% today</b></> : <strong>—</strong>}</div>
+        <div className="india-vix-range" role="img" aria-label={pulse?.vix ? `India VIX ${pulse.vix.price.toFixed(2)}, ${vixBand(pulse.vix.price).label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "Indicative VIX volatility bands"}>
+          <div className="india-vix-track" aria-hidden="true"><i className="calm" /><i className="watch" /><i className="elevated" /><i className="high" />{pulse?.vix && <span style={{ left: `${vixBand(pulse.vix.price).position}%` }} />}</div>
+          <div className="india-vix-labels"><span>Calm<br /><b>&lt;15</b></span><span>Watch<br /><b>15–20</b></span><span>Elevated<br /><b>20–30</b></span><span>High<br /><b>30+</b></span></div>
+        </div>
+        <small className="india-vix-note">Indicative bands · Higher VIX means more expected volatility, not market direction.</small>
       </div>
       <div className="india-flows">
         <div className="india-flow-top">

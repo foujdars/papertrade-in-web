@@ -3,6 +3,13 @@ import { NSE_HOLIDAYS } from "./nse-holidays.ts";
 export type NseBreadth = { advance: number; decline: number };
 export type IndexBreadth = { name: string; advance: number; decline: number };
 export type IndiaVix = { price: number; change: number; changePercent: number; low: number | null; high: number | null };
+// Indicative display bands, not exchange-defined risk classifications.
+export function vixBand(price: number) {
+  if (price < 15) return { label: "Calm", tone: "calm", position: Math.max(0, price / 15) * 25 };
+  if (price < 20) return { label: "Watch", tone: "watch", position: 25 + (price - 15) / 5 * 25 };
+  if (price < 30) return { label: "Elevated", tone: "elevated", position: 50 + (price - 20) / 10 * 25 };
+  return { label: "High", tone: "high", position: Math.min(100, 75 + (price - 30) / 10 * 25) };
+}
 export type CashFlow = { date: string; label: string; fii: number; dii: number };
 export type AdPoint = { t: number; advance: number; decline: number };
 
@@ -167,7 +174,7 @@ export function niftyCloses(payload: unknown): { date: string; close: number }[]
   stamps.forEach((stamp, index) => {
     const close = Number(closes[index]);
     const seconds = Number(stamp);
-    if (!Number.isFinite(close) || !Number.isFinite(seconds)) return;
+    if (!Number.isFinite(close) || close <= 0 || !Number.isFinite(seconds)) return;
     rows.push({ date: istDay(seconds * 1000), close });
   });
   return rows;
