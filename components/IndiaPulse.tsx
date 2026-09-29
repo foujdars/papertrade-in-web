@@ -92,6 +92,35 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
   </div>;
 }
 
+function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[number]["id"]; onChange: (value: (typeof FLOW_WINDOWS)[number]["id"]) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); triggerRef.current?.focus(); }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    rootRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
+    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("keydown", onKeyDown); };
+  }, [open]);
+  return <div className="india-flow-range" ref={rootRef}>
+    <button ref={triggerRef} type="button" className="india-flow-range-trigger" aria-label={`Chart timeline, ${range}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>{range}<span aria-hidden="true">⌄</span></button>
+    {open && <div className="india-flow-range-menu" role="listbox" aria-label="Chart timeline" onKeyDown={event => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+      const current = options.indexOf(document.activeElement as HTMLButtonElement);
+      options[(current + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length]?.focus();
+    }}>{FLOW_WINDOWS.map(item => <button key={item.id} type="button" role="option" aria-selected={range === item.id} onClick={() => { onChange(item.id); setOpen(false); triggerRef.current?.focus(); }}>{item.label}<span aria-hidden="true">{range === item.id ? "✓" : ""}</span></button>)}</div>}
+  </div>;
+}
+
 export function IndiaPulse() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [range, setRange] = useState<(typeof FLOW_WINDOWS)[number]["id"]>("1M");
@@ -141,15 +170,15 @@ export function IndiaPulse() {
         <small className="india-vix-note">Indicative bands · Higher VIX means more expected volatility, not market direction.</small>
       </div>
       <div className="india-pcr">
-        <div className="india-pcr-head"><span>Nifty put/call ratio</span><details><summary aria-label="Explain put/call ratio">?</summary><p>PCR = total put open interest ÷ total call open interest for the nearest Nifty expiry. Higher or lower values show positioning, not a reliable direction signal. Data: Upstox option chain.</p></details></div>
+        <div className="india-pcr-head"><span>Nifty put/call ratio</span><details><summary aria-label="What is put/call ratio?">i</summary><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.</p></details></div>
         <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong><span>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</span></div>
         <div className="india-pcr-track" role="img" aria-label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"}><i style={{ width: `${pcrShare}%` }} /></div>
         <div className="india-pcr-labels"><span>Put OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.putOi) : "—"}</span><span>Call OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.callOi) : "—"}</span></div>
       </div>
       <div className="india-flows">
         <div className="india-flow-top">
-          <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain FII, DII, and chart colors">?</summary><p>FII is foreign institutional investors; DII is domestic institutional investors. Green/red bars show FII net buying/selling; blue/pink bars show DII net buying/selling. Values are ₹ crore; bars below zero mean net selling. For longer ranges, adjacent sessions are grouped and bars show their net totals. Tap a bar for exact figures. Sources: Moneycontrol and historical flow data.</p></details></div>
-          <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><label className="india-flow-range"><span className="sr-only">Chart timeline</span><select aria-label="Chart timeline" value={range} onChange={event => setRange(event.target.value as typeof range)}>{FLOW_WINDOWS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
+          <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain chart colors">i</summary><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></details></div>
+          <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
         </div>
         {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
       </div>
