@@ -16,6 +16,7 @@ import {
   CandlestickChart,
   CheckCircle2,
   ChevronRight,
+  ChevronLeft,
   Layers3,
   Search,
   ShieldCheck,
@@ -23,9 +24,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usableHomeQuote, quoteChangeText, type HomeQuote } from "@/lib/home-quotes";
 import { formatInr } from "@/lib/market";
+import { FALLBACK_POPULAR, popularHeading, searchShelfRows, type PopularLists, type SearchShelfId } from "@/lib/search-shelf";
 
 export type HomeIndexQuote = {
   symbol: string;
@@ -82,11 +84,10 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock,
-  preferenceOwner='guest', favouriteSymbols=[],
+  onOpenStock, preferenceOwner='guest', favouriteSymbols=[], recentSymbols=[], onClearRecent,
   realisedToday=0, openChangeToday=0, attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
 }: {
-  preferenceOwner?:string;favouriteSymbols?:string[];
+  preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
   resumeChart?:{symbol:string;timeframe:string};onResumeChart?:()=>void;onOpenRealised?:()=>void;
@@ -127,6 +128,9 @@ export function HomeWorkspace({
   const [searchFocused, setSearchFocused] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [shelf, setShelf] = useState<SearchShelfId>("all");
+  const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
+  const sheetInput = useRef<HTMLInputElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
   useEffect(() => {
     try { setPreferences(normalizeHomePreferences(JSON.parse(localStorage.getItem(storageKey) ?? 'null'))); }
@@ -138,6 +142,21 @@ export function HomeWorkspace({
     document.addEventListener('visibilitychange', refresh);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [storageKey]);
+  useEffect(() => {
+    if (!searchFocused) return;
+    sheetInput.current?.focus();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const controller = new AbortController();
+    fetch("/api/market/search-popular", { signal: controller.signal, cache: "no-store" })
+      .then(response => response.json())
+      .then(body => {
+        if (!body?.ok || !Array.isArray(body.in) || !Array.isArray(body.us) || !Array.isArray(body.crypto)) return;
+        setPopular({ in: body.in, us: body.us, crypto: body.crypto, sources: { in: String(body.sources?.in ?? "moneycontrol"), us: String(body.sources?.us ?? "tradingview"), crypto: String(body.sources?.crypto ?? "moneycontrol") } });
+      })
+      .catch(() => undefined);
+    return () => { document.body.style.overflow = previous; controller.abort(); };
+  }, [searchFocused]);
   const updatePreferences = (next: HomePreferences) => {
     setPreferences(next);
     try { localStorage.setItem(storageKey, JSON.stringify(next)); }
@@ -162,16 +181,7 @@ export function HomeWorkspace({
     const reminders = { ...preferences.reminders }; delete reminders[id];
     updatePreferences({ ...preferences, reminders });
   };
-  const bySymbol = useMemo(() => new Map(marketOptions.map(stock => [stock.symbol, stock])), [marketOptions]);
-  const recentSearches = preferences.recentSearches.map(symbol => bySymbol.get(symbol)).filter((stock): stock is HomeStockOption => !!stock);
-  const favourites = [...new Set(favouriteSymbols)].map(symbol => bySymbol.get(symbol)).filter((stock): stock is HomeStockOption => !!stock).slice(0, 6);
-  const matches = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return [];
-    return marketOptions
-      .filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
-      .slice(0, 6);
-  }, [search, marketOptions]);
+  const shelfRows = useMemo(() => searchShelfRows({ shelf, instruments: stockOptions, recent: recentSymbols, popular, query: search }), [popular, recentSymbols, search, shelf, stockOptions]);
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
     if (!quoteKeys) { setLoading(false); return; }
@@ -206,16 +216,32 @@ export function HomeWorkspace({
           <div className="home-hero-copy">
             <div className="home-global-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setSearchFocused(false); setSearch(''); } }} onKeyDown={event => { if(event.key==='Escape'){setSearchFocused(false);setSearch('');} }}>
               <Search size={18} />
-              <input value={search} onFocus={() => setSearchFocused(true)} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
-              {search && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
-              {searchFocused && <div className="home-search-results" aria-label="Instrument search results">
-                {search.trim() ? matches.length ? matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments in this market.</div> : <>
-                  {!!recentSearches.length && <><div className="home-search-group"><b>Recent searches</b><button onClick={() => updatePreferences({...preferences, recentSearches: []})}>Clear recent</button></div>{recentSearches.map(searchRow)}</>}
-                  {!!favourites.length && <><div className="home-search-group"><b>Favourites</b><small>From your watchlists</small></div>{favourites.map(searchRow)}</>}
-                  {!recentSearches.length && !favourites.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
-                  <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
-                </>}
-              </div>}
+              <input value={search} onFocus={() => { setSearchFocused(true); setShelf("all"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
+              {search && !searchFocused && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
+              {searchFocused && <>
+                <button type="button" className="home-search-backdrop" aria-label="Close search" onClick={() => { setSearchFocused(false); setSearch(""); }} />
+                <div className="home-search-sheet" role="dialog" aria-modal="true" aria-label="Search markets">
+                  <header>
+                    <button type="button" aria-label="Close search" onClick={() => { setSearchFocused(false); setSearch(""); }}><ChevronLeft size={20} /></button>
+                    <Search size={18} />
+                    <input ref={sheetInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or symbol" aria-label="Search all markets" autoComplete="off" />
+                    {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
+                  </header>
+                  <div className="home-search-tabs" role="tablist" aria-label="Market">
+                    {([["all", "All"], ["in", "IN"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
+                  </div>
+                  <div className="home-search-sheet-list">
+                    {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
+                      {!!shelfRows.recent.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
+                      {shelfRows.recent.map(searchRow)}
+                      {!!shelfRows.popular.length && <div className="home-search-group"><b>{popularHeading(shelf, popular)}</b></div>}
+                      {shelfRows.popular.map(searchRow)}
+                      {!shelfRows.recent.length && !shelfRows.popular.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
+                      <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
+                    </>}
+                  </div>
+                </div>
+              </>}
             </div>
           </div>
         </section>

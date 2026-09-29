@@ -99,5 +99,17 @@
 .home-search-group button { min-height:44px;border:0;background:none;color:var(--purple);font-size:10px; }
 .home-search-group small { font-size:9px; }
 .home-search-hint { font-size:10px;color:var(--muted);padding:10px; }
+.home-search-backdrop { position:fixed; inset:0; z-index:100; border:0; background:#15162e66; }
+.home-search-sheet { position:fixed; z-index:101; top:0; bottom:0; left:0; width:min(440px,100%); display:flex; flex-direction:column; background:var(--surface); color:var(--ink); box-shadow:18px 0 48px #15162e33; animation:home-search-slide .28s ease; }
+.home-search-sheet header { display:flex; align-items:center; gap:8px; min-height:56px; padding:max(10px, env(safe-area-inset-top)) 12px 8px; }
+.home-search-sheet header button { min-width:44px; min-height:44px; display:grid; place-items:center; border:0; background:none; color:var(--ink); }
+.home-search-sheet header input { min-width:0; flex:1; border:0; outline:0; background:transparent; color:var(--ink); font:inherit; font-size:16px; }
+.home-search-tabs { display:flex; gap:6px; padding:0 12px 8px; }
+.home-search-tabs button { flex:1; min-height:36px; border:1px solid var(--line); border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:13px; font-weight:700; }
+.home-search-tabs button[aria-selected="true"] { border-color:transparent; background:var(--purple); color:#fff; }
+.home-search-sheet-list { min-height:0; flex:1; overflow:auto; overscroll-behavior:contain; padding-bottom:max(12px, env(safe-area-inset-bottom)); }
+@keyframes home-search-slide { from { transform:translateX(-105%); } to { transform:none; } }
+@media (max-width:760px) { .home-search-sheet { width:100%; } }
+@media (prefers-reduced-motion:reduce) { .home-search-sheet { animation:none; } }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}

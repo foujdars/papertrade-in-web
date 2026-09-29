@@ -3183,6 +3183,8 @@ export function TradingDashboard() {
         key={user?.id ?? 'guest'}
         preferenceOwner={user?.id ?? 'guest'}
         favouriteSymbols={[...new Set(customWatchlists.flatMap(list => list.symbols))]}
+        recentSymbols={recentStocks}
+        onClearRecent={() => setRecentStocks([])}
         firstName={typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : undefined}
         indices={LIVE_INDEX_TICKERS.map((item) => {
           const quote = marketQuotes[item.instrumentKey];

@@ -3,6 +3,7 @@ import * as homeQuotes from "../lib/home-quotes.ts";
 import * as homePreferences from "../lib/home-preferences.ts";
 import * as globalMarkets from "../lib/global-markets.ts";
 import * as marketDirectory from "../lib/market-directory.ts";
+import * as searchShelf from "../lib/search-shelf.ts";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -284,6 +285,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/home-preferences": homePreferences,
     "@/lib/global-markets": globalMarkets,
     "@/lib/market-directory": marketDirectory,
+    "@/lib/search-shelf": searchShelf,
     "./MarketDirectory": { MarketDirectory: () => null },
     "./SessionBoard": { SessionBoard: () => null },
     "@/lib/global-order-engine": { formatUsd: value => `$${Number(value).toFixed(2)}` },
