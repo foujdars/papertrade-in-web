@@ -1,0 +1,322 @@
+/* ==========================================================================
+   PaperTrade IN — Modern Theme Refresh
+   A cohesive, additive design layer imported LAST so it refines (never
+   replaces) the workspace styles. Everything is token-driven: light mode via
+   :root, dark mode via .terminal-shell[data-theme="neon"].
+   ========================================================================== */
+
+/* ---------- 1. Refined design tokens ---------- */
+:root {
+  /* Modern ink scale — richer, less blue-grey */
+  --ink: #181b31;
+  --ink-soft: #2b2e4a;
+  --muted: #5f6680;
+  --faint: #8b91a8;
+  --line: #e4e7f3;
+  --line-soft: #eef0f8;
+  --surface: #ffffff;
+  --soft: #f6f5fc;
+  --raised: #fbfbfe;
+
+  /* Brand accent — modern violet/indigo */
+  --purple: #6d3df0;
+  --purple-deep: #5429d6;
+  --purple-soft: #efe9fe;
+  --accent: linear-gradient(120deg, #7c3aed 0%, #5b4cf0 55%, #4f46e5 100%);
+  --accent-ink: #ffffff;
+
+  /* Semantic */
+  --green: #00a67e;
+  --green-soft: #dcf7ec;
+  --red: #ef3f5c;
+  --red-soft: #ffe7ec;
+  --amber: #b97a0c;
+  --amber-soft: #fff3da;
+  --blue: #2563eb;
+  --blue-soft: #e5efff;
+
+  /* Modern radius + shadow scale */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px #1b21400d, 0 2px 8px #1b21400a;
+  --shadow-2: 0 2px 6px #1b21400d, 0 12px 32px #1b214012;
+  --shadow-3: 0 4px 12px #1b214010, 0 24px 64px #1b214018;
+  --shadow-pop: 0 12px 40px #2a1b5e1f, 0 2px 8px #2a1b5e12;
+
+  /* Motion */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .44, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+
+  /* Keep studio tokens in sync with the modern palette */
+  --studio-canvas: #f6f5fc;
+  --studio-panel: #ffffff;
+  --studio-raised: #f8f7fd;
+  --studio-border: #e2e5f2;
+  --studio-highlight: #ece5ff;
+  --studio-accent: var(--accent);
+  --studio-card: linear-gradient(150deg, #ffffff 0%, #faf9ff 100%);
+  --studio-shadow: var(--shadow-2), inset 0 1px 0 #ffffff;
+}
+
+/* Dark "neon" — deeper, calmer, more modern */
+.terminal-shell[data-theme="neon"] {
+  --ink: #edf0fb;
+  --ink-soft: #c9cfe6;
+  --muted: #9aa3c0;
+  --faint: #6f7794;
+  --line: #232c49;
+  --line-soft: #1a2138;
+  --surface: #0c1329;
+  --soft: #101834;
+  --raised: #14203c;
+  --purple: #a78bfa;
+  --purple-deep: #8b5cf6;
+  --purple-soft: #221a45;
+  --green: #2dd4a7;
+  --green-soft: #0e2f28;
+  --red: #ff6b87;
+  --red-soft: #3a1622;
+  --amber: #f5b544;
+  --amber-soft: #37270e;
+  --blue: #6ea8ff;
+  --blue-soft: #16294d;
+  --studio-canvas: #080d1f;
+  --studio-panel: #0c1329;
+  --studio-raised: #111a36;
+  --studio-border: #263154;
+  --studio-highlight: #2c2350;
+  --studio-card: linear-gradient(150deg, #101832 0%, #0b1228 100%);
+  --studio-shadow: 0 10px 30px #00000030, inset 0 1px 0 #ffffff0a;
+  --shadow-1: 0 1px 2px #00000040, 0 4px 12px #00000030;
+  --shadow-2: 0 4px 10px #00000045, 0 16px 40px #00000035;
+  --shadow-3: 0 8px 20px #00000050, 0 30px 70px #00000040;
+  --shadow-pop: 0 16px 48px #00000055;
+  color-scheme: dark;
+}
+
+/* ---------- 2. Typography — clean, modern ---------- */
+.terminal-shell {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.terminal-shell :is(h1, h2, h3) {
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+.terminal-shell p { text-wrap: pretty; }
+/* Tabular numerals for anything price/stat-like */
+.terminal-shell :is(.tnum, .stat-value, .price, .pnl-card-result > b, .home-index-card strong,
+  .home-portfolio-value strong, .ticket-qty, .order-ticket b) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 3. Buttons — polished, tactile ---------- */
+.terminal-shell button {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+.terminal-shell button:active { transform: scale(.97); }
+.terminal-shell button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* Reusable modern button utilities (opt-in, additive) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 42px; padding: 0 18px;
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 700; letter-spacing: -.01em;
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+.btn-primary {
+  color: var(--accent-ink); background: var(--accent); border-color: #6a4fe000;
+  box-shadow: 0 8px 22px #6d3df033, inset 0 1px 0 #ffffff2e;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px #6d3df040, inset 0 1px 0 #ffffff2e; }
+.btn-ghost {
+  color: var(--ink); background: var(--surface); border-color: var(--line);
+  box-shadow: var(--shadow-1);
+}
+.btn-ghost:hover { border-color: color-mix(in srgb, var(--purple) 45%, var(--line)); }
+.btn-danger { color: #fff; background: linear-gradient(120deg, #f04b67, #d92d4e); box-shadow: 0 8px 22px #f04b6733; }
+.btn-sm { min-height: 34px; padding: 0 13px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn-lg { min-height: 50px; padding: 0 24px; font-size: 14px; border-radius: var(--radius-lg); }
+
+/* ---------- 4. Inputs / selects — consistent, calm ---------- */
+.terminal-shell :is(input, select, textarea) {
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.terminal-shell :is(input, select, textarea):focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 16%, transparent);
+  outline: none;
+}
+.terminal-shell input::placeholder { color: var(--faint); }
+.input {
+  width: 100%; min-height: 42px; padding: 0 13px;
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--ink); font-size: 13px;
+}
+
+/* ---------- 5. Cards & surfaces — softer, layered ---------- */
+.card {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.terminal-shell :is(.home-section, .trade-cockpit, .modal, .order-ticket,
+  .watchlist-panel, .chart-area, .notification-center-panel, .pnl-equity-card,
+  .pnl-calendar-card, .holdings-overview-card, .holdings-list-card) {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2), inset 0 1px 0 #ffffff0d;
+}
+.terminal-shell :is(.home-index-card, .home-discovery-card, .home-launchpad > div > button,
+  .market-result-card, .market-stock-card, .ipo-card, .allotment-card,
+  .pnl-stat-grid > div, .pnl-stat-grid > button) {
+  border-radius: var(--radius-md);
+}
+
+/* Section headers — quieter, more modern */
+.terminal-shell :is(.home-section > header, .modal-head) {
+  border-bottom: 1px solid var(--line-soft);
+}
+.terminal-shell :is(.home-section > header b, .modal-head h2) {
+  font-size: 13px; font-weight: 750; letter-spacing: -.015em;
+}
+
+/* ---------- 6. Topbar — glassy, refined ---------- */
+.terminal-shell .topbar {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid var(--line-soft);
+  box-shadow: 0 1px 0 #ffffff40, 0 8px 24px #1b214008;
+}
+.terminal-shell .main-nav button { border-radius: var(--radius-pill); }
+.terminal-shell .main-nav button.active {
+  color: var(--purple); background: var(--purple-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 22%, transparent);
+}
+.terminal-shell[data-theme="neon"] .topbar {
+  background: color-mix(in srgb, var(--studio-canvas) 78%, transparent);
+  border-bottom-color: var(--studio-border);
+  box-shadow: 0 1px 0 #ffffff08;
+}
+
+/* ---------- 7. Pills / badges / chips ---------- */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+}
+.pill-green { color: var(--green); background: var(--green-soft); }
+.pill-red { color: var(--red); background: var(--red-soft); }
+.pill-purple { color: var(--purple); background: var(--purple-soft); }
+.pill-amber { color: var(--amber); background: var(--amber-soft); }
+.pill-blue { color: var(--blue); background: var(--blue-soft); }
+.pill-muted { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
+
+/* ---------- 8. Focus, selection, scrollbars ---------- */
+.terminal-shell :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.terminal-shell ::selection {
+  background: color-mix(in srgb, var(--purple) 24%, transparent);
+}
+.terminal-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.terminal-shell ::-webkit-scrollbar-track { background: transparent; }
+.terminal-shell ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent; border-radius: 8px;
+  background: color-mix(in srgb, var(--muted) 38%, transparent);
+  background-clip: content-box;
+}
+.terminal-shell ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  background-clip: content-box;
+}
+
+/* ---------- 9. Buy / sell semantics — modern trading colors ---------- */
+.terminal-shell :is(.buy-button, .order-buy, [data-side="buy"]) {
+  --side: var(--green);
+}
+.terminal-shell :is(.sell-button, .order-sell, [data-side="sell"]) {
+  --side: var(--red);
+}
+.positive, .text-green, .up { color: var(--green); }
+.negative, .text-red, .down { color: var(--red); }
+
+/* ---------- 10. Dialogs & popovers — modern elevation ---------- */
+.terminal-shell :is(.modal, .notification-center-panel, .more-menu-panel,
+  .trade-symbol-menu, .chart-function-menu, .drawing-library, .watchlist-selector-menu,
+  .home-search-results, .option-chain-sheet) {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--line);
+}
+.terminal-shell dialog::backdrop,
+.modal-backdrop, .navigation-page-backdrop {
+  background: color-mix(in srgb, #10122b 55%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- 11. Chart chrome — quieter, modern ---------- */
+.terminal-shell :is(.chart-controls, .instrument-header, .chart-statusbar) {
+  border-radius: var(--radius-md);
+}
+.terminal-shell .chart-legend {
+  border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.terminal-shell :is(.timeframe-groups button, .drawing-toolbar button, .chart-function-trigger) {
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- 12. Skeleton shimmer for loading states ---------- */
+@keyframes modern-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--line-soft) 25%, var(--soft) 50%, var(--line-soft) 75%);
+  background-size: 800px 100%;
+  animation: modern-shimmer 1.6s ease-in-out infinite;
+}
+
+/* ---------- 13. Dividers & quiet helpers ---------- */
+.divider { height: 1px; background: var(--line-soft); border: 0; margin: 12px 0; }
+.stack-sm { display: grid; gap: 8px; }
+.stack-md { display: grid; gap: 12px; }
+.stack-lg { display: grid; gap: 16px; }
+.cluster { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- 14. Responsive polish ---------- */
+@media (max-width: 760px) {
+  .terminal-shell :is(.home-section, .trade-cockpit, .modal, .order-ticket) {
+    border-radius: var(--radius-md);
+  }
+  .btn { min-height: 44px; } /* comfortable touch target */
+}
+
+/* ---------- 15. Motion safety ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .terminal-shell *, .terminal-shell *::before, .terminal-shell *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+  .skeleton { animation: none; }
+}
