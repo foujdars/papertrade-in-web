@@ -115,16 +115,22 @@
 @media (max-width:760px) { .home-search-sheet { width:100%; box-shadow:none; } }
 @media (prefers-reduced-motion:reduce) { .home-search-sheet { animation:none; } }
 .india-pulse-board { display:grid; gap:12px; padding:4px 14px 14px; }
-.india-ad { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(108px,.75fr); gap:12px; align-items:end; padding:10px; border-radius:14px; background:var(--soft); }
+.india-ad { display:grid; gap:8px; padding:10px; border-radius:14px; background:var(--soft); }
 .india-ad span, .india-vix span, .india-flow-head span { color:var(--muted); font-size:10px; font-weight:750; }
 .india-ad-bar { height:8px; margin:8px 0 6px; border-radius:99px; background:var(--red, #f04458); overflow:hidden; }
 .india-ad-bar i { display:block; height:100%; background:var(--green, #00a67e); }
 .india-ad-counts { display:flex; justify-content:space-between; font-variant-numeric:tabular-nums; }
 .india-ad-counts b, .india-vix b, .india-flow-now em { font-size:13px; font-style:normal; font-weight:800; }
-.india-ad small { display:block; margin-top:2px; color:var(--muted); font-size:9px; }
-.india-ad-chart { display:block; width:100%; height:52px; }
+.india-ad small { display:block; color:var(--muted); font-size:9px; }
+.india-ad-legend { display:flex; justify-content:space-between; gap:8px; font-size:11px; font-weight:800; }
+.india-ad-legend i { display:inline-block; width:14px; height:3px; margin-right:6px; border-radius:99px; vertical-align:middle; background:currentColor; }
+.india-ad-chart { display:block; width:100%; height:168px; }
+.india-ad-chart .grid { stroke:var(--line); stroke-width:1; }
+.india-ad-chart text { fill:var(--muted); font-size:9px; }
 .india-ad-chart path { fill:none; stroke:var(--red, #f04458); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
 .india-ad-chart path + path { stroke:var(--green, #00a67e); }
+.india-ad-chart circle.up { fill:var(--green, #00a67e); }
+.india-ad-chart circle.down { fill:var(--red, #f04458); }
 .india-vix { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:72px; padding:10px 12px; border-radius:14px; background:var(--soft); }
 .india-vix strong { display:block; margin-top:2px; font-size:26px; letter-spacing:-.6px; line-height:1; }
 .india-vix-gauge { width:116px; height:56px; }
@@ -147,6 +153,6 @@
 .india-pulse .up { color:var(--green, #00a67e); }
 .india-pulse .down { color:var(--red, #f04458); }
 .india-pulse-wait { min-height:36px; display:grid; place-items:center; color:var(--muted); font-size:11px; }
-@media (max-width:420px) { .india-ad { grid-template-columns:1fr; } .india-vix strong { font-size:22px; } }
+@media (max-width:420px) { .india-vix strong { font-size:22px; } }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}

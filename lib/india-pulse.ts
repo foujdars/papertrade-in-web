@@ -1,7 +1,12 @@
+import { NSE_HOLIDAYS } from "./nse-holidays.ts";
+
 export type NseBreadth = { advance: number; decline: number };
 export type IndexBreadth = { name: string; advance: number; decline: number };
 export type IndiaVix = { price: number; change: number; changePercent: number; low: number | null; high: number | null };
 export type CashFlow = { date: string; label: string; fii: number; dii: number };
+export type AdPoint = { t: number; advance: number; decline: number };
+
+const IST_OFFSET_MS = 330 * 60 * 1000;
 
 export function nextData(html: string): unknown {
   const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -66,4 +71,35 @@ export function fiiDii(payload: unknown): CashFlow[] {
     if (rows.length >= 8) break;
   }
   return rows;
+}
+
+export function istDay(now = Date.now()) {
+  return new Date(now + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+export function istStamp(day: string, hours: number, minutes: number) {
+  const [year, month, date] = day.split("-").map(Number);
+  return Date.UTC(year, month - 1, date, hours, minutes) - IST_OFFSET_MS;
+}
+
+export function inNseCashSession(now = Date.now()) {
+  const ist = new Date(now + IST_OFFSET_MS);
+  const weekday = ist.getUTCDay();
+  if (weekday === 0 || weekday === 6) return false;
+  const day = ist.toISOString().slice(0, 10);
+  if (day in NSE_HOLIDAYS) return false;
+  const minutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 35;
+}
+
+export function appendAdTape(points: AdPoint[], breadth: NseBreadth | null, now = Date.now()): AdPoint[] {
+  if (!breadth || !inNseCashSession(now)) return points;
+  const day = istDay(now);
+  const kept = points.filter(point => istDay(point.t) === day);
+  const t = Math.floor(now / 60000) * 60000;
+  const last = kept[kept.length - 1];
+  if (last?.t === t && last.advance === breadth.advance && last.decline === breadth.decline) return kept.length === points.length ? points : kept;
+  const next = last?.t === t ? kept.slice(0, -1) : kept.length > 419 ? kept.slice(kept.length - 419) : kept.slice();
+  next.push({ t, advance: breadth.advance, decline: breadth.decline });
+  return next;
 }

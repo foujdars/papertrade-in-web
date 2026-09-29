@@ -1,19 +1,37 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { CashFlow, IndexBreadth, IndiaVix, NseBreadth } from "@/lib/india-pulse";
+import type { AdPoint, CashFlow, IndiaVix, NseBreadth } from "@/lib/india-pulse";
 
-type Pulse = { breadth: NseBreadth | null; indices: IndexBreadth[]; vix: IndiaVix | null; flows: CashFlow[] };
+type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; flows: CashFlow[] };
 
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
+const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
 
-function BreadthChart({ rows }: { rows: IndexBreadth[] }) {
-  const width = 148;
-  const height = 52;
-  const max = Math.max(...rows.flatMap(row => [row.advance, row.decline]), 1);
-  const x = (index: number) => rows.length < 2 ? width / 2 : (index / (rows.length - 1)) * (width - 4) + 2;
-  const y = (value: number) => height - 3 - (value / max) * (height - 8);
-  const line = (key: "advance" | "decline") => rows.map((row, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(row[key]).toFixed(1)}`).join(" ");
-  return <svg className="india-ad-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Advances and declines across major NSE indices"><path d={line("decline")} /><path d={line("advance")} /></svg>;
+function axisMax(value: number) {
+  const steps = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000];
+  return steps.find(step => step >= value) ?? Math.ceil(value / 1000) * 1000;
+}
+
+function SessionChart({ points }: { points: AdPoint[] }) {
+  const width = 320;
+  const height = 156;
+  const left = 36;
+  const right = 8;
+  const top = 10;
+  const bottom = 18;
+  const max = axisMax(Math.max(...points.flatMap(point => [point.advance, point.decline])));
+  const start = points[0].t;
+  const end = Math.max(points[points.length - 1].t, start + 60_000);
+  const x = (t: number) => left + ((t - start) / (end - start)) * (width - left - right);
+  const y = (value: number) => top + (1 - value / max) * (height - top - bottom);
+  const line = (key: "advance" | "decline") => points.map((point, index) => `${index ? "L" : "M"}${x(point.t).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
+  const marks = points.length < 3 ? points : [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]];
+  return <svg className="india-ad-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="NSE advances and declines through the session">
+    {[0, max / 2, max].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={y(value)} y2={y(value)} /><text x={left - 4} y={y(value) + 3} textAnchor="end">{Math.round(value)}</text></g>)}
+    <path d={line("decline")} /><path d={line("advance")} />
+    {points.length < 2 ? <><circle className="down" cx={x(points[0].t)} cy={y(points[0].decline)} r="3" /><circle className="up" cx={x(points[0].t)} cy={y(points[0].advance)} r="3" /></> : null}
+    {marks.map(point => <text key={point.t} x={x(point.t)} y={height - 4} textAnchor={point === points[0] ? "start" : point === points[points.length - 1] ? "end" : "middle"}>{clock.format(point.t)}</text>)}
+  </svg>;
 }
 
 function VixGauge({ vix }: { vix: IndiaVix }) {
@@ -47,14 +65,21 @@ export function IndiaPulse() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/market/india-pulse", { signal: controller.signal, cache: "no-store" })
-      .then(response => response.json())
-      .then(body => { if (body?.ok) setPulse({ breadth: body.breadth ?? null, indices: Array.isArray(body.indices) ? body.indices : [], vix: body.vix ?? null, flows: Array.isArray(body.flows) ? body.flows : [] }); })
-      .catch(() => undefined);
-    return () => controller.abort();
+    const load = () => {
+      fetch("/api/market/india-pulse", { signal: controller.signal, cache: "no-store" })
+        .then(response => response.json())
+        .then(body => { if (body?.ok) setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, flows: Array.isArray(body.flows) ? body.flows : [] }); })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
   }, []);
   const breadth = pulse?.breadth;
-  const advanceShare = breadth ? breadth.advance / Math.max(1, breadth.advance + breadth.decline) : 0;
+  const latestPoint = pulse?.tape[pulse.tape.length - 1];
+  const advance = latestPoint?.advance ?? breadth?.advance;
+  const decline = latestPoint?.decline ?? breadth?.decline;
+  const advanceShare = advance !== undefined && decline !== undefined ? advance / Math.max(1, advance + decline) : 0;
   const latest = pulse?.flows[0];
   return <section className="home-section india-pulse" aria-label="Indian market pulse">
     <header><span><b>Market pulse</b></span><small>Moneycontrol</small></header>
@@ -63,13 +88,11 @@ export function IndiaPulse() {
         <div>
           <span>Advance/Decline (NSE)</span>
           <div className="india-ad-bar" aria-hidden="true"><i style={{ width: `${Math.round(advanceShare * 100)}%` }} /></div>
-          <div className="india-ad-counts"><b className="up">{breadth ? breadth.advance.toLocaleString("en-IN") : "—"}</b><b className="down">{breadth ? breadth.decline.toLocaleString("en-IN") : "—"}</b></div>
+          <div className="india-ad-counts"><b className="up">{advance !== undefined ? advance.toLocaleString("en-IN") : "—"}</b><b className="down">{decline !== undefined ? decline.toLocaleString("en-IN") : "—"}</b></div>
         </div>
-        <div>
-          <span>A/D chart</span>
-          {pulse && pulse.indices.length > 1 ? <BreadthChart rows={pulse.indices} /> : <div className="india-pulse-wait">Chart unavailable</div>}
-          <small>Major indices</small>
-        </div>
+        <div className="india-ad-legend"><b className="up"><i />Advance ({advance !== undefined ? advance.toLocaleString("en-IN") : "—"})</b><b className="down"><i />Decline ({decline !== undefined ? decline.toLocaleString("en-IN") : "—"})</b></div>
+        {pulse && pulse.tape.length ? <SessionChart points={pulse.tape} /> : <div className="india-pulse-wait">Session line builds live from 9:15 IST</div>}
+        <small>NSE session · live counts, not a guessed path</small>
       </div>
       <div className="india-vix">
         <div><span>India VIX</span>{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}%</b></> : <strong>—</strong>}</div>

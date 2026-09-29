@@ -12,6 +12,7 @@ import { dispatchPushTests } from "@/lib/push-delivery-test";
 import { dispatchCloudGlobalAlerts } from "@/lib/global-alerts-server";
 import { dispatchDefaultEma21Alerts } from "@/lib/ema21-default-server";
 import { dispatchEma5ReversalAlerts } from "@/lib/ema5-reversal-server";
+import { sampleNseAdTape } from "@/lib/india-ad-tape";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { Candle } from "@/lib/market";
 import type { NseSession } from "@/lib/market-hours";
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
   const { db } = await pushServices(), lease = db.doc("technicalSystem/lease"), health = db.doc("technicalSystem/health"), owner = randomUUID(), started = Date.now();
   const acquired = await db.runTransaction(async tx => { const saved = await tx.get(lease); if ((saved.data()?.until ?? 0) > started) return false; tx.set(lease, { owner, until: started + 90000 }); return true; });
   if (!acquired) return Response.json({ ok: true, busy: true });
+  const tapeSample = sampleNseAdTape(db).catch(() => undefined);
   let checked = 0, sent = 0, failed = 0;
   try {
     // Delivery tests run outside market hours and do not create market signals.
@@ -116,5 +118,5 @@ export async function GET(request: Request) {
     await health.set({ lastRun: Date.now(), ok: failed === 0, checked, sent, failed });
     return Response.json({ ok: failed === 0, checked, sent, failed }, { status: failed ? 503 : 200, headers: { "Cache-Control": "no-store" } });
   } catch { await health.set({ lastRun: Date.now(), ok: false }); return Response.json({ error: "Server monitoring check failed. Review service configuration, capacity and feed availability." }, { status: 503 }); }
-  finally { await db.runTransaction(async tx => { const saved = await tx.get(lease); if (saved.data()?.owner === owner) tx.set(lease, { owner, until: 0 }); }); }
+  finally { await tapeSample; await db.runTransaction(async tx => { const saved = await tx.get(lease); if (saved.data()?.owner === owner) tx.set(lease, { owner, until: 0 }); }); }
 }
