@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { pushConfigured, pushServices, sendPush } from "@/lib/push-admin";
 import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, shadeChoice, shortIpoName, type PushNotice } from "@/lib/notification-policy";
 import { sessionOpenNotice } from "@/lib/market-sessions";
+import { type VolumeShockerDevice, deliverVolumeShockerAlerts } from "@/lib/volume-shocker-server";
 import { loadAllotments } from "@/lib/ipo-allotment-server";
 import { GET as getIpos } from "@/app/api/upstox/ipos/route";
 import type { IpoListResponse } from "@/lib/ipo";
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
   const lease = await db.runTransaction(async tx => { const saved = await tx.get(lock); if ((saved.data()?.until || 0) > now) return false; tx.set(lock, { until: now + 65000 }); return true; });
   if (!lease) return Response.json({ ok: true, busy: true });
   let sent = 0;
+  const shockerDevices: VolumeShockerDevice[] = [];
   try {
     const [response, allotments] = await Promise.all([
       getIpos(new Request("https://www.papertrade.site/api/upstox/ipos?status=open,closed,listed&details=1")).then(res => res.json() as Promise<IpoListResponse>),
@@ -75,6 +77,9 @@ export async function GET(request: Request) {
         await device.ref.delete(); continue;
       }
       if (preferences.pausedUntil > now) continue;
+      if (Array.isArray(data.shockerWatch) && data.shockerWatch.length && typeof data.token === "string") {
+        shockerDevices.push({ token: data.token, watch: data.shockerWatch, sent: data.shockerSent, ref: device.ref });
+      }
       if (data.preferences?.pausedUntil > 0 && data.preferences.pausedUntil <= now) {
         for (const topic of ["papertrade-ipo-v3","papertrade-allotment-v3","papertrade-sessions-v1"]) {
           const result = await messaging.subscribeToTopic(data.token,topic);
@@ -92,6 +97,8 @@ export async function GET(request: Request) {
       catch(error) { if ((error as {code?:string}).code === "messaging/registration-token-not-registered") await device.ref.delete(); }
     }
     await cursorRef.set({after:devices.size===250 ? devices.docs.at(-1)!.id : null});
+    try { sent += await deliverVolumeShockerAlerts(db, shockerDevices, now); }
+    catch { /* A volume-shocker scan must not fail IPO or session delivery. */ }
     return Response.json({ok:true,sent}, {headers:{"Cache-Control":"no-store"}});
   } catch { return Response.json({error:"Notification dispatch could not complete. Check service configuration and feed availability."},{status:503}); }
   finally { await lock.set({until:0}); }

@@ -39,6 +39,8 @@ import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { IpoWorkspace } from "@/components/IpoWorkspace";
 import { PushNotificationBridge } from "./PushNotificationBridge";
 import { SessionOpenAlerts } from "./SessionOpenAlerts";
+import { VolumeShockerAlerts } from "./VolumeShockerAlerts";
+import { selectVolumeShockerWatch } from "@/lib/volume-shocker-alerts";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
@@ -1083,6 +1085,7 @@ export function TradingDashboard() {
     for (const item of [...stockUniverse, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
   }, [derivativeInstruments, globalInstruments, stockFutureInstruments, stockUniverse]);
+  const volumeShockerWatch = useMemo(() => selectVolumeShockerWatch({ watchlist, customWatchlists, instruments: stockUniverse }), [customWatchlists, stockUniverse, watchlist]);
 
   useEffect(() => {
     if (!paperDataReady || !isAndroidApp) return;
@@ -2788,6 +2791,7 @@ export function TradingDashboard() {
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-section={activeNavigationSection}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
       <SessionOpenAlerts />
+      <VolumeShockerAlerts instruments={volumeShockerWatch} />
       <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} globalSymbol={selectedDeltaSymbol} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />

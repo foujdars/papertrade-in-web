@@ -8,12 +8,28 @@ let activeToken = "";
 let reviewCount = 0;
 let connecting: Promise<void> | null = null;
 let disconnecting = false;
+let shockerWatchReady = false;
+let shockerWatch: { symbol: string; instrumentKey: string }[] = [];
 export function setNotificationReviewCount(count: number) { reviewCount = count; }
+export function setShockerWatch(instruments: readonly { symbol: string; instrumentKey: string }[]) {
+  shockerWatchReady = true;
+  shockerWatch = instruments.slice(0, 50).map((item) => ({ symbol: item.symbol, instrumentKey: item.instrumentKey }));
+}
+export function pushConnected() { return Boolean(activeToken); }
 export async function syncPushDevice(remove = false) {
   if (!activeToken) return;
   const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
   if (!session) throw new Error("Sign in to enable background notifications.");
-  const response = await fetch("/api/notifications/device", { method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({token:activeToken,platform:Capacitor.getPlatform(),preferences:readNotificationPreferences(),reviewCount,remove}) });
+  const payload: Record<string, unknown> = { token: activeToken, platform: Capacitor.getPlatform(), preferences: readNotificationPreferences(), reviewCount, remove };
+  if (shockerWatchReady && !remove) {
+    let watch = shockerWatch.map((item) => ({ symbol: item.symbol, instrumentKey: item.instrumentKey }));
+    payload.shockerWatch = watch;
+    while (JSON.stringify(payload).length > 7000 && watch.length) {
+      watch = watch.slice(0, -1);
+      payload.shockerWatch = watch;
+    }
+  }
+  const response = await fetch("/api/notifications/device", { method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify(payload) });
   if (!response.ok) throw new Error("Background delivery could not be saved. Please retry.");
   if(remove) activeToken="";
 }

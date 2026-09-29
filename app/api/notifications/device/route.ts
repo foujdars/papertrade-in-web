@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { pushConfigured, pushServices } from "@/lib/push-admin";
 import { notificationPreferences, indiaClock } from "@/lib/notification-policy";
+import { normalizeShockerWatch } from "@/lib/volume-shocker-alerts";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -30,8 +31,9 @@ export async function POST(request: Request) {
     }
     if (body.remove) { await ref.delete(); return Response.json({ ok: true }); }
     const count = Math.min(10000, Math.max(0, Math.floor(Number(body.reviewCount) || 0)));
+    const shockerWatch = Array.isArray(body.shockerWatch) ? normalizeShockerWatch(body.shockerWatch).map(({ symbol, instrumentKey }) => ({ symbol, instrumentKey })) : undefined;
     // Store no holdings, PAN, P&L amount, names or credentials with push tokens.
-    await ref.set({ userId: data.user.id, token: body.token, platform: body.platform === "android" ? "android" : "web", preferences, lastActive: Date.now(), reviewDate: indiaClock(Date.now()).day, reviewCount: count, expiresAt: new Date(Date.now() + 90 * 86400000) }, { merge: true });
+    await ref.set({ userId: data.user.id, token: body.token, platform: body.platform === "android" ? "android" : "web", preferences, lastActive: Date.now(), reviewDate: indiaClock(Date.now()).day, reviewCount: count, expiresAt: new Date(Date.now() + 90 * 86400000), ...(shockerWatch ? { shockerWatch, shockerCount: shockerWatch.length } : {}) }, { merge: true });
     return Response.json({ ok: true });
   } catch { return Response.json({ error: "Could not register background delivery. Please retry." }, { status: 503 }); }
 }

@@ -1,6 +1,8 @@
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 import { rankOpenHighStocks, rankVolumeBreakouts, type HistoricalVolumePoint, type OpenHighCandidate, type VolumeBreakoutCandidate } from "@/lib/volume-breakout";
+import { normalizeShockerWatch } from "@/lib/volume-shocker-alerts";
+import { scanWatchlistShockers } from "@/lib/volume-shocker-scan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,7 +77,14 @@ async function loadAdjustedVolumeHistory(candidate: VolumeBreakoutCandidate) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json() as { instruments?: unknown; mode?: unknown; force?: unknown };
+    const payload = await request.json() as { instruments?: unknown; mode?: unknown; force?: unknown; scope?: unknown };
+    // A personal watchlist must not read or write the full-market scanner cache.
+    if (payload.scope === "watchlist") {
+      const instruments = normalizeShockerWatch(payload.instruments);
+      if (!instruments.length) return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide NSE equity instruments from the watchlist." } }, { status: 400 });
+      const { rows } = await scanWatchlistShockers(instruments, { maxHistories: instruments.length });
+      return Response.json({ ok: true, source: "Upstox live quotes + adjusted daily candles", rule: "Daily Volume > 5 × SMA(Volume, 20)", rows, scanned: instruments.length, fetchedAt: new Date().toISOString() }, { headers: { "Cache-Control": "private, max-age=0" } });
+    }
     const mode = payload.mode === "OPEN_HIGH" ? "OPEN_HIGH" : "VOLUME";
     const cached = scannerCache.get(mode);
     if (payload.force !== true && cached && cached.expiresAt > Date.now()) {
