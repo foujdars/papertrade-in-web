@@ -1,0 +1,112 @@
+diff --git a/components/TradingDashboard.tsx b/components/TradingDashboard.tsx
+index 7819426..aa76c05 100644
+--- a/components/TradingDashboard.tsx
++++ b/components/TradingDashboard.tsx
+@@ -1694,6 +1694,8 @@ export function TradingDashboard() {
+         const nextCandles = payload.candles;
+         globalCandleScopeRef.current = `${selectedDeltaChartSymbol}:${timeframe}`;
+         setGlobalCandles(previous => previous?.length === nextCandles.length && previous.every((c, i) => candlesEqual(c, nextCandles[i])) ? previous : nextCandles);
++        const lastCandle = nextCandles[nextCandles.length - 1];
++        if (selectedDeltaSymbol && lastCandle) globalTrading.noteCandle(selectedDeltaSymbol, { time: lastCandle.time, high: lastCandle.high, low: lastCandle.low, frame: timeframe });
+         setFeedStatus({ mode: "live", message: "Delta Exchange India candles", updatedAt: payload.fetchedAt ? new Date(payload.fetchedAt).toISOString() : undefined });
+       } catch (error) {
+         if (controller.signal.aborted) return;
+@@ -1711,7 +1713,7 @@ export function TradingDashboard() {
+       window.clearTimeout(retryTimer);
+       document.removeEventListener("visibilitychange", resume);
+     };
+-  }, [selectedDeltaChartSymbol, timeframe]);
++  }, [selectedDeltaChartSymbol, selectedDeltaSymbol, timeframe, globalTrading.noteCandle]);
+   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
+   const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
+   const selectedVenueLabel = instrumentVenueLabel(selected);
+@@ -1976,12 +1978,15 @@ export function TradingDashboard() {
+     if (selectedDeltaChartSymbol) {
+       if (!committed) return;
+       const symbol = selectedDeltaChartSymbol;
++      const lastCandle = selectedDeltaSymbol && globalCandleScopeRef.current === `${symbol}:${timeframe}` ? globalCandles?.at(-1) : undefined;
++      const extreme = lastCandle && lastCandle.time > 0 ? { time: lastCandle.time, high: lastCandle.high, low: lastCandle.low, frame: timeframe } : undefined;
++      if (selectedDeltaSymbol && extreme) globalTrading.noteCandle(selectedDeltaSymbol, extreme);
+       let error = "Could not save protection. Please try again.";
+       void globalTrading.transact((account, perps, options) => {
+         try {
+           const quote = selectedDeltaOption ? options[symbol]?.quote : perps[symbol]?.quote;
+           if (!quote) throw new Error("Waiting for a fresh global quote.");
+-          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value > 0 ? value : undefined, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now());
++          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value > 0 ? value : undefined, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now(), extreme);
+         } catch (cause) { error = cause instanceof Error ? cause.message : error; throw cause; }
+       }).then(saved => setToast(saved ? `${level === "target" ? "Target" : "Stop loss"} saved · ${symbol} · USD` : error));
+       return;
+diff --git a/components/useGlobalTrading.ts b/components/useGlobalTrading.ts
+index 330eab0..21bd098 100644
+--- a/components/useGlobalTrading.ts
++++ b/components/useGlobalTrading.ts
+@@ -1,6 +1,6 @@
+ "use client";
+ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+-import { advanceGlobalAccount, readGlobalAccount } from "@/lib/global-order-engine";
++import { advanceGlobalAccount, readGlobalAccount, type ChartExtreme } from "@/lib/global-order-engine";
+ import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
+ import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
+ 
+@@ -17,6 +17,13 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
+   const snapshotsRef = useRef(snapshots);
+   const optionSnapshotsRef = useRef(optionSnapshots);
+   const inFlight = useRef(false);
++  const extremesRef = useRef<Partial<Record<string, ChartExtreme>>>({});
++  const noteCandle = useCallback((symbol: string, candle: ChartExtreme | null | undefined) => {
++    if (!symbol || !candle || !(candle.time > 0) || !(candle.high > 0) || !(candle.low > 0) || candle.high < candle.low) return;
++    const prev = extremesRef.current[symbol];
++    if (prev && prev.time === candle.time && prev.high === candle.high && prev.low === candle.low && prev.frame === candle.frame) return;
++    extremesRef.current = { ...extremesRef.current, [symbol]: { time: candle.time, high: candle.high, low: candle.low, frame: candle.frame } };
++  }, []);
+   useEffect(() => {
+     activeKey.current = key;
+     setAccount(null); setError(""); setBusy(false);
+@@ -102,7 +109,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
+         for (const [symbol, snapshot] of Object.entries(next)) {
+           if (snapshot) { quotes[symbol] = snapshot.quote; specs[symbol] = snapshot.spec; }
+         }
+-        await transact(a => advanceOptions(advanceGlobalAccount(a, quotes, specs, Date.now()), observedOptions, Date.now()), true);
++        await transact(a => advanceOptions(advanceGlobalAccount(a, quotes, specs, Date.now(), extremesRef.current), observedOptions, Date.now()), true);
+       } finally { running = false; }
+     };
+     void poll();
+@@ -110,6 +117,6 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
+     document.addEventListener("visibilitychange", poll);
+     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
+   }, [monitorSymbols, transact]);
+-  return { account, snapshots, optionSnapshots, clock, busy, error, transact };
++  return { account, snapshots, optionSnapshots, clock, busy, error, transact, noteCandle };
+ }
+ export type GlobalTrading = ReturnType<typeof useGlobalTrading>;
+diff --git a/lib/global-chart-risk.ts b/lib/global-chart-risk.ts
+index 340bc59..5708db6 100644
+--- a/lib/global-chart-risk.ts
++++ b/lib/global-chart-risk.ts
+@@ -1,5 +1,5 @@
+ import { freshPerpQuote, type PerpAccount, type PerpPosition, type PerpQuote } from "./global-markets.ts";
+-import { roundGlobalPrice, triggerValue, type GlobalExit, type GlobalProtection } from "./global-order-engine.ts";
++import { roundGlobalPrice, triggerValue, type ChartExtreme, type GlobalExit, type GlobalProtection } from "./global-order-engine.ts";
+ 
+ export function globalChartLevels(p: PerpPosition) {
+   const plan = p.protection;
+@@ -10,7 +10,15 @@ export function globalChartLevels(p: PerpPosition) {
+ }
+ 
+ /** Change only the dragged leg. Keep trigger source, opposite leg and limit offset. */
+-export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "target" | "stopLoss", value: number, q: PerpQuote, now: number): PerpAccount {
++function armChartLeg(leg: GlobalExit, now: number, candle?: ChartExtreme): GlobalExit {
++  const armed: GlobalExit = { ...leg, armedAt: now };
++  if (candle && candle.time > 0 && candle.high > 0 && candle.low > 0 && candle.high >= candle.low) {
++    armed.seenTime = candle.time; armed.seenHigh = candle.high; armed.seenLow = candle.low;
++    if (candle.frame) armed.seenFrame = candle.frame;
++  }
++  return armed;
++}
++export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "target" | "stopLoss", value: number, q: PerpQuote, now: number, candle?: ChartExtreme): PerpAccount {
+   const p = a.positions.find(p => p.symbol === symbol);
+   if (!p || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("A position and fresh quote are required to move protection.");
+   if (p.protection?.activeExit) throw new Error("An exit has already triggered. Manage it in Positions.");
+@@ -27,16 +35,16 @@ export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "tar
+   if (above ? price <= refer
