@@ -1,12 +1,12 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { appendAdTape, inNseCashSession, istDay, nseBreadth, type AdPoint, type NseBreadth } from "./india-pulse.ts";
+import { appendAdTape, inNseCashSession, istDay, nseBreadth, selectAdTape, type AdPoint, type NseBreadth } from "./india-pulse.ts";
 import { firebaseProjectId, pushServices } from "./push-admin.ts";
 
 const DOC = "marketPulse/nseAdTape";
 const HOME = "https://www.moneycontrol.com/";
 const UA = "Mozilla/5.0 (compatible; PaperTrade/1.0)";
 
-let memory: { day: string; points: AdPoint[] } = { day: "", points: [] };
+let memory: { day: string; points: AdPoint[]; closedDay: string; closed: AdPoint[] } = { day: "", points: [], closedDay: "", closed: [] };
 let syncedAt = 0;
 let homeCache: { until: number; breadth: NseBreadth | null } | null = null;
 
@@ -55,20 +55,40 @@ export async function recordNseAdTape(breadth: NseBreadth | null, db?: Firestore
     try {
       const saved = await store.doc(DOC).get();
       const data = saved.data();
-      if (data?.day === day) memory = { day, points: merge(memory.day === day ? memory.points : [], clean(data.points)) };
+      const savedDay = typeof data?.day === "string" ? data.day : "";
+      const savedPoints = clean(data?.points);
+      const savedClosed = clean(data?.closed);
+      if (savedClosed.length) {
+        memory.closedDay = typeof data?.closedDay === "string" ? data.closedDay : memory.closedDay;
+        memory.closed = merge(memory.closed, savedClosed);
+      }
+      if (savedDay === day) memory = { ...memory, day, points: merge(memory.day === day ? memory.points : [], savedPoints) };
+      else if (savedPoints.length && savedDay && savedDay >= memory.closedDay) {
+        memory.closedDay = savedDay;
+        memory.closed = merge(memory.closed, savedPoints);
+      }
       syncedAt = now;
     } catch { /* The live count still draws from this instance. */ }
   }
-  if (memory.day !== day) memory = { day, points: [] };
+  let rolled = false;
+  if (memory.day !== day) {
+    if (memory.points.length && memory.day >= memory.closedDay) {
+      memory.closedDay = memory.day;
+      memory.closed = memory.points;
+    }
+    memory = { ...memory, day, points: [] };
+    rolled = true;
+  }
   const next = appendAdTape(memory.points, breadth, now);
-  const changed = next !== memory.points;
-  memory = { day, points: next };
+  const changed = next !== memory.points || rolled;
+  memory = { ...memory, day, points: next };
   if (changed && store) {
     try {
-      await store.doc(DOC).set({ day, points: next.map(point => ({ t: point.t, a: point.advance, d: point.decline })), updatedAt: now });
+      const pack = (points: AdPoint[]) => points.map(point => ({ t: point.t, a: point.advance, d: point.decline }));
+      await store.doc(DOC).set({ day, points: pack(next), closedDay: memory.closedDay, closed: pack(memory.closed), updatedAt: now });
     } catch { /* Keep the tape in memory until the next write. */ }
   }
-  return next;
+  return selectAdTape(next, memory.closed, now);
 }
 
 export async function sampleNseAdTape(db?: Firestore, now = Date.now()) {

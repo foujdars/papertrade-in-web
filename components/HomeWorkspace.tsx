@@ -20,9 +20,7 @@ import {
   ChevronLeft,
   Layers3,
   Search,
-  ShieldCheck,
   TrendingUp,
-  WalletCards,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -80,14 +78,15 @@ export function HomeWorkspace({
   closedTradesCount,
   stockOptions,
   cards,
-  riskSummary,
+  riskSummary: _riskSummary,
+
   onOpenWatchlist,
   onOpenHoldings,
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
   onOpenStock, preferenceOwner='guest', recentSymbols=[], onClearRecent,
-  realisedToday=0, openChangeToday=0, attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
+  realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, resumeChart, onResumeChart, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
@@ -282,19 +281,11 @@ export function HomeWorkspace({
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
-            <div className="home-portfolio-value">
-              <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today’s profit and loss — view P&L"><small>TODAY’S P&amp;L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
-            </div>
-            <div className="home-pnl-split"><button onClick={onOpenRealised??onOpenPnl}><small>Realised today · net</small><b className={privateBalances?'':realisedToday>=0?'positive':'negative'}>{privateBalances?'••••':formatInr(realisedToday)}</b><ChevronRight size={13}/></button><button onClick={onOpenPositions}><small>Open · today’s change</small><b className={privateBalances||openChangeToday===null?'':openChangeToday>=0?'positive':'negative'}>{privateBalances?'••••':openChangeToday===null?'Quote unavailable':formatInr(openChangeToday)}</b><ChevronRight size={13}/></button></div>
-            <div className="home-portfolio-stats">
-              <button onClick={onOpenHoldings}><span><Layers3 size={16} /> Holdings</span><b>{holdingsCount}</b></button>
-              <button onClick={onOpenPositions}><span><WalletCards size={16} /> Open positions</span><b>{openPositionsCount}</b></button>
-              <button onClick={onOpenTradeHistory}><span><CheckCircle2 size={16} /> Closed trades</span><b>{closedTradesCount}</b></button>
-            </div>
-            <div className="home-risk-meter">
-              <span><ShieldCheck size={15} /><b>Holdings concentration</b><em>{holdingsCount===0?"No holdings":Number.isFinite(riskSummary.topConcentration)&&riskSummary.exposure>0?`${riskSummary.topConcentration.toFixed(0)}% largest`:"Quote unavailable"}</em></span>
-              {holdingsCount>0&&riskSummary.exposure>0&&Number.isFinite(riskSummary.topConcentration)&&<div><i style={{ width: `${Math.min(100, riskSummary.topConcentration)}%` }} /></div>}
-              <small>{riskSummary.exposure > 0 ? `${riskSummary.topSymbol} is ${riskSummary.topConcentration.toFixed(0)}% of invested value` : holdingsCount===0?"No delivery holdings to measure.":"Waiting for holding valuations."}</small>
+            <div className="home-portfolio-row" aria-label="Portfolio snapshot">
+              <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today's profit and loss — view P&L"><small>Today P&L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
+              <button onClick={onOpenHoldings} aria-label="Holdings"><small>Holdings</small><b>{holdingsCount}</b></button>
+              <button onClick={onOpenPositions} aria-label="Open positions"><small>Open</small><b>{openPositionsCount}</b></button>
+              <button onClick={onOpenTradeHistory} aria-label="Closed trades"><small>Closed</small><b>{closedTradesCount}</b></button>
             </div>
           </section>}
 
