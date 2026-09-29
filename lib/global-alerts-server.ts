@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { GET as getGlobalMarkets } from "@/app/api/global-markets/route";
 import { evaluateGlobalAlert, ema21EntrySignal, globalAlertError, isEma21EntryKind, type GlobalAlert } from "./global-alerts";
-import { notificationPreferences, quietTime, type PushNotice } from "./notification-policy";
+import { divergenceTitle, emaTitle, notificationPreferences, quietTime, type PushNotice } from "./notification-policy";
 import { sendPush } from "./push-admin";
 import type { Candle } from "./market";
 import type { PerpQuote } from "./global-markets";
@@ -82,7 +82,7 @@ export async function dispatchCloudGlobalAlerts(db: Firestore, now = Date.now())
         const target = device.data(), prefs = notificationPreferences(target.preferences);
         if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
         const isEma = isEma21EntryKind(rule.kind);
-        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: isEma ? `📈 ${rule.symbol} ${rule.timeframe} kissed the 21 EMA — entry is live` : `⚡ ${rule.symbol} ${rule.timeframe} divergence just confirmed — take a look`, body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+        const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: isEma ? emaTitle(rule.symbol, rule.timeframe) : divergenceTitle(rule.symbol, rule.timeframe), body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
         await sendPush(notice, { token: target.token }); delivered++;
       }
       await item.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

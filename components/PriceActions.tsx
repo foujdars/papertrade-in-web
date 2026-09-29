@@ -12,6 +12,7 @@ import { GlobalAlerts } from "./GlobalAlerts";
 import { TECHNICAL_FRAMES, technicalDescription, defaultTechnicalConfig, type TechnicalRule } from "@/lib/technical-alerts";
 import { alertAttention, type HomeAlertSnapshot, type HomeAlertRequest } from '@/lib/home-attention';
 import { AndroidDeliveryTest } from "./AndroidDeliveryTest";
+import { fillTitle, priceHitTitle } from "@/lib/notification-policy";
 import type { Instrument } from "@/lib/market";
 const KEY = "papertrade-price-tasks-v1";
 const money = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -112,7 +113,7 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
             if (t.product === "INTRADAY" && t.kind === "order" && !callbacks.current.intradayOpen) continue;
             const failure = t.kind === "order" ? callbacks.current.onFill(t, q.lastPrice) : null;
             const status = failure ? "rejected" : t.kind === "alert" ? "triggered" : "filled";
-            const message = failure ?? (t.kind === "alert" ? `💰 ${t.instrument.symbol} just hit your price — nice catch` : `✅ ${t.instrument.symbol} paper order filled at ₹${q.lastPrice.toFixed(2)}`);
+            const message = failure ?? (t.kind === "alert" ? priceHitTitle(t.instrument.symbol, q.lastPrice) : fillTitle(t.instrument.symbol, q.lastPrice));
             save(tasksRef.current.map(item => item.id === t.id ? { ...item, status, message, completedAt: Date.now(), triggeredPrice: q.lastPrice } : item));
             addPaperTradeNotification({ id: t.id, kind: "trade", title: message, body: "", symbol: t.instrument.symbol, instrumentKey: t.instrument.instrumentKey });
             callbacks.current.onNotice(message);

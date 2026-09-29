@@ -32,10 +32,9 @@ test("stale, future-dated and invalid GMP cannot attract users through a high-GM
 });
 test("closing reminders include low-GMP issues without promising profit", () => {
   const notice = ipoDigest([issue({gmpPercent:0,biddingEndDate:"2026-09-14"})],at("13:30:00"));
-  assert.ok(notice.body.includes("closes today"));
-  assert.ok(notice.body.includes("unofficial"));
-  assert.ok(notice.body.includes("not assured profit"));
-  assert.ok(notice.body.includes("cutoff"));
+  assert.match(notice.title, /closes today/);
+  assert.equal(notice.body, "");
+  assert.ok(notice.title.length <= 42);
 });
 test("closed, listed and not-yet-open issues cannot be promoted as accepting applications", () => {
   for (const changed of [{status:"closed"},{status:"listed"},{biddingStartDate:"2026-09-15"},{biddingEndDate:"2026-09-13"}]) {
@@ -47,7 +46,9 @@ test("digest is combined, has a stable per-slot ID, and expires instead of pilin
   const now=at("09:05:00"), list=[issue(),issue({id:"two",name:"Second IPO"})];
   const notice=ipoDigest(list,now);
   assert.equal(notice.id,ipoDigest(list,now+60000).id);
-  assert.ok(notice.title.includes("2 issues"));
+  assert.match(notice.title, /2 IPOs open/);
+  assert.match(notice.title, /Example/);
+  assert.ok(notice.title.length <= 42);
   assert.equal(notice.expiresAt,now+30*60000);
   assert.equal(ipoDigest(list,at("11:00:00")),null);
 });
@@ -58,7 +59,8 @@ test("allotment notifications require evidence, not an expected date", () => {
   const notice=allotmentNotice([allotment],at("22:00:00"));
   assert.equal(notice.url,"/ipo-allotment/kfin");
   assert.equal(notice.silent,true);
-  assert.ok(notice.body.includes("PAN only there"));
+  assert.match(notice.title, /allotment is out/);
+  assert.equal(notice.body, "");
 });
 test("reviews require today's trades and the chosen evening window", () => {
   assert.ok(reviewNotice(2,"2026-09-14",at("17:15:00")));
@@ -66,11 +68,22 @@ test("reviews require today's trades and the chosen evening window", () => {
   assert.equal(reviewNotice(2,"2026-09-13",at("17:15:00")),null);
   assert.equal(reviewNotice(2,"2026-09-14",at("18:00:00")),null);
 });
-test("preferences honor opt-outs, default private amounts, and bound pauses", () => {
+test("shade titles name the IPO, the count and the GMP without overflowing a phone", () => {
+  const lead = issue({ name: "Orient Cables (India) IPO", gmpPercent: 18 });
+  const others = Array.from({ length: 10 }, (_, index) => issue({ id: `other-${index}`, name: "Other IPO", gmpPercent: 16 }));
+  const notice = ipoDigest([lead, ...others], at("09:05:00"));
+  assert.match(notice.title, /11 IPOs open/);
+  assert.match(notice.title, /Orient Cables/);
+  assert.match(notice.title, /GMP \+18%/);
+  assert.equal(notice.title.includes("(India)"), false);
+  assert.equal(notice.body, "");
+  assert.ok(notice.title.length <= 42, notice.title);
+});
+test("preferences honor opt-outs and bound pauses", () => {
   const defaults=notificationPreferences(null);
-  assert.equal(defaults.hideAmounts,true);
-  assert.equal(defaults.reviews,false);
-  assert.equal(defaults.practice,false);
+  assert.equal(defaults.hideAmounts,false);
+  assert.equal(defaults.reviews,true);
+  assert.equal(defaults.practice,true);
   const prefs=notificationPreferences({ipo:false,trades:false,pausedUntil:Infinity});
   assert.equal(prefs.ipo,false);assert.equal(prefs.trades,false);assert.equal(prefs.pausedUntil,0);
 });
@@ -101,10 +114,11 @@ async function workerHarness(preferences) {
   }};
 }
 const push=changes=>({id:"one",title:"IPO update",body:"Test",kind:"ipo",url:"/?screen=ipo",expiresAt:String(Date.now()+60000),silent:"false",...changes});
-test("background worker honors consent and pause, drops expired payloads and deduplicates", async () => {
-  for(const prefs of [undefined,{ipo:false},{ipo:true,pausedUntil:Date.now()+60000}]) {
-    const worker=await workerHarness(prefs);await worker.push(push());assert.equal(worker.shown.length,0);
-  }
+test("background worker honors pause, drops expired payloads and deduplicates", async () => {
+  const paused=await workerHarness({ipo:true,pausedUntil:Date.now()+60000});
+  await paused.push(push());assert.equal(paused.shown.length,0);
+  const open=await workerHarness(undefined);
+  await open.push(push());assert.equal(open.shown.length,1);
   const worker=await workerHarness({ipo:true});
   await worker.push(push({expiresAt:"0"}));assert.equal(worker.shown.length,0);
   await worker.push(push());await worker.push(push());assert.equal(worker.shown.length,1);
@@ -118,23 +132,20 @@ test("visible app receives inbox events without an extra OS alert, and unsafe li
   worker.setVisible(false);await worker.push(push({id:"two",url:"https://evil.example"}));
   assert.equal(worker.shown[0].data.url,"/");
 });
-test("closed-app technical notifications require trade consent, hide amounts and keep safe chart links", async () => {
+test("closed-app technical notifications stay on without a category opt-in, hide amounts and keep safe chart links", async () => {
   const disabled = await workerHarness({ ipo: true, trades: false });
-  await disabled.push(push({ kind: 'trade' })); assert.equal(disabled.shown.length, 0);
+  await disabled.push(push({ kind: 'trade', title: 'RELIANCE hit ₹500', body: '' })); assert.equal(disabled.shown.length, 1);
   const worker = await workerHarness({ trades: true, hideAmounts: true });
-  await worker.push(push({ kind: 'trade', body: 'Close ₹500', url: '/?symbol=RELIANCE&timeframe=5m' }));
-  assert.equal(worker.shown.length, 1); assert.doesNotMatch(worker.shown[0].body, /500/);
+  await worker.push(push({ kind: 'trade', title: 'RELIANCE hit ₹500', body: 'Close ₹500', url: '/?symbol=RELIANCE&timeframe=5m' }));
+  assert.equal(worker.shown.length, 1); assert.doesNotMatch(worker.shown[0].title, /500/); assert.doesNotMatch(worker.shown[0].body ?? "", /500/);
   assert.equal(worker.shown[0].data.url, '/?symbol=RELIANCE&timeframe=5m');
   await worker.push(push({ id: 'unsafe', kind: 'trade', url: '/?symbol=X&timeframe=5m&redirect=https://evil.example' }));
   assert.equal(worker.shown[1].data.url, '/');
 });
 
-test("session opens require the sessions preference and stay audible overnight", async () => {
-  const off = await workerHarness({ ipo: true });
-  await off.push(push({ kind: "session", id: "session-london-2026-01-06", title: "London session is open" }));
-  assert.equal(off.shown.length, 0);
-  const on = await workerHarness({ sessions: true });
-  await on.push(push({ kind: "session", id: "session-london-2026-01-06", title: "London session is open" }));
+test("session opens stay audible overnight even without a separate sessions opt-in", async () => {
+  const on = await workerHarness({ ipo: true });
+  await on.push(push({ kind: "session", id: "session-london-2026-01-06", title: "🟢 London open · 13:30–22:30 IST" }));
   assert.equal(on.shown.length, 1);
   assert.equal(on.shown[0].silent, false);
 });

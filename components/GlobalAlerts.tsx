@@ -24,6 +24,7 @@ import {
 } from "@/lib/global-alerts";
 import type { PerpSymbol } from "@/lib/global-markets";
 import type { CloudGlobalRule } from "@/lib/global-alerts-server";
+import { divergenceTitle, emaTitle, levelHitTitle } from "@/lib/notification-policy";
 const labels: Record<GlobalAlert["kind"], string> = {
   "price-above": "Price reaches / above",
   "price-below": "Price reaches / below",
@@ -92,7 +93,7 @@ export function GlobalAlerts({
       const known = new Set(readPaperTradeNotifications().map(n => n.id));
       for (const rule of next) if (rule.triggeredAt && Date.now() - rule.triggeredAt < 86400000) {
         const id = `global:${owner}:${rule.id}`;
-        if (!known.has(id)) try { addPaperTradeNotification({ id, kind: "market", title: isEma21EntryKind(rule.kind) ? `📈 ${rule.symbol} ${rule.timeframe} kissed the 21 EMA — entry is live` : `⚡ ${rule.symbol} ${rule.timeframe} divergence just confirmed — take a look`, body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}` }); } catch { /* The server retains status. */ }
+        if (!known.has(id)) try { addPaperTradeNotification({ id, kind: "market", title: isEma21EntryKind(rule.kind) ? emaTitle(rule.symbol, rule.timeframe) : divergenceTitle(rule.symbol, rule.timeframe), body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}` }); } catch { /* The server retains status. */ }
       }
       setCloudRules(next);
     } catch (error) { setCloudReady(false); setCloudMessage(error instanceof Error ? error.message : "Server monitoring unavailable."); }
@@ -258,10 +259,10 @@ export function GlobalAlerts({
           if (!saved) continue;
           for (const rule of triggered) {
             const title = rule.kind === "psbb-divergence"
-              ? `⚡ ${s} ${rule.timeframe} divergence just confirmed — take a look`
+              ? divergenceTitle(s, rule.timeframe)
               : isEma21EntryKind(rule.kind)
-              ? `📈 ${s} ${rule.timeframe} kissed the 21 EMA — entry is live`
-              : `💰 ${s} just hit your level — take a look`;
+              ? emaTitle(s, rule.timeframe)
+              : levelHitTitle(s);
             const url = rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind) ? `/?symbol=${s}&timeframe=${rule.timeframe}` : "/";
             try {
               addPaperTradeNotification({

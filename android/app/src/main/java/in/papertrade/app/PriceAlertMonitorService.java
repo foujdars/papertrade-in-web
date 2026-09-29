@@ -93,6 +93,7 @@ public class PriceAlertMonitorService extends Service {
             stopSelf();
             return;
         }
+        updateMonitorNotification(active);
         if (!isNseMarketOpen()) return;
 
         List<String> keys = new ArrayList<>();
@@ -141,6 +142,7 @@ public class PriceAlertMonitorService extends Service {
             .putString(TRIGGERED_ALERTS_KEY, pending.toString())
             .apply();
         if (remaining.length() == 0) stopSelf();
+        else updateMonitorNotification(remaining);
     }
 
     private boolean isNseMarketOpen() {
@@ -206,10 +208,38 @@ public class PriceAlertMonitorService extends Service {
     }
 
     private Notification buildMonitorNotification() {
+        JSONArray active = new JSONArray();
+        try {
+            active = new JSONArray(getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE).getString(ACTIVE_ALERTS_KEY, "[]"));
+        } catch (Exception ignored) {
+            active = new JSONArray();
+        }
+        return monitorNotification(active);
+    }
+
+    private void updateMonitorNotification(JSONArray active) {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) manager.notify(MONITOR_NOTIFICATION_ID, monitorNotification(active));
+    }
+
+    private Notification monitorNotification(JSONArray active) {
+        String title = "Watching paper stops";
+        String body = "NSE prices · 9:15–15:30";
+        int count = active.length();
+        if (count == 1) {
+            JSONObject alert = active.optJSONObject(0);
+            String symbol = alert == null ? "1 position" : alert.optString("symbol", "1 position");
+            title = clip("Watching " + symbol, 40);
+            body = onePositionDetail(alert);
+        } else if (count > 1) {
+            title = "Watching " + count + " paper levels";
+            body = clip(symbolList(active), 44);
+        }
         return new NotificationCompat.Builder(this, MONITOR_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_papertrade_current)
-            .setContentTitle("PaperTrade protection is active")
-            .setContentText("Targets and stop losses are being monitored in the background.")
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -217,13 +247,55 @@ public class PriceAlertMonitorService extends Service {
             .build();
     }
 
+    private String onePositionDetail(JSONObject alert) {
+        if (alert == null) return "NSE prices · 9:15–15:30";
+        StringBuilder line = new StringBuilder();
+        double stop = alert.optDouble("stopLossPrice", Double.NaN);
+        double target = alert.optDouble("targetPrice", Double.NaN);
+        if (Double.isFinite(stop) && stop > 0) line.append("Stop ").append(rupee(stop));
+        if (Double.isFinite(target) && target > 0) {
+            if (line.length() > 0) line.append(" · ");
+            line.append("Target ").append(rupee(target));
+        }
+        return line.length() == 0 ? "NSE prices · 9:15–15:30" : clip(line.toString(), 44);
+    }
+
+    private String symbolList(JSONArray active) {
+        StringBuilder names = new StringBuilder();
+        int shown = 0;
+        for (int index = 0; index < active.length() && shown < 3; index++) {
+            JSONObject alert = active.optJSONObject(index);
+            String symbol = alert == null ? "" : alert.optString("symbol", "");
+            if (symbol.isEmpty()) continue;
+            if (names.length() > 0) names.append(", ");
+            names.append(symbol);
+            shown++;
+        }
+        int extra = active.length() - shown;
+        if (extra > 0) names.append(" +").append(extra);
+        return names.length() == 0 ? "NSE prices · 9:15–15:30" : names.toString();
+    }
+
+    private static String clip(String text, int limit) {
+        if (text.length() <= limit) return text;
+        return text.substring(0, Math.max(0, limit - 1)).trim() + "…";
+    }
+
+    private static String rupee(double price) {
+        double rounded = Math.rint(price * 100) / 100.0;
+        boolean whole = Math.abs(rounded - Math.rint(rounded)) < 0.001;
+        return "₹" + String.format(Locale.ENGLISH, whole ? "%,.0f" : "%,.2f", rounded);
+    }
+
     private void showTriggeredNotification(JSONObject alert, String trigger, double price) {
         try {
             JSONObject notice=new JSONObject();
             String symbol=alert.optString("symbol","Stock");
+            boolean target="TARGET".equals(trigger);
+            String fact=symbol+(target?" target hit":" stop hit")+" · "+rupee(price);
             notice.put("id","price-"+alert.optString("id",symbol));notice.put("kind","trade");
-            notice.put("title",symbol+(": ")+("TARGET".equals(trigger)?"paper target reached":"paper stop-loss reached"));
-            notice.put("body",String.format(Locale.ENGLISH,"Protected price reached at Rs %,.2f. Open the app to confirm the paper exit and review the trade.",price));
+            notice.put("title",(target?"🎯 ":"🛑 ")+(fact.length()<=38?fact:symbol+(target?" target hit":" stop hit")));
+            notice.put("body","");
             notice.put("url","/?screen=pnl");NotificationDelivery.show(this,notice);
         }catch(Exception ignored){}
     }

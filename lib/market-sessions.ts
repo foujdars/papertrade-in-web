@@ -1,5 +1,5 @@
 import { NSE_HOLIDAYS } from "./nse-holidays.ts";
-import type { PushNotice } from "./notification-policy.ts";
+import { shadeChoice, type PushNotice } from "./notification-policy.ts";
 
 export const SESSION_OPEN_WINDOW_MINUTES = 3;
 
@@ -138,10 +138,12 @@ export function sessionOpenNotice(now: number): PushNotice | null {
     if (session.id === "india" && NSE_HOLIDAYS[local.date]) continue;
     const open = session.openHour * 60 + session.openMinute;
     if (local.minutes < open || local.minutes >= open + SESSION_OPEN_WINDOW_MINUTES) continue;
+    const start = zonedInstant(local.date, session.openHour, session.openMinute, session.timeZone);
+    const end = zonedInstant(local.date, session.closeHour, session.closeMinute, session.timeZone);
     return {
       id: `session-${session.id}-${local.date}`,
       kind: "session",
-      title: `🟢 ${session.name} just opened — the session is live`,
+      title: shadeChoice("🟢", [`${session.name} open · ${sessionPeriod(start, end)} IST`, `${session.name} market is open`]),
       body: "",
       url: "/",
       expiresAt: now + 30 * 60_000,

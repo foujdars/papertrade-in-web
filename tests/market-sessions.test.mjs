@@ -8,9 +8,9 @@ const at = (iso) => Date.parse(iso);
 test("session opens follow each city's local clock, including daylight saving", () => {
   const india = sessionOpenNotice(at("2026-09-15T03:45:00Z"));
   assert.equal(india.id, "session-india-2026-09-15");
-  assert.match(india.title, /India session is open/);
-  assert.match(india.body, /9:15 am local time/);
-  assert.match(india.body, /IST/);
+  assert.match(india.title, /India open · 9:15–15:30 IST/);
+  assert.equal(india.body, "");
+  assert.ok(india.title.length <= 42);
   assert.equal(sessionOpenNotice(at("2026-09-15T03:44:00Z")), null);
   assert.ok(sessionOpenNotice(at("2026-09-15T03:47:00Z")));
   assert.equal(sessionOpenNotice(at("2026-09-15T03:48:00Z")), null);

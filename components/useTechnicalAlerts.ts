@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCloudTechnicalAlerts } from "./useCloudTechnicalAlerts";
 import type { Candle, Instrument } from "@/lib/market";
 import { addPaperTradeNotification } from "@/lib/notification-center";
+import { setupTitle } from "@/lib/notification-policy";
 import { advanceTechnical, emptyTechnicalStore, evaluateTechnical, parseTechnicalStore, technicalCheckDue, technicalConfigError, technicalDescription, technicalGroup, technicalLimitError, validTechnicalCandles, type TechnicalConfig, type TechnicalEvent, type TechnicalRule, type TechnicalStore } from "@/lib/technical-alerts";
 
 export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotice: (message: string) => void) {
@@ -117,7 +118,7 @@ export function useTechnicalAlerts(ownerId: string, marketOpen: boolean, onNotic
                 if (changed) write({ ...latest, rules: updated, events: [...deliveries, ...latest.events].slice(0, 200) });
               });
               for (const event of deliveries) {
-                const title = `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
+                const title = setupTitle(event.instrument.symbol, event.timeframe);
                 try { addPaperTradeNotification({ id: event.id, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, timeframe: event.timeframe, instrument: event.instrument }); } catch { /* The durable alert log remains available if notification storage fails. */ }
                 current.current.onNotice(title);
               }

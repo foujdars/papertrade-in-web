@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { connectPush } from "@/lib/push-client";
 import { addPaperTradeNotification, readPaperTradeNotifications } from "@/lib/notification-center";
+import { priceHitTitle, setupTitle } from "@/lib/notification-policy";
 import { emptyTechnicalStore, parseTechnicalStore, type TechnicalConfig, type TechnicalRule, type TechnicalStore } from "@/lib/technical-alerts";
 import type { Instrument } from "@/lib/market";
 export function useCloudTechnicalAlerts(ownerId: string) {
@@ -21,7 +22,7 @@ export function useCloudTechnicalAlerts(ownerId: string) {
     const parsed = parseTechnicalStore(JSON.stringify(value)); setStore(parsed);
     const known = new Set(readPaperTradeNotifications().map(n => n.id));
     for (const event of [...parsed.events].reverse()) if (event.kind === "trigger" && !known.has(event.id) && Date.now() - event.createdAt < 86400000) {
-      const title = event.description.startsWith("Price ") ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`;
+      const title = event.description.startsWith("Price ") ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe);
       try { addPaperTradeNotification({ id: event.id, createdAt: event.createdAt, kind: "trade", title, body: "", symbol: event.instrument.symbol, instrumentKey: event.instrument.instrumentKey, instrument: event.instrument, timeframe: event.timeframe }); } catch { /* Server Log is retained even if browser storage is full. */ }
     }
   }

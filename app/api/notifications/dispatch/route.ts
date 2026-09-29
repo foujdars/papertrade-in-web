@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { pushConfigured, pushServices, sendPush } from "@/lib/push-admin";
-import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, type PushNotice } from "@/lib/notification-policy";
+import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, shadeChoice, shortIpoName, type PushNotice } from "@/lib/notification-policy";
 import { sessionOpenNotice } from "@/lib/market-sessions";
 import { loadAllotments } from "@/lib/ipo-allotment-server";
 import { GET as getIpos } from "@/app/api/upstox/ipos/route";
@@ -36,9 +36,10 @@ export async function GET(request: Request) {
     const released = allotmentNotice(newResults, now); if (released) events.push(released);
     const listings = ipos.filter(ipo => saved.exists && ipo.status === "listed" && ipo.details?.listingDate === day && ipo.details.listingPrice && ipo.details.issuePrice && !saved.data()?.listed?.[ipo.id]);
     if (listings.length) {
-      const lead = listings[0].name.replace(/\s+IPO$/i, "");
-      const pct = ((listings[0].details!.listingPrice! / listings[0].details!.issuePrice! - 1) * 100).toFixed(0);
-      events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: listings.length === 1 ? `🚀 ${lead} listed ${pct}% — the print is in` : `🚀 ${listings.length} listings just printed — go see the move`, body: "", url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
+      const name = shortIpoName(listings[0].name);
+      const pctNum = Math.round((listings[0].details!.listingPrice! / listings[0].details!.issuePrice! - 1) * 100);
+      const pct = `${pctNum > 0 ? "+" : ""}${pctNum}%`;
+      events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: listings.length === 1 ? shadeChoice("🚀", [`${name} listed ${pct}`, `${name} listed today`]) : shadeChoice("🚀", [`${listings.length} IPOs listed · ${name} ${pct}`, `${listings.length} IPOs listed today`]), body: "", url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
     }
     const refs = events.map(event => db.collection("notificationOutbox").doc(hash(event.id)));
     await db.runTransaction(async tx => {
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
       }
       if (calendarCount >= 2) continue;
       let notice = reviewNotice(data.reviewCount, data.reviewDate, now);
-      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:"🎯 One candle, one decision — your replay is waiting",body:"",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
+      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:shadeChoice("🎯", ["Candle replay is ready"]),body:"",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
       if (!notice || data.lastNotice === notice.id || now-data.lastActive < 10*60000) continue;
       // Claim before sending, preventing repeated notifications on overlapping runs.
       await device.ref.update({lastNotice:notice.id});

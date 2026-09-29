@@ -3,7 +3,7 @@ import { pushServices, sendPush } from "@/lib/push-admin";
 import { technicalServerConfigured } from "@/lib/technical-alerts-server";
 import { readServerTechnicalStore } from "@/lib/technical-alerts-server-model";
 import { advanceTechnical, evaluateTechnical, technicalCheckDue, technicalDescription, technicalGroup, validTechnicalCandles, type TechnicalRule } from "@/lib/technical-alerts";
-import { notificationPreferences, quietTime, type PushNotice } from "@/lib/notification-policy";
+import { notificationPreferences, priceHitTitle, quietTime, setupTitle, type PushNotice } from "@/lib/notification-policy";
 import { GET as getCandles } from "@/app/api/upstox/candles/route";
 import { GET as getSession } from "@/app/api/market/session/route";
 import { GET as getQuotes } from "@/app/api/upstox/quotes/route";
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
           if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
           const isPrice = rule.family === "price";
-          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? `💰 ${event.instrument.symbol} just hit your price — nice catch` : `📈 ${event.instrument.symbol} ${event.timeframe} just confirmed — your setup fired`, body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe), body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
           await sendPush(notice, { token: target.token }); delivered++;
         }
         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;
