@@ -201,5 +201,47 @@
 .india-vix-note { color:var(--muted); font-size:11px; line-height:1.4; }
 .india-pulse-wait { min-height:36px; display:grid; place-items:center; color:var(--muted); font-size:11px; }
 @media (max-width:420px) { .india-flow-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .india-flow-stats > div:last-child { grid-column:1 / -1; } .india-flow-stats > div:last-child strong { display:inline-block; margin-right:8px; } .india-vix strong { font-size:29px; } }
+/* Compact market pulse: readable summaries, one range selector and contextual help. */
+.india-pulse-board { gap:9px; padding-inline:12px; }
+.india-ad { gap:5px; padding:12px; }
+.india-ad-chart { height:168px; }
+.india-ad-chart text { font-size:11px; fill:var(--ink); }
+.india-ad-legend { margin-top:-2px; }
+.india-vix { gap:7px; padding:13px; }
+.india-vix strong { font-size:27px; }
+.india-vix-note { margin:0; }
+.india-flows { padding:13px; }
+.india-flow-top { gap:8px; }
+.india-flow-heading, .india-pcr-head { display:flex; align-items:center; gap:8px; }
+.india-flow-heading > b { color:#fff; font-size:14px; }
+.india-flow-heading > span { margin-left:auto; color:#c2d0e4; font-size:11px; }
+.india-flow-heading details, .india-pcr-head details { position:relative; flex:none; }
+.india-flow-heading summary, .india-pcr-head summary { display:grid; place-items:center; width:28px; height:28px; border:1px solid currentColor; border-radius:50%; color:#e0e9f8; font-size:15px; font-weight:800; list-style:none; cursor:pointer; }
+.india-pcr-head summary { color:var(--ink); }
+.india-flow-heading summary::-webkit-details-marker, .india-pcr-head summary::-webkit-details-marker { display:none; }
+.india-flow-heading details p, .india-pcr-head details p { position:absolute; z-index:5; right:0; top:24px; width:min(280px,75vw); padding:12px; border:1px solid #546987; border-radius:10px; background:#17263c; box-shadow:0 8px 24px #0006; color:#eef4fc; font-size:12px; line-height:1.45; font-weight:500; }
+.india-flow-stats { grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+.india-flow-stats > div, .india-flow-stats > div:last-child { grid-column:auto; padding:8px; }
+.india-flow-stats span { font-size:11px; white-space:nowrap; }
+.india-flow-stats strong, .india-flow-stats > div:last-child strong { display:block; margin:3px 0 0; font-size:clamp(12px,3.4vw,17px); white-space:nowrap; }
+.india-flow-stats em { margin:0; font-size:10px; }
+.india-flow-range { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#c2d0e4; font-size:11px; font-weight:700; }
+.india-flow-range select { min-width:105px; min-height:38px; padding:0 10px; border:1px solid #546987; border-radius:9px; background:#1c2d46; color:#fff; font:inherit; font-size:13px; }
+.india-flow-range select:focus-visible, .india-flow-heading summary:focus-visible, .india-pcr-head summary:focus-visible { outline:2px solid #61a8ff; outline-offset:2px; }
+.india-flow-visual { margin-top:6px; }
+.india-flow-chart { height:196px; }
+.india-flow-detail { padding:7px 9px; gap:3px 10px; }
+.india-flow-detail > b { width:auto; margin-right:auto; }
+.india-pcr { display:grid; gap:8px; padding:13px; border:1px solid var(--line); border-radius:15px; background:var(--soft); }
+.india-pcr-head > span { color:var(--ink); font-size:14px; font-weight:800; }
+.india-pcr-head details { margin-left:auto; }
+.india-pcr-main { display:flex; align-items:baseline; gap:10px; }
+.india-pcr-main strong { color:var(--ink); font-size:28px; line-height:1; font-variant-numeric:tabular-nums; }
+.india-pcr-main span { color:var(--muted); font-size:11px; }
+.india-pcr-track { height:11px; overflow:hidden; border-radius:99px; background:#ed6682; }
+.india-pcr-track i { display:block; height:100%; background:#2f80e7; }
+.india-pcr-labels { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; font-weight:700; }
+.india-pcr-labels span:first-child { color:#2464bd; }
+.india-pcr-labels span:last-child { color:#bc3858; }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}

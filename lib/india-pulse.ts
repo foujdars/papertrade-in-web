@@ -12,6 +12,22 @@ export function vixBand(price: number) {
 }
 export type CashFlow = { date: string; label: string; fii: number; dii: number };
 export type AdPoint = { t: number; advance: number; decline: number };
+export type PutCallRatio = { value: number; putOi: number; callOi: number; expiry: string; asOf: string };
+
+export function putCallRatio(rows: unknown, expiry: string, asOf: string): PutCallRatio | null {
+  if (!Array.isArray(rows)) return null;
+  let putOi = 0;
+  let callOi = 0;
+  for (const row of rows) {
+    const item = row as { put_options?: { market_data?: { oi?: unknown } }; call_options?: { market_data?: { oi?: unknown } } };
+    const put = Number(item?.put_options?.market_data?.oi);
+    const call = Number(item?.call_options?.market_data?.oi);
+    if (Number.isFinite(put) && put > 0) putOi += put;
+    if (Number.isFinite(call) && call > 0) callOi += call;
+  }
+  if (!putOi || !callOi) return null;
+  return { value: putOi / callOi, putOi, callOi, expiry, asOf };
+}
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
 
@@ -113,7 +129,7 @@ export function appendAdTape(points: AdPoint[], breadth: NseBreadth | null, now 
 
 /** During the session, draw today's line once it exists. Otherwise keep the last full session until 9:15 forms a new one. */
 export function selectAdTape(today: AdPoint[], closed: AdPoint[], now = Date.now()): AdPoint[] {
-  if (inNseCashSession(now)) return today.length ? today : closed;
+  if (inNseCashSession(now)) return today;
   if (today.length) return today;
   return closed;
 }
@@ -197,7 +213,6 @@ export function withNifty(flows: CashFlow[], closes: { date: string; close: numb
 }
 
 export const FLOW_WINDOWS = [
-  { id: "1D", label: "1D", days: 1 },
   { id: "1W", label: "1W", days: 7 },
   { id: "1M", label: "1M", days: 31 },
   { id: "3M", label: "3M", days: 93 },
