@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { appendAdTape, fiiDii, flowsInRange, historyFlows, indexBreadth, indiaVix, istStamp, mergeFlows, niftyCloses, nseBreadth, selectAdTape, vixBand, withNifty } from "../lib/india-pulse.ts";
+import { appendAdTape, fiiDii, flowsInRange, historyFlows, indexBreadth, indiaVix, istStamp, mergeFlows, niftyCloses, nseBreadth, putCallRatio, selectAdTape, vixBand, withNifty, FLOW_WINDOWS } from "../lib/india-pulse.ts";
 
 test("NSE advance and decline come from the Moneycontrol bar", () => {
   const breadth = nseBreadth('<div class="advBar"><span style="width:43%;"></span></div><div class="bartxt"><span class="baradv">1,380</span><span class="bardecl">1870</span></div>');
@@ -41,8 +41,15 @@ test("after the close the full session stays up until the next 9:15 tape forms",
   const tuesday = [{ t: istStamp("2026-09-29", 15, 30), advance: 1380, decline: 1870 }];
   assert.equal(selectAdTape(tuesday, [], istStamp("2026-09-29", 18, 0)).length, 1);
   assert.equal(selectAdTape([], tuesday, istStamp("2026-09-30", 8, 30))[0].advance, 1380);
+  assert.deepEqual(selectAdTape([], tuesday, istStamp("2026-09-30", 9, 15)), []);
   const wednesday = [{ t: istStamp("2026-09-30", 9, 16), advance: 400, decline: 200 }];
   assert.equal(selectAdTape(wednesday, tuesday, istStamp("2026-09-30", 9, 16))[0].advance, 400);
+});
+
+test("PCR sums nearest-expiry put and call open interest and does not invent missing values", () => {
+  assert.deepEqual(putCallRatio([{ put_options: { market_data: { oi: 120 } }, call_options: { market_data: { oi: 80 } } }, { put_options: { market_data: { oi: 60 } }, call_options: { market_data: { oi: 40 } } }], "2026-10-01", "2026-09-29T10:00:00Z"), { value: 1.5, putOi: 180, callOi: 120, expiry: "2026-10-01", asOf: "2026-09-29T10:00:00Z" });
+  assert.equal(putCallRatio([{ put_options: { market_data: { oi: 100 } } }], "2026-10-01", "now"), null);
+  assert.equal(FLOW_WINDOWS.some(item => item.id === "1D"), false);
 });
 
 test("FII and DII ranges keep six months and one year", () => {
