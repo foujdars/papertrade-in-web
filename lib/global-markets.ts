@@ -684,6 +684,7 @@ export function closePerp(
   kind: "CLOSE" | "LIQUIDATION" = "CLOSE",
   detail = "Manual reduce-only close",
   maker = false,
+  force = false,
 ): PerpAccount {
   const p = a.positions.find((p) => p.symbol === symbol);
   if (!p) throw new Error("No position to close.");
@@ -696,6 +697,7 @@ export function closePerp(
   )
     throw new Error("Close quantity must not exceed the open position.");
   if (
+    !force &&
     kind !== "LIQUIDATION" &&
     contracts > (p.side === "BUY" ? q.bidSize : q.askSize)
   )
@@ -822,16 +824,17 @@ export function advancePerps(
       (p.target !== undefined &&
         (p.side === "BUY" ? q.mark >= p.target : q.mark <= p.target))
     )) {
-      if (p.contracts <= (p.side === "BUY" ? q.bidSize : q.askSize))
-        n = closePerp(
-          n,
-          p.symbol,
-          q,
-          p.contracts,
-          now,
-          "CLOSE",
-          "Mark-price TP/SL · observed bid/ask",
-        );
+      n = closePerp(
+        n,
+        p.symbol,
+        q,
+        p.contracts,
+        now,
+        "CLOSE",
+        "Mark-price TP/SL · observed bid/ask",
+        false,
+        true,
+      );
     }
   }
   if (manageOrders && !n.fundingGap)

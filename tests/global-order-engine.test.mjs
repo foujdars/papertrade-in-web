@@ -46,6 +46,51 @@ test('moving a trailing stop retains its mode and saved anchor', () => {
   assert.equal(b.positions[0].protection.stopLoss.trail, 250);
   assert.equal(globalChartLevels(b.positions[0]).stopLossPrice, 99750);
 });
+test('a later chart wick exits a dragged stop even when mark is back inside', () => {
+  const a = submit();
+  const armed = moveGlobalChartLevel(a, 'BTCUSD', 'stopLoss', 99500, quote, now, { time: 100, high: 100200, low: 99800, frame: '5m' });
+  const inside = fresh(99900);
+  const held = advanceGlobalAccount(armed, { BTCUSD: inside }, { BTCUSD: spec }, inside.at, { BTCUSD: { time: 100, high: 100200, low: 99800, frame: '5m' } });
+  assert.equal(held.positions.length, 1);
+  const wicked = advanceGlobalAccount(armed, { BTCUSD: inside }, { BTCUSD: spec }, inside.at, { BTCUSD: { time: 100, high: 100200, low: 99400, frame: '5m' } });
+  assert.equal(wicked.positions.length, 0);
+});
+test('a wick already on the candle when the stop is placed does not exit', () => {
+  const a = submit();
+  const armed = moveGlobalChartLevel(a, 'BTCUSD', 'stopLoss', 99500, quote, now, { time: 100, high: 100200, low: 99000, frame: '5m' });
+  const inside = fresh(99900);
+  const held = advanceGlobalAccount(armed, { BTCUSD: inside }, { BTCUSD: spec }, inside.at, { BTCUSD: { time: 100, high: 100200, low: 99000, frame: '5m' } });
+  assert.equal(held.positions.length, 1);
+  assert.equal(held.positions[0].protection.stopLoss.seenLow, 99000);
+});
+test('the next candle high exits a dragged target while mark stays below it', () => {
+  const a = submit();
+  const armed = moveGlobalChartLevel(a, 'BTCUSD', 'target', 101000, quote, now, { time: 100, high: 100400, low: 99800, frame: '5m' });
+  const q = fresh(100200);
+  const closed = advanceGlobalAccount(armed, { BTCUSD: q }, { BTCUSD: spec }, q.at, { BTCUSD: { time: 200, high: 101200, low: 100000, frame: '5m' } });
+  assert.equal(closed.positions.length, 0);
+});
+test('chart last price exits when mark has not crossed the dragged target', () => {
+  const armed = moveGlobalChartLevel(submit(), 'BTCUSD', 'target', 101000, quote, now);
+  const q = fresh(100500, 1000, { last: 101050 });
+  assert.equal(advance(armed, q).positions.length, 0);
+});
+test('a thin book cannot block a paper stop or target', () => {
+  const armed = moveGlobalChartLevel(submit(), 'BTCUSD', 'stopLoss', 99500, quote, now);
+  const q = fresh(99000, 1000, { bidSize: 0, askSize: 0 });
+  assert.equal(advance(armed, q).positions.length, 0);
+  assert.throws(() => closePerp(submit(), 'BTCUSD', fresh(100000, 1000, { bidSize: 1 }), 10, now + 1000), /liquidity/);
+});
+test('an old wick does not exit a saved stop until price extends past it', () => {
+  const armed = moveGlobalChartLevel(submit(), 'BTCUSD', 'stopLoss', 99500, quote, now);
+  const q = fresh(99900);
+  const held = advanceGlobalAccount(armed, { BTCUSD: q }, { BTCUSD: spec }, q.at, { BTCUSD: { time: 200, high: 100200, low: 99000, frame: '5m' } });
+  assert.equal(held.positions.length, 1);
+  assert.equal(held.positions[0].protection.stopLoss.seenTime, 200);
+  const q2 = fresh(99900, 2000);
+  const closed = advanceGlobalAccount(held, { BTCUSD: q2 }, { BTCUSD: spec }, q2.at, { BTCUSD: { time: 200, high: 100200, low: 98000, frame: '5m' } });
+  assert.equal(closed.positions.length, 0);
+});
 
 test("new global accounts, margin, fees and P&L are all USD", () => {
   const a = submit();

@@ -1694,6 +1694,8 @@ export function TradingDashboard() {
         const nextCandles = payload.candles;
         globalCandleScopeRef.current = `${selectedDeltaChartSymbol}:${timeframe}`;
         setGlobalCandles(previous => previous?.length === nextCandles.length && previous.every((c, i) => candlesEqual(c, nextCandles[i])) ? previous : nextCandles);
+        const lastCandle = nextCandles[nextCandles.length - 1];
+        if (selectedDeltaSymbol && lastCandle) globalTrading.noteCandle(selectedDeltaSymbol, { time: lastCandle.time, high: lastCandle.high, low: lastCandle.low, frame: timeframe });
         setFeedStatus({ mode: "live", message: "Delta Exchange India candles", updatedAt: payload.fetchedAt ? new Date(payload.fetchedAt).toISOString() : undefined });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -1711,7 +1713,7 @@ export function TradingDashboard() {
       window.clearTimeout(retryTimer);
       document.removeEventListener("visibilitychange", resume);
     };
-  }, [selectedDeltaChartSymbol, timeframe]);
+  }, [selectedDeltaChartSymbol, selectedDeltaSymbol, timeframe, globalTrading.noteCandle]);
   const selectedQuote = marketQuotes[selected.instrumentKey] ?? marketQuotes[selected.symbol];
   const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
   const selectedVenueLabel = instrumentVenueLabel(selected);
@@ -1976,12 +1978,15 @@ export function TradingDashboard() {
     if (selectedDeltaChartSymbol) {
       if (!committed) return;
       const symbol = selectedDeltaChartSymbol;
+      const lastCandle = selectedDeltaSymbol && globalCandleScopeRef.current === `${symbol}:${timeframe}` ? globalCandles?.at(-1) : undefined;
+      const extreme = lastCandle && lastCandle.time > 0 ? { time: lastCandle.time, high: lastCandle.high, low: lastCandle.low, frame: timeframe } : undefined;
+      if (selectedDeltaSymbol && extreme) globalTrading.noteCandle(selectedDeltaSymbol, extreme);
       let error = "Could not save protection. Please try again.";
       void globalTrading.transact((account, perps, options) => {
         try {
           const quote = selectedDeltaOption ? options[symbol]?.quote : perps[symbol]?.quote;
           if (!quote) throw new Error("Waiting for a fresh global quote.");
-          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value > 0 ? value : undefined, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now());
+          return selectedDeltaOption ? moveOptionChartLevel(account, symbol, level, value > 0 ? value : undefined, quote, Date.now()) : moveGlobalChartLevel(account, symbol, level, value, quote, Date.now(), extreme);
         } catch (cause) { error = cause instanceof Error ? cause.message : error; throw cause; }
       }).then(saved => setToast(saved ? `${level === "target" ? "Target" : "Stop loss"} saved · ${symbol} · USD` : error));
       return;

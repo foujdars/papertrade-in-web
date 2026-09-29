@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "next build && node scripts/verify-coach-assets.mjs",
-  "ignoreCommand": "exit 0"
+  "buildCommand": "next build && node scripts/verify-coach-assets.mjs"
 }

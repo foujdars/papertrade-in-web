@@ -1,5 +1,5 @@
 import { freshPerpQuote, type PerpAccount, type PerpPosition, type PerpQuote } from "./global-markets.ts";
-import { roundGlobalPrice, triggerValue, type GlobalExit, type GlobalProtection } from "./global-order-engine.ts";
+import { roundGlobalPrice, triggerValue, type ChartExtreme, type GlobalExit, type GlobalProtection } from "./global-order-engine.ts";
 
 export function globalChartLevels(p: PerpPosition) {
   const plan = p.protection;
@@ -10,7 +10,15 @@ export function globalChartLevels(p: PerpPosition) {
 }
 
 /** Change only the dragged leg. Keep trigger source, opposite leg and limit offset. */
-export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "target" | "stopLoss", value: number, q: PerpQuote, now: number): PerpAccount {
+function armChartLeg(leg: GlobalExit, now: number, candle?: ChartExtreme): GlobalExit {
+  const armed: GlobalExit = { ...leg, armedAt: now };
+  if (candle && candle.time > 0 && candle.high > 0 && candle.low > 0 && candle.high >= candle.low) {
+    armed.seenTime = candle.time; armed.seenHigh = candle.high; armed.seenLow = candle.low;
+    if (candle.frame) armed.seenFrame = candle.frame;
+  }
+  return armed;
+}
+export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "target" | "stopLoss", value: number, q: PerpQuote, now: number, candle?: ChartExtreme): PerpAccount {
   const p = a.positions.find(p => p.symbol === symbol);
   if (!p || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("A position and fresh quote are required to move protection.");
   if (p.protection?.activeExit) throw new Error("An exit has already triggered. Manage it in Positions.");
@@ -27,16 +35,16 @@ export function moveGlobalChartLevel(a: PerpAccount, symbol: string, level: "tar
   if (above ? price <= reference : price >= reference) throw new Error("That level is already crossed by the trigger price. Choose another level.");
   const key = level === "target" ? "takeProfit" : "stopLoss";
   const old = plan[key];
-  let leg: GlobalExit = { mode: "Market", trigger: price };
+  let leg = armChartLeg({ mode: "Market", trigger: price }, now, candle);
   if (old?.mode === "Limit") {
     const limit = roundGlobalPrice(price + (old.limit! - old.trigger!), p.spec);
     if (limit <= 0) throw new Error("The moved exit limit would be invalid. Adjust it in Positions.");
-    leg = { ...old, trigger: price, limit };
+    leg = armChartLeg({ ...old, trigger: price, limit }, now, candle);
   } else if (old?.mode === "Trail") {
     const anchor = old.anchor ?? reference;
     const trail = roundGlobalPrice((anchor - price) * (p.side === "BUY" ? 1 : -1), p.spec);
     if (trail <= 0 || trail >= Math.min(reference, p.entry)) throw new Error("Choose a valid trailing-stop distance.");
-    leg = { ...old, anchor, trail };
+    leg = armChartLeg({ ...old, anchor, trail }, now, candle);
   }
   return { ...a, revision: a.revision + 1, positions: a.positions.map(item => item.symbol === symbol ? { ...item, stop: undefined, target: undefined, protection: { ...plan, [key]: leg } } : item) };
 }

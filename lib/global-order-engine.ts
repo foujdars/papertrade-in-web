@@ -9,7 +9,8 @@ export const GLOBAL_ORDER_TYPES = ["Market", "Limit", "Maker only", "Stop limit"
 export type GlobalOrderType = typeof GLOBAL_ORDER_TYPES[number];
 export type TriggerSource = "mark" | "last" | "index";
 export type SizeUnit = "lots" | "USD" | "asset";
-export type GlobalExit = { mode: "Market" | "Limit" | "Trail"; trigger?: number; limit?: number; trail?: number; anchor?: number };
+export type GlobalExit = { mode: "Market" | "Limit" | "Trail"; trigger?: number; limit?: number; trail?: number; anchor?: number; armedAt?: number; seenTime?: number; seenHigh?: number; seenLow?: number; seenFrame?: string };
+export type ChartExtreme = { time: number; high: number; low: number; frame?: string };
 export type GlobalProtection = { source: TriggerSource; takeProfit?: GlobalExit; stopLoss?: GlobalExit; activeExit?: "takeProfit" | "stopLoss" };
 export type GlobalOrderFields = {
   type?: GlobalOrderType; trigger?: number; source?: TriggerSource; trail?: number;
@@ -151,7 +152,26 @@ export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: 
   return pending;
 }
 /** Observe current quotes only. Triggered limit orders remain active across price reversals. */
-export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<PerpSymbol, PerpQuote>>, specs: Partial<Record<PerpSymbol, PerpSpec>>, now: number) {
+const priceCrossed = (above: boolean, price: number | undefined, trigger: number) => !!price && (above ? price >= trigger : price <= trigger);
+/** A wick already on the candle when the level was armed must not stop the position out. Later extremes do. */
+function chartExtremeHit(leg: GlobalExit, extreme: ChartExtreme | undefined, above: boolean, trigger: number) {
+  if (!extreme || !(extreme.time > 0) || !(extreme.high > 0) || !(extreme.low > 0) || extreme.high < extreme.low) return false;
+  const frameMismatch = !!leg.seenFrame && !!extreme.frame && leg.seenFrame !== extreme.frame;
+  if (!leg.seenTime || frameMismatch) {
+    leg.seenTime = extreme.time; leg.seenHigh = extreme.high; leg.seenLow = extreme.low;
+    if (extreme.frame) leg.seenFrame = extreme.frame;
+    return false;
+  }
+  if (extreme.time < leg.seenTime) return false;
+  const hit = extreme.time === leg.seenTime
+    ? (above ? extreme.high > (leg.seenHigh ?? extreme.high) && extreme.high >= trigger : extreme.low < (leg.seenLow ?? extreme.low) && extreme.low <= trigger)
+    : (above ? extreme.high >= trigger : extreme.low <= trigger);
+  if (extreme.time !== leg.seenTime || extreme.high !== leg.seenHigh || extreme.low !== leg.seenLow) {
+    leg.seenTime = extreme.time; leg.seenHigh = extreme.high; leg.seenLow = extreme.low;
+  }
+  return hit;
+}
+export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<PerpSymbol, PerpQuote>>, specs: Partial<Record<PerpSymbol, PerpSpec>>, now: number, extremes?: Partial<Record<string, ChartExtreme>>) {
   let n = advancePerps(a, quotes, specs, now, false);
   for (const p of [...n.positions]) {
     const q = quotes[p.symbol], plan = cloneProtection(p.protection);
@@ -163,16 +183,17 @@ export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<Perp
       sl.anchor = p.side === "BUY" ? Math.max(sl.anchor ?? observed, observed) : Math.min(sl.anchor ?? observed, observed);
       sl.trigger = p.side === "BUY" ? sl.anchor - sl.trail! : sl.anchor + sl.trail!;
     }
+    const extreme = extremes?.[p.symbol];
     for (const key of ["stopLoss", "takeProfit"] as const) {
       const leg = plan[key];
-      if (!leg || plan.activeExit) continue;
+      if (!leg || plan.activeExit || !validPositive(leg.trigger)) continue;
       const above = p.side === "BUY" ? key === "takeProfit" : key === "stopLoss";
-      if (above ? observed >= leg.trigger! : observed <= leg.trigger!) plan.activeExit = key;
+      if (priceCrossed(above, observed, leg.trigger) || priceCrossed(above, q.last, leg.trigger) || chartExtremeHit(leg, extreme, above, leg.trigger)) plan.activeExit = key;
     }
     if (JSON.stringify(plan) !== JSON.stringify(p.protection)) n = { ...n, revision: n.revision + 1, positions: n.positions.map(v => v.symbol === p.symbol ? { ...v, protection: plan } : v) };
     const leg = plan.activeExit && plan[plan.activeExit];
     if (!leg || leg.mode === "Limit" && (p.side === "BUY" ? q.bid < leg.limit! : q.ask > leg.limit!)) continue;
-    try { n = closePerp(n, p.symbol, q, p.contracts, now, "CLOSE", `${plan.activeExit} · ${leg.mode} · ${plan.source}`); } catch { /* Retry only when visible liquidity supports execution. */ }
+    try { n = closePerp(n, p.symbol, q, p.contracts, now, "CLOSE", `${plan.activeExit} · ${leg.mode} · ${plan.source}`, false, true); } catch { /* Retry on the next fresh quote. */ }
   }
   for (const old of [...n.orders]) {
     if (!n.orders.some(o => o.id === old.id)) continue;

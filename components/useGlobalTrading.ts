@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { advanceGlobalAccount, readGlobalAccount } from "@/lib/global-order-engine";
+import { advanceGlobalAccount, readGlobalAccount, type ChartExtreme } from "@/lib/global-order-engine";
 import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
 
@@ -17,6 +17,13 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
   const snapshotsRef = useRef(snapshots);
   const optionSnapshotsRef = useRef(optionSnapshots);
   const inFlight = useRef(false);
+  const extremesRef = useRef<Partial<Record<string, ChartExtreme>>>({});
+  const noteCandle = useCallback((symbol: string, candle: ChartExtreme | null | undefined) => {
+    if (!symbol || !candle || !(candle.time > 0) || !(candle.high > 0) || !(candle.low > 0) || candle.high < candle.low) return;
+    const prev = extremesRef.current[symbol];
+    if (prev && prev.time === candle.time && prev.high === candle.high && prev.low === candle.low && prev.frame === candle.frame) return;
+    extremesRef.current = { ...extremesRef.current, [symbol]: { time: candle.time, high: candle.high, low: candle.low, frame: candle.frame } };
+  }, []);
   useEffect(() => {
     activeKey.current = key;
     setAccount(null); setError(""); setBusy(false);
@@ -102,7 +109,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
         for (const [symbol, snapshot] of Object.entries(next)) {
           if (snapshot) { quotes[symbol] = snapshot.quote; specs[symbol] = snapshot.spec; }
         }
-        await transact(a => advanceOptions(advanceGlobalAccount(a, quotes, specs, Date.now()), observedOptions, Date.now()), true);
+        await transact(a => advanceOptions(advanceGlobalAccount(a, quotes, specs, Date.now(), extremesRef.current), observedOptions, Date.now()), true);
       } finally { running = false; }
     };
     void poll();
@@ -110,6 +117,6 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     document.addEventListener("visibilitychange", poll);
     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
   }, [monitorSymbols, transact]);
-  return { account, snapshots, optionSnapshots, clock, busy, error, transact };
+  return { account, snapshots, optionSnapshots, clock, busy, error, transact, noteCandle };
 }
 export type GlobalTrading = ReturnType<typeof useGlobalTrading>;
