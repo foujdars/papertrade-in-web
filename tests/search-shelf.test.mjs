@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { moneycontrolCryptoSymbols, moneycontrolEquitySymbols, popularHeading, searchShelfRows, tradingViewLeaders } from "../lib/search-shelf.ts";
+import { moneycontrolCryptoSymbols, moneycontrolEquitySymbols, moneycontrolTrendingSymbols, moneycontrolUsSymbols, popularHeading, searchShelfRows, tradingViewLeaders } from "../lib/search-shelf.ts";
 
 const instruments = [
   { symbol: "RELIANCE", name: "Reliance Industries", instrumentKey: "NSE_EQ|1", categories: [], assetType: "EQUITY" },
@@ -20,8 +20,12 @@ const popular = {
 };
 
 test("Moneycontrol pages yield NSE symbols and crypto bases", () => {
+  const trending = moneycontrolTrendingSymbols({ a: { analytics_sequence: "2", sc_nseid: "TCS" }, b: { analytics_sequence: "1", sc_nseid: " idea " }, c: { analytics_sequence: "3", sc_nseid: "" } });
+  assert.deepEqual(trending, ["IDEA", "TCS"]);
   const indian = moneycontrolEquitySymbols({ props: { pageProps: { marketStatsData: { marketStatsOverviewData: { list: [{ symbol: " sail " }, { symbol: "RELIANCE" }, { symbol: "bad symbol" }, { symbol: "RELIANCE" }] } } } } });
   assert.deepEqual(indian, ["SAIL", "RELIANCE"]);
+  const us = moneycontrolUsSymbols({ props: { pageProps: { USData: { tableData: { header: [{ name: "stock_ticker" }], body: { dataList: [["NVDA"], ["AAPL"], ["BRK.B"], ["too long"]] } } } } } });
+  assert.deepEqual(us, ["NVDA", "AAPL", "BRK.B"]);
   const crypto = moneycontrolCryptoSymbols({ props: { pageProps: { topCryptoListData: [{ baseAsset: "BTC" }, { baseAsset: "USDC" }, { baseAsset: "ETH" }] } } });
   assert.deepEqual(crypto, ["BTC", "ETH"]);
   assert.deepEqual(tradingViewLeaders({ data: [{ d: ["NVDA"] }, { d: ["AAPL"] }, { d: ["TOO-LONG"] }] }), ["NVDA", "AAPL"]);
@@ -31,7 +35,7 @@ test("All opens with recent charts before Moneycontrol names", () => {
   const rows = searchShelfRows({ shelf: "all", instruments, recent: ["BTCUSD", "RELIANCE"], popular, query: "" });
   assert.deepEqual(rows.recent.map(item => item.symbol), ["BTCUSD", "RELIANCE"]);
   assert.deepEqual(rows.popular.map(item => item.symbol), ["TCS"]);
-  assert.equal(popularHeading("all", popular), "Most active on Moneycontrol");
+  assert.equal(popularHeading("all", popular), "Trending on Moneycontrol");
 });
 
 test("IN keeps Indian charts first, US and crypto use their own rankings", () => {
@@ -42,6 +46,8 @@ test("IN keeps Indian charts first, US and crypto use their own rankings", () =>
   assert.deepEqual(us.recent.map(item => item.symbol), ["AAPLXUSD"]);
   assert.deepEqual(us.popular.map(item => item.symbol), ["NVDAXUSD"]);
   assert.equal(popularHeading("us", popular), "Most active on TradingView");
+  assert.equal(popularHeading("us", { ...popular, sources: { ...popular.sources, us: "moneycontrol" } }), "Largest on Moneycontrol");
+  assert.equal(popularHeading("crypto", popular), "Top on Moneycontrol");
   const crypto = searchShelfRows({ shelf: "crypto", instruments, recent: [], popular, query: "" });
   assert.deepEqual(crypto.popular.map(item => item.symbol), ["ETHUSD", "BTCUSD"]);
 });
@@ -55,6 +61,8 @@ test("a query stays inside the selected tab", () => {
 
 test("the popular route reads Moneycontrol", async () => {
   const route = await readFile(new URL("../app/api/market/search-popular/route.ts", import.meta.url), "utf8");
+  assert.match(route, /moneycontrol\.com\/mc-apis\/trending-stocks\/limit-30/);
   assert.match(route, /moneycontrol\.com\/stocks\/market-stats\/most-active-stocks-nse/);
   assert.match(route, /moneycontrol\.com\/cryptocurrency/);
+  assert.match(route, /moneycontrol\.com\/us-markets\/market-movers\/top-companies-by-market-cap/);
 });

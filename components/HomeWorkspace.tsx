@@ -84,7 +84,7 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock, preferenceOwner='guest', favouriteSymbols=[], recentSymbols=[], onClearRecent,
+  onOpenStock, preferenceOwner='guest', recentSymbols=[], onClearRecent,
   realisedToday=0, openChangeToday=0, attention=[], onAttention, resumeChart, onResumeChart, onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
@@ -152,7 +152,7 @@ export function HomeWorkspace({
       .then(response => response.json())
       .then(body => {
         if (!body?.ok || !Array.isArray(body.in) || !Array.isArray(body.us) || !Array.isArray(body.crypto)) return;
-        setPopular({ in: body.in, us: body.us, crypto: body.crypto, sources: { in: String(body.sources?.in ?? "moneycontrol"), us: String(body.sources?.us ?? "tradingview"), crypto: String(body.sources?.crypto ?? "moneycontrol") } });
+        setPopular({ in: body.in, us: body.us, crypto: body.crypto, sources: { in: String(body.sources?.in ?? "fallback"), us: String(body.sources?.us ?? "fallback"), crypto: String(body.sources?.crypto ?? "fallback") } });
       })
       .catch(() => undefined);
     return () => { document.body.style.overflow = previous; controller.abort(); };

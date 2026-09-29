@@ -12,7 +12,7 @@ export const FALLBACK_POPULAR: PopularLists = {
   in: ["RELIANCE", "HDFCBANK", "TCS", "BHARTIARTL", "ICICIBANK", "INFY", "SBIN", "ITC", "LT", "HINDUNILVR", "BAJFINANCE", "MARUTI", "M&M", "SUNPHARMA", "TATAMOTORS", "AXISBANK", "KOTAKBANK", "TATASTEEL", "TRENT", "HAL"],
   us: ["NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "AMD", "PLTR", "INTC", "MU"],
   crypto: ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE", "ADA", "LINK", "AVAX", "SUI"],
-  sources: { in: "moneycontrol", us: "tradingview", crypto: "moneycontrol" },
+  sources: { in: "fallback", us: "fallback", crypto: "fallback" },
 };
 
 const STABLE = new Set(["USDT", "USDC", "DAI", "TUSD", "FDUSD", "USDE", "STETH", "WBETH", "WETH", "WBTC"]);
@@ -22,6 +22,40 @@ export function nextData(html: string): unknown {
   if (!match) return null;
   try { return JSON.parse(match[1]); }
   catch { return null; }
+}
+
+export function moneycontrolTrendingSymbols(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object") return [];
+  const rows = Object.values(payload as Record<string, unknown>).filter((row): row is { analytics_sequence?: unknown; sc_nseid?: unknown } => !!row && typeof row === "object");
+  rows.sort((a, b) => Number(a.analytics_sequence ?? 99) - Number(b.analytics_sequence ?? 99));
+  const symbols: string[] = [];
+  for (const row of rows) {
+    const symbol = typeof row.sc_nseid === "string" ? row.sc_nseid.trim().toUpperCase() : "";
+    if (!/^[A-Z0-9&-]{1,20}$/.test(symbol) || symbols.includes(symbol)) continue;
+    symbols.push(symbol);
+    if (symbols.length >= 24) break;
+  }
+  return symbols;
+}
+
+export function moneycontrolUsSymbols(payload: unknown): string[] {
+  const table = (payload as { props?: { pageProps?: { USData?: { tableData?: { header?: unknown; body?: { dataList?: unknown } } } } } })?.props?.pageProps?.USData?.tableData;
+  const rows = table?.body?.dataList;
+  if (!Array.isArray(rows)) return [];
+  const header = Array.isArray(table?.header) ? table.header : [];
+  const found = header.findIndex(column => {
+    const name = (column as { name?: unknown })?.name;
+    return name === "stock_ticker" || name === "ticker";
+  });
+  const index = found >= 0 ? found : 0;
+  const symbols: string[] = [];
+  for (const row of rows) {
+    const symbol = Array.isArray(row) && typeof row[index] === "string" ? row[index].trim().toUpperCase() : "";
+    if (!/^[A-Z.]{1,6}$/.test(symbol) || symbols.includes(symbol)) continue;
+    symbols.push(symbol);
+    if (symbols.length >= 24) break;
+  }
+  return symbols;
 }
 
 export function moneycontrolEquitySymbols(payload: unknown): string[] {
@@ -72,9 +106,9 @@ function shelfOf(item: DirectoryInstrument): SearchShelfId | "other" {
   return "other";
 }
 
-export function searchShelfRows(input: {
+export function searchShelfRows<T extends DirectoryInstrument>(input: {
   shelf: SearchShelfId;
-  instruments: DirectoryInstrument[];
+  instruments: T[];
   recent: string[];
   popular: PopularLists;
   query: string;
@@ -82,7 +116,7 @@ export function searchShelfRows(input: {
   const tradable = input.instruments.filter(item => item.assetType !== "OPTION");
   const pool = tradable.filter(item => input.shelf === "all" || shelfOf(item) === input.shelf);
   const bySymbol = new Map(pool.map(item => [item.symbol.toUpperCase(), item]));
-  const byTicker = new Map<string, DirectoryInstrument>();
+  const byTicker = new Map<string, T>();
   for (const item of pool) {
     const key = marketTicker(item).toUpperCase();
     const previous = byTicker.get(key);
@@ -91,12 +125,12 @@ export function searchShelfRows(input: {
   const query = input.query.trim().toLowerCase();
   if (query) {
     return {
-      recent: [] as DirectoryInstrument[],
-      popular: [] as DirectoryInstrument[],
+      recent: [] as T[],
+      popular: [] as T[],
       matches: pool.filter(item => `${item.symbol} ${item.name} ${marketDisplayName(item)}`.toLowerCase().includes(query)).slice(0, 20),
     };
   }
-  const recent: DirectoryInstrument[] = [];
+  const recent: T[] = [];
   for (const symbol of input.recent) {
     const item = bySymbol.get(symbol.toUpperCase());
     if (!item || recent.some(row => row.symbol === item.symbol)) continue;
@@ -105,7 +139,7 @@ export function searchShelfRows(input: {
   }
   const tokens = input.shelf === "us" ? input.popular.us : input.shelf === "crypto" ? input.popular.crypto : input.popular.in;
   const seen = new Set(recent.map(item => item.symbol));
-  const popular: DirectoryInstrument[] = [];
+  const popular: T[] = [];
   for (const token of tokens) {
     const key = token.toUpperCase();
     const item = bySymbol.get(key) ?? bySymbol.get(`${key}USD`) ?? byTicker.get(key);
@@ -115,12 +149,15 @@ export function searchShelfRows(input: {
     popular.push(item);
     if (popular.length >= 12) break;
   }
-  return { recent, popular, matches: [] as DirectoryInstrument[] };
+  return { recent, popular, matches: [] as T[] };
 }
 
 export function popularHeading(shelf: SearchShelfId, popular: PopularLists) {
   const source = shelf === "us" ? popular.sources.us : shelf === "crypto" ? popular.sources.crypto : popular.sources.in;
   if (source === "tradingview") return "Most active on TradingView";
-  if (source === "moneycontrol") return "Most active on Moneycontrol";
+  if (source === "moneycontrol-active") return "Most active on Moneycontrol";
+  if (shelf === "us" && source === "moneycontrol") return "Largest on Moneycontrol";
+  if (shelf === "crypto" && source === "moneycontrol") return "Top on Moneycontrol";
+  if (source === "moneycontrol") return "Trending on Moneycontrol";
   return "Popular symbols";
 }
