@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 public class IpoOpeningAlertWorker extends Worker {
     private static final String UNIQUE_WORK_NAME = "papertrade_daily_ipo_opening_alert";
-    private static final String CHANNEL_ID = "papertrade_ipo_gmp_alerts_v1";
+    private static final String CHANNEL_ID = "papertrade_ipo_gmp_alerts_tu_v1";
     private static final String ENDPOINT = "https://www.papertrade.site/api/upstox/ipos?status=open";
     private static final ZoneId INDIA_ZONE = ZoneId.of("Asia/Kolkata");
 
@@ -128,6 +128,7 @@ public class IpoOpeningAlertWorker extends Worker {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Daily IPO alerts", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("IPO opening, closing-day and GMP reminders");
             channel.enableVibration(true);
+            PaperTradeTone.apply(context, channel);
             manager.createNotificationChannel(channel);
         }
         Intent launchIntent = new Intent(context, MainActivity.class)

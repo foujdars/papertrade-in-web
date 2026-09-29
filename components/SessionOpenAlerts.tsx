@@ -5,6 +5,7 @@ import { sessionOpenNotice } from "@/lib/market-sessions";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { NOTIFICATION_SETTINGS_EVENT, readNotificationPreferences } from "@/lib/notification-preferences";
 import { getNativeTradeAlert } from "@/lib/native-alert";
+import { playPaperTradeTone } from "@/lib/papertrade-tone";
 
 const SEEN_KEY = "papertrade-session-alerts-seen-v1";
 
@@ -20,6 +21,7 @@ function remember(id: string) {
 }
 
 async function showSystem(title: string, body: string, id: string) {
+  if (Capacitor.getPlatform() !== "android") void playPaperTradeTone();
   if (Capacitor.getPlatform() === "android") {
     await getNativeTradeAlert().show({ title, body, notificationId: id, kind: "session", url: "/" });
     return;

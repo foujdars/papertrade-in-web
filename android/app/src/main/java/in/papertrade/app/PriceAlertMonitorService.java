@@ -43,7 +43,7 @@ public class PriceAlertMonitorService extends Service {
     public static final String TRIGGERED_ALERTS_KEY = "triggered_alerts";
     public static final String FIRED_PREFIX = "fired_";
     private static final String MONITOR_CHANNEL_ID = "papertrade_protection_monitor_v1";
-    private static final String ALERT_CHANNEL_ID = "papertrade_protection_alerts_v2";
+    private static final String ALERT_CHANNEL_ID = "papertrade_protection_alerts_tu_v1";
     private static final int MONITOR_NOTIFICATION_ID = 28120;
     private static final ZoneId INDIA_ZONE = ZoneId.of("Asia/Kolkata");
     private ScheduledExecutorService executor;
@@ -199,6 +199,7 @@ public class PriceAlertMonitorService extends Service {
         NotificationChannel alerts = new NotificationChannel(ALERT_CHANNEL_ID, "PaperTrade alerts", NotificationManager.IMPORTANCE_HIGH);
         alerts.setDescription("Target and stop-loss alerts");
         alerts.enableVibration(true);
+        PaperTradeTone.apply(this, alerts);
         manager.createNotificationChannel(alerts);
     }
 

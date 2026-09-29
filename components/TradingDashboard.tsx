@@ -39,9 +39,11 @@ import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { IpoWorkspace } from "@/components/IpoWorkspace";
 import { PushNotificationBridge } from "./PushNotificationBridge";
 import { SessionOpenAlerts } from "./SessionOpenAlerts";
+import { PaperTradeToneListener } from "./PaperTradeToneListener";
 import { VolumeShockerAlerts } from "./VolumeShockerAlerts";
 import { selectVolumeShockerWatch } from "@/lib/volume-shocker-alerts";
 import { readNotificationPreferences } from "@/lib/notification-preferences";
+import { playPaperTradeTone } from "@/lib/papertrade-tone";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
 import { homePreferenceKey } from '@/lib/home-preferences';
@@ -167,7 +169,10 @@ function showProtectionAlert(order: PaperOrder, nativeAlreadyNotified = false) {
   const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
   addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body, symbol: order.symbol, instrumentKey: order.instrumentKey });
   const preferences = readNotificationPreferences();
-  if (!preferences.trades || preferences.pausedUntil > Date.now() || nativeAlreadyNotified || document.visibilityState === "visible") return;
+  if (!preferences.trades || preferences.pausedUntil > Date.now() || nativeAlreadyNotified || document.visibilityState === "visible") {
+    if (document.visibilityState === "visible" && preferences.trades && preferences.pausedUntil <= Date.now() && !nativeAlreadyNotified) void playPaperTradeTone();
+    return;
+  }
   if (Capacitor.getPlatform() === "android" && !nativeAlreadyNotified) {
     void getNativeTradeAlert().show({ title: `${order.symbol}: paper ${reason.toLowerCase()}`, body, kind: "trade", notificationId: `trade-${order.id}`, url: "/?screen=pnl" }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
@@ -2791,6 +2796,7 @@ export function TradingDashboard() {
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-section={activeNavigationSection}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
       <SessionOpenAlerts />
+      <PaperTradeToneListener />
       <VolumeShockerAlerts instruments={volumeShockerWatch} />
       <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} globalSymbol={selectedDeltaSymbol} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">

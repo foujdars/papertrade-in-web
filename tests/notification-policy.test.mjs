@@ -148,6 +148,7 @@ test("session opens stay audible overnight even without a separate sessions opt-
   await on.push(push({ kind: "session", id: "session-london-2026-01-06", title: "🟢 London open · 13:30–22:30 IST" }));
   assert.equal(on.shown.length, 1);
   assert.equal(on.shown[0].silent, false);
+  assert.equal(on.shown[0].sound, "/papertrade-tu.wav");
 });
 
 test("browser push configuration rejects placeholders and requires Firebase-shaped public IDs", async () => {

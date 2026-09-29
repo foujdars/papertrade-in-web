@@ -10,6 +10,7 @@ import { GET as getQuotes } from "@/app/api/upstox/quotes/route";
 import { evaluatePriceQuote } from "@/lib/technical-alerts";
 import { dispatchPushTests } from "@/lib/push-delivery-test";
 import { dispatchCloudGlobalAlerts } from "@/lib/global-alerts-server";
+import { dispatchDefaultEma21Alerts } from "@/lib/ema21-default-server";
 import type { NormalizedQuote } from "@/lib/upstox";
 import type { Candle } from "@/lib/market";
 import type { NseSession } from "@/lib/market-hours";
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
     await dispatchPushTests();
     try { await dispatchCloudGlobalAlerts(db); }
     catch { await db.doc("globalAlertSystem/health").set({ lastRun: Date.now(), ok: false }); }
+    try { await dispatchDefaultEma21Alerts(db); }
+    catch { await db.doc("ema21AlertSystem/health").set({ lastRun: Date.now(), ok: false }); }
     const accounts = await db.collection("technicalAccounts").where("active", "==", true).limit(11).get();
     if (accounts.size > 10) throw new Error("Capacity requires a sharded scheduler");
     const sessionPayload = await (await getSession(new Request("https://www.papertrade.site/api/market/session"))).json();

@@ -6,6 +6,7 @@ import { readNotificationPreferences } from "@/lib/notification-preferences";
 import { indiaClock } from "@/lib/notification-policy";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { pushConnected, setShockerWatch, syncPushDevice } from "@/lib/push-client";
+import { playPaperTradeTone } from "@/lib/papertrade-tone";
 import { normalizeShockerWatch, nseCashSessionOpen, planShockerNotices, type ShockerInstrument, type ShockerNotice } from "@/lib/volume-shocker-alerts";
 
 const SEEN_KEY = "papertrade-volume-shocker-alerts-v1";
@@ -27,6 +28,7 @@ function remember(day: string, ids: string[]) {
 
 async function showSystem(notice: ShockerNotice) {
   if (pushConnected() && document.visibilityState === "hidden") return;
+  if (Capacitor.getPlatform() !== "android") void playPaperTradeTone();
   if (Capacitor.getPlatform() === "android") {
     await getNativeTradeAlert().show({ title: notice.title, body: "", notificationId: notice.id, kind: "trade", url: notice.url });
     return;

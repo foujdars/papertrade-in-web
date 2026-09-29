@@ -8,6 +8,7 @@ import { readPaperTradeNotifications } from "@/lib/notification-center";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { connectPush } from "@/lib/push-client";
 import { getNativeTradeAlert } from "@/lib/native-alert";
+import { playPaperTradeTone } from "@/lib/papertrade-tone";
 import { Capacitor } from "@capacitor/core";
 import { useIndicatorSettings } from "@/lib/indicator-settings";
 import { studyDefaults } from "@/lib/indicator-catalog";
@@ -277,6 +278,7 @@ export function GlobalAlerts({
             }
             if (rule.kind === "psbb-divergence" || isEma21EntryKind(rule.kind)) {
               try {
+                if (Capacitor.getPlatform() !== "android") void playPaperTradeTone();
                 if (Capacitor.getPlatform() === "android") await getNativeTradeAlert().show({ title, body: "", notificationId: `global:${owner}:${rule.id}`, kind: "trade", url });
                 else if ("Notification" in window && Notification.permission === "granted") {
                   if ("serviceWorker" in navigator) {

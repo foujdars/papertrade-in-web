@@ -10,6 +10,7 @@ import { useIndicatorSettings } from '@/lib/indicator-settings';
 import { studyDefaults } from '@/lib/indicator-catalog';
 import { addPaperTradeNotification } from '@/lib/notification-center';
 import { getNativeTradeAlert } from '@/lib/native-alert';
+import { playPaperTradeTone } from '@/lib/papertrade-tone';
 import { getNseMarketStatus } from '@/lib/market-hours';
 import { TRADING_TIMEFRAMES, LIVE_DIVERGENCE_VERSION, indiaDay, type TradingTimeframe, type TodayDivergenceReport, type TodayDivergence } from '@/lib/psbb-watchlist';
 
@@ -63,6 +64,7 @@ async function notifyDivergence(instrument: Instrument, frame: TradingTimeframe,
   const url = `/?symbol=${encodeURIComponent(instrument.symbol)}&timeframe=${frame}`;
   addPaperTradeNotification({ id, kind: 'trade', title, body, symbol: instrument.symbol, instrumentKey: instrument.instrumentKey, timeframe: frame, instrument, url });
   try {
+    if (Capacitor.getPlatform() !== 'android') void playPaperTradeTone();
     if (Capacitor.getPlatform() === 'android') await getNativeTradeAlert().show({ title, body, notificationId: id, kind: 'trade', url });
     else if ('Notification' in window && Notification.permission === 'granted') {
       if ('serviceWorker' in navigator) {

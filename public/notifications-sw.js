@@ -23,6 +23,7 @@ self.addEventListener("push",event=>{event.waitUntil((async()=>{
   if(visible.length){visible.forEach(client=>client.postMessage({type:"papertrade-push",notice}));return;}
   const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
   const options={icon:"/papertrade-icon-192.png?v=1.22",badge:"/notification-badge.svg",tag:notice.id,renotify:false,silent:notice.kind!=="session"&&(notice.silent==="true"||hour>=21||hour<8),data:{url:safePath(notice.url)}};
+  if(!options.silent)options.sound="/papertrade-tu.wav";
   if(notice.body)options.body=notice.body;
   await self.registration.showNotification(notice.title,options);
 })());});

@@ -54,15 +54,16 @@ public final class NotificationDelivery {
       int hour=ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).getHour();
       boolean session="session".equals(kind);
       boolean silent=!session&&(notice.optBoolean("silent",false)||hour>=21||hour<8);
-      String channelId=silent?"papertrade_quiet_v3":session?"papertrade_sessions_v1":"trade".equals(kind)?"papertrade_trades_v3":"papertrade_ipo_v3";
+      String channelId=silent?"papertrade_quiet_v3":session?"papertrade_sessions_tu_v1":"trade".equals(kind)?"papertrade_trades_tu_v1":"papertrade_ipo_tu_v1";
       NotificationManager manager=(NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
       if(manager==null)return;
-      if(Build.VERSION.SDK_INT>=26){NotificationChannel channel=new NotificationChannel(channelId,silent?"Quiet updates":session?"Market sessions":"trade".equals(kind)?"My paper trades":"IPO updates",silent?NotificationManager.IMPORTANCE_LOW:NotificationManager.IMPORTANCE_DEFAULT);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);manager.createNotificationChannel(channel);}
+      if(Build.VERSION.SDK_INT>=26){NotificationChannel channel=new NotificationChannel(channelId,silent?"Quiet updates":session?"Market sessions":"trade".equals(kind)?"My paper trades":"IPO updates",silent?NotificationManager.IMPORTANCE_LOW:NotificationManager.IMPORTANCE_DEFAULT);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);if(!silent)PaperTradeTone.apply(context,channel);manager.createNotificationChannel(channel);}
       Intent intent=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("notificationPath",safePath(notice.optString("url")));
       PendingIntent pending=PendingIntent.getActivity(context,id.hashCode()&0x7fffffff,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
       String body=notice.optString("body");
       if("trade".equals(kind)&&prefs.optBoolean("hideAmounts",true))body="A technical or trade alert is ready. Open PaperTrade IN to review it.";
       NotificationCompat.Builder builder=new NotificationCompat.Builder(context,channelId).setSmallIcon(R.drawable.ic_stat_papertrade_current).setContentTitle(notice.optString("title","PaperTrade IN")).setContentText(body).setStyle(new NotificationCompat.BigTextStyle().bigText(body)).setContentIntent(pending).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(silent).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setCategory(Notification.CATEGORY_STATUS).setGroup("papertrade-"+kind);
+      if(!silent)builder.setSound(PaperTradeTone.uri(context));
       manager.notify(id.hashCode()&0x7fffffff,builder.build());
     }catch(Exception ignored){/* Never interrupt trading if notification delivery fails. */}
   }
