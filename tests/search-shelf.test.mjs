@@ -59,6 +59,16 @@ test("a query stays inside the selected tab", () => {
   assert.deepEqual(all.matches.map(item => item.symbol), ["XAUTUSD"]);
 });
 
+test("the search window is portaled over Home instead of sitting in the search box", async () => {
+  const view = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/home-hub.css", import.meta.url), "utf8");
+  assert.match(view, /createPortal\(/);
+  assert.match(view, /document\.querySelector\("\.terminal-shell"\)/);
+  assert.match(css, /\.home-search-sheet \{[^}]*position:\s*fixed/s);
+  assert.match(css, /\.home-search-sheet \{[^}]*z-index:\s*261/s);
+  assert.match(css, /\.home-search-tabs button \{[^}]*background:\s*var\(--soft/s);
+});
+
 test("the popular route reads Moneycontrol", async () => {
   const route = await readFile(new URL("../app/api/market/search-popular/route.ts", import.meta.url), "utf8");
   assert.match(route, /moneycontrol\.com\/mc-apis\/trending-stocks\/limit-30/);

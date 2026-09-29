@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usableHomeQuote, quoteChangeText, type HomeQuote } from "@/lib/home-quotes";
 import { formatInr } from "@/lib/market";
 import { FALLBACK_POPULAR, popularHeading, searchShelfRows, type PopularLists, type SearchShelfId } from "@/lib/search-shelf";
@@ -131,6 +132,7 @@ export function HomeWorkspace({
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
   const sheetInput = useRef<HTMLInputElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
   useEffect(() => {
     try { setPreferences(normalizeHomePreferences(JSON.parse(localStorage.getItem(storageKey) ?? 'null'))); }
@@ -182,6 +184,7 @@ export function HomeWorkspace({
     updatePreferences({ ...preferences, reminders });
   };
   const shelfRows = useMemo(() => searchShelfRows({ shelf, instruments: stockOptions, recent: recentSymbols, popular, query: search }), [popular, recentSymbols, search, shelf, stockOptions]);
+  const closeSearch = () => { setSearchFocused(false); setSearch(""); };
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
     if (!quoteKeys) { setLoading(false); return; }
@@ -214,34 +217,39 @@ export function HomeWorkspace({
       <div className="home-dashboard-scroll">
         <section className="home-hero">
           <div className="home-hero-copy">
-            <div className="home-global-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setSearchFocused(false); setSearch(''); } }} onKeyDown={event => { if(event.key==='Escape'){setSearchFocused(false);setSearch('');} }}>
+            <div className="home-global-search" onBlur={event => { const next = event.relatedTarget as Node | null; if (next && (event.currentTarget.contains(next) || sheetRef.current?.contains(next))) return; if (sheetRef.current) return; setSearchFocused(false); setSearch(""); }} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
               <Search size={18} />
               <input value={search} onFocus={() => { setSearchFocused(true); setShelf("all"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
               {search && !searchFocused && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
-              {searchFocused && <>
-                <button type="button" className="home-search-backdrop" aria-label="Close search" onClick={() => { setSearchFocused(false); setSearch(""); }} />
-                <div className="home-search-sheet" role="dialog" aria-modal="true" aria-label="Search markets">
-                  <header>
-                    <button type="button" aria-label="Close search" onClick={() => { setSearchFocused(false); setSearch(""); }}><ChevronLeft size={20} /></button>
-                    <Search size={18} />
-                    <input ref={sheetInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or symbol" aria-label="Search all markets" autoComplete="off" />
-                    {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
-                  </header>
-                  <div className="home-search-tabs" role="tablist" aria-label="Market">
-                    {([["all", "All"], ["in", "IN"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
+              {searchFocused && typeof document !== "undefined" && createPortal(
+                <>
+                  <button type="button" className="home-search-backdrop" aria-label="Close search" onClick={closeSearch} />
+                  <div ref={sheetRef} className="home-search-sheet" role="dialog" aria-modal="true" aria-label="Search markets" onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
+                    <header>
+                      <button type="button" aria-label="Close search" onClick={closeSearch}><ChevronLeft size={22} /></button>
+                      <label className="home-search-field">
+                        <Search size={18} />
+                        <input ref={sheetInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or symbol" aria-label="Search all markets" autoComplete="off" />
+                        {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
+                      </label>
+                    </header>
+                    <div className="home-search-tabs" role="tablist" aria-label="Market">
+                      {([["all", "All"], ["in", "IN"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
+                    </div>
+                    <div className="home-search-sheet-list">
+                      {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
+                        {!!shelfRows.recent.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
+                        {shelfRows.recent.map(searchRow)}
+                        {!!shelfRows.popular.length && <div className="home-search-group"><b>{popularHeading(shelf, popular)}</b></div>}
+                        {shelfRows.popular.map(searchRow)}
+                        {!shelfRows.recent.length && !shelfRows.popular.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
+                        <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
+                      </>}
+                    </div>
                   </div>
-                  <div className="home-search-sheet-list">
-                    {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
-                      {!!shelfRows.recent.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
-                      {shelfRows.recent.map(searchRow)}
-                      {!!shelfRows.popular.length && <div className="home-search-group"><b>{popularHeading(shelf, popular)}</b></div>}
-                      {shelfRows.popular.map(searchRow)}
-                      {!shelfRows.recent.length && !shelfRows.popular.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
-                      <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
-                    </>}
-                  </div>
-                </div>
-              </>}
+                </>,
+                document.querySelector(".terminal-shell") ?? document.body,
+              )}
             </div>
           </div>
         </section>
