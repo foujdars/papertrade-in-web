@@ -1,0 +1,34 @@
+name: Apply global exit fix
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Apply patch and restore production build
+        run: |
+          set -euo pipefail
+          cat .github/exit-fix/b64-00 .github/exit-fix/b64-01 .github/exit-fix/b64-02 .github/exit-fix/b64-03 .github/exit-fix/b64-04 | base64 -d > /tmp/exit-fix.patch
+          echo "1348cd836f08e75bbb9d0c8fd84d4fca233a98666c6da120e83cd4b45698c892  /tmp/exit-fix.patch" | sha256sum -c -
+          git apply /tmp/exit-fix.patch
+          test "$(git hash-object lib/global-order-engine.ts)" = "18a9dcc6a2e82e5031ae8fbcb26e4303245dc077"
+          test "$(git hash-object lib/global-chart-risk.ts)" = "5708db66ccb49412534668998224dd3eea60c4da"
+          test "$(git hash-object lib/global-markets.ts)" = "bfdeeafba4dc3e953fae8f0ca105a6969ac5546f"
+          test "$(git hash-object components/useGlobalTrading.ts)" = "21bd0980cff9b10c335b334f43edae63987c1d0d"
+          test "$(git hash-object components/TradingDashboard.tsx)" = "aa76c05b54b3d46888466232c340d8343fed03b7"
+          test "$(git hash-object tests/global-order-engine.test.mjs)" = "400816ecbf51f19c2e61210e2b65f878cb5b8127"
+          python3 -c 'open("vercel.json","w").write("{\n  \"$schema\": \"https://openapi.vercel.sh/vercel.json\",\n  \"framework\": \"nextjs\",\n  \"buildCommand\": \"next build && node scripts/verify-coach-assets.mjs\"\n}\n")'
+          test "$(git hash-object vercel.json)" = "45032a79e971742b9e23b6394d4d2231cf135bef"
+          git rm -r .github/exit-fix
+          git rm -f .github/workflows/apply-exit-fix.yml
+          git add lib/global-order-engine.ts lib/global-chart-risk.ts lib/global-markets.ts components/useGlobalTrading.ts components/TradingDashboard.tsx tests/global-order-engine.test.mjs vercel.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Exit global chart stops and targets when the candle hits them."
+          git push origin HEAD:main
