@@ -17,6 +17,7 @@ import { ModernSelect } from "./ModernSelect";
 import { useTransientBack } from "./useTransientBack";
 import { STUDIES } from "@/lib/indicator-catalog";
 import { formatInr, type Candle, type Instrument } from "@/lib/market";
+import { cachedChartCandles, rememberChartCandles } from "@/lib/chart-history";
 import {
   advancePerps,
   availablePerpCash,
@@ -320,7 +321,9 @@ export function GlobalMarketsWorkspace({
     };
   }, [open, hasExposure, key, retry]);
   useEffect(() => {
-    setCandles([]);
+    const cacheKey = `delta:${symbol}:${timeframe}`;
+    const saved = cachedChartCandles(cacheKey);
+    setCandles(saved ?? []);
     setCandleError("");
     if (!open || symbol === "BRENT") return;
     const controller = new AbortController();
@@ -336,6 +339,7 @@ export function GlobalMarketsWorkspace({
         const p = await r.json();
         if (!r.ok || !p.ok) throw new Error(p.error ?? "History unavailable.");
         if (!controller.signal.aborted) {
+          rememberChartCandles(cacheKey, p.candles);
           setCandles(p.candles);
           setCandleError("");
         }

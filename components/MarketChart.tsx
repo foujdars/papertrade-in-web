@@ -33,7 +33,7 @@ import { useChartPreference } from "@/lib/chart-view-preferences";
 import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKind, toStyleSeriesPoint, type ChartStyleId } from "@/lib/chart-style";
 import { compareColor, compareQuote, formatCompareDelta, formatComparePrice } from "@/lib/chart-compare";
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
-import { candleBucket, candlesEqual, nearestCandleIndex, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
+import { cachedChartCandles, candleBucket, candlesEqual, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
 import { comparisonRequest } from "@/lib/chart-compare";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -1550,6 +1550,15 @@ export function MarketChart({
   }, [chartAction, instrument.symbol, timeframe]);
 
   useEffect(() => {
+    if (isReplay || externalFeed || historyRequest) return;
+    const cached = cachedChartCandles(`${instrument.instrumentKey}:${timeframe}`);
+    dataRef.current = cached?.length ? cached : [];
+    lastLiveTickRef.current = null;
+    setLatestCandle(cached?.at(-1));
+    setFeedMode(cached?.length ? "stale" : "loading");
+  }, [externalFeed, historyRequest, instrument.instrumentKey, isReplay, timeframe]);
+
+  useEffect(() => {
     if (!chartHost.current) return;
     const host = chartHost.current;
     viewportInteractedRef.current = false;
@@ -2810,16 +2819,16 @@ export function MarketChart({
     if (isReplay || externalFeed || historyRequest) return;
     const controller = new AbortController();
     let retryTimer = 0;
-    onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
+    if (!dataRef.current.length) onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
 
     async function loadUpstoxCandles() {
-      try {
-        const params = new URLSearchParams({ instrumentKey: instrument.instrumentKey, timeframe });
+      const segments = new Set<string>();
+      const pull = async (scope: "historical" | "intraday") => {
+        const params = new URLSearchParams({ instrumentKey: instrument.instrumentKey, timeframe, scope });
         const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal });
         const payload = await response.json() as {
           ok?: boolean;
           candles?: Candle[];
-          segments?: string[];
           fetchedAt?: string;
           error?: { code?: string; message?: string; retryAfterSeconds?: number };
         };
@@ -2828,23 +2837,37 @@ export function MarketChart({
           failure.retryAfterSeconds = payload.error?.retryAfterSeconds ?? (payload.error?.code === "RATE_LIMITED" ? 30 : 15);
           throw failure;
         }
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return payload;
+        const wasEmpty = dataRef.current.length === 0;
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
-        const latest = dataRef.current.at(-1);
-        setLatestCandle(latest);
+        rememberChartCandles(`${instrument.instrumentKey}:${timeframe}`, dataRef.current);
+        segments.add(scope);
+        setLatestCandle(dataRef.current.at(-1));
         paintPriceSeries();
-        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, payload.candles, timeframe), false);
-        syncIndicatorData();
-        applyInitialVisibleRange(payload.candles);
+        if (wasEmpty || scope === "historical") applyInitialVisibleRange(dataRef.current);
+        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, dataRef.current, timeframe), false);
         scheduleOverlayRefresh();
+        window.requestAnimationFrame(() => { if (!controller.signal.aborted) syncIndicatorData(); });
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
-        const hasCurrentMarketData = historicalOnlyTimeframe || payload.segments?.includes("intraday");
+        const hasCurrentMarketData = historicalOnlyTimeframe || segments.has("intraday");
         setFeedMode(hasCurrentMarketData ? "live" : "stale");
         onFeedStatusRef.current({
           mode: hasCurrentMarketData ? "live" : "stale",
-          message: hasCurrentMarketData ? (payload.segments?.includes("intraday") ? "Upstox historical + intraday candles" : "Upstox historical candles") : "Upstox historical candles · live update paused",
+          message: segments.has("historical") && segments.has("intraday") ? "Upstox historical + intraday candles" : segments.has("intraday") ? "Upstox intraday candles" : "Upstox historical candles",
           updatedAt: payload.fetchedAt,
         });
+        return payload;
+      };
+      try {
+        const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
+        const requests = [pull("historical")];
+        if (!historicalOnlyTimeframe) requests.push(pull("intraday"));
+        const results = await Promise.allSettled(requests);
+        if (controller.signal.aborted) return;
+        if (results.every(result => result.status === "rejected")) {
+          const error = results.find((result): result is PromiseRejectedResult => result.status === "rejected")?.reason;
+          throw error instanceof Error ? error : new Error("Upstox candles are unavailable.");
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         const retryAfterSeconds = Math.max(15, Math.min(120, Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds) || 30));

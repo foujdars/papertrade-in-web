@@ -59,6 +59,23 @@ export function deltaHistoryPlan(timeframe: string, params: URLSearchParams, now
   return { resolution: base.toLowerCase(), windows, aggregate: base !== timeframe, start, end };
 }
 
+const chartCandleCache = new Map<string, Candle[]>();
+
+export function cachedChartCandles(key: string) {
+  return chartCandleCache.get(key);
+}
+
+export function rememberChartCandles(key: string, candles: Candle[]) {
+  if (!candles.length) return;
+  chartCandleCache.delete(key);
+  chartCandleCache.set(key, candles);
+  while (chartCandleCache.size > 12) {
+    const oldest = chartCandleCache.keys().next().value;
+    if (oldest === undefined) break;
+    chartCandleCache.delete(oldest);
+  }
+}
+
 export function candlesEqual(a: Candle, b: Candle) {
   return a.time === b.time && a.open === b.open && a.high === b.high && a.low === b.low && a.close === b.close && a.volume === b.volume;
 }

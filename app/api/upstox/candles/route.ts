@@ -125,7 +125,7 @@ export async function GET(request: Request) {
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
-    if (scope !== "combined" && scope !== "intraday") {
+    if (scope !== "combined" && scope !== "intraday" && scope !== "historical") {
       return Response.json(
         { ok: false, error: { code: "INVALID_SCOPE", message: "Unsupported candle scope." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
       );
     }
 
-    if (config.historicalOnly || requestedHistory) {
+    if (config.historicalOnly || requestedHistory || scope === "historical") {
       const historical = await readCandles<UpstoxCandlePayload>(historicalPath);
       candles = mergeCandles([normalizeCandles(historical)]);
       if (config.aggregateYears) candles = aggregateAnnualCandles(candles);

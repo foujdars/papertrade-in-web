@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateChartCandles, candleBucket, deltaHistoryPlan, nearestCandleIndex, trailingCandleUpdate } from '../lib/chart-history.ts';
+import { aggregateChartCandles, cachedChartCandles, candleBucket, deltaHistoryPlan, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate } from '../lib/chart-history.ts';
 import { CHART_STYLE_GROUPS, isChartStyle } from '../lib/chart-style.ts';
 const epoch = value => Date.parse(value) / 1000;
 const bar = (date, close = 12) => ({ time: epoch(date), open: 10, high: Math.max(14, close), low: 8, close, volume: 7 });
@@ -45,6 +45,14 @@ test('incremental painting is allowed only when earlier candles are unchanged', 
   assert.ok(trailingCandleUpdate(candles, [...candles,bar('2024-01-03')]));
   assert.equal(trailingCandleUpdate(candles, [{...candles[0],close:13},candles[1]]),false);
   assert.equal(trailingCandleUpdate(candles, candles.slice(1)), false);
+});
+
+test('a chart can reopen from the last candles before the next download', () => {
+  const candles = [bar('2024-01-01'), bar('2024-01-02')];
+  rememberChartCandles('NSE_EQ|TEST:5m', candles);
+  assert.equal(cachedChartCandles('NSE_EQ|TEST:5m')?.length, 2);
+  rememberChartCandles('NSE_EQ|TEST:5m', []);
+  assert.equal(cachedChartCandles('NSE_EQ|TEST:5m')?.length, 2);
 });
 
 test('unfinished profile chart modes stay out of the style menu', () => {

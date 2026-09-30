@@ -26,6 +26,18 @@ function route() {
   return { get: exports.GET, paths };
 }
 
+test("historical scope paints without waiting for the intraday request", async () => {
+  const { get, paths } = route();
+  const response = await get(new Request("https://example.test/api/upstox/candles?instrumentKey=NSE_EQ%7CINE002A01018&timeframe=5m&scope=historical"));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(paths.length, 1);
+  assert.match(paths[0], /\/historical-candle\/NSE_EQ/);
+  assert.doesNotMatch(paths[0], /intraday/);
+  assert.equal(body.segments[0], "historical");
+  assert.ok(body.candles.length > 0);
+});
+
 test("1Y candles request only published Upstox history and aggregate monthly bars", async () => {
   const { get, paths } = route();
   const response = await get(new Request("https://example.test/api/upstox/candles?instrumentKey=NSE_EQ%7CINE002A01018&timeframe=1Y"));
