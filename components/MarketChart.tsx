@@ -695,6 +695,16 @@ export function MarketChart({
   const legendSource = prepareStyleCandles(dataRef.current, chartStyle);
   const legend = selectCandleLegend(legendSource, hoveredCandle?.scope === legendScope ? hoveredCandle.time : null);
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
+  const chartCacheKey = `${instrument.instrumentKey}:${timeframe}`;
+  const [paintedCacheKey, setPaintedCacheKey] = useState("");
+  if (!isReplay && !externalFeed && !historyRequest && paintedCacheKey !== chartCacheKey) {
+    const cached = cachedChartCandles(chartCacheKey);
+    dataRef.current = cached?.length ? cached : [];
+    lastLiveTickRef.current = null;
+    setPaintedCacheKey(chartCacheKey);
+    setLatestCandle(cached?.at(-1));
+    setFeedMode(cached?.length ? "stale" : "loading");
+  }
   const [placementHint, setPlacementHint] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
@@ -1548,15 +1558,6 @@ export function MarketChart({
       });
     }
   }, [chartAction, instrument.symbol, timeframe]);
-
-  useEffect(() => {
-    if (isReplay || externalFeed || historyRequest) return;
-    const cached = cachedChartCandles(`${instrument.instrumentKey}:${timeframe}`);
-    dataRef.current = cached?.length ? cached : [];
-    lastLiveTickRef.current = null;
-    setLatestCandle(cached?.at(-1));
-    setFeedMode(cached?.length ? "stale" : "loading");
-  }, [externalFeed, historyRequest, instrument.instrumentKey, isReplay, timeframe]);
 
   useEffect(() => {
     if (!chartHost.current) return;

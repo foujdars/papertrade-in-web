@@ -100,7 +100,7 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
   let intentionallyClosed = false;
   const openedAt = Date.now();
   let lastMessageAt = 0;
-  let watch = 0;
+  let stopTimer = () => {};
   const recycle = (reason: string) => {
     if (intentionallyClosed || signal.aborted) return;
     if (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING) return;
@@ -112,8 +112,8 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
     if (socket.readyState !== WebSocket.OPEN || (cashSessionOpen() && stale)) recycle("Resume live feed");
   };
   const stopWatch = () => {
-    clearInterval(watch);
-    watch = 0;
+    stopTimer();
+    stopTimer = () => {};
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
   };
   const abort = () => socket.close(1000, "Chart changed");
@@ -170,12 +170,13 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
 
   lastMessageAt = Date.now();
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
-  watch = setInterval(() => {
+  const watchId = setInterval(() => {
     if (intentionallyClosed || signal.aborted || socket.readyState !== WebSocket.OPEN) return;
     if (typeof document !== "undefined" && document.hidden) return;
     // The V3 feed often dies just before 10 minutes and sends no close frame.
     if (cashSessionOpen() && Date.now() - openedAt >= 8 * 60 * 1000) recycle("Recycle live feed");
   }, 15_000);
+  stopTimer = () => clearInterval(watchId);
 
   socket.addEventListener("close", () => {
     stopWatch();
