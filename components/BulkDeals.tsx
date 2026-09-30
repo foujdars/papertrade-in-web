@@ -1,5 +1,5 @@
 "use client";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { dealValue, groupDeals, type Deal } from "@/lib/bulk-deals";
@@ -20,6 +20,7 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
+  const [openSymbol, setOpenSymbol] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     const load = () => {
@@ -48,30 +49,35 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const listed = rows ?? [];
   const visible = tab === "All" ? listed : listed.filter(row => row.kind === tab);
   const groups = groupDeals(visible);
-  const lead = groupDeals(listed).slice(0, 3).map(group => group.rows[0]);
   const bulk = listed.filter(row => row.kind === "Bulk").length;
   const block = listed.filter(row => row.kind === "Block").length;
   const logoKey = (isin: string) => isin ? `NSE_EQ|${isin}` : undefined;
   return <div className="home-deal-slot">
-    <button type="button" className="home-market-card" data-kind="deals" onClick={() => setOpen(true)} aria-label={lead[0] ? `Open bulk and block deals. Largest ${lead[0].symbol} ${lead[0].kind} ${lead[0].side}` : "Open bulk and block deals"}>
+    <button type="button" className="home-market-card" data-kind="deals" onClick={() => setOpen(true)} aria-label="Open bulk and block deals">
       <span className="home-market-card-copy"><b>Bulk & block{rows ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
-      {rows ? <span className="home-market-lines"><small className="home-deal-meta">{date ? sessionLabel(date) : "Latest session"} · {bulk} bulk · {block} block</small>{lead.map(row => <span className="home-market-line home-deal-line" key={row.symbol}><StockLogo symbol={row.symbol} instrumentKey={logoKey(row.isin)} size={18} /><b title={row.name}>{row.symbol}</b><em className={row.side === "Buy" ? "up" : "down"}>{row.kind} {row.side} {dealValue(row.value)}</em></span>)}</span> : <span className="home-deal-meta">{failed ? "Deals unavailable right now" : "Loading the latest NSE session"}</span>}
+      <span className="home-deal-meta">{rows ? `${date ? sessionLabel(date) : "Latest session"} · ${bulk} bulk · ${block} block` : failed ? "Deals unavailable right now" : "Loading the latest NSE session"}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close bulk and block deals" onClick={() => setOpen(false)} />
       <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Bulk and block deals">
         <header><span><small>NSE large deals</small><b>{date ? sessionLabel(date) : "Bulk & block"}</b></span><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="home-mover-tabs" role="tablist" aria-label="Deal type">{TABS.map(item => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{item}</button>)}</div>
-        {groups.length ? <div className="home-pair-list">{groups.map(group => <section className="home-deal-group" key={group.symbol}>
-          <button type="button" className="home-deal-symbol" onClick={() => { setOpen(false); onOpen(group.symbol); }} aria-label={`Open ${group.symbol} chart`}>
-            <StockLogo symbol={group.symbol} instrumentKey={logoKey(group.isin)} size={28} />
-            <span><b>{group.symbol}</b><small>{group.name}</small></span>
-          </button>
-          {group.rows.map(row => <button key={`${row.client}:${row.side}:${row.kind}:${row.qty}:${row.price}`} type="button" className="home-deal-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
-            <span><b>{row.client}</b><small>{row.kind} {row.side}</small></span>
-            <span><strong>{dealValue(row.value)}</strong><em className={row.side === "Buy" ? "up" : "down"}>{qty.format(row.qty)} @ {price.format(row.price)}</em></span>
-          </button>)}
-        </section>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No deals on this list" : "Loading NSE deals"}</div>}
+        {groups.length ? <div className="home-pair-list">{groups.map(group => {
+          const shown = openSymbol === group.symbol;
+          return <section className="home-deal-group" key={group.symbol}>
+            <div className="home-deal-symbol">
+              <button type="button" onClick={() => { setOpen(false); onOpen(group.symbol); }} aria-label={`Open ${group.symbol} chart`}>
+                <StockLogo symbol={group.symbol} instrumentKey={logoKey(group.isin)} size={28} />
+                <span><b>{group.symbol}</b><small>{group.name}</small></span>
+              </button>
+              <button type="button" aria-expanded={shown} aria-label={shown ? `Hide ${group.symbol} deals` : `Show ${group.symbol} deals`} onClick={() => setOpenSymbol(shown ? null : group.symbol)}>{shown ? <ChevronDown size={18} /> : <ChevronUp size={18} />}</button>
+            </div>
+            {shown ? group.rows.map(row => <button key={`${row.client}:${row.side}:${row.kind}:${row.qty}:${row.price}`} type="button" className="home-deal-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
+              <span><b>{row.client}</b><small>{row.kind} {row.side}</small></span>
+              <span><strong>{dealValue(row.value)}</strong><em className={row.side === "Buy" ? "up" : "down"}>{qty.format(row.qty)} @ {price.format(row.price)}</em></span>
+            </button>) : null}
+          </section>;
+        })}</div> : <div className="india-pulse-wait">{rows || failed ? "No deals on this list" : "Loading NSE deals"}</div>}
       </div>
     </>, document.querySelector(".terminal-shell") ?? document.body)}
   </div>;

@@ -121,7 +121,7 @@ function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[numbe
   </div>;
 }
 
-export function IndiaPulse() {
+function usePulse() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [range, setRange] = useState<(typeof FLOW_WINDOWS)[number]["id"]>("1M");
   useEffect(() => {
@@ -136,16 +136,17 @@ export function IndiaPulse() {
     const timer = window.setInterval(load, 30_000);
     return () => { controller.abort(); window.clearInterval(timer); };
   }, []);
+  return { pulse, range, setRange };
+}
+
+export function IndiaPulse() {
+  const { pulse } = usePulse();
   const breadth = pulse?.breadth;
   const latestPoint = pulse?.tape[pulse.tape.length - 1];
   const advance = pulse?.sessionLive ? breadth?.advance ?? latestPoint?.advance : latestPoint?.advance;
   const decline = pulse?.sessionLive ? breadth?.decline ?? latestPoint?.decline : latestPoint?.decline;
   const advanceShare = advance !== undefined && decline !== undefined ? advance / Math.max(1, advance + decline) : 0;
-  const windowDays = FLOW_WINDOWS.find(item => item.id === range)?.days ?? 31;
-  const series = flowsInRange(pulse?.flows ?? [], windowDays);
-  const latest = pulse?.flows[0];
   const sessionDate = latestPoint ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(latestPoint.t) : "";
-  const latestDate = latest?.date ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${latest.date}T00:00:00Z`)) : "";
   const pcr = pulse?.pcr;
   const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : 50;
   return <section className="home-section india-pulse" aria-label="Indian market pulse">
@@ -175,13 +176,23 @@ export function IndiaPulse() {
         <div className="india-pcr-track" role="img" aria-label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"}><i style={{ width: `${pcrShare}%` }} /></div>
         <div className="india-pcr-labels"><span>Put OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.putOi) : "—"}</span><span>Call OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.callOi) : "—"}</span></div>
       </div>
-      <div className="india-flows">
-        <div className="india-flow-top">
-          <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain chart colors">i</summary><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></details></div>
-          <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
-        </div>
-        {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
-      </div>
     </div>
   </section>;
+}
+
+export function IndiaFlows() {
+  const { pulse, range, setRange } = usePulse();
+  const windowDays = FLOW_WINDOWS.find(item => item.id === range)?.days ?? 31;
+  const series = flowsInRange(pulse?.flows ?? [], windowDays);
+  const latest = pulse?.flows[0];
+  const latestDate = latest?.date ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${latest.date}T00:00:00Z`)) : "";
+  return <div className="india-flows-slot">
+    <div className="india-flows">
+      <div className="india-flow-top">
+        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain chart colors">i</summary><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></details></div>
+        <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
+      </div>
+      {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
+    </div>
+  </div>;
 }

@@ -288,7 +288,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/search-shelf": searchShelf,
     "@/lib/equity-watch": { volumeLabel: () => "" },
     "./MarketDirectory": { MarketDirectory: () => null },
-    "./IndiaPulse": { IndiaPulse: () => null },
+    "./IndiaPulse": { IndiaPulse: () => null, IndiaFlows: () => null },
     "./MarketMovers": { MarketMovers: () => null },
     "./EquityWatch": { EquityWatch: () => null },
     "./BulkDeals": { BulkDeals: () => null },

@@ -353,11 +353,13 @@
 .terminal-shell[data-theme="neon"] .home-market-line .up, .terminal-shell[data-theme="neon"] .home-breadth-line .up { color:#3ee0a2; }
 .terminal-shell[data-theme="neon"] .home-market-line .down, .terminal-shell[data-theme="neon"] .home-breadth-line .down { color:#ff8aa0; }
 .home-deal-slot { margin-top:10px; }
+.india-flows-slot { margin-top:16px; }
 .home-market-card[data-kind="deals"] { --kind:#b86e00; }
 .home-deal-meta { color:var(--muted); font-size:10px; }
-.home-deal-line .stock-logo { align-self:center; }
 .home-deal-group { border-top:1px solid var(--line); }
-.home-deal-symbol { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; align-items:center; padding:10px 14px 2px; border:0; background:transparent; color:inherit; text-align:left; }
+.home-deal-symbol { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; }
+.home-deal-symbol > button:first-child { min-width:0; display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; align-items:center; padding:10px 6px 10px 14px; border:0; background:transparent; color:inherit; text-align:left; }
+.home-deal-symbol > button:last-child { width:44px; height:44px; display:grid; place-items:center; border:0; background:transparent; color:var(--muted); }
 .home-deal-symbol b, .home-deal-symbol small { display:block; }
 .home-deal-symbol b { font-size:13px; }
 .home-deal-symbol small { overflow:hidden; color:var(--muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
