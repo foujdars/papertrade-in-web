@@ -50,6 +50,7 @@ test("home renders the equity market watch", async () => {
   assert.match(home, /<EquityWatch onOpen=\{onOpenStock\} focusIndex=\{sectorWatch\} focusTick=\{sectorTick\} \/>/);
   assert.match(view, /home-market-card/);
   assert.match(view, /StockLogo/);
+  assert.match(view, /home-pair-quote/);
   assert.match(view, /volumeLabel/);
   assert.match(route, /scanner\.tradingview\.com\/india\/scan/);
   assert.match(lib, /Nifty 50/);

@@ -342,7 +342,9 @@
 .home-pair-name b { flex:none; font-size:11px; }
 .home-pair-name small { overflow:hidden; color:var(--muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .home-pair-vol { font-variant-numeric:tabular-nums; }
-.home-pair-row em { font-style:normal; font-size:10px; font-weight:750; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+.home-pair-quote { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.home-pair-quote strong { font-size:12px; font-weight:750; font-variant-numeric:tabular-nums; }
+.home-pair-row em { font-style:normal; font-size:11px; font-weight:750; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
 .home-pair-row .up { color:var(--green, #00a67e); }
 .home-pair-row .down { color:var(--red, #f04458); }
 .home-side-sheet { position:fixed; z-index:261; top:0; right:0; bottom:0; left:auto; width:min(440px,100%); display:flex; flex-direction:column; overflow:hidden; background:var(--surface, #fff); color:var(--ink, #20233d); box-shadow:-18px 0 48px #15162e33; animation:home-side-slide .28s ease; }

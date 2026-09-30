@@ -12,8 +12,8 @@ const sorts: { id: WatchSort; label: string }[] = [
   { id: "volume", label: "Vol" },
 ];
 
-function quote(value: number, change: number) {
-  return `${price.format(value)} (${change > 0 ? "+" : ""}${change.toFixed(2)}%)`;
+function percent(change: number) {
+  return `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
 }
 
 export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOpen: (symbol: string) => void; focusIndex?: string | null; focusTick?: number }) {
@@ -70,7 +70,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
         {ordered.length ? <div className="home-pair-list">{ordered.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
           <StockLogo symbol={row.symbol} size={28} />
           <span className="home-pair-name"><span><b>{row.symbol}</b><small>{row.name}</small></span>{row.volume > 0 ? <small className="home-pair-vol">Vol {volumeLabel(row.volume)}</small> : null}</span>
-          <em className={row.change < 0 ? "down" : "up"}>{quote(row.price, row.change)}</em>
+          <span className="home-pair-quote"><strong>{price.format(row.price)}</strong><em className={row.change < 0 ? "down" : "up"}>{percent(row.change)}</em></span>
         </button>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No names in this index right now" : "Loading equity market watch"}</div>}
       </div>
     </>, document.querySelector(".terminal-shell") ?? document.body)}
