@@ -94,7 +94,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
         <div className="home-watch-sort" role="group" aria-label="Sort">{sorts.map(item => <button key={item.id} type="button" aria-pressed={sort === item.id} onClick={() => setSort(item.id)}>{item.label}</button>)}</div>
         {ordered.length ? <div className="home-pair-list">{ordered.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
           <StockLogo symbol={row.symbol} size={28} />
-          <span className="home-pair-name"><span><b>{row.symbol}</b><small>{row.name}</small></span>{row.volume > 0 ? <small className="home-pair-vol">Vol {volumeLabel(row.volume)}</small> : null}</span>
+          <span className="home-pair-name"><b>{row.symbol}</b><small>{row.name}</small><small className="home-pair-vol">{row.volume > 0 ? `Vol ${volumeLabel(row.volume)}` : "—"}</small></span>
           <span className="home-pair-quote"><strong>{price.format(row.price)}</strong><em className={row.change < 0 ? "down" : "up"}>{percent(row.change)}</em></span>
         </button>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No names in this index right now" : "Loading equity market watch"}</div>}
       </div>

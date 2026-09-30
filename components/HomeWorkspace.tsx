@@ -210,7 +210,7 @@ export function HomeWorkspace({
   };
   const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number; volume: number; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
     {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
-    <span className="home-pair-name"><span><b>{line.symbol}</b><small>{line.name}</small></span>{line.volume > 0 ? <small className="home-pair-vol">Vol {volumeLabel(line.volume)}</small> : null}</span>
+    <span className="home-pair-name"><b>{line.symbol}</b><small>{line.name}</small><small className="home-pair-vol">{line.volume > 0 ? `Vol ${volumeLabel(line.volume)}` : "—"}</small></span>
     <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.change < 0 ? "down" : "up"}>{line.change > 0 ? "+" : ""}{line.change.toFixed(2)}%</em></span>
   </button>;
   const quoteLine = (quote: BoardQuote, seen: Set<string>) => {

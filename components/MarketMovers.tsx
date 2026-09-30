@@ -69,7 +69,7 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
         <div className="home-mover-tabs" role="tablist" aria-label="Mover list">{MOVER_TABS.map(item => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
         {rows.length ? <div className="home-pair-list">{rows.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
           <StockLogo symbol={row.symbol} size={28} />
-          <span className="home-pair-name"><span><b>{row.symbol}</b><small>{row.name}</small></span>{volumeMetrics(row) ? <small className="home-pair-vol">{volumeMetrics(row)}</small> : null}</span>
+          <span className="home-pair-name"><b>{row.symbol}</b><small>{row.name}</small><small className="home-pair-vol">{volumeMetrics(row) || "—"}</small></span>
           <span className="home-pair-quote"><strong>{price.format(row.price)}</strong><em className={row.change < 0 ? "down" : "up"}>{percent(row.change)}</em></span>
         </button>)}</div> : <div className="india-pulse-wait">{lists || failed ? "No names on this list right now" : "Loading NSE movers"}</div>}
       </div>
