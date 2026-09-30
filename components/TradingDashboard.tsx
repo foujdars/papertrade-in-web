@@ -1956,6 +1956,19 @@ export function TradingDashboard() {
   useTransientBack(pnlOpen, () => returnToTradeFromBackRef.current());
   useTransientBack(Boolean(selectingTrades && pnlOpen), () => setTradeSelection(null));
   useTransientBack(Boolean(pendingDeleteIds && pnlOpen), () => setPendingDeleteIds(null));
+  useTransientBack(moreMenuOpen, () => setMoreMenuOpen(false));
+  useTransientBack(showTradeSymbols, () => setShowTradeSymbols(false));
+  useTransientBack(orderSheetOpen, () => setOrderSheetOpen(false));
+  useTransientBack(riskSizingOpen, () => setRiskSizingOpen(false));
+  useTransientBack(positionsOpen, () => setPositionsOpen(false));
+  useTransientBack(optionChainOpen, () => setOptionChainOpen(false));
+  useTransientBack(fnoTradeDockOpen, () => setFnoTradeDockOpen(false));
+  useTransientBack(showApi, () => setShowApi(false));
+  useTransientBack(fundsOpen, () => setFundsOpen(false));
+  useTransientBack(downloadOpen, () => setDownloadOpen(false));
+  useTransientBack(feedbackOpen, () => setFeedbackOpen(false));
+  useTransientBack(accountOpen && !accountDeleteArmed, () => { setAccountOpen(false); setAccountDeleteArmed(false); });
+  useTransientBack(accountDeleteArmed, () => setAccountDeleteArmed(false));
   const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
   const pendingDeletion = useMemo(() => pendingDeleteIds ? prepareClosedTradeDeletion(orders, pendingDeleteIds) : null, [orders, pendingDeleteIds]);
   function toggleTradeSelection(id: string) {

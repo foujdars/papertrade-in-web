@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOVER_TABS, volumeMetrics, type Mover, type MoverTab } from "@/lib/market-movers";
 import { StockLogo } from "@/components/StockLogo";
+import { useTransientBack } from "./useTransientBack";
 
 type Lists = Record<MoverTab, Mover[]>;
 
@@ -18,6 +19,7 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<MoverTab>("gainers");
   const [open, setOpen] = useState(false);
+  useTransientBack(open, () => setOpen(false));
   useEffect(() => {
     const controller = new AbortController();
     const load = () => {
@@ -52,7 +54,7 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const moverLine = (kind: string, row: Mover | undefined) => <span className="home-market-line" key={kind}><i>{kind}</i><b title={row ? `${row.symbol} ${row.name}` : undefined}>{row?.symbol ?? "—"}</b><em className={row && row.change < 0 ? "down" : "up"}>{row ? `${row.change > 0 ? "+" : ""}${row.change.toFixed(1)}%` : "—"}</em></span>;
   return <div className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label={lead ? `Open market movers. Top gainer ${lead.symbol} ${percent(lead.change)}` : "Open market movers"}>
-      <span className="home-market-card-copy"><b>Market movers{lists ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
+      <span className="home-market-card-copy"><b>Market movers</b><ChevronRight size={16} aria-hidden="true" /></span>
       <span className="home-market-lines">{moverLine("Gainer", lead)}{moverLine("Loser", lag)}{moverLine("52W", high)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>

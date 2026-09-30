@@ -278,6 +278,7 @@ async function componentHarness(path, name, initialStates = []) {
   };
   const mocks = {
     react,
+    "./useTransientBack": { useTransientBack() {}, hasTransientBackLayer() { return false; }, TRANSIENT_BACK_EVENT: "papertrade:dismiss-layer" },
     "./CandleLoader": { CandleLoader: () => null },
     "./usePullToRefresh": { usePullToRefresh() {} },
     "@/components/StockLogo": { StockLogo: () => null },

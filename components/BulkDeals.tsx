@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { dealValue, groupDeals, type Deal } from "@/lib/bulk-deals";
 import { StockLogo } from "@/components/StockLogo";
+import { useTransientBack } from "./useTransientBack";
 
 const TABS = ["All", "Bulk", "Block"] as const;
 const price = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
@@ -21,6 +22,7 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
   const [openSymbol, setOpenSymbol] = useState<string | null>(null);
+  useTransientBack(open, () => setOpen(false));
   useEffect(() => {
     const controller = new AbortController();
     const load = () => {
@@ -54,7 +56,7 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const logoKey = (isin: string) => isin ? `NSE_EQ|${isin}` : undefined;
   return <div className="home-deal-slot">
     <button type="button" className="home-market-card" data-kind="deals" onClick={() => setOpen(true)} aria-label="Open bulk and block deals">
-      <span className="home-market-card-copy"><b>Bulk & block{rows ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
+      <span className="home-market-card-copy"><b>Bulk & block</b><ChevronRight size={16} aria-hidden="true" /></span>
       <span className="home-deal-meta">{rows ? `${date ? sessionLabel(date) : "Latest session"} · ${bulk} bulk · ${block} block` : failed ? "Deals unavailable right now" : "Loading the latest NSE session"}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>

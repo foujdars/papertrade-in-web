@@ -32,6 +32,7 @@ import { usableHomeQuote, quoteChangeText, type HomeQuote } from "@/lib/home-quo
 import { formatInr } from "@/lib/market";
 import { FALLBACK_POPULAR, matchShelfInstrument, searchShelfRows, type PopularLists, type SearchShelfId } from "@/lib/search-shelf";
 import { volumeLabel } from "@/lib/equity-watch";
+import { useTransientBack } from "./useTransientBack";
 import type { BoardQuote, SearchBoard } from "@/lib/search-board";
 
 export type HomeIndexQuote = {
@@ -200,6 +201,8 @@ export function HomeWorkspace({
   };
   const shelfRows = useMemo(() => searchShelfRows({ shelf, instruments: stockOptions, recent: recentSymbols, popular, query: search }), [popular, recentSymbols, search, shelf, stockOptions]);
   const closeSearch = () => { setSearchFocused(false); setSearch(""); };
+  useTransientBack(searchFocused, closeSearch);
+  useTransientBack(preview !== null, () => setPreview(null));
   const inrPrice = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
   const boardKey = shelf === "crypto" ? "crypto" : shelf === "us" || (shelf === "all" && activeMarket === "global") ? "us" : "in";
   const boardShelf: SearchShelfId = boardKey === "in" ? "in" : boardKey;

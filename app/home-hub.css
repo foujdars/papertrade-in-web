@@ -338,7 +338,6 @@
 .home-market-card-copy { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:4px; }
 .home-market-card-copy b { display:flex; align-items:center; gap:4px; min-width:0; font-size:11px; font-weight:750; letter-spacing:-.02em; }
 .home-market-card-copy > svg { flex:none; color:var(--kind); }
-.home-market-live { width:5px; height:5px; border-radius:50%; background:#12b886; box-shadow:0 0 0 2px color-mix(in srgb, #12b886 28%, transparent); }
 .home-market-lines { display:grid; gap:3px; }
 .home-market-line { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px; align-items:baseline; }
 .home-market-line i { color:var(--muted); font-size:8px; font-style:normal; font-weight:700; }
