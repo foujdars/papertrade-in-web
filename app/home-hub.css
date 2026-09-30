@@ -331,6 +331,21 @@
 .home-watch-list em { display:block; font-size:11px; font-weight:750; }
 .home-watch-list .up { color:var(--green, #00a67e); }
 .home-watch-list .down { color:var(--red, #f04458); }
+.terminal-shell .home-hub .home-market-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-top:16px; overflow:hidden; border-radius:18px; background:var(--surface); }
+.terminal-shell .home-hub .home-market-pair .home-section { margin-top:0; border-radius:0; background:transparent; box-shadow:none; }
+.terminal-shell .home-hub .home-market-pair .home-equity-watch { border-left:1px solid var(--line); }
+.terminal-shell .home-hub .home-market-pair .home-section>header { min-height:40px; padding:0 10px; }
+.terminal-shell .home-hub .home-market-pair .home-section>header b { font-size:12px; }
+.home-market-pair .home-mover-tabs, .home-market-pair .home-watch-sort { padding-inline:8px; }
+.home-market-pair .home-mover-tabs button, .home-market-pair .home-watch-sort button { padding-inline:8px; font-size:11px; }
+.home-pair-list { max-height:460px; overflow:auto; }
+.home-pair-row { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:center; padding:7px 8px; border:0; border-top:1px solid var(--line); background:transparent; color:inherit; text-align:left; }
+.home-pair-name { display:flex; gap:4px; align-items:baseline; min-width:0; }
+.home-pair-name b { flex:none; font-size:11px; }
+.home-pair-name small { overflow:hidden; color:var(--muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.home-pair-row em { font-style:normal; font-size:10px; font-weight:750; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+.home-pair-row .up { color:var(--green, #00a67e); }
+.home-pair-row .down { color:var(--red, #f04458); }
 .home-heat { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:2px 14px 14px; }
 .home-heat button { min-height:62px; display:flex; flex-direction:column; justify-content:center; gap:2px; padding:8px 7px; border:0; border-radius:12px; text-align:left; cursor:default; }
 .home-heat button.is-link { cursor:pointer; }
