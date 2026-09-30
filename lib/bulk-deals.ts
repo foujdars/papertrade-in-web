@@ -1,6 +1,7 @@
 export type Deal = {
   symbol: string;
   name: string;
+  isin: string;
   client: string;
   side: "Buy" | "Sell";
   kind: "Bulk" | "Block";
@@ -8,6 +9,13 @@ export type Deal = {
   price: number;
   value: number;
   date: string;
+};
+
+export type DealGroup = {
+  symbol: string;
+  name: string;
+  isin: string;
+  rows: Deal[];
 };
 
 export function dealValue(value: number) {
@@ -37,6 +45,7 @@ export function presentDeals(rows: unknown[]): Deal[] {
     deals.push({
       symbol,
       name: String(item.csym || item.scname || symbol),
+      isin: /^IN[A-Z0-9]{10}$/.test(String(item.isin ?? "")) ? String(item.isin) : "",
       client: String(item.cname || "—").trim() || "—",
       side: String(item.bs ?? "").toUpperCase() === "B" ? "Buy" : "Sell",
       kind: kind === "BLOCK" ? "Block" : "Bulk",
@@ -52,4 +61,17 @@ export function presentDeals(rows: unknown[]): Deal[] {
 export function latestSession(deals: Deal[]) {
   const date = deals.reduce((latest, deal) => deal.date > latest ? deal.date : latest, "");
   return { date, rows: date ? deals.filter(deal => deal.date === date) : [] };
+}
+
+export function groupDeals(deals: Deal[]): DealGroup[] {
+  const groups = new Map<string, Deal[]>();
+  for (const deal of deals) {
+    const rows = groups.get(deal.symbol) ?? [];
+    rows.push(deal);
+    groups.set(deal.symbol, rows);
+  }
+  return [...groups.values()].map(rows => {
+    rows.sort((a, b) => b.value - a.value);
+    return { symbol: rows[0].symbol, name: rows[0].name, isin: rows[0].isin, rows };
+  }).sort((a, b) => b.rows[0].value - a.rows[0].value || a.symbol.localeCompare(b.symbol));
 }
