@@ -41,6 +41,7 @@ test("home renders the sector heat map", async () => {
     readFile(new URL("../components/SectorHeat.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(home, /<SectorHeat /);
+  assert.ok(home.lastIndexOf("<SectorHeat ") > home.lastIndexOf("home-attention"));
   assert.match(route, /sectorChartUrl/);
   assert.match(view, /Sector heat map/);
   assert.doesNotMatch(view, /Sample sector/);
