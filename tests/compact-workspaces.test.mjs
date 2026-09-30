@@ -288,6 +288,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/search-shelf": searchShelf,
     "./MarketDirectory": { MarketDirectory: () => null },
     "./IndiaPulse": { IndiaPulse: () => null },
+    "./MarketMovers": { MarketMovers: () => null },
     "./SessionBoard": { SessionBoard: () => null },
     "@/lib/global-order-engine": { formatUsd: value => `$${Number(value).toFixed(2)}` },
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },
