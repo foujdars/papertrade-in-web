@@ -300,13 +300,18 @@ export function HomeWorkspace({
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
           <div className="home-index-grid" aria-label="Indian market indices">
             {indices.map((index) => {
-              const positive = (index.points ?? 0) >= 0;
-              const up = (index.changePercent ?? 0) >= 0;
+              const points = index.points;
+              const change = index.changePercent;
+              const known = points !== null && change !== null;
+              const up = (change ?? 0) >= 0;
               return (
-                <button key={index.symbol} className="home-index-card" data-live={index.live ? "true" : "false"} onClick={() => onOpenStock(index.symbol)}>
-                  <span>{index.label}</span>
+                <button key={index.symbol} className="home-index-card" data-symbol={index.symbol} data-live={index.live ? "true" : "false"} data-tone={known ? (up ? "up" : "down") : "flat"} onClick={() => onOpenStock(index.symbol)}>
+                  <span>{index.live ? <i aria-hidden="true" /> : null}{index.label}</span>
                   <b>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
-                  <small className={index.points === null ? "" : positive ? "positive" : "negative"}>{index.points === null || index.changePercent === null ? "—" : `${positive ? "+" : ""}${index.points.toFixed(2)} · ${up ? "+" : ""}${index.changePercent.toFixed(2)}%`}</small>
+                  <small className={known ? (up ? "positive" : "negative") : ""}>
+                    <em>{known ? `${up ? "+" : ""}${change.toFixed(2)}%` : "—"}</em>
+                    {known ? <em>{`${points >= 0 ? "+" : ""}${points.toFixed(2)}`}</em> : null}
+                  </small>
                 </button>
               );
             })}

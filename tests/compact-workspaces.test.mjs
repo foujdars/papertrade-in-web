@@ -286,6 +286,7 @@ async function componentHarness(path, name, initialStates = []) {
     "@/lib/global-markets": globalMarkets,
     "@/lib/market-directory": marketDirectory,
     "@/lib/search-shelf": searchShelf,
+    "@/lib/equity-watch": { volumeLabel: () => "" },
     "./MarketDirectory": { MarketDirectory: () => null },
     "./IndiaPulse": { IndiaPulse: () => null },
     "./MarketMovers": { MarketMovers: () => null },
