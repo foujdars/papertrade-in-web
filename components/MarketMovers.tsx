@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOVER_TABS, volumeMetrics, type Mover, type MoverTab } from "@/lib/market-movers";
@@ -49,10 +49,10 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const high = lists?.high52?.[0];
   const lead = gainers[0];
   const lag = losers[0];
-  const moverLine = (kind: string, row: Mover | undefined) => <span className="home-market-line" key={kind}><i>{kind}</i><b>{row?.symbol ?? "—"}</b><em className={row && row.change < 0 ? "down" : "up"}>{row ? percent(row.change) : "—"}</em></span>;
+  const moverLine = (kind: string, row: Mover | undefined) => <span className="home-market-line" key={kind}><i>{kind}</i><b title={row ? `${row.symbol} ${row.name}` : undefined}>{row?.symbol ?? "—"}</b><em className={row && row.change < 0 ? "down" : "up"}>{row ? `${row.change > 0 ? "+" : ""}${row.change.toFixed(1)}%` : "—"}</em></span>;
   return <div className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label={lead ? `Open market movers. Top gainer ${lead.symbol} ${percent(lead.change)}` : "Open market movers"}>
-      <span className="home-market-card-copy"><b>Market movers{lists ? <i className="home-market-live" /> : null}</b></span>
+      <span className="home-market-card-copy"><b>Market movers{lists ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
       <span className="home-market-lines">{moverLine("Gainer", lead)}{moverLine("Loser", lag)}{moverLine("52W", high)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>

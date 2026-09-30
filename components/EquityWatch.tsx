@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
@@ -80,7 +80,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
   return <div id="equity-watch" className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
-      <span className="home-market-card-copy"><b>Equity market{niftyBreadth ? <i className="home-market-live" /> : null}</b></span>
+      <span className="home-market-card-copy"><b>Equity market{niftyBreadth ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
       <span className="home-market-lines">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>

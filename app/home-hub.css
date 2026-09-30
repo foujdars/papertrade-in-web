@@ -331,23 +331,24 @@
 .home-watch-list .up { color:var(--green, #00a67e); }
 .home-watch-list .down { color:var(--red, #f04458); }
 .terminal-shell .home-hub .home-market-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:16px; }
-.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; overflow:hidden; padding:10px 12px 12px; border:1px solid color-mix(in srgb, var(--kind) 30%, var(--line)); border-radius:16px; background:linear-gradient(180deg, color-mix(in srgb, var(--kind) 10%, var(--surface)), var(--surface) 70%); color:var(--ink); text-align:left; }
+.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:5px; overflow:hidden; padding:8px 8px 9px; border:1px solid color-mix(in srgb, var(--kind) 30%, var(--line)); border-radius:14px; background:linear-gradient(180deg, color-mix(in srgb, var(--kind) 10%, var(--surface)), var(--surface) 70%); color:var(--ink); text-align:left; }
 .home-market-card[data-kind="equity"] { --kind:#6d4aff; }
 .home-market-card:active { transform:scale(.985); }
 @media (prefers-reduced-motion:reduce) { .home-market-card:active { transform:none; } }
-.home-market-card-copy { min-width:0; }
-.home-market-card-copy b { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:750; letter-spacing:-.02em; }
-.home-market-live { width:6px; height:6px; border-radius:50%; background:#12b886; box-shadow:0 0 0 3px color-mix(in srgb, #12b886 28%, transparent); }
-.home-market-lines { display:grid; gap:5px; }
-.home-market-line { display:grid; grid-template-columns:46px minmax(0,1fr) auto; gap:4px; align-items:baseline; }
-.home-market-line i { color:var(--muted); font-size:9px; font-style:normal; font-weight:750; }
-.home-market-line b { min-width:0; overflow:hidden; font-size:12px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
-.home-market-line em, .home-breadth-line em { font-style:normal; font-size:11px; font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.home-market-card-copy { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:4px; }
+.home-market-card-copy b { display:flex; align-items:center; gap:4px; min-width:0; font-size:11px; font-weight:750; letter-spacing:-.02em; }
+.home-market-card-copy > svg { flex:none; color:var(--kind); }
+.home-market-live { width:5px; height:5px; border-radius:50%; background:#12b886; box-shadow:0 0 0 2px color-mix(in srgb, #12b886 28%, transparent); }
+.home-market-lines { display:grid; gap:3px; }
+.home-market-line { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px; align-items:baseline; }
+.home-market-line i { color:var(--muted); font-size:8px; font-style:normal; font-weight:700; }
+.home-market-line b { min-width:0; font-size:10px; font-weight:720; letter-spacing:-.03em; line-height:1.15; white-space:nowrap; }
+.home-market-line em, .home-breadth-line em { font-style:normal; font-size:10px; font-weight:720; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .home-market-line .up, .home-breadth-line .up { color:#087f60; }
 .home-market-line .down, .home-breadth-line .down { color:#c92e51; }
-.home-breadth-line { display:flex; align-items:baseline; justify-content:space-between; gap:6px; }
-.home-breadth-line b { min-width:0; font-size:12px; font-weight:720; }
-.home-breadth-line em { display:flex; gap:6px; }
+.home-breadth-line { display:flex; align-items:baseline; justify-content:space-between; gap:4px; }
+.home-breadth-line b { min-width:0; font-size:10px; font-weight:720; white-space:nowrap; }
+.home-breadth-line em { display:flex; gap:4px; font-size:9px; }
 .home-breadth-line i { font-style:normal; }
 .terminal-shell[data-theme="neon"] .home-market-line .up, .terminal-shell[data-theme="neon"] .home-breadth-line .up { color:#3ee0a2; }
 .terminal-shell[data-theme="neon"] .home-market-line .down, .terminal-shell[data-theme="neon"] .home-breadth-line .down { color:#ff8aa0; }
