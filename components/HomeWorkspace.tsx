@@ -1,6 +1,6 @@
 "use client";
 import type { HomeAttention } from '@/lib/home-attention';
-import { Bell, AlertCircle, Play, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
+import { Bell, AlertCircle, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
 import { isGlobalInstrumentKey } from '@/lib/global-markets';
 import { compareMarketInstruments } from '@/lib/market-directory';
 import { MarketDirectory } from './MarketDirectory';
@@ -90,12 +90,12 @@ export function HomeWorkspace({
   onOpenTradeHistory,
   onOpenPnl,
   onOpenStock, preferenceOwner='guest', recentSymbols=[], onClearRecent,
-  realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, resumeChart, onResumeChart, onOpenRealised: _onOpenRealised,
+  realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
-  resumeChart?:{symbol:string;timeframe:string};onResumeChart?:()=>void;onOpenRealised?:()=>void;
+  onOpenRealised?:()=>void;
   firstName?: string;
   indices: HomeIndexQuote[];
   feedLive: boolean;
@@ -355,7 +355,6 @@ export function HomeWorkspace({
           {!!hiddenAttention.length && <><button className="home-hidden-toggle" aria-expanded={showHidden} onClick={()=>setShowHidden(!showHidden)}>{showHidden?'Hide':'Show'} reviewed / later ({hiddenAttention.length})</button>{showHidden && hiddenAttention.map(item => <div className="home-hidden-reminder" key={item.id}><span><b>{item.title}</b><small>{preferences.reminders[item.id].reviewed?'Reviewed · returns if details change':`Remind at ${new Date(preferences.reminders[item.id].until).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`}</small></span><button onClick={()=>restoreReminder(item.id)}>Restore</button></div>)}</>}
         </div></section>}
         {preferenceMessage && <p className="home-preference-message" role="status">{preferenceMessage}<button aria-label="Dismiss preference message" onClick={()=>setPreferenceMessage('')}><X size={14}/></button></p>}
-        {resumeChart && isGlobalInstrumentKey(stockOptions.find(stock => stock.symbol === resumeChart.symbol)?.instrumentKey) === (activeMarket === 'global') && <button className="home-resume-card" onClick={onResumeChart}><span className="home-resume-icon"><CandlestickChart size={23}/></span><span><small>Continue your chart</small><b>{resumeChart.symbol} <em>· {resumeChart.timeframe}</em></b><small>Your saved chart setup</small></span><span className="home-resume-action">Resume <Play size={14}/></span></button>}
       </div>
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>

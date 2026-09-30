@@ -3223,8 +3223,6 @@ export function TradingDashboard() {
         sessionMessage={marketStatus.message}
         attention={[...positionAttention(openPositions,protections,orders),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
         onAttention={(item:HomeAttention)=>{if(item.target.kind==='alerts'){setHomeAlertRequest({key:Date.now(),tab:item.target.tab,id:item.target.id});}else{setHomeOpen(false);setWorkspaceMode('trade');openPositionChart(item.target.symbol);setProduct(item.target.product);}}}
-        resumeChart={chartPreferencesReady?{symbol:selected.symbol,timeframe}:undefined}
-        onResumeChart={()=>openNavigationSection(workspaceMode==='fno'?'fno':'trade')}
         onOpenRealised={()=>{setPnlScope({...DEFAULT_PNL_SCOPE,period:'custom',start:pnlToday,end:pnlToday});setSelectedPnlDateKey(null);setPnlDrill(null);setPnlHistoryFilter('all');openNavigationSection('pnl');setPnlTab('trades');}}
         holdingsCount={holdings.length}
         openPositionsCount={openPositions.length}

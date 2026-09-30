@@ -31,7 +31,7 @@ test("server-renders only the full-screen disclaimer before the home dashboard",
   const dashboard = await readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8");
   assert.match(dashboard, /Indian market indices/);
   assert.match(dashboard, /Needs attention/);
-  assert.match(dashboard, /Continue your chart/);
+  assert.doesNotMatch(dashboard, /Continue your chart/);
   assert.match(dashboard, /Search Indian stocks and indices/);
   assert.match(dashboard, /Search global markets/);
   assert.match(dashboard, /Your paper portfolio/);
