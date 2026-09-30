@@ -19,8 +19,15 @@ function harness({autoOpen=true,loadFailures=0,initialPayload}={}){
   (fn,ms)=>{assert.equal(ms,15000);timers.set(++id,fn);return id;},key=>timers.delete(key));
  return {open:exports.openUpstoxLiveFeed,sockets,timers};
 }
-test('intentional close does not schedule another reconnect; network disconnect does',async()=>{
- const h=harness();let disconnected=0;const controller=new AbortController();
+test('the feed recycles a session socket before the ten minute drop', async () => {
+  assert.match(source, /8 \* 60 \* 1000/);
+  assert.match(source, /visibilitychange/);
+  const chart = await readFile(new URL('../components/MarketChart.tsx', import.meta.url), 'utf8');
+  assert.match(chart, /document\.hidden \|\| liveStreamConnectedRef\.current\) return/);
+});
+
+test('intentional close does not schedule another reconnect; network disconnect does', async () => {
+  const h=harness();let disconnected=0;const controller=new AbortController();
  const options={instrumentKey:'TEST',signal:controller.signal,onTick:()=>{},onDisconnect:()=>disconnected++};
  const close=await h.open(options);assert.equal(h.timers.size,0);close();assert.equal(disconnected,0);
  await h.open(options);h.sockets[1].close();assert.equal(disconnected,1);

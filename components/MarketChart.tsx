@@ -2946,17 +2946,24 @@ export function MarketChart({
     }
 
     const resume = () => {
-      if (document.hidden) return;
+      if (document.hidden || liveStreamConnectedRef.current) return;
       window.clearTimeout(reconnectTimer);
+      retryAttempt = 0;
       void connect();
+    };
+    const onOffline = () => {
+      liveStreamConnectedRef.current = false;
+      closeSocket?.();
     };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
+    window.addEventListener("offline", onOffline);
     void connect();
     return () => {
       stopped = true;
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("online", resume);
+      window.removeEventListener("offline", onOffline);
       liveStreamConnectedRef.current = false;
       controller.abort();
       closeSocket?.();

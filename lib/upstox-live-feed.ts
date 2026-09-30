@@ -61,6 +61,14 @@ function extractTick(payload: FeedObject, instrumentKey: string): UpstoxLiveTick
   };
 }
 
+function cashSessionOpen(now = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  if (value.weekday === "Sat" || value.weekday === "Sun") return false;
+  const minutes = Number(value.hour) * 60 + Number(value.minute);
+  return minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 30;
+}
+
 async function messageBytes(data: unknown) {
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
   if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
@@ -90,12 +98,31 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
   const socket = new WebSocket(authorization.authorizedRedirectUri);
   socket.binaryType = "arraybuffer";
   let intentionallyClosed = false;
+  const openedAt = Date.now();
+  let lastMessageAt = 0;
+  let watch = 0;
+  const recycle = (reason: string) => {
+    if (intentionallyClosed || signal.aborted) return;
+    if (socket.readyState !== WebSocket.OPEN && socket.readyState !== WebSocket.CONNECTING) return;
+    socket.close(4000, reason);
+  };
+  const onVisible = () => {
+    if (typeof document !== "undefined" && document.hidden) return;
+    const stale = socket.readyState !== WebSocket.OPEN || Date.now() - openedAt >= 8 * 60 * 1000 || (lastMessageAt > 0 && Date.now() - lastMessageAt >= 45_000);
+    if (socket.readyState !== WebSocket.OPEN || (cashSessionOpen() && stale)) recycle("Resume live feed");
+  };
+  const stopWatch = () => {
+    clearInterval(watch);
+    watch = 0;
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
+  };
   const abort = () => socket.close(1000, "Chart changed");
   signal.addEventListener("abort", abort, { once: true });
 
   // Subscribe to frames before sending the subscription so the initial quote
   // cannot be lost. Ignore queued frames after a chart has disconnected.
   socket.addEventListener("message", (event) => {
+    lastMessageAt = Date.now();
     void messageBytes(event.data).then((bytes) => {
       if (!bytes || signal.aborted || intentionallyClosed) return;
       try {
@@ -120,6 +147,7 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
     };
     const fail = () => {
       cleanup();
+      stopWatch();
       signal.removeEventListener("abort", abort);
       intentionallyClosed = true;
       socket.close();
@@ -140,13 +168,24 @@ export async function openUpstoxLiveFeed({ instrumentKey, instrumentKeys: reques
     socket.addEventListener("open", opened, { once: true });
   });
 
+  lastMessageAt = Date.now();
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
+  watch = setInterval(() => {
+    if (intentionallyClosed || signal.aborted || socket.readyState !== WebSocket.OPEN) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    // The V3 feed often dies just before 10 minutes and sends no close frame.
+    if (cashSessionOpen() && Date.now() - openedAt >= 8 * 60 * 1000) recycle("Recycle live feed");
+  }, 15_000);
+
   socket.addEventListener("close", () => {
+    stopWatch();
     signal.removeEventListener("abort", abort);
     if (!signal.aborted && !intentionallyClosed) onDisconnect();
   });
 
   return () => {
     intentionallyClosed = true;
+    stopWatch();
     signal.removeEventListener("abort", abort);
     if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
       socket.close(1000, "Chart changed");

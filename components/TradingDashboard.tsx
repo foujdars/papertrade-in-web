@@ -1353,15 +1353,20 @@ export function TradingDashboard() {
     let closeFeed: (() => void) | undefined;
     let reconnectTimer = 0;
     let retryCount = 0;
+    let connecting = false;
 
     const scheduleReconnect = () => {
       if (controller.signal.aborted) return;
+      window.clearTimeout(reconnectTimer);
       retryCount += 1;
       reconnectTimer = window.setTimeout(() => void connect(), Math.min(30_000, 2_000 * 2 ** Math.min(retryCount - 1, 4)));
     };
     async function connect() {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || connecting) return;
+      connecting = true;
       try {
+        closeFeed?.();
+        closeFeed = undefined;
         closeFeed = await openUpstoxLiveFeed({
           instrumentKeys: [...instrumentsByKey.keys()],
           signal: controller.signal,
@@ -1371,9 +1376,15 @@ export function TradingDashboard() {
           },
           onDisconnect: scheduleReconnect,
         });
+        if (controller.signal.aborted) {
+          closeFeed();
+          return;
+        }
         retryCount = 0;
       } catch {
-        scheduleReconnect();
+        if (!controller.signal.aborted) scheduleReconnect();
+      } finally {
+        connecting = false;
       }
     }
     void connect();
