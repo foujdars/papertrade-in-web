@@ -106,6 +106,20 @@ function shelfOf(item: DirectoryInstrument): SearchShelfId | "other" {
   return "other";
 }
 
+export function matchShelfInstrument<T extends DirectoryInstrument>(instruments: T[], shelf: SearchShelfId, token: string): T | null {
+  const pool = instruments.filter(item => item.assetType !== "OPTION" && (shelf === "all" || shelfOf(item) === shelf));
+  const key = token.trim().toUpperCase();
+  if (!key) return null;
+  const bySymbol = new Map(pool.map(item => [item.symbol.toUpperCase(), item]));
+  const byTicker = new Map<string, T>();
+  for (const item of pool) {
+    const ticker = marketTicker(item).toUpperCase();
+    const previous = byTicker.get(ticker);
+    if (!previous || item.symbol.length < previous.symbol.length) byTicker.set(ticker, item);
+  }
+  return bySymbol.get(key) ?? bySymbol.get(`${key}USD`) ?? byTicker.get(key) ?? null;
+}
+
 export function searchShelfRows<T extends DirectoryInstrument>(input: {
   shelf: SearchShelfId;
   instruments: T[];
@@ -135,7 +149,7 @@ export function searchShelfRows<T extends DirectoryInstrument>(input: {
     const item = bySymbol.get(symbol.toUpperCase());
     if (!item || recent.some(row => row.symbol === item.symbol)) continue;
     recent.push(item);
-    if (recent.length >= 8) break;
+    if (recent.length >= 5) break;
   }
   const tokens = input.shelf === "us" ? input.popular.us : input.shelf === "crypto" ? input.popular.crypto : input.popular.in;
   const seen = new Set(recent.map(item => item.symbol));

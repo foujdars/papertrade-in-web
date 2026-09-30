@@ -20,7 +20,6 @@ import {
   CandlestickChart,
   CheckCircle2,
   ChevronRight,
-  ChevronLeft,
   Layers3,
   Search,
   TrendingUp,
@@ -30,7 +29,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usableHomeQuote, quoteChangeText, type HomeQuote } from "@/lib/home-quotes";
 import { formatInr } from "@/lib/market";
-import { FALLBACK_POPULAR, popularHeading, searchShelfRows, type PopularLists, type SearchShelfId } from "@/lib/search-shelf";
+import { FALLBACK_POPULAR, matchShelfInstrument, searchShelfRows, type PopularLists, type SearchShelfId } from "@/lib/search-shelf";
+import { volumeLabel } from "@/lib/equity-watch";
+import type { BoardQuote, SearchBoard } from "@/lib/search-board";
 
 export type HomeIndexQuote = {
   symbol: string;
@@ -136,6 +137,7 @@ export function HomeWorkspace({
   const [now, setNow] = useState(() => Date.now());
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
+  const [boards, setBoards] = useState<{ in: SearchBoard; us: SearchBoard; crypto: SearchBoard } | null>(null);
   const sheetInput = useRef<HTMLInputElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
@@ -160,6 +162,13 @@ export function HomeWorkspace({
       .then(body => {
         if (!body?.ok || !Array.isArray(body.in) || !Array.isArray(body.us) || !Array.isArray(body.crypto)) return;
         setPopular({ in: body.in, us: body.us, crypto: body.crypto, sources: { in: String(body.sources?.in ?? "fallback"), us: String(body.sources?.us ?? "fallback"), crypto: String(body.sources?.crypto ?? "fallback") } });
+      })
+      .catch(() => undefined);
+    fetch("/api/market/search-movers", { signal: controller.signal, cache: "no-store" })
+      .then(response => response.json())
+      .then(body => {
+        if (!body?.ok || !body.in || !body.us || !body.crypto) return;
+        setBoards({ in: body.in, us: body.us, crypto: body.crypto });
       })
       .catch(() => undefined);
     return () => { document.body.style.overflow = previous; controller.abort(); };
@@ -190,6 +199,27 @@ export function HomeWorkspace({
   };
   const shelfRows = useMemo(() => searchShelfRows({ shelf, instruments: stockOptions, recent: recentSymbols, popular, query: search }), [popular, recentSymbols, search, shelf, stockOptions]);
   const closeSearch = () => { setSearchFocused(false); setSearch(""); };
+  const inrPrice = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  const boardKey = shelf === "crypto" ? "crypto" : shelf === "us" || (shelf === "all" && activeMarket === "global") ? "us" : "in";
+  const boardShelf: SearchShelfId = boardKey === "in" ? "in" : boardKey;
+  const listMoney = (value: number) => {
+    if (!(value > 0)) return "—";
+    if (boardKey === "in") return inrPrice.format(value);
+    const digits = value >= 1 ? 2 : 4;
+    return value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  };
+  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number; volume: number; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
+    {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
+    <span className="home-pair-name"><span><b>{line.symbol}</b><small>{line.name}</small></span>{line.volume > 0 ? <small className="home-pair-vol">Vol {volumeLabel(line.volume)}</small> : null}</span>
+    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.change < 0 ? "down" : "up"}>{line.change > 0 ? "+" : ""}{line.change.toFixed(2)}%</em></span>
+  </button>;
+  const quoteLine = (quote: BoardQuote, seen: Set<string>) => {
+    const stock = matchShelfInstrument(stockOptions, boardShelf, quote.symbol);
+    const symbol = stock?.symbol ?? quote.symbol;
+    if (seen.has(symbol)) return null;
+    seen.add(symbol);
+    return { key: `${boardKey}:${symbol}`, symbol, name: stock?.name ?? quote.name, price: quote.price, change: quote.change, volume: quote.volume, stock };
+  };
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
     if (!quoteKeys) { setLoading(false); return; }
@@ -210,12 +240,14 @@ export function HomeWorkspace({
     return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); window.clearTimeout(debounce); };
   }, [quoteKeys, retry]);
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
-  const searchRow = (stock: HomeStockOption) => <div className="home-search-row" key={stock.symbol}>
-    <button className="home-search-preview" aria-label={isGlobalInstrumentKey(stock.instrumentKey) ? `Open ${stock.symbol} chart` : `Preview ${stock.symbol}`} onClick={() => chooseSearch(stock)}>
-      <span className="stock-identity">{stock.assetType === 'INDEX' ? <TrendingUp size={25} aria-hidden="true" /> : <StockLogo symbol={stock.symbol} instrumentKey={stock.instrumentKey} categories={stock.categories} size={32} />}<span><b>{stock.symbol}</b><small>{stock.name}</small></span></span>
-    </button>
-    <button className="home-search-chart" aria-label={`Open ${stock.symbol} chart`} title="Open chart" onClick={() => chooseSearch(stock, true)}><CandlestickChart size={18} /></button>
-  </div>;
+  const seen = new Set<string>();
+  const recentLines = shelfRows.recent.slice(0, 5).map(stock => {
+    seen.add(stock.symbol);
+    return { key: stock.symbol, symbol: stock.symbol, name: stock.name, price: stock.price, change: stock.changePercent, volume: 0, stock };
+  });
+  const board = boards?.[boardKey];
+  const gainerLines = (board?.gainers ?? []).map(quote => quoteLine(quote, seen)).filter((line): line is NonNullable<typeof line> => !!line).slice(0, 5);
+  const loserLines = (board?.losers ?? []).map(quote => quoteLine(quote, seen)).filter((line): line is NonNullable<typeof line> => !!line).slice(0, 5);
 
   return (
     <section className="home-workspace home-hub home-studio" data-market={activeMarket} aria-label="PaperTrade home">
@@ -224,31 +256,32 @@ export function HomeWorkspace({
           <div className="home-hero-copy">
             <div className="home-global-search" onBlur={event => { const next = event.relatedTarget as Node | null; if (next && (event.currentTarget.contains(next) || sheetRef.current?.contains(next))) return; if (sheetRef.current) return; setSearchFocused(false); setSearch(""); }} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
               <Search size={18} />
-              <input value={search} onFocus={() => { setSearchFocused(true); setShelf("all"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
+              <input value={search} onFocus={() => { setSearchFocused(true); setShelf(activeMarket === "global" ? "all" : "in"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
               {search && !searchFocused && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
               {searchFocused && typeof document !== "undefined" && createPortal(
                 <>
                   <button type="button" className="home-search-backdrop" aria-label="Close search" onClick={closeSearch} />
                   <div ref={sheetRef} className="home-search-sheet" role="dialog" aria-modal="true" aria-label="Search markets" onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
                     <header>
-                      <button type="button" aria-label="Close search" onClick={closeSearch}><ChevronLeft size={22} /></button>
                       <label className="home-search-field">
                         <Search size={18} />
                         <input ref={sheetInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or symbol" aria-label="Search all markets" autoComplete="off" />
                         {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
                       </label>
+                      <button type="button" aria-label="Close search" onClick={closeSearch}><X size={20} /></button>
                     </header>
                     <div className="home-search-tabs" role="tablist" aria-label="Market">
                       {([["all", "All"], ["in", "IN"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
                     </div>
                     <div className="home-search-sheet-list">
-                      {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(searchRow) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
-                        {!!shelfRows.recent.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
-                        {shelfRows.recent.map(searchRow)}
-                        {!!shelfRows.popular.length && <div className="home-search-group"><b>{popularHeading(shelf, popular)}</b></div>}
-                        {shelfRows.popular.map(searchRow)}
-                        {!shelfRows.recent.length && !shelfRows.popular.length && <div className="home-search-empty">Search this market by name or symbol.</div>}
-                        <div className="home-search-hint">Tap a name to preview · chart icon to open</div>
+                      {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, price: stock.price, change: stock.changePercent, volume: 0, stock })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
+                        {!!recentLines.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
+                        {recentLines.map(searchLine)}
+                        {!!gainerLines.length && <div className="home-search-group"><b>Gainers</b></div>}
+                        {gainerLines.map(searchLine)}
+                        {!!loserLines.length && <div className="home-search-group"><b>Losers</b></div>}
+                        {loserLines.map(searchLine)}
+                        {!recentLines.length && !gainerLines.length && !loserLines.length && <div className="home-search-empty">{boards ? "Search this market by name or symbol." : "Loading market lists"}</div>}
                       </>}
                     </div>
                   </div>

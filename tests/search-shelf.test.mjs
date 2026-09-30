@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { moneycontrolCryptoSymbols, moneycontrolEquitySymbols, moneycontrolTrendingSymbols, moneycontrolUsSymbols, popularHeading, searchShelfRows, tradingViewLeaders } from "../lib/search-shelf.ts";
+import { moneycontrolCryptoSymbols, moneycontrolEquitySymbols, moneycontrolTrendingSymbols, moneycontrolUsSymbols, popularHeading, searchShelfRows, tradingViewLeaders, matchShelfInstrument } from "../lib/search-shelf.ts";
+import { boardQuotes, splitBoard } from "../lib/search-board.ts";
 
 const instruments = [
   { symbol: "RELIANCE", name: "Reliance Industries", instrumentKey: "NSE_EQ|1", categories: [], assetType: "EQUITY" },
@@ -66,7 +67,28 @@ test("the search window is portaled over Home instead of sitting in the search b
   assert.match(view, /document\.querySelector\("\.terminal-shell"\)/);
   assert.match(css, /\.home-search-sheet \{[^}]*position:\s*fixed/s);
   assert.match(css, /\.home-search-sheet \{[^}]*z-index:\s*261/s);
-  assert.match(css, /\.home-search-tabs button \{[^}]*background:\s*var\(--soft/s);
+  assert.match(css, /\.home-search-sheet \{[^}]*right:\s*0/s);
+  assert.match(css, /\.home-search-sheet \{[^}]*animation:\s*home-side-slide/s);
+  assert.match(view, /home-pair-row/);
+  assert.match(view, /Gainers/);
+  assert.match(view, /Losers/);
+  assert.match(view, /search-movers/);
+});
+
+test("search lists keep five recent names, then gainers and losers", () => {
+  const many = ["RELIANCE", "TCS", "INFY", "SBIN", "ITC", "LT"].map((symbol, index) => ({ symbol, name: symbol, instrumentKey: `NSE_EQ|${index}`, categories: [], assetType: "EQUITY" }));
+  const rows = searchShelfRows({ shelf: "in", instruments: many, recent: many.map(item => item.symbol), popular, query: "" });
+  assert.deepEqual(rows.recent.map(item => item.symbol), ["RELIANCE", "TCS", "INFY", "SBIN", "ITC"]);
+  const board = splitBoard(boardQuotes({ data: [
+    { d: ["NVDA", 100, 2, 2500000, "NVIDIA"] },
+    { d: ["AAPL", 90, -1.5, 100000, "Apple"] },
+    { d: ["MSFT", 80, 0, 10, "Flat"] },
+  ] }, "us"));
+  assert.deepEqual(board.gainers.map(row => row.symbol), ["NVDA"]);
+  assert.deepEqual(board.losers.map(row => row.symbol), ["AAPL"]);
+  assert.equal(board.gainers[0].volume, 2500000);
+  assert.equal(matchShelfInstrument(instruments, "us", "AAPL")?.symbol, "AAPLXUSD");
+  assert.equal(matchShelfInstrument(instruments, "crypto", "BTC")?.symbol, "BTCUSD");
 });
 
 test("the popular route reads Moneycontrol", async () => {
