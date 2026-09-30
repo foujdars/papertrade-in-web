@@ -7,7 +7,8 @@ import { kfinPublicationReport } from "./ipo-kfin-server";
 type Issue = { id?: string; name?: string; symbol?: string; status?: string; bidding_end_date?: string; issue_type?: string };
 type Details = Issue & { timeline?: { allotment_date?: string; listing_date?: string }; registrar_info?: { name?: string; registrar?: string } };
 type Payload<T> = { data?: T };
-const TTL = 5 * 60_000;
+const TTL = 60_000;
+const MUFG_STATUS = "https://in.mpms.mufg.com/Initial_Offer/public-issues.html";
 let cached: { expires: number; value: { allotments: IpoAllotment[]; fetchedAt: string; partial: boolean } } | undefined;
 let pending: Promise<NonNullable<typeof cached>["value"]> | undefined;
 let mufgCompanies: { expires: number; value: ReturnType<typeof parseMufgCompanies> } | undefined;
@@ -19,22 +20,27 @@ async function deadline<T>(promise: Promise<T>, milliseconds = 8_000): Promise<T
   } finally { clearTimeout(timer!); }
 }
 
+async function pdfReady(url: string) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(4_000), redirect: "error", cache: "no-store" });
+    if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) { await response.body?.cancel(); return false; }
+    const reader = response.body?.getReader();
+    if (!reader) return false;
+    try {
+      const { value } = await reader.read();
+      return new TextDecoder().decode(value?.slice(0, 5)) === "%PDF-";
+    } finally { await reader.cancel(); }
+  } catch { return false; }
+}
+
 async function publishedBasis(name: string, companies: ReturnType<typeof parseMufgCompanies>): Promise<string | undefined> {
   const normalized = normalizeIssuerName(name);
   const matches = companies.filter((company) => company.name === normalized);
   if (matches.length !== 1) return undefined;
-  const url = `https://in.mpms.mufg.com/Initial_Offer/PDF/${matches[0].id}/BasisOfAllotment.pdf`;
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(4_000), redirect: "error", cache: "no-store" });
-    if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) { await response.body?.cancel(); return undefined; }
-    // Confirm real PDF bytes; some registrar servers return a 200 HTML error page.
-    const reader = response.body?.getReader();
-    if (!reader) return undefined;
-    try {
-      const { value } = await reader.read();
-      return new TextDecoder().decode(value?.slice(0, 5)) === "%PDF-" ? url : undefined;
-    } finally { await reader.cancel(); }
-  } catch { return undefined; }
+  // The registrar adds the company to status check when allotment is finalised, often around 10:30.
+  // The basis PDF is a later file and must not hold the alert back.
+  const pdf = `https://in.mpms.mufg.com/Initial_Offer/PDF/${matches[0].id}/BasisOfAllotment.pdf`;
+  return await pdfReady(pdf) ? pdf : MUFG_STATUS;
 }
 
 async function loadMufgCompanies() {

@@ -97,13 +97,14 @@ test("allotment server verifies a public PDF, preserves failed details and share
   const data = await server.loadAllotments();
   assert.equal(data.partial, true);
   assert.equal(data.allotments.find(i => i.id === "sample").state, "published");
+  assert.equal(data.allotments.find(i => i.id === "sample").evidenceUrl, "https://in.mpms.mufg.com/Initial_Offer/PDF/123/BasisOfAllotment.pdf");
   assert.equal(data.allotments.find(i => i.id === "other").state, "unconfirmed");
   assert.equal(data.allotments.find(i => i.id === "bad").state, "unavailable");
   assert.equal(await server.loadAllotments(), data);
   assert.equal(calls, 5);
 });
 
-test("an HTML error document cannot produce an allotment publication alert", async (t) => {
+test("a registrar listing publishes allotment even before the basis PDF exists", async (t) => {
   const today = indiaDateKey();
   const server = await serverWith(t, async (path) => path.includes("?")
     ? { data: path.includes("status=closed") ? [{ id: "sample", name: "Example IPO", status: "closed", bidding_end_date: today }] : [] }
@@ -111,7 +112,9 @@ test("an HTML error document cannot produce an allotment publication alert", asy
   t.mock.method(globalThis, "fetch", async (url) => url.endsWith("GetDetails")
     ? Response.json({ d: "<Table><company_id>123</company_id><companyname>Example Limited IPO</companyname></Table>" })
     : new Response("<html>not ready</html>", { headers: { "Content-Type": "application/pdf" } }));
-  assert.equal((await server.loadAllotments()).allotments[0].state, "unconfirmed");
+  const row = (await server.loadAllotments()).allotments[0];
+  assert.equal(row.state, "published");
+  assert.equal(row.evidenceUrl, "https://in.mpms.mufg.com/Initial_Offer/public-issues.html");
 });
 
 test("total upstream failure is an error, not a successful empty allotment list", async (t) => {
