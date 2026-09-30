@@ -351,6 +351,14 @@
 .home-market-card[data-kind="equity"] .home-market-spark i:nth-child(3) { height:88%; }
 .home-market-card[data-kind="equity"] .home-market-spark i:nth-child(4) { height:60%; }
 .home-market-card[data-kind="equity"] .home-market-spark i:nth-child(5) { height:96%; }
+.home-market-spark i.up { background:#12b886; }
+.home-market-spark i.down { background:#f04458; }
+.home-market-card b { display:flex; align-items:center; gap:6px; }
+.home-market-live { width:6px; height:6px; border-radius:50%; background:#12b886; box-shadow:0 0 0 3px color-mix(in srgb, #12b886 28%, transparent); }
+.home-market-breadth { width:100%; height:7px; display:flex; overflow:hidden; border-radius:99px; background:var(--soft); margin-top:auto; }
+.home-market-breadth i { display:block; height:100%; }
+.home-market-breadth .up { background:#12b886; }
+.home-market-breadth .down { background:#f04458; }
 .home-market-card-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .home-market-card b { font-size:14px; font-weight:750; letter-spacing:-.03em; line-height:1.15; }
 .home-market-card small { color:var(--muted); font-size:11px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }

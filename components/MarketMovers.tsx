@@ -19,7 +19,6 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [tab, setTab] = useState<MoverTab>("gainers");
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (!open) return;
     const controller = new AbortController();
     const load = () => {
       fetch("/api/market/movers", { signal: controller.signal, cache: "no-store" })
@@ -32,9 +31,9 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
         .catch(() => { if (!controller.signal.aborted) setFailed(true); });
     };
     load();
-    const timer = window.setInterval(load, 60_000);
+    const timer = window.setInterval(load, 30_000);
     return () => { controller.abort(); window.clearInterval(timer); };
-  }, [open]);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -45,17 +44,23 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   }, [open]);
   const label = MOVER_TABS.find(item => item.id === tab)?.label ?? "Market movers";
   const rows = lists?.[tab] ?? [];
+  const gainers = lists?.gainers ?? [];
+  const losers = lists?.losers ?? [];
+  const bars = [...gainers.slice(0, 3), ...losers.slice(0, 2)];
+  const peak = Math.max(1, ...bars.map(row => Math.abs(row.change)));
+  const lead = gainers[0];
+  const lag = losers[0];
   return <div className="home-market-slot">
-    <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label="Open market movers">
+    <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label={lead ? `Open market movers. Top gainer ${lead.symbol} ${percent(lead.change)}` : "Open market movers"}>
       <span className="home-market-card-top">
         <span className="home-market-card-icon" aria-hidden="true"><TrendingUp size={18} /></span>
         <span className="home-market-card-aside">
-          <span className="home-market-spark" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+          <span className="home-market-spark" aria-hidden="true">{bars.length ? bars.map(row => <i key={row.symbol} className={row.change < 0 ? "down" : "up"} style={{ height: `${Math.max(22, Math.round(Math.abs(row.change) / peak * 100))}%` }} />) : <><i /><i /><i /><i /><i /></>}</span>
           <ChevronRight size={16} aria-hidden="true" />
         </span>
       </span>
-      <span className="home-market-card-copy"><b>Market movers</b><small>Gainers, losers, 52-week highs and circuit bands</small></span>
-      <span className="home-market-pills" aria-hidden="true"><em className="up">Gainers</em><em className="down">Losers</em><em>52W</em></span>
+      <span className="home-market-card-copy"><b>Market movers{lists ? <i className="home-market-live" /> : null}</b><small>{lead && lag ? `${lead.symbol} ${percent(lead.change)} · ${lag.symbol} ${percent(lag.change)}` : "Gainers, losers, 52-week highs and circuit bands"}</small></span>
+      <span className="home-market-pills" aria-hidden="true"><em className="up">{lead ? `+${lead.change.toFixed(1)}%` : "Gainers"}</em><em className="down">{lag ? `${lag.change.toFixed(1)}%` : "Losers"}</em><em>52W</em></span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close market movers" onClick={() => setOpen(false)} />
