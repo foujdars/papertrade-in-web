@@ -12,6 +12,7 @@ import {
   readPaperTradeNotifications,
   type PaperTradeNotification,
 } from "@/lib/notification-center";
+import { useTransientBack } from "./useTransientBack";
 
 function formatNotificationTime(timestamp: number) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -33,6 +34,7 @@ function NotificationIcon({ item }: { item: PaperTradeNotification }) {
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<PaperTradeNotification[]>([]);
+  useTransientBack(open, () => setOpen(false));
 
   useEffect(() => {
     const refresh = () => setItems(readPaperTradeNotifications());

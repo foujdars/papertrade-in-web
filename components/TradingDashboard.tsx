@@ -881,21 +881,13 @@ export function TradingDashboard() {
         setToast("");
         return;
       }
-
-      const now = Date.now();
-      if (now <= exitBackDeadlineRef.current) {
+      if (!window.dispatchEvent(new CustomEvent("papertrade:home-back", { cancelable: true }))) {
         exitBackDeadlineRef.current = 0;
-        void CapacitorApp.exitApp();
+        if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
+        setToast("");
         return;
       }
-
-      exitBackDeadlineRef.current = now + 2_500;
-      setToast("Press back again to close PaperTrade IN");
-      if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
-      exitBackToastTimerRef.current = window.setTimeout(() => {
-        exitBackDeadlineRef.current = 0;
-        setToast("");
-      }, 2_500);
+      void CapacitorApp.exitApp();
     }).then((listener) => {
       if (disposed) void listener.remove();
       else nativeListener = listener;

@@ -203,6 +203,17 @@ export function HomeWorkspace({
   const closeSearch = () => { setSearchFocused(false); setSearch(""); };
   useTransientBack(searchFocused, closeSearch);
   useTransientBack(preview !== null, () => setPreview(null));
+  useEffect(() => {
+    const onBack = (event: Event) => {
+      if (preferences.market !== "global") return;
+      event.preventDefault();
+      updatePreferences({ ...preferences, market: "india" });
+      setSearch("");
+      setSearchFocused(false);
+    };
+    window.addEventListener("papertrade:home-back", onBack);
+    return () => window.removeEventListener("papertrade:home-back", onBack);
+  }, [preferences]);
   const inrPrice = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
   const boardKey = shelf === "crypto" ? "crypto" : shelf === "us" || (shelf === "all" && activeMarket === "global") ? "us" : "in";
   const boardShelf: SearchShelfId = boardKey === "in" ? "in" : boardKey;

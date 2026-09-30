@@ -1,11 +1,25 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FLOW_WINDOWS, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
+import { useTransientBack } from "./useTransientBack";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
+
+function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDetailsElement>(null);
+  useTransientBack(open, () => setOpen(false));
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  return <details ref={ref} open={open}><summary aria-label={label} onClick={(event) => { event.preventDefault(); setOpen(value => !value); }}>i</summary>{open ? children : null}</details>;
+}
 
 function axisMax(value: number) {
   const steps = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000];
@@ -171,7 +185,7 @@ export function IndiaPulse() {
         <small className="india-vix-note">Indicative bands · Higher VIX means more expected volatility, not market direction.</small>
       </div>
       <div className="india-pcr">
-        <div className="india-pcr-head"><span>Nifty put/call ratio</span><details><summary aria-label="What is put/call ratio?">i</summary><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.</p></details></div>
+        <div className="india-pcr-head"><span>Nifty put/call ratio</span><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.</p></InfoTip></div>
         <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong><span>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</span></div>
         <div className="india-pcr-track" role="img" aria-label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"}><i style={{ width: `${pcrShare}%` }} /></div>
         <div className="india-pcr-labels"><span>Put OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.putOi) : "—"}</span><span>Call OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.callOi) : "—"}</span></div>
@@ -189,7 +203,7 @@ export function IndiaFlows() {
   return <div className="india-flows-slot">
     <div className="india-flows">
       <div className="india-flow-top">
-        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><details><summary aria-label="Explain chart colors">i</summary><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></details></div>
+        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><InfoTip label="Explain chart colors"><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></InfoTip></div>
         <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
       </div>
       {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
