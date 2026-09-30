@@ -1,0 +1,214 @@
+/* PaperTrade mobile design system. Loaded last to unify legacy screen styles. */
+.terminal-shell {
+  --ink: #172237;
+  --muted: #58667b;
+  --line: #e1e7ef;
+  --surface: #fff;
+  --soft: #f2f5fa;
+  --purple: #6046d6;
+  --purple-soft: #eeeafa;
+  --green: #008464;
+  --red: #d83255;
+  --panel: var(--surface);
+  --studio-canvas: var(--soft);
+  --studio-panel: var(--surface);
+  --studio-raised: #f7f9fc;
+  --studio-border: var(--line);
+  --studio-highlight: var(--purple-soft);
+  --studio-card: var(--surface);
+  --studio-shadow: 0 2px 8px #19263b04;
+  --mobile-header-height: 62px;
+  color: var(--ink);
+  background: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+.terminal-shell[data-theme="neon"] {
+  --ink: #eef3fc;
+  --muted: #a8b6cc;
+  --line: #28364b;
+  --surface: #111d30;
+  --soft: #091321;
+  --purple: #b3a3ff;
+  --purple-soft: #2b254b;
+  --green: #43d5ad;
+  --red: #ff7d94;
+  --studio-raised: #18263c;
+  --studio-shadow: none;
+}
+.terminal-shell button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.terminal-shell button:focus-visible, .terminal-shell input:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.terminal-shell button:active:not(:disabled) { filter: brightness(.94); }
+.terminal-shell .topbar { background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: none; }
+.terminal-shell .brand { letter-spacing: -.7px; }
+.terminal-shell .top-actions .icon-button { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--muted); box-shadow: none; }
+.terminal-shell .top-actions .icon-button.active { color: var(--purple); background: var(--purple-soft); }
+.mobile-utility-grid { display: none; }
+.terminal-shell .home-workspace { background: var(--soft); }
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll { max-width: 1100px; padding: 22px 24px 100px; display: flex; flex-direction: column; gap: 16px; }
+.home-overview-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.home-overview-eyebrow { color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: 1.5px; }
+.home-overview-heading h1 { margin: 4px 0 0; font-size: 25px; line-height: 1.2; letter-spacing: -.8px; font-weight: 750; }
+.home-overview-heading > button { display: flex; align-items: center; gap: 7px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--purple); font-size: 12px; font-weight: 650; }
+.terminal-shell .home-hub.home-studio .home-hero { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+.terminal-shell .home-hub.home-studio .home-global-search { min-height: 48px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none; padding-inline: 14px; }
+.terminal-shell .home-global-search input { font-size: 14px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser { gap: 4px; margin: 0; padding: 4px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--line) 45%, var(--surface)); }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button { min-height: 52px; padding: 8px 10px; gap: 8px; border: 0; border-radius: 12px; color: var(--muted); background: transparent; box-shadow: none; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button.active { color: var(--purple); background: var(--surface); box-shadow: 0 2px 6px #18283b0a; }
+.terminal-shell .home-market-chooser button b { font-size: 13px; font-weight: 700; }
+.terminal-shell .home-market-chooser button small { font-size: 10px; line-height: 1.4; }
+.terminal-shell .home-market-chooser button em { display: none; }
+.terminal-shell .home-hub.home-studio :is(.home-section,.market-directory,.home-market-card,.home-sector-card,.home-bulk-card,.india-flows) { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--studio-shadow); color: var(--ink); }
+.terminal-shell .home-section > header { padding: 12px 14px; min-height: 44px; }
+.terminal-shell .home-section > header b { font-size: 14px; font-weight: 700; letter-spacing: -.2px; }
+.terminal-shell .home-section > header small { font-size: 10px; color: var(--muted); }
+.terminal-shell .home-pulse-first { padding: 0; background: transparent; border: 0; box-shadow: none; }
+.terminal-shell .home-index-grid { gap: 8px; margin: 0; }
+.terminal-shell .home-index-card { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: none; text-align: left; }
+.terminal-shell .home-index-card > span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.terminal-shell .home-index-card > b { font-size: 21px; letter-spacing: -.6px; line-height: 1.35; color: var(--ink); }
+.terminal-shell .home-index-card small { font-size: 10px; gap: 4px; }
+.terminal-shell .home-session-board { padding: 10px 2px 0; margin: 0; background: none; border: 0; border-radius: 0; box-shadow: none; }
+.terminal-shell .home-session-board > div { gap: 8px; }
+.terminal-shell .home-session-board span { padding: 0; border: 0; background: transparent; }
+.terminal-shell .home-session-board span b { font-size: 10px; }
+.terminal-shell .home-session-board span small { font-size: 8px; }
+.terminal-shell .home-session-board > button { min-width: 40px; min-height: 40px; color: var(--purple); border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.terminal-shell .home-main-grid { margin: 0; gap: 16px; }
+.terminal-shell .home-portfolio-card { overflow: hidden; }
+.terminal-shell .home-portfolio-actions { gap: 2px; }
+.terminal-shell .home-portfolio-actions button { min-height: 40px; color: var(--muted); }
+.terminal-shell .home-portfolio-row { padding: 0 14px 14px; gap: 8px; }
+.terminal-shell .home-portfolio-row button { min-height: 64px; padding: 8px; background: var(--soft); border: 0; border-radius: 12px; }
+.terminal-shell .home-portfolio-row small { font-size: 10px; }
+.terminal-shell .home-portfolio-row b { font-size: 18px; }
+.terminal-shell .home-portfolio-row strong { font-size: 22px; letter-spacing: -.6px; }
+.terminal-shell .home-market-pair { gap: 8px; margin: 0; }
+.terminal-shell .home-market-card { padding: 12px; min-height: 100px; }
+.terminal-shell .home-market-card-copy > b { font-size: 13px; }
+.terminal-shell .home-market-line { font-size: 10px; }
+.terminal-shell .india-pulse { overflow: visible; }
+.terminal-shell .india-pulse-board { gap: 10px; padding: 0 12px 12px; }
+.terminal-shell :is(.india-ad,.india-vix,.india-pcr) { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--studio-raised); }
+.terminal-shell .india-ad > div > span { display: block; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.terminal-shell .india-ad-bar { height: 6px; margin-block: 10px 8px; }
+.terminal-shell .india-ad-counts b { font-size: 20px; letter-spacing: -.5px; }
+.terminal-shell .india-ad-legend { font-size: 10px; margin-top: 3px; }
+.terminal-shell .india-ad-chart { height: auto; max-height: 190px; margin-top: 8px; }
+.terminal-shell .india-ad-chart text { fill: var(--muted); font-size: 11px; }
+.terminal-shell .india-vix-head > span,.terminal-shell .india-pcr-head > span { font-size: 13px; font-weight: 650; }
+.terminal-shell .india-vix-head small { font-size: 10px; }
+.terminal-shell :is(.india-vix-value,.india-pcr-main) strong { font-size: 30px; line-height: 1.2; letter-spacing: -.8px; }
+.terminal-shell .india-vix-value { margin-block: 8px 4px; }
+.terminal-shell .india-vix-value b { font-size: 12px; }
+.terminal-shell .india-pulse-freshness { font-size: 10px; line-height: 1.5; color: var(--muted); }
+.terminal-shell .india-vix-track { height: 7px; }
+.terminal-shell .india-vix-labels { font-size: 10px; }
+.terminal-shell .india-vix-labels b { font-size: 9px; }
+.terminal-shell .india-vix-note { font-size: 10px; line-height: 1.5; }
+.terminal-shell .india-pcr-main > span { font-size: 10px; }
+.terminal-shell .india-pcr-track { height: 7px; margin-block: 10px 6px; }
+.terminal-shell .india-pcr-labels { font-size: 11px; }
+.terminal-shell .india-flows { padding: 12px; }
+.terminal-shell .india-flow-heading > b { font-size: 14px; }
+.terminal-shell .india-flow-heading > span { font-size: 10px; color: var(--muted); }
+.terminal-shell .india-flow-summary { margin-block: 8px; gap: 8px; }
+.terminal-shell .india-flow-stats { gap: 8px; }
+.terminal-shell .india-flow-stats > div { padding: 8px 10px; border: 0; border-radius: 10px; background: var(--soft); }
+.terminal-shell .india-flow-stats span { font-size: 10px; }
+.terminal-shell .india-flow-stats strong { font-size: 18px; letter-spacing: -.4px; }
+.terminal-shell .india-flow-range-trigger { min-height: 48px; border-radius: 12px; background: var(--soft); }
+.terminal-shell .india-flow-chart { height: 180px; }
+.terminal-shell .india-flow-chart text { font-size: 12px; }
+.terminal-shell .india-flow-detail { padding: 8px 10px; border-radius: 10px; font-size: 11px; background: var(--soft); }
+.terminal-shell :is(.home-side-sheet,.home-search-results,.more-menu-panel,.modal,.order-ticket) { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.terminal-shell .home-search-top { border-bottom: 1px solid var(--line); }
+.terminal-shell .home-search-top input { font-size: 16px; }
+.terminal-shell :is(.home-search-item,.home-pair-row,.instrument-row) { min-height: 68px; }
+.terminal-shell .home-search-item b,.terminal-shell .home-pair-name b { font-size: 14px; }
+.terminal-shell :is(.home-search-item small,.home-pair-name small) { font-size: 11px; }
+.terminal-shell .home-search-tabs button { min-height: 44px; border-radius: 10px; }
+.terminal-shell .trade-cockpit .chart-controls { background: var(--surface); border-bottom: 1px solid var(--line); }
+.terminal-shell .permanent-trade-footer { background: var(--surface); border-top: 1px solid var(--line); box-shadow: none; }
+.terminal-shell .chart-order-buttons button { border-radius: 12px; box-shadow: none; }
+@media (max-width: 760px) {
+  .terminal-shell .topbar { height: var(--mobile-header-height); min-height: var(--mobile-header-height); padding: 0 16px; gap: 8px; }
+  .terminal-shell .brand { min-width: 0; gap: 7px; font-size: 19px; }
+  .terminal-shell .brand-mark { width: 30px; height: 30px; flex: 0 0 30px; }
+  .terminal-shell .brand-mark svg { width: 30px; height: 30px; }
+  .terminal-shell .top-actions { gap: 6px; }
+  .terminal-shell .top-actions :is(.icon-button,.notification-bell,.account-button) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
+  .terminal-shell .top-actions :is(.header-coach-button,.header-wallet-button,.theme-toggle) { display: none; }
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding: 18px 16px 80px; gap: 14px; }
+  .home-overview-heading h1 { font-size: 23px; }
+  .home-overview-heading > button { padding: 0 10px; }
+  .home-overview-heading > button span { display: none; }
+  .terminal-shell .home-index-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .terminal-shell .home-index-card > b { font-size: 21px; }
+  .terminal-shell .more-menu-panel { position: fixed; inset: auto 12px calc(68px + env(safe-area-inset-bottom,0px)); width: auto; max-width: 480px; max-height: calc(100dvh - 150px); margin-inline: auto; overflow-y: auto; padding: 16px; border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 12px 50px #0004; }
+  .terminal-shell .more-menu-panel > header { margin-bottom: 16px; }
+  .mobile-utility-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 18px; }
+  .mobile-utility-grid > button { min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; color: var(--purple); background: var(--soft); font-size: 12px; font-weight: 600; }
+  .terminal-shell .more-menu-panel .home-card-toggles > button { min-height: 48px; }
+  .terminal-shell .more-menu-panel .density-picker button { min-height: 44px; }
+  .terminal-shell .mobile-bottom-nav { background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: none; padding-inline: 4px; box-shadow: 0 -4px 20px #19263b06; }
+  .terminal-shell .mobile-bottom-nav::before { display: none; }
+  .terminal-shell .mobile-bottom-nav button { position: relative; isolation: isolate; color: var(--muted); gap: 4px; font-size: 10px; font-weight: 550; text-shadow: none; }
+  .terminal-shell .mobile-bottom-nav button svg { width: 21px; height: 21px; flex-basis: 21px; stroke-width: 1.8px; }
+  .terminal-shell .mobile-bottom-nav button.active { color: var(--purple); font-weight: 750; text-shadow: none; background: transparent; }
+  .terminal-shell .mobile-bottom-nav button.active::before { content: ''; position: absolute; top: 4px; width: 46px; height: 28px; border-radius: 10px; background: var(--purple-soft); z-index: -1; }
+  .terminal-shell .trade-cockpit .chart-controls { min-height: 48px; height: 48px; flex-basis: 48px; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger { min-height: 42px; }
+  .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { min-height: 42px; border-radius: 10px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-style-link,.chart-compare-link,.chart-derivatives-link) { min-height: 42px; border-radius: 10px; }
+  .terminal-shell .trade-symbol-menu { border-radius: 18px; background: var(--surface); box-shadow: 0 12px 36px #0003; }
+}
+@media (max-width: 359px) {
+  .terminal-shell .topbar { padding-inline: 10px; }
+  .terminal-shell .brand { font-size: 17px; }
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding-inline: 12px; }
+  .terminal-shell .home-market-chooser button b { font-size: 12px; }
+  .terminal-shell .home-market-chooser button small { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .terminal-shell *, .terminal-shell *::before { scroll-behavior: auto !important; } }
+
+/* Scroll children must retain their height inside the fixed mobile workspace. */
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll > * { flex-shrink: 0; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button { justify-content: flex-start; gap: 8px; min-height: 52px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button > svg { display: block; }
+.terminal-shell .home-hub.home-studio .home-market-chooser small { display: block; }
+.terminal-shell .home-hub.home-studio .home-index-grid { padding: 0; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.terminal-shell .home-hub.home-studio .home-index-card { padding: 12px 10px; background: var(--surface); border-color: var(--line); border-radius: 14px; min-height: 92px; gap: 6px; }
+.terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 19px; line-height: 1.2; }
+.terminal-shell .home-hub.home-studio .home-index-card > span { font-size: 10px; letter-spacing: .02em; }
+.terminal-shell .home-hub.home-studio .home-index-card > small { flex-wrap: wrap; white-space: normal; gap: 4px; }
+.terminal-shell .home-hub.home-studio .home-index-card > small em:first-child { padding: 0; background: none; }
+.terminal-shell .home-today-pnl strong { white-space: nowrap; }
+@media (max-width:760px) {
+  .terminal-shell .top-actions :is(.header-coach-button,.header-wallet-button,.theme-toggle) { display: none !important; }
+  .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 18px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row { grid-template-columns: 1.6fr repeat(3,minmax(0,1fr)); }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row strong { font-size: 19px; }
+}
+
+.terminal-shell .more-menu-panel > header > span { flex: 1; }
+.more-menu-close { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); color: var(--muted); }
+.terminal-shell[data-theme] .mobile-bottom-nav button.active { background: transparent; }
+.terminal-shell[data-theme] .mobile-bottom-nav button.active::before { background: var(--purple-soft); box-shadow: none; }
+.terminal-shell[data-theme] .home-hub.home-studio .home-pulse-first { margin-top: 0; }
+.terminal-shell .home-hub.home-studio .home-main-grid { margin-top: 0; }
+.terminal-shell .home-hub.home-studio .home-market-pair { margin-top: 0; }
+@media (max-width:760px) {
+  /* Give symbol search the full space above the keyboard. */
+  .terminal-shell .chart-area:has(.desktop-symbol-menu) .permanent-trade-footer { display: none; }
+  .terminal-shell .trade-cockpit .desktop-symbol-menu { max-height: calc(100dvh - var(--mobile-header-height) - 104px - env(safe-area-inset-bottom,0px)); }
+  .terminal-shell[data-theme] .chart-order-buttons .compact-sell { background: #cc3151; color: #fff; }
+  .terminal-shell[data-theme] .chart-order-buttons .compact-buy { background: #087d68; color: #fff; }
+}
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu > label { min-height: 48px; background: var(--surface); border-color: var(--line); color: var(--muted); }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu input { font-size: 16px; background: transparent; color: var(--ink); }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu > div > button { min-height: 64px; padding: 10px 12px; background: var(--surface); color: var(--ink); border-color: var(--line); }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu b { font-size: 13px; }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu small { font-size: 11px; color: var(--muted); }
+.terminal-shell[data-theme] .trade-cockpit .trade-symbol-menu em { font-size: 10px; color: var(--muted); }

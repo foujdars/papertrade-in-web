@@ -2836,7 +2836,12 @@ export function TradingDashboard() {
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
-                <header><SlidersHorizontal size={17} /><span><b>More</b><small>Personalise your home screen</small></span></header>
+                <header><SlidersHorizontal size={17} /><span><b>Your workspace</b><small>Quick access &amp; preferences</small></span><button type="button" className="more-menu-close" onClick={() => setMoreMenuOpen(false)} aria-label="Close workspace menu"><X size={18}/></button></header>
+                <div className="mobile-utility-grid" aria-label="Quick access">
+                  <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={20} aria-hidden="true"/><span>Wallet</span></button>
+                  <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={20} aria-hidden="true"/> : <Moon size={20} aria-hidden="true"/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
+                  <button onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={20} aria-hidden="true"/><span>Coach</span></button>
+                </div>
                 <div className="home-card-toggles">
                   <b>Home cards</b>
                   {([['market', 'Market pulse'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
