@@ -94,6 +94,7 @@ import { buildClosedTrades, getOrderCharges, type ClosedTradeOutcome } from "@/l
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
 import type { NormalizedQuote } from "@/lib/upstox";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
+import { exponentialBackoffMs } from "@/lib/reconnect-backoff";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
@@ -1359,7 +1360,7 @@ export function TradingDashboard() {
       if (controller.signal.aborted) return;
       window.clearTimeout(reconnectTimer);
       retryCount += 1;
-      reconnectTimer = window.setTimeout(() => void connect(), Math.min(30_000, 2_000 * 2 ** Math.min(retryCount - 1, 4)));
+      reconnectTimer = window.setTimeout(() => void connect(), exponentialBackoffMs(retryCount));
     };
     async function connect() {
       if (controller.signal.aborted || connecting) return;

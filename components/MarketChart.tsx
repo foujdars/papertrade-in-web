@@ -58,6 +58,7 @@ import type {
 } from "lightweight-charts-drawing";
 import type { Candle, Instrument } from "@/lib/market";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
+import { exponentialBackoffMs } from "@/lib/reconnect-backoff";
 import { ChartAlertLevels } from "@/components/ChartAlertLevels";
 import { SessionBoard } from "./SessionBoard";
 import { sessionIntervals } from "@/lib/market-sessions";
@@ -2820,7 +2821,8 @@ export function MarketChart({
     if (isReplay || externalFeed || historyRequest) return;
     const controller = new AbortController();
     let retryTimer = 0;
-    if (!dataRef.current.length) onFeedStatusRef.current({ mode: "loading", message: "Connecting to Upstox…" });
+    let candleAttempt = 0;
+    onFeedStatusRef.current({ mode: dataRef.current.length ? "stale" : "loading", message: dataRef.current.length ? "Refreshing candles…" : "Connecting to Upstox…" });
 
     async function loadUpstoxCandles() {
       const segments = new Set<string>();
@@ -2835,7 +2837,7 @@ export function MarketChart({
         };
         if (!response.ok || !payload.ok || !payload.candles?.length) {
           const failure = new Error(payload.error?.message ?? "Upstox candles are unavailable.") as Error & { retryAfterSeconds?: number };
-          failure.retryAfterSeconds = payload.error?.retryAfterSeconds ?? (payload.error?.code === "RATE_LIMITED" ? 30 : 15);
+          failure.retryAfterSeconds = payload.error?.retryAfterSeconds ?? (payload.error?.code === "RATE_LIMITED" ? 30 : undefined);
           throw failure;
         }
         if (controller.signal.aborted) return payload;
@@ -2869,9 +2871,13 @@ export function MarketChart({
           const error = results.find((result): result is PromiseRejectedResult => result.status === "rejected")?.reason;
           throw error instanceof Error ? error : new Error("Upstox candles are unavailable.");
         }
+        candleAttempt = 0;
       } catch (error) {
         if (controller.signal.aborted) return;
-        const retryAfterSeconds = Math.max(15, Math.min(120, Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds) || 30));
+        candleAttempt += 1;
+        const hinted = Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds);
+        const delayMs = exponentialBackoffMs(candleAttempt, { baseMs: 3_000, capMs: 60_000, retryAfterMs: Number.isFinite(hinted) && hinted > 0 ? hinted * 1_000 : undefined });
+        const retryAfterSeconds = Math.max(1, Math.round(delayMs / 1_000));
         const hasVerifiedCandles = dataRef.current.length > 0;
         setFeedMode(hasVerifiedCandles ? "stale" : "error");
         onFeedStatusRef.current({
@@ -2903,9 +2909,9 @@ export function MarketChart({
       window.clearTimeout(reconnectTimer);
       liveStreamConnectedRef.current = false;
       retryAttempt += 1;
-      const delaySeconds = retryAfterSeconds
-        ? Math.max(5, Math.min(120, retryAfterSeconds))
-        : Math.min(60, 3 * 2 ** Math.min(retryAttempt - 1, 4));
+      const hinted = Number(retryAfterSeconds);
+      const delayMs = exponentialBackoffMs(retryAttempt, { retryAfterMs: Number.isFinite(hinted) && hinted > 0 ? hinted * 1_000 : undefined });
+      const delaySeconds = Math.max(1, Math.round(delayMs / 1_000));
       setFeedMode(dataRef.current.length ? "stale" : "loading");
       onFeedStatusRef.current({
         mode: dataRef.current.length ? "stale" : "loading",
