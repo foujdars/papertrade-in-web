@@ -1,5 +1,5 @@
 "use client";
-import { ChevronRight, Landmark, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
@@ -22,15 +22,17 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const [rows, setRows] = useState<WatchQuote[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
-  const [breadth, setBreadth] = useState<WatchQuote[] | null>(null);
+  const [niftyBreadth, setNiftyBreadth] = useState<WatchQuote[] | null>(null);
+  const [bankBreadth, setBankBreadth] = useState<WatchQuote[] | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    const load = () => {
-      fetch("/api/market/equity-watch?index=nifty50", { signal: controller.signal, cache: "no-store" })
+    const pull = (indexId: string, apply: (rows: WatchQuote[]) => void) => {
+      fetch(`/api/market/equity-watch?index=${indexId}`, { signal: controller.signal, cache: "no-store" })
         .then(response => response.json())
-        .then(body => { if (body?.ok && Array.isArray(body.rows)) setBreadth(body.rows); })
+        .then(body => { if (body?.ok && Array.isArray(body.rows)) apply(body.rows); })
         .catch(() => undefined);
     };
+    const load = () => { pull("nifty50", setNiftyBreadth); pull("bank", setBankBreadth); };
     load();
     const timer = window.setInterval(load, 30_000);
     return () => { controller.abort(); window.clearInterval(timer); };
@@ -69,22 +71,17 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   }, [open]);
   const title = WATCH_INDICES.find(item => item.id === index)?.label ?? "Equity market";
   const ordered = useMemo(() => sortWatch(rows ?? [], sort), [rows, sort]);
-  const rising = breadth?.filter(row => row.change > 0).length ?? 0;
-  const falling = breadth?.filter(row => row.change < 0).length ?? 0;
-  const counted = rising + falling;
-  const swing = useMemo(() => [...(breadth ?? [])].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5), [breadth]);
-  const swingPeak = Math.max(1, ...swing.map(row => Math.abs(row.change)));
+  const breadthLine = (label: string, quotes: WatchQuote[] | null) => {
+    const rising = quotes?.filter(row => row.change > 0).length ?? 0;
+    const falling = quotes?.filter(row => row.change < 0).length ?? 0;
+    return <span className="home-breadth-line" key={label}><b>{label}</b>{quotes ? <em><i className="up">{rising} rising</i><i className="down">{falling} falling</i></em> : <em>—</em>}</span>;
+  };
+  const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;
+  const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
   return <div id="equity-watch" className="home-market-slot">
-    <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label={counted ? `Open equity market. Nifty 50 breadth ${rising} rising, ${falling} falling` : "Open equity market"}>
-      <span className="home-market-card-top">
-        <span className="home-market-card-icon" aria-hidden="true"><Landmark size={18} /></span>
-        <span className="home-market-card-aside">
-          <span className="home-market-spark" aria-hidden="true">{swing.length ? swing.map(row => <i key={row.symbol} className={row.change < 0 ? "down" : "up"} style={{ height: `${Math.max(22, Math.round(Math.abs(row.change) / swingPeak * 100))}%` }} />) : <><i /><i /><i /><i /><i /></>}</span>
-          <ChevronRight size={16} aria-hidden="true" />
-        </span>
-      </span>
-      <span className="home-market-card-copy"><b>Equity market{breadth ? <i className="home-market-live" /> : null}</b><small>{counted ? `Nifty 50 · ${rising} rising · ${falling} falling` : "Nifty 50, Next 50 and sector baskets"}</small></span>
-      {counted ? <span className="home-market-breadth" aria-hidden="true"><i className="up" style={{ width: `${rising / counted * 100}%` }} /><i className="down" style={{ width: `${falling / counted * 100}%` }} /></span> : <span className="home-market-pills" aria-hidden="true"><em>Nifty 50</em><em>Next 50</em><em>Sectors</em></span>}
+    <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
+      <span className="home-market-card-copy"><b>Equity market{niftyBreadth ? <i className="home-market-live" /> : null}</b></span>
+      <span className="home-market-lines">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />

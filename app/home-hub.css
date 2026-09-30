@@ -331,43 +331,26 @@
 .home-watch-list .up { color:var(--green, #00a67e); }
 .home-watch-list .down { color:var(--red, #f04458); }
 .terminal-shell .home-hub .home-market-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:16px; }
-.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:148px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; overflow:hidden; padding:12px 12px 12px; border:1px solid color-mix(in srgb, var(--kind) 30%, var(--line)); border-radius:18px; background:radial-gradient(90px 56px at 100% 0%, color-mix(in srgb, var(--kind) 24%, transparent), transparent 72%), linear-gradient(180deg, color-mix(in srgb, var(--kind) 11%, var(--surface)), var(--surface) 58%); color:var(--ink); text-align:left; box-shadow:0 10px 22px color-mix(in srgb, var(--kind) 10%, transparent); }
+.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:6px; overflow:hidden; padding:10px 12px 12px; border:1px solid color-mix(in srgb, var(--kind) 30%, var(--line)); border-radius:16px; background:linear-gradient(180deg, color-mix(in srgb, var(--kind) 10%, var(--surface)), var(--surface) 70%); color:var(--ink); text-align:left; }
 .home-market-card[data-kind="equity"] { --kind:#6d4aff; }
 .home-market-card:active { transform:scale(.985); }
 @media (prefers-reduced-motion:reduce) { .home-market-card:active { transform:none; } }
-.home-market-card-top { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.home-market-card-aside { display:flex; align-items:flex-end; gap:6px; color:var(--kind); }
-.home-market-card-aside > svg { flex:none; }
-.home-market-card-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; color:#fff; background:var(--kind); box-shadow:0 6px 14px color-mix(in srgb, var(--kind) 35%, transparent); }
-.home-market-spark { display:flex; align-items:flex-end; gap:3px; height:28px; }
-.home-market-spark i { display:block; width:4px; border-radius:99px; background:color-mix(in srgb, var(--kind) 72%, white); }
-.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(1) { height:38%; }
-.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(2) { height:62%; }
-.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(3) { height:46%; }
-.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(4) { height:84%; }
-.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(5) { height:100%; }
-.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(1) { height:72%; }
-.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(2) { height:48%; }
-.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(3) { height:88%; }
-.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(4) { height:60%; }
-.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(5) { height:96%; }
-.home-market-spark i.up { background:#12b886; }
-.home-market-spark i.down { background:#f04458; }
-.home-market-card b { display:flex; align-items:center; gap:6px; }
+.home-market-card-copy { min-width:0; }
+.home-market-card-copy b { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:750; letter-spacing:-.02em; }
 .home-market-live { width:6px; height:6px; border-radius:50%; background:#12b886; box-shadow:0 0 0 3px color-mix(in srgb, #12b886 28%, transparent); }
-.home-market-breadth { width:100%; height:7px; display:flex; overflow:hidden; border-radius:99px; background:var(--soft); margin-top:auto; }
-.home-market-breadth i { display:block; height:100%; }
-.home-market-breadth .up { background:#12b886; }
-.home-market-breadth .down { background:#f04458; }
-.home-market-card-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
-.home-market-card b { font-size:14px; font-weight:750; letter-spacing:-.03em; line-height:1.15; }
-.home-market-card small { color:var(--muted); font-size:11px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.home-market-pills { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
-.home-market-pills em { font-style:normal; font-size:9px; font-weight:750; letter-spacing:.01em; padding:3px 6px; border-radius:999px; color:var(--muted); background:color-mix(in srgb, var(--kind) 10%, var(--surface)); }
-.home-market-pills .up { color:#087f60; background:color-mix(in srgb, #12b886 18%, var(--surface)); }
-.home-market-pills .down { color:#c92e51; background:color-mix(in srgb, #f04458 16%, var(--surface)); }
-.terminal-shell[data-theme="neon"] .home-market-pills .up { color:#3ee0a2; }
-.terminal-shell[data-theme="neon"] .home-market-pills .down { color:#ff8aa0; }
+.home-market-lines { display:grid; gap:5px; }
+.home-market-line { display:grid; grid-template-columns:46px minmax(0,1fr) auto; gap:4px; align-items:baseline; }
+.home-market-line i { color:var(--muted); font-size:9px; font-style:normal; font-weight:750; }
+.home-market-line b { min-width:0; overflow:hidden; font-size:12px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+.home-market-line em, .home-breadth-line em { font-style:normal; font-size:11px; font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.home-market-line .up, .home-breadth-line .up { color:#087f60; }
+.home-market-line .down, .home-breadth-line .down { color:#c92e51; }
+.home-breadth-line { display:flex; align-items:baseline; justify-content:space-between; gap:6px; }
+.home-breadth-line b { min-width:0; font-size:12px; font-weight:720; }
+.home-breadth-line em { display:flex; gap:6px; }
+.home-breadth-line i { font-style:normal; }
+.terminal-shell[data-theme="neon"] .home-market-line .up, .terminal-shell[data-theme="neon"] .home-breadth-line .up { color:#3ee0a2; }
+.terminal-shell[data-theme="neon"] .home-market-line .down, .terminal-shell[data-theme="neon"] .home-breadth-line .down { color:#ff8aa0; }
 .home-pair-list { max-height:460px; overflow:auto; }
 .home-pair-row { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; column-gap:10px; row-gap:2px; align-items:center; padding:10px 14px; border:0; border-top:1px solid var(--line); background:transparent; color:inherit; text-align:left; }
 .home-pair-row .stock-logo, .home-pair-row > svg { grid-column:1; grid-row:1 / span 2; align-self:center; border-radius:8px; }
