@@ -340,9 +340,11 @@
 .home-market-pair .home-mover-tabs button, .home-market-pair .home-watch-sort button { padding-inline:8px; font-size:11px; }
 .home-pair-list { max-height:460px; overflow:auto; }
 .home-pair-row { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:center; padding:7px 8px; border:0; border-top:1px solid var(--line); background:transparent; color:inherit; text-align:left; }
-.home-pair-name { display:flex; gap:4px; align-items:baseline; min-width:0; }
+.home-pair-name { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.home-pair-name > span { display:flex; gap:4px; align-items:baseline; min-width:0; }
 .home-pair-name b { flex:none; font-size:11px; }
 .home-pair-name small { overflow:hidden; color:var(--muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.home-pair-vol { font-variant-numeric:tabular-nums; }
 .home-pair-row em { font-style:normal; font-size:10px; font-weight:750; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
 .home-pair-row .up { color:var(--green, #00a67e); }
 .home-pair-row .down { color:var(--red, #f04458); }

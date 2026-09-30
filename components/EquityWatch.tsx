@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { sortWatch, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
+import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
 
 const price = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 const sorts: { id: WatchSort; label: string }[] = [
@@ -45,7 +45,7 @@ export function EquityWatch({ onOpen, focusIndex = null }: { onOpen: (symbol: st
     <div className="home-mover-tabs" role="tablist" aria-label="Index">{WATCH_INDICES.map(item => <button key={item.id} type="button" role="tab" aria-selected={index === item.id} onClick={() => setIndex(item.id)}>{item.label}</button>)}</div>
     <div className="home-watch-sort" role="group" aria-label="Sort">{sorts.map(item => <button key={item.id} type="button" aria-pressed={sort === item.id} onClick={() => setSort(item.id)}>{item.label}</button>)}</div>
     {ordered.length ? <div className="home-pair-list">{ordered.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => onOpen(row.symbol)} aria-label={`Open ${row.symbol} chart`}>
-      <span className="home-pair-name"><b>{row.symbol}</b><small>{row.name}</small></span>
+      <span className="home-pair-name"><span><b>{row.symbol}</b><small>{row.name}</small></span>{row.volume > 0 ? <small className="home-pair-vol">Vol {volumeLabel(row.volume)}</small> : null}</span>
       <em className={row.change < 0 ? "down" : "up"}>{quote(row.price, row.change)}</em>
     </button>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No names in this index right now" : "Loading equity market watch"}</div>}
   </section>;

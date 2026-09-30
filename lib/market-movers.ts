@@ -1,3 +1,5 @@
+import { volumeLabel } from "./equity-watch.ts";
+
 export const MOVER_TABS = [
   { id: "gainers", label: "Gainers" },
   { id: "losers", label: "Losers" },
@@ -31,6 +33,8 @@ export type Mover = {
   name: string;
   price: number;
   change: number;
+  volume: number;
+  tradedValue: number | null;
   note: string | null;
 };
 
@@ -118,6 +122,15 @@ function valueNote(rupees: number) {
   return `₹${crore.toLocaleString("en-IN", { maximumFractionDigits: digits, minimumFractionDigits: digits })} cr`;
 }
 
+export function volumeMetrics(row: { volume: number; tradedValue?: number | null; note?: string | null }) {
+  const parts: string[] = [];
+  if (row.volume > 0) parts.push(`Vol ${volumeLabel(row.volume)}`);
+  const turnover = row.tradedValue && row.tradedValue > 0 ? valueNote(row.tradedValue) : null;
+  if (turnover && turnover !== row.note) parts.push(turnover);
+  if (row.note) parts.push(row.note);
+  return parts.join(" · ");
+}
+
 export function presentMovers(tab: MoverTab, rows: Quote[], limit = 8): Mover[] {
   const movers: Mover[] = [];
   for (const row of rows) {
@@ -132,7 +145,7 @@ export function presentMovers(tab: MoverTab, rows: Quote[], limit = 8): Mover[] 
     } else if (tab === "active") {
       note = row.tradedValue && row.tradedValue > 0 ? valueNote(row.tradedValue) : null;
     }
-    movers.push({ symbol: row.symbol, name: row.name, price: row.price, change: row.change, note });
+    movers.push({ symbol: row.symbol, name: row.name, price: row.price, change: row.change, volume: row.volume, tradedValue: row.tradedValue, note });
     if (movers.length >= limit) break;
   }
   return movers;

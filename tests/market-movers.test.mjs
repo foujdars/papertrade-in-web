@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { moverScan, presentMovers, priceBand, quotesFromScan } from "../lib/market-movers.ts";
+import { moverScan, presentMovers, priceBand, quotesFromScan, volumeMetrics } from "../lib/market-movers.ts";
 
 const row = (patch) => ({
   symbol: "TEST",
@@ -42,9 +42,12 @@ test("price-band hits are the 2, 5, 10, 20 and 40 percent circuits, not an ordin
 test("each home list keeps its own note and does not invent a band", () => {
   const gained = presentMovers("gainers", [row({ symbol: "AAA", change: 4, changeAbs: 4, high: 104 })]);
   assert.equal(gained[0].note, null);
+  assert.equal(gained[0].volume, 1000);
+  assert.equal(volumeMetrics(gained[0]), "Vol 1,000 · ₹250 cr");
   assert.equal(gained[0].symbol, "AAA");
   const active = presentMovers("active", [row({ tradedValue: 3.09e10 })]);
   assert.equal(active[0].note, "₹3,090 cr");
+  assert.equal(volumeMetrics(active[0]), "Vol 1,000 · ₹3,090 cr");
   const volume = presentMovers("volume", [row({ relativeVolume: 12.4 }), row({ symbol: "QUIET", relativeVolume: 1.1 })]);
   assert.deepEqual(volume.map(item => item.symbol), ["TEST"]);
   assert.equal(volume[0].note, "12× avg");
@@ -78,6 +81,7 @@ test("home renders the mover board from the NSE scan route", async () => {
   assert.match(home, /<MarketMovers onOpen=\{onOpenStock\} \/>/);
   assert.match(route, /scanner\.tradingview\.com\/india\/scan/);
   assert.match(view, /Market movers/);
+  assert.match(view, /volumeMetrics/);
   assert.match(lib, /52W high/);
   assert.match(lib, /Upper band/);
   assert.match(lib, /Most active/);
