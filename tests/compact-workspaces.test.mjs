@@ -289,6 +289,7 @@ async function componentHarness(path, name, initialStates = []) {
     "./MarketDirectory": { MarketDirectory: () => null },
     "./IndiaPulse": { IndiaPulse: () => null },
     "./MarketMovers": { MarketMovers: () => null },
+    "./EquityWatch": { EquityWatch: () => null },
     "./SessionBoard": { SessionBoard: () => null },
     "@/lib/global-order-engine": { formatUsd: value => `$${Number(value).toFixed(2)}` },
     "@/components/MarketSectionTabs": { MarketSectionTabs: () => null },

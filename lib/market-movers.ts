@@ -70,7 +70,7 @@ export function quotesFromScan(payload: unknown): Quote[] {
     const ticker = String((item as { s?: unknown })?.s ?? "");
     if (!ticker.startsWith("NSE:")) continue;
     const symbol = ticker.slice(4).toUpperCase();
-    if (!/^[A-Z0-9&-]{1,20}$/.test(symbol)) continue;
+    if (!/^[A-Z0-9&_-]{1,20}$/.test(symbol)) continue;
     const cells = (item as { d?: unknown }).d;
     if (!Array.isArray(cells)) continue;
     const price = num(cells[1]);
