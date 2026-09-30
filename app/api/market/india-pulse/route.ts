@@ -17,6 +17,7 @@ type Pulse = {
   vix: ReturnType<typeof indiaVix>;
   flows: ReturnType<typeof fiiDii>;
   pcr: PutCallRatio | null;
+  vixCheckedAt: number | null;
   sessionLive: boolean;
 };
 
@@ -56,9 +57,12 @@ async function niftyPcr(now: number): Promise<PutCallRatio | null> {
 
 async function load(): Promise<Pulse> {
   const now = Date.now();
-  const [breadth, vix, scraped, history, nifty, pcr] = await Promise.all([
+  const [breadth, vixResult, scraped, history, nifty, pcr] = await Promise.all([
     liveNseBreadth(),
-    fetch(VIX, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => indiaVix(response.ok ? await response.json() : null)).catch(() => null),
+    fetch(VIX, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => {
+      const value = indiaVix(response.ok ? await response.json() : null);
+      return { value, checkedAt: value ? Date.now() : null };
+    }).catch(() => ({ value: null, checkedAt: null })),
     text(FLOWS).then(html => fiiDii(nextData(html))).catch(() => []),
     fetch(FLOW_HISTORY, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => historyFlows(response.ok ? await response.json() : [])).catch(() => []),
     fetch(NIFTY, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => niftyCloses(response.ok ? await response.json() : null)).catch(() => []),
@@ -66,7 +70,7 @@ async function load(): Promise<Pulse> {
   ]);
   const flows = withNifty(mergeFlows(scraped, history), nifty);
   const tape = await recordNseAdTape(breadth, undefined, now);
-  return { breadth, tape, vix, flows, pcr, sessionLive: inNseCashSession(now) };
+  return { breadth, tape, vix: vixResult.value, vixCheckedAt: vixResult.checkedAt, flows, pcr, sessionLive: inNseCashSession(now) };
 }
 
 export async function GET() {

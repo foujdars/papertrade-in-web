@@ -3,10 +3,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FLOW_WINDOWS, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
 import { useTransientBack } from "./useTransientBack";
 
-type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
+type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
+const istDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const checkedTime = (at: number) => `${istDate.format(at)}, ${clock.format(at)} IST`;
 
 function InfoTip({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -143,7 +145,7 @@ function usePulse() {
     const load = () => {
       fetch("/api/market/india-pulse", { signal: controller.signal, cache: "no-store" })
         .then(response => response.json())
-        .then(body => { if (body?.ok) setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }); })
+        .then(body => { if (body?.ok) setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }); })
         .catch(() => undefined);
     };
     load();
@@ -160,15 +162,23 @@ export function IndiaPulse() {
   const advance = pulse?.sessionLive ? breadth?.advance ?? latestPoint?.advance : latestPoint?.advance;
   const decline = pulse?.sessionLive ? breadth?.decline ?? latestPoint?.decline : latestPoint?.decline;
   const advanceShare = advance !== undefined && decline !== undefined ? advance / Math.max(1, advance + decline) : 0;
-  const sessionDate = latestPoint ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(latestPoint.t) : "";
+  const marketOpen = Boolean(pulse?.sessionLive && clock.format(Date.now()) < "15:30");
+  const sessionDate = latestPoint ? istDate.format(latestPoint.t) : "";
+  const sampleTime = latestPoint ? clock.format(latestPoint.t) : "";
+  const adStatus = marketOpen
+    ? latestPoint ? Date.now() - latestPoint.t < 3 * 60_000 ? `Live · ${sampleTime} IST` : `Last update ${sampleTime} IST` : "Waiting for live data"
+    : latestPoint ? `${sessionDate} · ${sampleTime >= "15:25" ? "final" : "last sample"} ${sampleTime} IST` : "";
+  const vixStatus = pulse?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} · checked ${checkedTime(pulse.vixCheckedAt)}` : "";
   const pcr = pulse?.pcr;
+  const pcrCheckedAt = pcr ? Date.parse(pcr.asOf) : NaN;
+  const pcrStatus = Number.isFinite(pcrCheckedAt) ? `${marketOpen ? "Market open" : "Market closed"} · OI checked ${checkedTime(pcrCheckedAt)}` : "";
   const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : 50;
   return <section className="home-section india-pulse" aria-label="Indian market pulse">
     <header><span><b>Market pulse</b></span><small>Moneycontrol</small></header>
     <div className="india-pulse-board">
       <div className="india-ad">
         <div>
-          <span>Advance/Decline (NSE){pulse?.sessionLive ? " · Live" : sessionDate ? ` · ${sessionDate}` : ""}</span>
+          <span>Advance/Decline (NSE){adStatus ? ` · ${adStatus}` : ""}</span>
           <div className="india-ad-bar" aria-hidden="true"><i style={{ width: `${Math.round(advanceShare * 100)}%` }} /></div>
           <div className="india-ad-counts"><b className="up">{advance !== undefined ? advance.toLocaleString("en-IN") : "—"}</b><b className="down">{decline !== undefined ? decline.toLocaleString("en-IN") : "—"}</b></div>
         </div>
@@ -177,7 +187,8 @@ export function IndiaPulse() {
       </div>
       <div className="india-vix">
         <div className="india-vix-head"><span>India VIX <small>Expected 30-day volatility</small></span>{pulse?.vix ? <b className={`india-vix-status ${vixBand(pulse.vix.price).tone}`}>{vixBand(pulse.vix.price).label}</b> : null}</div>
-        <div className="india-vix-value">{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}% today</b></> : <strong>—</strong>}</div>
+        <div className="india-vix-value">{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}%</b></> : <strong>—</strong>}</div>
+        {vixStatus && <small className="india-pulse-freshness">{vixStatus}</small>}
         <div className="india-vix-range" role="img" aria-label={pulse?.vix ? `India VIX ${pulse.vix.price.toFixed(2)}, ${vixBand(pulse.vix.price).label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "Indicative VIX volatility bands"}>
           <div className="india-vix-track" aria-hidden="true"><i className="calm" /><i className="watch" /><i className="elevated" /><i className="high" />{pulse?.vix && <span style={{ left: `${vixBand(pulse.vix.price).position}%` }} />}</div>
           <div className="india-vix-labels"><span>Calm<br /><b>&lt;15</b></span><span>Watch<br /><b>15–20</b></span><span>Elevated<br /><b>20–30</b></span><span>High<br /><b>30+</b></span></div>
@@ -187,6 +198,7 @@ export function IndiaPulse() {
       <div className="india-pcr">
         <div className="india-pcr-head"><span>Nifty put/call ratio</span><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.</p></InfoTip></div>
         <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong><span>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</span></div>
+        {pcrStatus && <small className="india-pulse-freshness">{pcrStatus}</small>}
         <div className="india-pcr-track" role="img" aria-label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"}><i style={{ width: `${pcrShare}%` }} /></div>
         <div className="india-pcr-labels"><span>Put OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.putOi) : "—"}</span><span>Call OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.callOi) : "—"}</span></div>
       </div>
@@ -203,7 +215,7 @@ export function IndiaFlows() {
   return <div className="india-flows-slot">
     <div className="india-flows">
       <div className="india-flow-top">
-        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate || "—"}</span><InfoTip label="Explain chart colors"><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></InfoTip></div>
+        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate ? `Reported ${latestDate}` : "—"}</span><InfoTip label="Explain chart colors"><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></InfoTip></div>
         <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
       </div>
       {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
