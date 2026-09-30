@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { ChevronRight, TrendingUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOVER_TABS, volumeMetrics, type Mover, type MoverTab } from "@/lib/market-movers";
@@ -46,14 +46,15 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const label = MOVER_TABS.find(item => item.id === tab)?.label ?? "Market movers";
   const rows = lists?.[tab] ?? [];
   return <div className="home-market-slot">
-    <button type="button" className="home-market-card" onClick={() => setOpen(true)} aria-label="Open market movers">
-      <b>Market movers</b>
-      <small>Gainers, losers, 52W, bands</small>
+    <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label="Open market movers">
+      <span className="home-market-card-icon" aria-hidden="true"><TrendingUp size={17} /></span>
+      <span className="home-market-card-copy"><b>Market movers</b><small>Gainers, losers, 52W, bands</small></span>
+      <ChevronRight size={16} aria-hidden="true" />
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close market movers" onClick={() => setOpen(false)} />
       <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Market movers">
-        <header><b>{label}</b><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
+        <header><span><small>Market movers</small><b>{label}</b></span><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="home-mover-tabs" role="tablist" aria-label="Mover list">{MOVER_TABS.map(item => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
         {rows.length ? <div className="home-pair-list">{rows.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
           <StockLogo symbol={row.symbol} size={28} />

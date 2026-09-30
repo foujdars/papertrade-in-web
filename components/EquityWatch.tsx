@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { ChevronRight, Landmark, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
@@ -57,14 +57,15 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const title = WATCH_INDICES.find(item => item.id === index)?.label ?? "Equity market";
   const ordered = useMemo(() => sortWatch(rows ?? [], sort), [rows, sort]);
   return <div id="equity-watch" className="home-market-slot">
-    <button type="button" className="home-market-card" onClick={() => setOpen(true)} aria-label="Open equity market">
-      <b>Equity market</b>
-      <small>Nifty 50, Next 50, sectors</small>
+    <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label="Open equity market">
+      <span className="home-market-card-icon" aria-hidden="true"><Landmark size={17} /></span>
+      <span className="home-market-card-copy"><b>Equity market</b><small>Nifty 50, Next 50, sectors</small></span>
+      <ChevronRight size={16} aria-hidden="true" />
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />
       <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Equity market watch">
-        <header><b>{title}</b><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
+        <header><span><small>Equity market</small><b>{title}</b></span><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="home-mover-tabs" role="tablist" aria-label="Index">{WATCH_INDICES.map(item => <button key={item.id} type="button" role="tab" aria-selected={index === item.id} onClick={() => setIndex(item.id)}>{item.label}</button>)}</div>
         <div className="home-watch-sort" role="group" aria-label="Sort">{sorts.map(item => <button key={item.id} type="button" aria-pressed={sort === item.id} onClick={() => setSort(item.id)}>{item.label}</button>)}</div>
         {ordered.length ? <div className="home-pair-list">{ordered.map(row => <button key={row.symbol} type="button" className="home-pair-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
