@@ -1,0 +1,69 @@
+"use client";
+import { ChevronRight, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { dealValue, type Deal } from "@/lib/bulk-deals";
+
+const TABS = ["All", "Bulk", "Block"] as const;
+const price = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const qty = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+
+function sessionLabel(date: string) {
+  const [year, month, day] = date.split("-");
+  return year && month && day ? `${day}/${month}/${year.slice(2)}` : "Latest session";
+}
+
+export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
+  const [rows, setRows] = useState<Deal[] | null>(null);
+  const [date, setDate] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<(typeof TABS)[number]>("All");
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = () => {
+      fetch("/api/market/deals", { signal: controller.signal, cache: "no-store" })
+        .then(response => response.json())
+        .then(body => {
+          if (!body?.ok || !Array.isArray(body.rows)) { setFailed(true); return; }
+          setFailed(false);
+          setDate(String(body.date || ""));
+          setRows(body.rows);
+        })
+        .catch(() => { if (!controller.signal.aborted) setFailed(true); });
+    };
+    load();
+    const timer = window.setInterval(load, 15 * 60 * 1000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const listed = rows ?? [];
+  const visible = tab === "All" ? listed : listed.filter(row => row.kind === tab);
+  const lead = listed.slice(0, 3);
+  const bulk = listed.filter(row => row.kind === "Bulk").length;
+  const block = listed.filter(row => row.kind === "Block").length;
+  return <div className="home-deal-slot">
+    <button type="button" className="home-market-card" data-kind="deals" onClick={() => setOpen(true)} aria-label={lead[0] ? `Open bulk and block deals. Largest ${lead[0].symbol} ${lead[0].kind} ${lead[0].side}` : "Open bulk and block deals"}>
+      <span className="home-market-card-copy"><b>Bulk & block{rows ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
+      {rows ? <span className="home-market-lines"><small className="home-deal-meta">{date ? sessionLabel(date) : "Latest session"} · {bulk} bulk · {block} block</small>{lead.map(row => <span className="home-market-line" key={`${row.symbol}:${row.client}:${row.side}:${row.kind}`}><i>{row.kind}</i><b title={row.client}>{row.symbol}</b><em className={row.side === "Buy" ? "up" : "down"}>{row.side} {dealValue(row.value)}</em></span>)}</span> : <span className="home-deal-meta">{failed ? "Deals unavailable right now" : "Loading the latest NSE session"}</span>}
+    </button>
+    {open && typeof document !== "undefined" && createPortal(<>
+      <button type="button" className="home-search-backdrop" aria-label="Close bulk and block deals" onClick={() => setOpen(false)} />
+      <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Bulk and block deals">
+        <header><span><small>NSE large deals</small><b>{date ? sessionLabel(date) : "Bulk & block"}</b></span><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
+        <div className="home-mover-tabs" role="tablist" aria-label="Deal type">{TABS.map(item => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{item}</button>)}</div>
+        {visible.length ? <div className="home-pair-list">{visible.map(row => <button key={`${row.symbol}:${row.client}:${row.side}:${row.kind}:${row.qty}`} type="button" className="home-deal-row" onClick={() => { setOpen(false); onOpen(row.symbol); }} aria-label={`Open ${row.symbol} chart`}>
+          <span><b>{row.symbol}</b><small>{row.client}</small></span>
+          <span><strong>{dealValue(row.value)}</strong><em className={row.side === "Buy" ? "up" : "down"}>{row.kind} {row.side} · {qty.format(row.qty)} @ {price.format(row.price)}</em></span>
+        </button>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No deals on this list" : "Loading NSE deals"}</div>}
+      </div>
+    </>, document.querySelector(".terminal-shell") ?? document.body)}
+  </div>;
+}
