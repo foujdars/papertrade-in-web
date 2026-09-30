@@ -75,7 +75,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const breadthLine = (label: string, quotes: WatchQuote[] | null) => {
     const rising = quotes?.filter(row => row.change > 0).length ?? 0;
     const falling = quotes?.filter(row => row.change < 0).length ?? 0;
-    return <span className="home-market-line" key={label}><b>{label}</b>{quotes ? <em><i className="up">{rising} up</i><i className="down">{falling} dn</i></em> : <em>—</em>}</span>;
+    return <span className="home-breadth-line" key={label}><b>{label}</b>{quotes ? <em><i className="up">{rising} rising</i><i className="down">{falling} falling</i></em> : <em>—</em>}</span>;
   };
   const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
