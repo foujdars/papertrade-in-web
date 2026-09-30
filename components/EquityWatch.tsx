@@ -58,9 +58,15 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const ordered = useMemo(() => sortWatch(rows ?? [], sort), [rows, sort]);
   return <div id="equity-watch" className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label="Open equity market">
-      <span className="home-market-card-icon" aria-hidden="true"><Landmark size={17} /></span>
-      <span className="home-market-card-copy"><b>Equity market</b><small>Nifty 50, Next 50, sectors</small></span>
-      <ChevronRight size={16} aria-hidden="true" />
+      <span className="home-market-card-top">
+        <span className="home-market-card-icon" aria-hidden="true"><Landmark size={18} /></span>
+        <span className="home-market-card-aside">
+          <span className="home-market-spark" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+          <ChevronRight size={16} aria-hidden="true" />
+        </span>
+      </span>
+      <span className="home-market-card-copy"><b>Equity market</b><small>Nifty 50, Next 50 and sector baskets</small></span>
+      <span className="home-market-pills" aria-hidden="true"><em>Nifty 50</em><em>Next 50</em><em>Sectors</em></span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />

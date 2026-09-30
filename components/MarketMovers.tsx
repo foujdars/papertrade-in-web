@@ -47,9 +47,15 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const rows = lists?.[tab] ?? [];
   return <div className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="movers" onClick={() => setOpen(true)} aria-label="Open market movers">
-      <span className="home-market-card-icon" aria-hidden="true"><TrendingUp size={17} /></span>
-      <span className="home-market-card-copy"><b>Market movers</b><small>Gainers, losers, 52W, bands</small></span>
-      <ChevronRight size={16} aria-hidden="true" />
+      <span className="home-market-card-top">
+        <span className="home-market-card-icon" aria-hidden="true"><TrendingUp size={18} /></span>
+        <span className="home-market-card-aside">
+          <span className="home-market-spark" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+          <ChevronRight size={16} aria-hidden="true" />
+        </span>
+      </span>
+      <span className="home-market-card-copy"><b>Market movers</b><small>Gainers, losers, 52-week highs and circuit bands</small></span>
+      <span className="home-market-pills" aria-hidden="true"><em className="up">Gainers</em><em className="down">Losers</em><em>52W</em></span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close market movers" onClick={() => setOpen(false)} />

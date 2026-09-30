@@ -330,15 +330,36 @@
 .home-watch-list em { display:block; font-size:11px; font-weight:750; }
 .home-watch-list .up { color:var(--green, #00a67e); }
 .home-watch-list .down { color:var(--red, #f04458); }
-.terminal-shell .home-hub .home-market-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; margin-top:16px; }
-.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:0; display:flex; flex-direction:row; align-items:center; gap:10px; overflow:hidden; padding:10px 10px 10px 12px; border:1px solid color-mix(in srgb, var(--kind) 32%, var(--line)); border-radius:14px; background:linear-gradient(165deg, color-mix(in srgb, var(--kind) 16%, var(--surface)), var(--surface) 62%); color:var(--ink); text-align:left; }
+.terminal-shell .home-hub .home-market-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:16px; }
+.home-market-card { --kind:#0b8a5b; position:relative; width:100%; min-height:148px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; overflow:hidden; padding:12px 12px 12px; border:1px solid color-mix(in srgb, var(--kind) 30%, var(--line)); border-radius:18px; background:radial-gradient(90px 56px at 100% 0%, color-mix(in srgb, var(--kind) 24%, transparent), transparent 72%), linear-gradient(180deg, color-mix(in srgb, var(--kind) 11%, var(--surface)), var(--surface) 58%); color:var(--ink); text-align:left; box-shadow:0 10px 22px color-mix(in srgb, var(--kind) 10%, transparent); }
 .home-market-card[data-kind="equity"] { --kind:#6d4aff; }
-.home-market-card::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--kind); }
-.home-market-card-icon { display:grid; place-items:center; flex:none; width:32px; height:32px; border-radius:10px; color:var(--kind); background:color-mix(in srgb, var(--kind) 16%, var(--surface)); }
-.home-market-card-copy { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
-.home-market-card b { font-size:13px; font-weight:720; letter-spacing:-.02em; }
-.home-market-card small { overflow:hidden; color:var(--muted); font-size:10px; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
-.home-market-card > svg { flex:none; color:var(--muted); }
+.home-market-card:active { transform:scale(.985); }
+@media (prefers-reduced-motion:reduce) { .home-market-card:active { transform:none; } }
+.home-market-card-top { width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.home-market-card-aside { display:flex; align-items:flex-end; gap:6px; color:var(--kind); }
+.home-market-card-aside > svg { flex:none; }
+.home-market-card-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:12px; color:#fff; background:var(--kind); box-shadow:0 6px 14px color-mix(in srgb, var(--kind) 35%, transparent); }
+.home-market-spark { display:flex; align-items:flex-end; gap:3px; height:28px; }
+.home-market-spark i { display:block; width:4px; border-radius:99px; background:color-mix(in srgb, var(--kind) 72%, white); }
+.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(1) { height:38%; }
+.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(2) { height:62%; }
+.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(3) { height:46%; }
+.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(4) { height:84%; }
+.home-market-card[data-kind="movers"] .home-market-spark i:nth-child(5) { height:100%; }
+.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(1) { height:72%; }
+.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(2) { height:48%; }
+.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(3) { height:88%; }
+.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(4) { height:60%; }
+.home-market-card[data-kind="equity"] .home-market-spark i:nth-child(5) { height:96%; }
+.home-market-card-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.home-market-card b { font-size:14px; font-weight:750; letter-spacing:-.03em; line-height:1.15; }
+.home-market-card small { color:var(--muted); font-size:11px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.home-market-pills { display:flex; flex-wrap:wrap; gap:4px; margin-top:auto; }
+.home-market-pills em { font-style:normal; font-size:9px; font-weight:750; letter-spacing:.01em; padding:3px 6px; border-radius:999px; color:var(--muted); background:color-mix(in srgb, var(--kind) 10%, var(--surface)); }
+.home-market-pills .up { color:#087f60; background:color-mix(in srgb, #12b886 18%, var(--surface)); }
+.home-market-pills .down { color:#c92e51; background:color-mix(in srgb, #f04458 16%, var(--surface)); }
+.terminal-shell[data-theme="neon"] .home-market-pills .up { color:#3ee0a2; }
+.terminal-shell[data-theme="neon"] .home-market-pills .down { color:#ff8aa0; }
 .home-pair-list { max-height:460px; overflow:auto; }
 .home-pair-row { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 14px; border:0; border-top:1px solid var(--line); background:transparent; color:inherit; text-align:left; }
 .home-pair-row .stock-logo { flex:none; border-radius:8px; }
