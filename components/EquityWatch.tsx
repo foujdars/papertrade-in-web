@@ -24,6 +24,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const [open, setOpen] = useState(false);
   const [niftyBreadth, setNiftyBreadth] = useState<WatchQuote[] | null>(null);
   const [bankBreadth, setBankBreadth] = useState<WatchQuote[] | null>(null);
+  const [itBreadth, setItBreadth] = useState<WatchQuote[] | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     const pull = (indexId: string, apply: (rows: WatchQuote[]) => void) => {
@@ -32,7 +33,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
         .then(body => { if (body?.ok && Array.isArray(body.rows)) apply(body.rows); })
         .catch(() => undefined);
     };
-    const load = () => { pull("nifty50", setNiftyBreadth); pull("bank", setBankBreadth); };
+    const load = () => { pull("nifty50", setNiftyBreadth); pull("bank", setBankBreadth); pull("it", setItBreadth); };
     load();
     const timer = window.setInterval(load, 30_000);
     return () => { controller.abort(); window.clearInterval(timer); };
@@ -81,7 +82,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   return <div id="equity-watch" className="home-market-slot">
     <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
       <span className="home-market-card-copy"><b>Equity market{niftyBreadth ? <i className="home-market-live" /> : null}</b><ChevronRight size={16} aria-hidden="true" /></span>
-      <span className="home-market-lines">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}</span>
+      <span className="home-market-lines">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />
