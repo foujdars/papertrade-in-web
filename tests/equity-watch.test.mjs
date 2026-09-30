@@ -47,7 +47,8 @@ test("home renders the equity market watch", async () => {
     readFile(new URL("../lib/equity-watch.ts", import.meta.url), "utf8"),
   ]);
   assert.match(home, /home-market-pair/);
-  assert.match(home, /<EquityWatch onOpen=\{onOpenStock\} focusIndex=\{sectorWatch\} \/>/);
+  assert.match(home, /<EquityWatch onOpen=\{onOpenStock\} focusIndex=\{sectorWatch\} focusTick=\{sectorTick\} \/>/);
+  assert.match(view, /home-market-card/);
   assert.match(view, /volumeLabel/);
   assert.match(route, /scanner\.tradingview\.com\/india\/scan/);
   assert.match(lib, /Nifty 50/);

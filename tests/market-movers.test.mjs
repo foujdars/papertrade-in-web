@@ -80,7 +80,7 @@ test("home renders the mover board from the NSE scan route", async () => {
   assert.match(home, /home-market-pair/);
   assert.match(home, /<MarketMovers onOpen=\{onOpenStock\} \/>/);
   assert.match(route, /scanner\.tradingview\.com\/india\/scan/);
-  assert.match(view, /Market movers/);
+  assert.match(view, /home-market-card/);
   assert.match(view, /volumeMetrics/);
   assert.match(lib, /52W high/);
   assert.match(lib, /Upper band/);

@@ -132,6 +132,7 @@ export function HomeWorkspace({
   const [searchFocused, setSearchFocused] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [sectorWatch, setSectorWatch] = useState<string | null>(null);
+  const [sectorTick, setSectorTick] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
@@ -282,7 +283,7 @@ export function HomeWorkspace({
 
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
-        {activeMarket === 'india' && <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); document.getElementById('equity-watch')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} />}
+        {activeMarket === 'india' && <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); setSectorTick(tick => tick + 1); }} />}
 
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
@@ -307,7 +308,7 @@ export function HomeWorkspace({
         </div>
         {activeMarket === "india" && <div className="home-market-pair">
           <MarketMovers onOpen={onOpenStock} />
-          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} />
+          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
         </div>}
         {activeMarket === "india" ? <IndiaPulse /> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
