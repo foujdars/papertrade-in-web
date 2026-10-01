@@ -1,5 +1,5 @@
 export type StudyPoint = { time: number; value: number };
-export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean };
+export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean; anchorTimeOffset?: number };
 export type StudyDrawing = {
   id: string;
   studyId: string;
@@ -65,6 +65,13 @@ export function drawingTextPosition(a: {x:number;y:number}, b: {x:number;y:numbe
   const vertical = options.textVertical ?? 'above';
   const y = vertical === 'above' ? Math.min(a.y,b.y)-7 : vertical === 'below' ? Math.max(a.y,b.y)+15 : (a.y+b.y)/2+4;
   return { x, y, align, anchor: align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle' } as const;
+}
+
+/** Alignment follows the rendered horizontal line, while visibility follows its anchor. */
+export function drawingLineTextPosition(tool: string, a: {x:number;y:number}, b: {x:number;y:number}, width: number, options: DrawingPresentation = {}) {
+  if (tool === 'horizontal-line') return drawingTextPosition({x:0,y:a.y}, {x:width,y:a.y}, options);
+  if (tool === 'horizontal-ray') return drawingTextPosition(a, {x:options.direction === 'left' ? 0 : width,y:a.y}, options);
+  return drawingTextPosition(a,b,options);
 }
 
 /** Single-anchor annotations leave with their candle, even when the line extends. */

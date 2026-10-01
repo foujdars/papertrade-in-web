@@ -5,7 +5,7 @@ import { DrawingActionBar } from "./DrawingActionBar";
 import { drawingTitle } from "@/lib/drawing-editing";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
-import { studyLinePoints, drawingTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
+import { studyLinePoints, drawingLineTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
@@ -65,7 +65,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       const ends = studyLinePoints(selected.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight, selected.presentation);
       const midX = ends ? (ends.x1 + ends.x2) / 2 : (from.x + to.x) / 2;
       const midY = ends ? Math.min(ends.y1, ends.y2) : Math.min(from.y, to.y);
-      toolbar = { x: Math.max(4, Math.min(width - 280, midX - 136)), y: Math.max(from.top + 4, midY - 82) };
+      toolbar = { x: Math.max(4, Math.min(width - 280, midX - 136)), y: midY >= from.top + 104 ? midY - 104 : Math.max(from.top + 4, Math.min(midY + 24, from.top + from.paneHeight - 76)) };
     }
   }
   return <>
@@ -77,7 +77,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       if (!from || !to) return null;
       const ends = studyLinePoints(line.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight, line.presentation);
       const selectedLine = line.id === selectedId;
-      const label = drawingTextPosition(from,to,line.presentation);
+      const label = drawingLineTextPosition(line.tool,from,to,width,line.presentation);
       const text = line.presentation?.text && drawingTextVisible(line.tool, from, label, width, height) && <text x={label.x} y={label.y} textAnchor={label.anchor} fill={line.presentation?.color ?? "#8054da"} fontSize={12} style={{paintOrder:"stroke",stroke:"var(--surface,#fff)",strokeWidth:3,strokeLinejoin:"round"}}>{line.presentation.text}</text>;
       const clip = `study-clip-${clipPrefix}-${line.id}`;
       const wrap = (shape: React.ReactNode) => <g key={line.id}><defs><clipPath id={clip}><rect x={0} y={from.top} width={width} height={from.paneHeight}/></clipPath></defs><g clipPath={`url(#${clip})`}>{shape}{text}{selectedLine && <>{[from,to].map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="white" stroke="#8054da"/>)}</>}</g></g>;

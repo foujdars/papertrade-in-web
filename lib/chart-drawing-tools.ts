@@ -7,7 +7,8 @@ import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
-import { drawingTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
+import { drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
+import { drawingTimeForFrame } from './drawing-anchor-time.ts';
 const readableFont = () => "13px sans-serif";
 
 function initialPositionAnchors(type: string, entry: Anchor, source: VolumeCandle[]): Anchor[] {
@@ -46,7 +47,8 @@ export function positionLineIndex(drawing: { type?: string; getViewport?: () => 
   return best?.index ?? null;
 }
 
-export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean; formatPrice?: (price: number) => string }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
+export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean; formatPrice?: (price: number) => string }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData, frame?: {timeframe:string;calendarOffset:number}) {
+  const axisOffset = frame && !['1D','1W','1M','1Y'].includes(frame.timeframe) ? 19800 : 0;
   // A registry belongs to one chart; replay and live charts must not share a data-source closure.
   type Entry = NonNullable<ReturnType<ReturnType<typeof drawing.getToolRegistry>["get"]>>;
   const entries = new Map(drawing.getToolRegistry().getAll().map(entry => [entry.type, entry]));
@@ -58,6 +60,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
       // Native factories only forward their known fields; retain our saved presentation too.
       if (options) item.updateOptions(options);
+      if (frame && (item.options as DrawingPresentation).anchorTimeOffset === undefined) item.updateOptions({anchorTimeOffset:axisOffset} as Partial<DrawingOptions>);
       if (type === 'vertical-line' && 'setVerticalLineOptions' in item && typeof item.setVerticalLineOptions === 'function') {
         // The native default prints raw Unix seconds. User text is rendered
         // separately below, including for drawings restored from older builds.
@@ -122,7 +125,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           });
           if (points.length) {
             const a = {...points[0]}, b = {...points.at(-1)!};
-            const label = drawingTextPosition(a,b,presentation);
+            const label = drawingLineTextPosition(type,a,b,viewport.width,presentation);
             if (drawingTextVisible(type,a,label,viewport.width,viewport.height)) geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
           }
         }
@@ -133,8 +136,15 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         const viewport=getViewport();if(!viewport)return null;
         const native=viewport.timeScale.timeToCoordinate;
         return {...viewport,height:plotSize?.().height??viewport.height,timeScale:{...viewport.timeScale,timeToCoordinate:time=>{
-          const x=native(time);if(x!==null)return x;
-          const logical=drawingLogicalAtTime(Number(time),candles().map(c=>c.time));
+          const sourceOffset=(item.options as DrawingPresentation).anchorTimeOffset??axisOffset;
+          if (!frame || !['1D','1W','1M','1Y'].includes(frame.timeframe)) {
+            const direct=native((Number(time)-sourceOffset+axisOffset) as Anchor['time']);
+            if(direct!==null)return direct;
+          }
+          const times=candles().map(c=>c.time);
+          const displayTime=frame?drawingTimeForFrame(Number(time),times,frame.timeframe,frame.calendarOffset,sourceOffset,axisOffset):Number(time);
+          const x=native(displayTime as Anchor['time']);if(x!==null)return x;
+          const logical=drawingLogicalAtTime(displayTime,times);
           return logical===null?null:viewport.timeScale.logicalToCoordinate(logical as Logical);
         }}};
       };
