@@ -2,6 +2,8 @@
 
 ## Drawing controls
 
+`node tests/browser/ray-timeframes.cjs` checks left/centre/right text on the actual canvas and switches Indian daily and global 5m rays to their containing monthly candles. It also checks that monthly style edits and reloads preserve the original anchor dates. Calendar boundaries and axis offsets are covered by `tests/drawing-anchor-time.test.mjs`.
+
 `node tests/browser/drawing-controls.cjs` tests touch selection, body dragging, handle resizing, double-tap settings, duplicate, per-object lock/hide, the drawing list, master lock/hide, coordinate validation, price-drawing undo/redo, reload persistence and indicator-pane controls. It uses the real chart and drawing engines with mocked candles, and checks light/dark layouts from 320 to 1280px.
 
 `node tests/browser/chart-repair.cjs` covers history paging, viewport stability, symbol isolation, ray-text clipping and price-axis labels. `node tests/browser/rsi-drawings.cjs` checks drawing placement in indicator panes and settings with a resized Android visual viewport.

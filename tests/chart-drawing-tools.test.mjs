@@ -334,3 +334,17 @@ test('ray text leaves with its anchor while its price stays on the scale', () =>
   assert.deepEqual(restored.style.lineDash,[8,5]);
   assert.equal(restored.options.showPriceLabel,false);
 });
+
+test('horizontal text alignment spans the actual line and either ray direction',()=>{
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const type of ['horizontal-line','horizontal-ray'])for(const direction of ['left','right']) {
+  const item=registry.createDrawing(type,'label',[{time:1,price:100}],{}, {text:'SH',direction});
+  const xs=[];
+  for(const align of ['left','center','right']) {
+   item.updateOptions({textHorizontal:align});
+   const label=item.computeGeometry(viewport).find(g=>g.type==='text');
+   xs.push(label.position.x);assert.equal(label.align,align);
+  }
+  assert.deepEqual(xs,type==='horizontal-line'?[4,200,396]:direction==='right'?[104,250,396]:[4,50,96]);
+ }
+});

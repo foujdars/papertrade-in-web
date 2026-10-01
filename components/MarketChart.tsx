@@ -247,6 +247,7 @@ type DrawingEdit = {
   anchorIndex: number | null;
   start: Anchor;
   originalAnchors: Anchor[];
+  originalTimeOffset: number;
   startX: number;
   startY: number;
   moved: boolean;
@@ -379,26 +380,6 @@ function timeToTimestamp(time: Time) {
   return Date.UTC(time.year, time.month - 1, time.day) / 1_000;
 }
 
-function projectDrawingsToCandles(snapshot: SerializedDrawing[], candles: Candle[], timeframe: string) {
-  if (!candles.length) return snapshot;
-  const candleTimes = candles.map((candle) => chartTimeFromEpoch(Number(candle.time), timeframe));
-  return snapshot.map((item) => ({
-    ...item,
-    anchors: item.anchors.map((anchor) => {
-      const timestamp = timeToTimestamp(anchor.time);
-      if (timestamp < Number(candleTimes[0]) || timestamp > Number(candleTimes.at(-1))) return anchor;
-      let nearest = candleTimes[0];
-      let distance = Math.abs(nearest - timestamp);
-      for (let index = 1; index < candleTimes.length; index += 1) {
-        const nextDistance = Math.abs(candleTimes[index] - timestamp);
-        if (nextDistance >= distance) continue;
-        nearest = candleTimes[index];
-        distance = nextDistance;
-      }
-      return { ...anchor, time: nearest };
-    }),
-  }));
-}
 
 function chartDisplayTime(time: Time, timeframe: string) {
   const timestamp = timeToTimestamp(time);
@@ -906,13 +887,13 @@ export function MarketChart({
       const selectedDrawing = drawingManager.current?.getSelectedDrawing();
       const anchors = selectedDrawing?.anchors ?? [];
       const actionPoints = anchors.flatMap((anchor) => {
-        const pointX = drawingX(anchor.time);
+        const pointX = drawingX(anchor.time, selectedDrawing);
         const pointY = candleSeries.current?.priceToCoordinate(anchor.price) ?? null;
         return pointX === null || pointY === null ? [] : [{ x: pointX, y: pointY }];
       });
       const nextActions = actionPoints.length ? {
         x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 280, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 136)),
-        y: Math.max(4, Math.min(...actionPoints.map((point) => point.y)) - 82),
+        y: Math.min(...actionPoints.map((point) => point.y)) >= 104 ? Math.min(...actionPoints.map((point) => point.y)) - 104 : Math.min(...actionPoints.map((point) => point.y)) + 24,
       } : null;
       setDrawingActions((current) => current && nextActions && Math.abs(current.x - nextActions.x) < 1 && Math.abs(current.y - nextActions.y) < 1 ? current : nextActions);
       refreshRiskCoordinates();
@@ -1220,7 +1201,7 @@ export function MarketChart({
     } else {
       const item=drawingManager.current?.getAllDrawings().find(line=>line.id===id);
       if (!item || item.options.locked) return;
-      setEditingDrawing({id,tool:item.type,study:false,value:{...item.options,color:item.style.lineColor,lineWidth:item.style.lineWidth,lineDash:item.style.lineDash},coordinates:item.anchors.map(anchor=>({time:Number(anchor.time),value:anchor.price}))});
+      setEditingDrawing({id,tool:item.type,study:false,value:{...item.options,color:item.style.lineColor,lineWidth:item.style.lineWidth,lineDash:item.style.lineDash},coordinates:item.anchors.map(anchor=>({time:Number(anchor.time)-((item.options as DrawingPresentation).anchorTimeOffset??(usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0))+(usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0),value:anchor.price}))});
     }
   }
   function drawingAction(id:string,study:boolean,action:'duplicate'|'lock'|'hide'|'delete') {
@@ -1240,8 +1221,8 @@ export function MarketChart({
       const manager=drawingManager.current, item=manager?.getAllDrawings().find(line=>line.id===id);
       if (!manager || !item || (action==='delete' && item.options.locked)) return;
       if(action==='duplicate') {
-        const source=item.toJSON(), anchors=duplicateDrawingPoints(source.anchors.map(anchor=>({...anchor,time:Number(anchor.time)})),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
-        const copy=drawingRegistry.current?.createDrawing(source.type,crypto.randomUUID(),anchors.map(anchor=>({...anchor,time:anchor.time as UTCTimestamp})),source.style,{...source.options,locked:false,visible:true,userHidden:false} as DrawingOptions);
+        const source=item.toJSON(), axisOffset=usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0, anchors=duplicateDrawingPoints(source.anchors.map(anchor=>({...anchor,time:Number(anchor.time)-((source.options as DrawingPresentation).anchorTimeOffset??axisOffset)+axisOffset})),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
+        const copy=drawingRegistry.current?.createDrawing(source.type,crypto.randomUUID(),anchors.map(anchor=>({...anchor,time:anchor.time as UTCTimestamp})),source.style,{...source.options,anchorTimeOffset:axisOffset,locked:false,visible:true,userHidden:false} as DrawingOptions);
         if(copy){manager.addDrawing(copy);manager.selectDrawing(copy.id);}
       } else if(action==='lock') item.updateOptions({locked:!item.options.locked});
       else if(action==='hide') {const userHidden=!(item.options as DrawingPresentation).userHidden;item.updateOptions({userHidden,visible:!hiddenRef.current&&!userHidden} as DrawingOptions);manager.deselectAll();}
@@ -1290,7 +1271,8 @@ export function MarketChart({
     return useMagnet ? snapAnchor(time, price) : { time, price };
   }
 
-  function drawingX(time: Time) {
+  function drawingX(time: Time, drawing?: IDrawing | null) {
+    if (drawing) return drawing.getViewport()?.timeScale.timeToCoordinate(time) ?? null;
     const chart = chartApi.current;
     if (!chart) return null;
     const direct = chart.timeScale().timeToCoordinate(time);
@@ -1971,14 +1953,19 @@ export function MarketChart({
           if (isReplay || externalFeed) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} ${externalFeed?'Delta':'replay'} volume · estimated distribution` };
           // Profiles are independent of the quote feed: no profile candle can change a fill price.
           return profileClient!.read(period.from, Math.min(period.to, Math.floor(Date.now()/60000)*60), id);
-        });
+        }, {timeframe,calendarOffset:externalFeed?0:IST_OFFSET_SECONDS});
       const drawingScope = drawingStorageKey(instrument);
       const stored = isReplay ? (replayDrawingsRef.current?.scope === drawingScope ? replayDrawingsRef.current.snapshot : []) : readStoredDrawings(drawingScope, legacyDrawingStorageKey(instrument, timeframe));
       storageKeyRef.current = drawingScope;
       storedDrawingsRef.current = stored;
       if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(stored));
-      restoreDrawings(projectDrawingsToCandles(stored, dataRef.current, timeframe), false);
-      historyRef.current = [stored];
+      restoreDrawings(stored, false);
+      // Record the source axis for legacy drawings before another timeframe
+      // is opened. Only metadata changes; the original anchor dates stay intact.
+      const restored = manager.exportDrawings();
+      storedDrawingsRef.current = restored;
+      if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(restored));
+      historyRef.current = [restored];
       redoRef.current = [];
 
       manager.on("drawing:updated", () => persistDrawings(true));
@@ -2070,13 +2057,14 @@ export function MarketChart({
             startX: event.clientX,
             startY: event.clientY,
             moved: false,
-            originalPixels: hit.anchors.map((anchor) => drawingX(anchor.time)),
+            originalPixels: hit.anchors.map((anchor) => drawingX(anchor.time, hit)),
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
               return hit.id !== selectedId ? null : positionLineIndex(hit as unknown as Parameters<typeof positionLineIndex>[0], point) ?? hit.getControlPoints(viewport).find((control) => pointDistance(point, control) <= 22)?.index ?? null;
             })(),
             start,
+            originalTimeOffset: (hit.options as DrawingPresentation).anchorTimeOffset ?? (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0),
             originalAnchors: hit.anchors.map((anchor) => ({ ...anchor })),
           };
           chartInstance.applyOptions({ handleScroll: false, handleScale: false });
@@ -2142,7 +2130,7 @@ export function MarketChart({
             rememberStudyDrawings(studyDrawingsRef.current.map(item => item.id === original.id ? original : item));
             studyEdit = null;
           }
-          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
+          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current.drawing.updateOptions({anchorTimeOffset:editRef.current.originalTimeOffset} as Partial<DrawingOptions>); editRef.current = null; }
           chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
           return;
         }
@@ -2251,6 +2239,9 @@ export function MarketChart({
         const edit = editRef.current;
         if (edit && edit.pointerId === event.pointerId) {
           if (!edit.moved && Math.hypot(event.clientX-edit.startX,event.clientY-edit.startY) < 5) { event.preventDefault(); event.stopPropagation(); return; }
+          const axisOffset = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
+          const editAnchors = edit.originalAnchors.map(anchor=>({...anchor,time:(Number(anchor.time)-edit.originalTimeOffset+axisOffset) as Time}));
+          if (!edit.moved) { edit.drawing.setAnchors(editAnchors); edit.drawing.updateOptions({anchorTimeOffset:axisOffset} as Partial<DrawingOptions>); }
           edit.moved = true;
           drawingTapRef.current = null;
           const current = pointerAnchor(event, false);
@@ -2258,23 +2249,23 @@ export function MarketChart({
           const positionTool = edit.drawing.type === "long-position" || edit.drawing.type === "short-position";
           if (positionTool) {
             const centerX = edit.originalPixels[0];
-            const nextCenter = centerX === null ? current.time : drawingTimeAtCoordinate(centerX + event.clientX - edit.startX) ?? edit.originalAnchors[0].time;
-            const timeDelta = Number(nextCenter) - Number(edit.originalAnchors[0].time);
+            const nextCenter = centerX === null ? current.time : drawingTimeAtCoordinate(centerX + event.clientX - edit.startX) ?? editAnchors[0].time;
+            const timeDelta = Number(nextCenter) - Number(editAnchors[0].time);
             const priceDelta = current.price - edit.start.price;
             const grabbed = edit.anchorIndex;
-            edit.drawing.setAnchors(edit.originalAnchors.map((anchor, index) => ({
+            edit.drawing.setAnchors(editAnchors.map((anchor, index) => ({
               time: (Number(anchor.time) + timeDelta) as Time,
               price: anchor.price + (grabbed === null || grabbed === 0 || index === grabbed ? priceDelta : 0),
             })));
           } else if (edit.anchorIndex !== null) {
-            const original = edit.originalAnchors[edit.anchorIndex];
+            const original = editAnchors[edit.anchorIndex];
             const originalX = edit.originalPixels[edit.anchorIndex];
             const next = { time: originalX === null ? original.time : drawingTimeAtCoordinate(originalX + event.clientX - edit.startX) ?? original.time, price: original.price + current.price - edit.start.price };
             edit.drawing.updateAnchor(edit.anchorIndex, snapAnchor(next.time, next.price));
           } else {
             const priceDelta = current.price - edit.start.price;
             const dx = event.clientX - edit.startX;
-            edit.drawing.setAnchors(edit.originalAnchors.map((anchor,index) => ({
+            edit.drawing.setAnchors(editAnchors.map((anchor,index) => ({
               time: edit.originalPixels[index] !== null ? drawingTimeAtCoordinate(edit.originalPixels[index]! + dx) ?? anchor.time : anchor.time,
               price: anchor.price + priceDelta,
             })));
@@ -2373,7 +2364,7 @@ export function MarketChart({
         if (event.type === "pointercancel") {
           lastStudyTap.current=null;
           if (draftRef.current) cancelDraft();
-          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current = null; }
+          if (editRef.current) { editRef.current.drawing.setAnchors(editRef.current.originalAnchors); editRef.current.drawing.updateOptions({anchorTimeOffset:editRef.current.originalTimeOffset} as Partial<DrawingOptions>); editRef.current = null; }
           chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll));
           return;
         }
@@ -2990,7 +2981,7 @@ export function MarketChart({
         setLatestCandle(dataRef.current.at(-1));
         paintPriceSeries();
         if (wasEmpty || scope === "historical") applyInitialVisibleRange(dataRef.current);
-        restoreDrawings(projectDrawingsToCandles(storedDrawingsRef.current, dataRef.current, timeframe), false);
+        restoreDrawings(storedDrawingsRef.current, false);
         scheduleOverlayRefresh();
         window.requestAnimationFrame(() => { if (!controller.signal.aborted) syncIndicatorData(); });
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
@@ -3268,7 +3259,7 @@ export function MarketChart({
         {editingDrawing && <DrawingSettings key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
           if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id&&!line.locked?{...line,presentation:value,...(points?{a:{time:points[0].time,value:points[0].value},b:{time:(points[1]??points[0]).time,value:(points[1]??points[0]).value}}:{})}:line));
-          else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points)item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));persistDrawings(true);}}
+          else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points){item.updateOptions({anchorTimeOffset:usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0} as Partial<DrawingOptions>);item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));}persistDrawings(true);}}
           scheduleOverlayRefresh();
         }} />}
         {objectsOpen && <DrawingObjects disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={()=>setObjectsOpen(false)} onAction={(item:DrawingObject,action)=>{
