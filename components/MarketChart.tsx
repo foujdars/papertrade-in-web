@@ -51,7 +51,7 @@ import type {
   Time,
   UTCTimestamp,
 } from "lightweight-charts";
-import { ColorType, MismatchDirection } from "lightweight-charts";
+import { ColorType, MismatchDirection, TrackingModeExitMode } from "lightweight-charts";
 import type {
   Anchor,
   DrawingManager,
@@ -1827,6 +1827,14 @@ export function MarketChart({
       let rsiLastHidden = false;
       let followPane = -1;
       let crosshairOwner = -1;
+      let cursorPoint: { x: number; y: number; pane: number } | null = null;
+      let touchPointerStart: { id: number; x: number; y: number } | null = null;
+      let cursorGesture: { id: number; x: number; y: number; origin: { x: number; y: number; pane: number }; moved: boolean; existing: boolean } | null = null;
+      let keepCursorAfterTouch = false;
+      let retainedCursorFrame: number | null = null;
+      // Native tracking belongs to one pane. End that tracking on release,
+      // then retain our cross-pane cursor through the public chart API.
+      chart.applyOptions({ trackingMode: { exitMode: TrackingModeExitMode.OnTouchEnd } });
       const rsiCursorColor = (studyId: string | undefined) => {
         if (studyId !== "rsi") return undefined;
         const color = studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi")?.config.colors[0];
@@ -1868,9 +1876,49 @@ export function MarketChart({
         for (let index = 0; index < paneIndex && index < panes.length; index += 1) top += panes[index]?.getHeight() ?? 0;
         return { studyId: bundle.id, value, y: top + localY };
       };
+      const moveTrackedCursor = (point: { x: number; y: number; pane: number }) => {
+        const bundle = studyRenderer.current?.bundles.find(item => item.pane === point.pane && item.series[0]);
+        const line = point.pane === 0 ? series : bundle?.series[0];
+        let top = 0;
+        for (let i = 0; i < point.pane; i += 1) top += chart.panes()[i]?.getHeight() ?? 0;
+        const time = chart.timeScale().coordinateToTime(point.x), raw = line?.coordinateToPrice(point.y - top);
+        if (!line || time === null || raw == null || !Number.isFinite(raw)) return;
+        const logical = chart.timeScale().coordinateToLogical(point.x);
+        const rsi = rsiBundle(), datum = logical === null ? null : rsi?.series[0]?.dataByIndex(Math.round(logical), MismatchDirection.NearestLeft);
+        const rsiValue = datum && 'value' in datum && typeof datum.value === 'number' ? datum.value : null;
+        const value = bundle?.id === 'rsi' && rsiValue !== null ? rsiValue : raw;
+        chart.setCrosshairPosition(value, time, line);
+        cursorPoint = point;
+        studyAimRef.current = bundle ? { studyId: bundle.id, time: Number(time), value, x: point.x, y: top + (line.priceToCoordinate(value) ?? point.y - top) } : null;
+        if (point.pane === 0) lastCrosshairAnchorRef.current = { time, price: value };
+        paintRsiCrosshair(bundle?.id);
+        const rsiReadout = (point.pane === 0 || bundle?.id === 'rsi') && rsiValue !== null && !!rsi;
+        setRsiLastVisible(!rsiReadout);
+        if (rsiReadout && rsi) {
+          let rsiTop = 0;
+          for (let i = 0; i < rsi.pane; i += 1) rsiTop += chart.panes()[i]?.getHeight() ?? 0;
+          const y = rsi.series[0]?.priceToCoordinate(rsiValue!);
+          setStudyCursor(y == null ? null : { y: rsiTop + y, text: formatStudyValue(rsiValue!), color: rsiCursorColor('rsi') });
+        } else setStudyCursor(bundle ? { y: point.y, text: formatStudyValue(value), color: rsiCursorColor(bundle.id) } : null);
+        const stamp = typeof time === 'number' ? time - (usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0) : null;
+        setHoveredCandle(previous => previous?.scope === legendScope && previous.time === stamp ? previous : { scope: legendScope, time: stamp });
+        if (replayRef.current.selecting && stamp !== null) replayRef.current.onPreview?.(stamp);
+      };
       crosshairMove = (event) => {
         if (followPane >= 0 && event.paneIndex !== followPane) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
+        if (!normalizeTool(activeToolRef.current)) {
+          if (event.point && event.paneIndex !== undefined) {
+            let top = 0;
+            for (let i = 0; i < event.paneIndex; i += 1) top += chart.panes()[i]?.getHeight() ?? 0;
+            cursorPoint = { x: event.point.x, y: top + event.point.y, pane: event.paneIndex };
+            // A native long press starts tracking. Preserve the finger-to-cursor
+            // offset so crossing a pane boundary never jumps under the finger.
+            if (touchPointerStart && !cursorGesture && !pinching && event.sourceEvent) {
+              cursorGesture = { ...touchPointerStart, origin: { ...cursorPoint }, moved: false, existing: false };
+            }
+          } else cursorPoint = null;
+        }
         // Keep the visible crosshair when entering a drawing tool. Confirmation taps must never replace it.
         if (!normalizeTool(activeToolRef.current) && event.point && event.paneIndex === 0 && event.time !== undefined) {
           const price = series.coordinateToPrice(event.point.y);
@@ -2120,6 +2168,7 @@ export function MarketChart({
         if (hiddenRef.current && normalizeTool(activeToolRef.current)) return;
         pointers.add(event.pointerId);
         if (pointers.size > 1) {
+          cursorGesture = null; touchPointerStart = null; keepCursorAfterTouch = false;
           setSelectedStudy(null);lastStudyTap.current=null;
           viewportInteractedRef.current = true;
           pinching = true;
@@ -2135,6 +2184,11 @@ export function MarketChart({
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
+        if (!tool && event.pointerType === "touch") {
+          touchPointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+          keepCursorAfterTouch = false;
+          cursorGesture = cursorPoint ? { ...touchPointerStart, origin: { ...cursorPoint }, moved: false, existing: true } : null;
+        }
         const study = studyAt(event);
         if (tool && STUDY_LINE_TOOLS.has(tool) && (studyAimRef.current||study)) {
           const aim=studyAimRef.current??study!;
@@ -2203,13 +2257,26 @@ export function MarketChart({
           if(studyGesture.moved) {
             const bounds=host.getBoundingClientRect();
             const hit=studyAt({clientX:bounds.left+studyGesture.origin.x+event.clientX-studyGesture.x,clientY:bounds.top+studyGesture.origin.y+event.clientY-studyGesture.y});
-            if(hit&&hit.studyId===studyGesture.origin.studyId) {
+            const draft=studyDraftRef.current;
+            if(!hit && !draft) {
+              const x=Math.max(0,Math.min(chart.timeScale().width(),studyGesture.origin.x+event.clientX-studyGesture.x));
+              const y=studyGesture.origin.y+event.clientY-studyGesture.y;
+              const time=drawingTimeAtCoordinate(x),price=series.coordinateToPrice(y);
+              if(y>=0 && y<chart.panes()[0].getHeight() && time!==null && price!==null) {
+                const anchor=snapAnchor(time,price);
+                studyAimRef.current=null;studyGestureRef.current=null;
+                drawingGestureRef.current={pointerId:event.pointerId,x:event.clientX,y:event.clientY,moved:true,anchor,origin:{x,y}};
+                drawingAimRef.current=anchor;lastCrosshairAnchorRef.current=anchor;
+                paintRsiCrosshair(undefined);setStudyCursor(null);setRsiLastVisible(true);
+                chart.setCrosshairPosition(anchor.price,anchor.time,series);refreshDrawingCrosshair();
+              }
+            }
+            if(hit&&(!draft || hit.studyId===draft.studyId)) {
               studyAimRef.current=hit;
               const bundle=studyRenderer.current?.bundles.find(item=>item.id===hit.studyId);
               if(bundle?.series[0])chart.setCrosshairPosition(hit.value,hit.time as UTCTimestamp,bundle.series[0]);
               refreshDrawingCrosshair();
               setStudyCursor({y:hit.y,text:formatStudyValue(hit.value),color:rsiCursorColor(hit.studyId)});
-              const draft=studyDraftRef.current;
               if(draft)setStudyDrawings([...studyDrawingsRef.current,{...draft,id:'draft',b:{time:hit.time,value:hit.value}}]);
             }
           }
@@ -2275,42 +2342,24 @@ export function MarketChart({
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
-        if (!tool && !studyEdit && pointers.has(event.pointerId)) {
-          const x = event.clientX - host.getBoundingClientRect().left;
+        if (!tool && !studyEdit && pointers.has(event.pointerId) && (event.pointerType !== "touch" || cursorGesture?.id === event.pointerId)) {
+          const bounds = host.getBoundingClientRect();
+          const tracking = cursorGesture?.id === event.pointerId ? cursorGesture : null;
+          if (tracking && Math.hypot(event.clientX - tracking.x, event.clientY - tracking.y) > 6) tracking.moved = true;
           const width = chart.timeScale().width();
           const panes = chart.panes();
+          const x = tracking ? Math.max(0, Math.min(width - 1, tracking.origin.x + event.clientX - tracking.x)) : event.clientX - bounds.left;
+          const globalY = tracking ? Math.max(0, Math.min(panes.reduce((height, pane) => height + pane.getHeight(), 0) - 1, tracking.origin.y + event.clientY - tracking.y)) : event.clientY - bounds.top;
+          const clientY = bounds.top + globalY;
           const hit = x >= 0 && x <= width ? panes.findIndex((pane) => {
             const rect = pane.getHTMLElement()?.getBoundingClientRect();
-            return Boolean(rect && event.clientY >= rect.top && event.clientY < rect.bottom);
+            return Boolean(rect && clientY >= rect.top && clientY < rect.bottom);
           }) : -1;
           followPane = hit;
-          if (crosshairOwner < 0) crosshairOwner = hit;
+          if (crosshairOwner < 0) crosshairOwner = tracking?.origin.pane ?? hit;
           if (hit >= 0 && hit !== crosshairOwner) event.stopPropagation();
-          if (hit === 0) {
-            const top = panes[0].getHTMLElement()?.getBoundingClientRect().top ?? 0;
-            const price = series.coordinateToPrice(event.clientY - top);
-            const time = chart.timeScale().coordinateToTime(x);
-            if (time != null && price != null) {
-              chart.setCrosshairPosition(price, time, series);
-              lastCrosshairAnchorRef.current = { time, price };
-              paintRsiCrosshair(undefined);
-              setStudyCursor((current) => current ? null : current);
-              setRsiLastVisible(true);
-            }
-          } else if (hit > 0) {
-            const bundle = studyRenderer.current?.bundles.find((item) => item.pane === hit && item.series[0]);
-            const line = bundle?.series[0];
-            const localY = event.clientY - (panes[hit].getHTMLElement()?.getBoundingClientRect().top ?? 0);
-            const value = line?.coordinateToPrice(localY);
-            const time = chart.timeScale().coordinateToTime(x);
-            if (line && time != null && value != null && Number.isFinite(value)) {
-              chart.setCrosshairPosition(value, time, line);
-              paintRsiCrosshair(bundle?.id);
-              setStudyCursor(null);
-              setRsiLastVisible(bundle?.id !== "rsi");
-              event.stopPropagation();
-            }
-          }
+          if (hit >= 0) moveTrackedCursor({ x, y: globalY, pane: hit });
+          if (hit > 0) event.stopPropagation();
         }
         if (tool && !CONTINUOUS_TOOLS.has(tool)) {
           if (gesture?.pointerId === event.pointerId && gesture.moved) aim(event);
@@ -2335,6 +2384,15 @@ export function MarketChart({
 
       const onPointerUp = (event: PointerEvent) => {
         scheduleOverlayRefresh();
+        if (cursorGesture?.id === event.pointerId) {
+          keepCursorAfterTouch = (cursorGesture.moved || !cursorGesture.existing) && event.type !== "pointercancel";
+          if (!keepCursorAfterTouch) {
+            chart.clearCrosshairPosition(); cursorPoint = null; studyAimRef.current = null;
+            paintRsiCrosshair(undefined); setStudyCursor(null); setRsiLastVisible(true);
+          }
+          cursorGesture = null;
+        }
+        if (touchPointerStart?.id === event.pointerId) touchPointerStart = null;
         pointers.delete(event.pointerId);
         if (!pointers.size) { followPane = -1; crosshairOwner = -1; }
         if(studyEdit?.pointerId===event.pointerId) {
@@ -2455,9 +2513,23 @@ export function MarketChart({
       host.addEventListener("pointercancel", onPointerUp, true);
       // Stop browser page magnification inside the canvas; the chart still receives the pinch.
       const containChartTouch = (event: TouchEvent) => {
+        if (event.type === "touchmove" && cursorGesture?.moved && !pinching) {
+          // The old pane's native touch handler otherwise repaints its cursor
+          // after our pointer handler has already moved it to the new pane.
+          event.preventDefault(); event.stopPropagation(); return;
+        }
         if (event.touches.length > 1 || normalizeTool(activeToolRef.current) || editRef.current) event.preventDefault();
         const tool = normalizeTool(activeToolRef.current);
         if (event.touches.length === 1 && tool && !CONTINUOUS_TOOLS.has(tool) && !pinching) event.stopPropagation();
+      };
+      const finishCursorTouch = (event: TouchEvent) => {
+        const retained = keepCursorAfterTouch && event.type === "touchend" ? cursorPoint : null;
+        keepCursorAfterTouch = false;
+        if (retained) retainedCursorFrame = requestAnimationFrame(() => {
+          retainedCursorFrame = null;
+          if (!host.isConnected || normalizeTool(activeToolRef.current)) return;
+          moveTrackedCursor(retained);
+        });
       };
       // Native mouse hover must not move the crosshair to the confirmation-click location either.
       const containDrawingMouse = (event: MouseEvent) => {
@@ -2469,8 +2541,12 @@ export function MarketChart({
       host.addEventListener("mouseup", containDrawingMouse, true);
       host.addEventListener("touchstart", containChartTouch, { passive: false, capture: true });
       host.addEventListener("touchmove", containChartTouch, { passive: false, capture: true });
+      host.addEventListener("touchend", finishCursorTouch, true);
+      host.addEventListener("touchcancel", finishCursorTouch, true);
       const releaseOutsidePointer = (event: PointerEvent) => {
         pointers.delete(event.pointerId);
+        if (touchPointerStart?.id === event.pointerId) touchPointerStart = null;
+        if (cursorGesture?.id === event.pointerId) cursorGesture = null;
         if (pinching && !pointers.size) { pinching = false; chart.applyOptions(chartInteractionOptions(activeToolRef.current === "cursor", preservePageScroll)); }
       };
       window.addEventListener("pointerup", releaseOutsidePointer);
@@ -2486,12 +2562,15 @@ export function MarketChart({
         pointerListeners: "active",
       });
       (host as HTMLDivElement & { __papertradeCleanup?: () => void }).__papertradeCleanup = () => {
+        if (retainedCursorFrame !== null) cancelAnimationFrame(retainedCursorFrame);
         host.removeEventListener("pointerdown", onPointerDown, true);
         host.removeEventListener("pointermove", onPointerMove, true);
         host.removeEventListener("pointerup", onPointerUp, true);
         host.removeEventListener("pointercancel", onPointerUp, true);
         host.removeEventListener("touchstart", containChartTouch, true);
         host.removeEventListener("touchmove", containChartTouch, true);
+        host.removeEventListener("touchend", finishCursorTouch, true);
+        host.removeEventListener("touchcancel", finishCursorTouch, true);
         host.removeEventListener("mousemove", containDrawingMouse, true);
         host.removeEventListener("mousedown", containDrawingMouse, true);
         host.removeEventListener("mouseup", containDrawingMouse, true);

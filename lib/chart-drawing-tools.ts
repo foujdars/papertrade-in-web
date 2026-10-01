@@ -114,7 +114,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           if (shape.type !== 'rectangle') return shape;
           const left = presentation.extendLeft ? 0 : shape.topLeft.x;
           const right = presentation.extendRight ? viewport.width : shape.topLeft.x + shape.width;
-          return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: right - left };
+          return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: Math.max(0, right - left) };
         });
         if (presentation.text) {
           const points: Point[] = item.anchors.flatMap(anchor => {
@@ -131,6 +131,18 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         }
         return geometry;
       };
+      if (type === 'rectangle') {
+        const nativeHit = item.testHit.bind(item);
+        item.testHit = (point, viewport) => {
+          const presentation = item.options as DrawingPresentation;
+          if (!presentation.extendLeft && !presentation.extendRight) return nativeHit(point, viewport);
+          const rect = item.computeGeometry(viewport).find(shape => shape.type === 'rectangle');
+          if (!rect || rect.type !== 'rectangle' || rect.width <= 0) return false;
+          const {x,y}=rect.topLeft, right=x+rect.width, bottom=y+rect.height;
+          if ((item as InstanceType<typeof drawing.Rectangle>).rectangleOptions.filled) return point.x >= x && point.x <= right && point.y >= y && point.y <= bottom;
+          return ((Math.abs(point.y-y)<=8 || Math.abs(point.y-bottom)<=8) && point.x>=x && point.x<=right) || ((Math.abs(point.x-x)<=8 || Math.abs(point.x-right)<=8) && point.y>=y && point.y<=bottom);
+        };
+      }
       const getViewport=item.getViewport.bind(item);
       item.getViewport=()=>{
         const viewport=getViewport();if(!viewport)return null;
@@ -160,6 +172,13 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const baseTransform=scope.context.getTransform();
           const context=new Proxy(scope.context,{
             get(ctx,key){
+              // Rectangle's native renderer bypasses computeGeometry. Paint
+              // both its fill and border using the same extended bounds.
+              if(type==='rectangle' && (key==='fillRect' || key==='strokeRect')) return (...args:Parameters<CanvasRenderingContext2D['fillRect']>)=>{
+                const rect=item.computeGeometry(viewport).find(shape=>shape.type==='rectangle');
+                if(rect?.type==='rectangle')ctx[key](rect.topLeft.x,rect.topLeft.y,rect.width,rect.height);
+                else ctx[key](...args);
+              };
               if(key==="beginPath")return ()=>{labelBox=false;ctx.beginPath();};
               if(key==="roundRect")return (...args:Parameters<CanvasRenderingContext2D["roundRect"]>)=>{labelBox=true;ctx.roundRect(...args);};
               if(key==="fill")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.fill,ctx,args);};
