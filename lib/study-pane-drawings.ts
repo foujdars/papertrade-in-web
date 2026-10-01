@@ -1,5 +1,5 @@
 export type StudyPoint = { time: number; value: number };
-export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; showPriceLabel?: boolean };
+export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean };
 export type StudyDrawing = {
   id: string;
   studyId: string;
@@ -7,6 +7,8 @@ export type StudyDrawing = {
   a: StudyPoint;
   b: StudyPoint;
   presentation?: DrawingPresentation;
+  locked?: boolean;
+  hidden?: boolean;
 };
 
 export const STUDY_LINE_TOOLS = new Set(["trend-line", "ray", "extended-line", "horizontal-line", "horizontal-ray", "vertical-line", "arrow", "rectangle"]);

@@ -128,3 +128,62 @@ html, body { touch-action: pan-x pan-y; }
 }
 .terminal-shell .timeframe-menu .timeframe-line.active { background: var(--purple, #753bce); color: #fff; }
 .terminal-shell .timeframe-menu .timeframe-line.active > button.timeframe-star { background: transparent; color: #fff; }
+
+/* Drawing actions use phone-sized hit areas without covering the candle. */
+.terminal-shell .chart-selected-drawing.drawing-action-bar {
+  display: flex; flex-direction: column; gap: 0; width: 272px;
+  max-width: calc(100% - 8px); padding: 3px; transform: none;
+  border: 1px solid var(--line, #d7dce8); border-radius: 13px;
+  color: var(--ink, #202537); background: var(--surface, #fff);
+  box-shadow: 0 5px 20px #0002; touch-action: manipulation;
+}
+.drawing-action-title { display: flex; align-items: center; gap: 6px; padding: 4px 9px 2px; font-size: 11px; line-height: 15px; color: var(--muted, #667085); }
+.drawing-action-bar > div { display: flex; }
+.terminal-shell .drawing-action-bar.chart-selected-drawing button {
+  width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 9px;
+  background: transparent; color: inherit; box-shadow: none;
+}
+.terminal-shell .drawing-action-bar.chart-selected-drawing button:hover,
+.terminal-shell .drawing-action-bar.chart-selected-drawing button[aria-pressed=true] { background: var(--purple-soft, #eee8ff); color: var(--purple, #753bce); }
+.terminal-shell .drawing-action-bar.chart-selected-drawing .drawing-delete-action { color: var(--red, #d83259); }
+.drawing-action-bar button:disabled, .drawing-object-actions button:disabled { opacity: .35; cursor: default; }
+.drawing-action-bar button:focus-visible, .drawing-objects button:focus-visible, .drawing-settings [role=tab]:focus-visible { outline: 2px solid var(--purple, #753bce); outline-offset: -2px; }
+.terminal-shell .chart-object-trigger { position: absolute; z-index: 20; bottom: 48px; width: 44px; height: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line, #d7dce8); border-radius: 12px; color: var(--ink, #202537); background: var(--surface, #fff); box-shadow: 0 2px 8px #0001; }
+
+.drawing-settings .drawing-settings-tabs { display: flex; flex: 0 0 auto; gap: 4px; margin: 2px 0 12px; padding: 4px; border-radius: 11px; background: var(--purple-soft, #f1edf8); }
+.drawing-settings-tabs button { flex: 1; min-height: 44px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted, #667085); font-size: 13px; font-weight: 600; }
+.drawing-settings-tabs button[aria-selected=true] { color: var(--purple, #753bce); background: var(--surface, #fff); box-shadow: 0 1px 4px #0001; }
+.drawing-settings .drawing-settings-swatches { gap: 0; }
+.drawing-settings .drawing-settings-swatches button { width: 44px; height: 44px; border: 7px solid var(--surface, #fff); box-shadow: inset 0 0 0 1px #8886; }
+.drawing-settings .drawing-settings-swatches button.active { outline-offset: -4px; }
+.drawing-settings :is(select,input:not([type=checkbox])) { min-height: 44px; }
+.drawing-settings input[type=checkbox] { width: 22px; height: 22px; margin: 11px; accent-color: var(--purple, #753bce); }
+.drawing-coordinate-fields fieldset { min-width: 0; border: 1px solid var(--line, #d7dce8); border-radius: 10px; padding: 4px 12px; margin: 8px 0 12px; }
+.drawing-coordinate-fields legend { padding: 0 5px; color: var(--muted, #667085); font-size: 12px; }
+.drawing-settings .drawing-coordinate-fields label { display: block; margin: 8px 0; }
+.drawing-settings .drawing-coordinate-fields input { display: block; width: 100%; box-sizing: border-box; margin-top: 5px; }
+.drawing-coordinate-fields small { color: var(--muted, #667085); font-size: 11px; }
+.drawing-settings footer button:disabled { opacity: .4; }
+
+.drawing-objects { position: fixed; inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; box-sizing: border-box; border: 1px solid var(--line, #d7dce8); border-radius: 18px; color: var(--ink, #202537); background: var(--surface, #fff); box-shadow: 0 12px 50px #0003; }
+.drawing-objects[open] { display: flex; flex-direction: column; }
+.drawing-objects::backdrop { background: #11182777; }
+.drawing-objects > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line, #d7dce8); }
+.drawing-objects h3 { margin: 0 0 3px; font-size: 18px; }
+.drawing-objects small { display: block; color: var(--muted, #667085); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawing-objects button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.drawing-objects header button, .drawing-object-actions button { width: 44px; height: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border-radius: 9px; }
+.drawing-object-rows { overflow-y: auto; min-height: 0; overscroll-behavior: contain; padding: 4px 8px; }
+.drawing-object-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px; padding: 6px 0; border-bottom: 1px solid var(--line, #d7dce8); }
+.drawing-object-row:last-child { border-bottom: 0; }
+.drawing-object-name { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 112px; min-height: 44px; padding: 6px 8px; text-align: left; }
+.drawing-object-name > i { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; box-shadow: 0 0 0 1px #8885; }
+.drawing-object-name > span { min-width: 0; }
+.drawing-object-name b { font-size: 13px; font-weight: 600; }
+.drawing-object-row.is-hidden .drawing-object-name { opacity: .5; }
+.drawing-object-actions { display: flex; gap: 0; }
+.drawing-object-actions button:hover, .drawing-object-actions button[aria-pressed=true] { background: var(--purple-soft, #eee8ff); color: var(--purple, #753bce); }
+.drawing-object-actions button:last-child { color: var(--red, #d83259); }
+.drawing-objects-empty { margin: 24px 16px; color: var(--muted, #667085); font-size: 13px; }
+@media (max-width: 380px) { .drawing-object-name { flex-basis: 100%; } .drawing-object-actions { margin-left: 20px; } }
