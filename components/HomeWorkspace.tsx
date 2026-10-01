@@ -140,6 +140,7 @@ export function HomeWorkspace({
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
   const [boards, setBoards] = useState<{ in: SearchBoard; us: SearchBoard; crypto: SearchBoard } | null>(null);
+  const [listQuotes, setListQuotes] = useState<Record<string, { price: number; change: number; volume: number }>>({});
   const sheetInput = useRef<HTMLInputElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
@@ -226,7 +227,7 @@ export function HomeWorkspace({
   const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number; volume: number; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
     {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
     <span className="home-pair-name"><b>{line.symbol}</b><small>{line.name}</small><small className="home-pair-vol">{line.volume > 0 ? `Vol ${volumeLabel(line.volume)}` : "—"}</small></span>
-    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.change < 0 ? "down" : "up"}>{line.change > 0 ? "+" : ""}{line.change.toFixed(2)}%</em></span>
+    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 ? (line.change < 0 ? "down" : "up") : ""}>{line.price > 0 ? `${line.change > 0 ? "+" : ""}${line.change.toFixed(2)}%` : "—"}</em></span>
   </button>;
   const quoteLine = (quote: BoardQuote, seen: Set<string>) => {
     const stock = matchShelfInstrument(stockOptions, boardShelf, quote.symbol);
@@ -255,10 +256,44 @@ export function HomeWorkspace({
     return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); window.clearTimeout(debounce); };
   }, [quoteKeys, retry]);
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
+  const searchQuoteKeys = useMemo(() => {
+    if (!searchFocused) return "";
+    const rows = search.trim() ? shelfRows.matches.slice(0, 20) : shelfRows.recent.slice(0, 6);
+    return rows.map(stock => stock.instrumentKey).filter((key): key is string => Boolean(key)).join(",");
+  }, [search, searchFocused, shelfRows]);
+  useEffect(() => {
+    if (!searchQuoteKeys) return;
+    const controller = new AbortController();
+    const keys = searchQuoteKeys.split(",");
+    const load = () => {
+      fetch(`/api/upstox/quotes?keys=${keys.map(encodeURIComponent).join(",")}`, { signal: controller.signal, cache: "no-store" })
+        .then(response => response.json())
+        .then(body => {
+          if (!body?.ok || !body.quotes) return;
+          setListQuotes(current => {
+            const next = { ...current };
+            for (const key of keys) {
+              const quote = body.quotes[key] as { lastPrice?: number; changePercent?: number; volume?: number } | undefined;
+              if (!quote || !(Number(quote.lastPrice) > 0)) continue;
+              next[key] = { price: Number(quote.lastPrice), change: Number.isFinite(Number(quote.changePercent)) ? Number(quote.changePercent) : 0, volume: Number(quote.volume) > 0 ? Number(quote.volume) : 0 };
+            }
+            return next;
+          });
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 20_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [searchQuoteKeys]);
+  const priced = (stock: HomeStockOption) => {
+    const live = stock.instrumentKey ? listQuotes[stock.instrumentKey] : undefined;
+    return { price: live?.price || stock.price, change: live ? live.change : stock.changePercent, volume: live?.volume ?? 0 };
+  };
   const seen = new Set<string>();
   const recentLines = shelfRows.recent.slice(0, 5).map(stock => {
     seen.add(stock.symbol);
-    return { key: stock.symbol, symbol: stock.symbol, name: stock.name, price: stock.price, change: stock.changePercent, volume: 0, stock };
+    return { key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) };
   });
   const board = boards?.[boardKey];
   const gainerLines = (board?.gainers ?? []).map(quote => quoteLine(quote, seen)).filter((line): line is NonNullable<typeof line> => !!line).slice(0, 5);
@@ -290,7 +325,7 @@ export function HomeWorkspace({
                       {([["all", "All"], ["in", "IN"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
                     </div>
                     <div className="home-search-sheet-list">
-                      {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, price: stock.price, change: stock.changePercent, volume: 0, stock })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
+                      {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
                         {!!recentLines.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
                         {recentLines.map(searchLine)}
                         {!!gainerLines.length && <div className="home-search-group"><b>Gainers</b></div>}

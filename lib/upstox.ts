@@ -48,6 +48,7 @@ export type NormalizedQuote = {
   previousClose: number;
   lastTradeAt: string;
   updatedAt: string;
+  volume?: number;
 };
 
 export function derivePreviousClose(lastPrice: number, netChange: number, fallbackClose: number) {

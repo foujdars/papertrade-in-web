@@ -12,6 +12,7 @@ type UpstoxQuote = {
   timestamp?: string;
   last_trade_time?: string;
   ohlc?: { open?: number; high?: number; low?: number; close?: number };
+  volume?: number;
 };
 
 type UpstoxQuotePayload = {
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
         previousClose: Number.isFinite(previousClose) ? previousClose : lastPrice,
         lastTradeAt,
         updatedAt: quote.timestamp ?? new Date().toISOString(),
+        volume: Number(quote.volume) > 0 ? Number(quote.volume) : 0,
       };
       quotes[instrumentKey] = normalized;
       quotes[symbol] = normalized;
