@@ -1,5 +1,13 @@
 # Live chart regression
 
+## Drawing controls
+
+`node tests/browser/drawing-controls.cjs` tests touch selection, body dragging, handle resizing, double-tap settings, duplicate, per-object lock/hide, the drawing list, master lock/hide, coordinate validation, price-drawing undo/redo, reload persistence and indicator-pane controls. It uses the real chart and drawing engines with mocked candles, and checks light/dark layouts from 320 to 1280px.
+
+`node tests/browser/chart-repair.cjs` covers history paging, viewport stability, symbol isolation, ray-text clipping and price-axis labels. `node tests/browser/rsi-drawings.cjs` checks drawing placement in indicator panes and settings with a resized Android visual viewport.
+
+Set `PLAYWRIGHT_MODULE_PATH` for an external Playwright installation. `CHROMIUM_PACKAGE` optionally points to an installed `@sparticuz/chromium` module. Run `node --experimental-strip-types --test tests/drawing-editing.test.mjs` for duplication across trading-session gaps.
+
 ## PSBB Trading watchlist
 
 `npm run test:psbb` checks divergence/MSS, swing-extreme stops, fixed 1R outcomes, full monthly ledgers, calendar boundaries, category membership and the history endpoint with mocked upstream data.

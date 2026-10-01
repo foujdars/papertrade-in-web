@@ -6,7 +6,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const start=Date.parse('2026-09-18T09:15:00+05:30')/1000,candles=Array.from({length:330},(_,i)=>{const close=100+i*.03+4*Math.sin(i/9);return {time:start+i*300,open:close-.3,high:close+1,low:close-1,close,volume:1000+i*7};});
  const server=http.createServer((req,res)=>{if(req.url.startsWith('/api/')){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,candles,quotes:{},segments:['historical']}));}res.setHeader('Content-Type',req.url==='/qa.js'?'application/javascript':'text/html');res.end(req.url==='/qa.js'?build.outputFiles[0].text:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}.price-chart-wrap,.price-chart,.chart-stack{height:100%!important}</style><div id="root"></div><script src="/qa.js"></script>`);});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- const browser=await chromium.launch({headless:true});try{
+ const launch={headless:true};if(process.env.CHROMIUM_PACKAGE){const c=(await import(process.env.CHROMIUM_PACKAGE)).default;launch.executablePath=await c.executablePath();launch.args=c.args.filter(arg=>arg!=='--single-process');}
+ const browser=await chromium.launch(launch);try{
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.qaCanvasText=new Set();window.qaCanvasPositions=new Map();const fill=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.qaCanvasText.add(String(text));window.qaCanvasPositions.set(String(text),{x:args[0],y:args[1]});return fill.call(this,text,...args);};});
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaCandles?.data().length>300);
@@ -38,12 +39,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  assert.equal(await page.locator('.permanent-trade-footer').evaluate(e=>getComputedStyle(e).visibility),'hidden');
  // Simulate Android resize-visual without shrinking the underlying chart.
  await page.evaluate(()=>{Object.defineProperty(visualViewport,'height',{configurable:true,value:360});Object.defineProperty(visualViewport,'offsetTop',{configurable:true,value:42});visualViewport.dispatchEvent(new Event('resize'));});
+ await page.getByRole('tab',{name:'Text',exact:true}).click();
  await page.getByLabel('Drawing text').fill('RSI divergence');
  const apply=page.getByRole('button',{name:'Apply',exact:true});
  assert.ok(await apply.evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=42&&r.bottom<=402&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e;}),'Apply stays visible and above the trading row with keyboard open');
  await page.screenshot({path:'outputs/drawing-settings-keyboard-verified.png'});
  await page.evaluate(()=>{delete visualViewport.height;delete visualViewport.offsetTop;visualViewport.dispatchEvent(new Event('resize'));});
- await page.getByLabel('Drawing text').fill('RSI divergence');await page.getByLabel('Text position').selectOption('below');await page.getByLabel('Text alignment').selectOption('right');await page.getByLabel('Extend right',{exact:true}).check();await page.getByRole('button',{name:'Apply',exact:true}).click();
+ await page.getByRole('tab',{name:'Text',exact:true}).click();
+ await page.getByLabel('Drawing text').fill('RSI divergence');await page.getByLabel('Text position').selectOption('below');await page.getByLabel('Text alignment').selectOption('right');await page.getByRole('tab',{name:'Style',exact:true}).click();await page.getByLabel('Extend right',{exact:true}).check();await page.getByRole('button',{name:'Apply',exact:true}).click();
  await page.getByText('RSI divergence',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('papertrade-study-drawings:NSE_EQ|TEST'))[0].presentation.extendRight),true);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -70,6 +73,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const verticalTime=await page.evaluate(()=>String(window.qaManager.getAllDrawings().find(d=>d.type==='vertical-line').anchors[0].time));
  assert.equal(await page.evaluate(time=>window.qaCanvasText.has(time),verticalTime),false);
  await page.getByRole('button',{name:'Drawing settings',exact:true}).click();
+ await page.getByRole('tab',{name:'Text',exact:true}).click();
  await page.getByLabel('Drawing text').fill('My D1 peak');await page.getByLabel('Text position').selectOption('middle');await page.getByRole('button',{name:'Apply',exact:true}).click();
  await page.waitForFunction(()=>window.qaCanvasText.has('My D1 peak'));
  await page.screenshot({path:'outputs/vertical-line-text-verified.png'});

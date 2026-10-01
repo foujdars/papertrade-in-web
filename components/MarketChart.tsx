@@ -1,6 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
-import { Check, Trash2, Settings2, Eye, EyeOff, X } from "lucide-react";
+import { Check, Trash2, Settings2, Eye, EyeOff, X, Layers } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
@@ -10,7 +10,10 @@ import { PsbbMarks } from "./PsbbMarks";
 import { Ema21EntryMarks } from "./Ema21EntryMarks";
 import { Ema5ReversalMarks } from "./Ema5ReversalMarks";
 import { StudyPaneLayer } from "./StudyPaneLayer";
-import { DrawingSettings } from './DrawingSettings';
+import { DrawingSettings, type DrawingCoordinate } from './DrawingSettings';
+import { DrawingActionBar } from './DrawingActionBar';
+import { DrawingObjects, type DrawingObject } from './DrawingObjects';
+import { duplicateDrawingPoints, drawingTitle } from '@/lib/drawing-editing';
 import type { DrawingPresentation } from '@/lib/study-pane-drawings';
 import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
@@ -53,6 +56,7 @@ import type {
   Anchor,
   DrawingManager,
   DrawingStyle,
+  DrawingOptions,
   IDrawing,
   SerializedDrawing,
 } from "lightweight-charts-drawing";
@@ -244,6 +248,8 @@ type DrawingEdit = {
   start: Anchor;
   originalAnchors: Anchor[];
   startX: number;
+  startY: number;
+  moved: boolean;
   pointerId: number;
   originalPixels: (number | null)[];
 };
@@ -714,7 +720,7 @@ export function MarketChart({
   const [drafting, setDrafting] = useState(false);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [studyDrawings, setStudyDrawings] = useState<StudyDrawing[]>([]);
-  const [editingDrawing, setEditingDrawing] = useState<{id:string;tool:string;study:boolean;value:DrawingPresentation}|null>(null);
+  const [editingDrawing, setEditingDrawing] = useState<{id:string;tool:string;study:boolean;value:DrawingPresentation;coordinates:DrawingCoordinate[]}|null>(null);
   const studyAimRef = useRef<{studyId:string;time:number;value:number;x:number;y:number}|null>(null);
   const studyGestureRef = useRef<{pointerId:number;x:number;y:number;origin:NonNullable<typeof studyAimRef.current>;moved:boolean}|null>(null);
   const [studyCursor, setStudyCursor] = useState<{ y: number; text: string; color?: string } | null>(null);
@@ -725,6 +731,10 @@ export function MarketChart({
   const rememberStudyDrawingsRef = useRef<(next: StudyDrawing[]) => void>(() => {});
   const cancelInProgressRef = useRef<() => void>(() => {});
   const studyPaneRefreshRef = useRef<(() => void) | null>(null);
+  const [objectsOpen, setObjectsOpen] = useState(false);
+  const [, setObjectsRevision] = useState(0);
+  const drawingTapRef = useRef<{id:string;time:number}|null>(null);
+  useEffect(() => { setObjectsOpen(false); setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
   const [drawingActions, setDrawingActions] = useState<{ x: number; y: number } | null>(null);
   const [priceScaleWidth, setPriceScaleWidth] = useState(72);
   const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
@@ -901,8 +911,8 @@ export function MarketChart({
         return pointX === null || pointY === null ? [] : [{ x: pointX, y: pointY }];
       });
       const nextActions = actionPoints.length ? {
-        x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 112, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 48)),
-        y: Math.max(4, Math.min(...actionPoints.map((point) => point.y)) - 32),
+        x: Math.max(4, Math.min((chartHost.current?.clientWidth ?? 320) - 280, (Math.min(...actionPoints.map((point) => point.x)) + Math.max(...actionPoints.map((point) => point.x))) / 2 - 136)),
+        y: Math.max(4, Math.min(...actionPoints.map((point) => point.y)) - 82),
       } : null;
       setDrawingActions((current) => current && nextActions && Math.abs(current.x - nextActions.x) < 1 && Math.abs(current.y - nextActions.y) < 1 ? current : nextActions);
       refreshRiskCoordinates();
@@ -1167,6 +1177,7 @@ export function MarketChart({
     const draftId = omitId || draftRef.current?.drawing.id;
     const snapshot = manager.exportDrawings().filter((item) => item.id !== draftId);
     storedDrawingsRef.current = snapshot;
+    setObjectsRevision(value=>value+1);
     if (isReplay) replayDrawingsRef.current = { scope: storageKeyRef.current, snapshot };
     if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     if (pushHistory) {
@@ -1188,7 +1199,7 @@ export function MarketChart({
     for (const item of snapshot) {
       const drawing = registry.createDrawing(item.type, item.id, item.anchors, { ...item.style, labelFont: "13px Inter, sans-serif" }, item.options);
       if (drawing) {
-        drawing.updateOptions({ ...item.options, visible: !hiddenRef.current, locked: lockedRef.current });
+        drawing.updateOptions({ ...item.options, visible: !hiddenRef.current && !(item.options as DrawingPresentation).userHidden });
         manager.addDrawing(drawing);
       }
     }
@@ -1198,6 +1209,46 @@ export function MarketChart({
       if (isReplay) replayDrawingsRef.current = { scope: storageKeyRef.current, snapshot };
       if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     }
+  }
+
+  function openDrawingSettings(id:string, study:boolean) {
+    if (lockedRef.current) return;
+    if (study) {
+      const line=studyDrawingsRef.current.find(item=>item.id===id);
+      if (!line || line.locked) return;
+      setEditingDrawing({id,tool:line.tool,study:true,value:{...line.presentation,color:line.presentation?.color??'#6657ee'},coordinates:[{time:line.a.time,value:line.a.value},{time:line.b.time,value:line.b.value}].slice(0,['horizontal-line','horizontal-ray','vertical-line'].includes(line.tool)?1:2)});
+    } else {
+      const item=drawingManager.current?.getAllDrawings().find(line=>line.id===id);
+      if (!item || item.options.locked) return;
+      setEditingDrawing({id,tool:item.type,study:false,value:{...item.options,color:item.style.lineColor,lineWidth:item.style.lineWidth,lineDash:item.style.lineDash},coordinates:item.anchors.map(anchor=>({time:Number(anchor.time),value:anchor.price}))});
+    }
+  }
+  function drawingAction(id:string,study:boolean,action:'duplicate'|'lock'|'hide'|'delete') {
+    if (lockedRef.current) return;
+    if (study) {
+      const line=studyDrawingsRef.current.find(item=>item.id===id);
+      if (!line || (action==='delete' && line.locked)) return;
+      if (action==='duplicate') {
+        const [a,b]=duplicateDrawingPoints([line.a,line.b],dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
+        const copy={...line,id:crypto.randomUUID(),a,b,locked:false,hidden:false,presentation:{...line.presentation}};
+        rememberStudyDrawingsRef.current([...studyDrawingsRef.current,copy]);selectedStudyLineRef.current=copy.id;setSelectedStudyLine(copy.id);
+      } else {
+        rememberStudyDrawingsRef.current(action==='delete'?studyDrawingsRef.current.filter(item=>item.id!==id):studyDrawingsRef.current.map(item=>item.id===id?{...item,...(action==='lock'?{locked:!line.locked}:{hidden:!line.hidden})}:item));
+        if(action!=='lock'){selectedStudyLineRef.current=null;setSelectedStudyLine(null);}
+      }
+    } else {
+      const manager=drawingManager.current, item=manager?.getAllDrawings().find(line=>line.id===id);
+      if (!manager || !item || (action==='delete' && item.options.locked)) return;
+      if(action==='duplicate') {
+        const source=item.toJSON(), anchors=duplicateDrawingPoints(source.anchors.map(anchor=>({...anchor,time:Number(anchor.time)})),dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe))));
+        const copy=drawingRegistry.current?.createDrawing(source.type,crypto.randomUUID(),anchors.map(anchor=>({...anchor,time:anchor.time as UTCTimestamp})),source.style,{...source.options,locked:false,visible:true,userHidden:false} as DrawingOptions);
+        if(copy){manager.addDrawing(copy);manager.selectDrawing(copy.id);}
+      } else if(action==='lock') item.updateOptions({locked:!item.options.locked});
+      else if(action==='hide') {const userHidden=!(item.options as DrawingPresentation).userHidden;item.updateOptions({userHidden,visible:!hiddenRef.current&&!userHidden} as DrawingOptions);manager.deselectAll();}
+      else manager.removeDrawing(id);
+      persistDrawings(true);
+    }
+    scheduleOverlayRefresh();
   }
 
   function magnetArmed() {
@@ -1491,13 +1542,12 @@ export function MarketChart({
 
   useEffect(() => {
     lockedRef.current = lockedDrawings;
-    for (const drawing of drawingManager.current?.getAllDrawings() ?? []) drawing.updateOptions({ locked: lockedDrawings });
-    persistDrawings();
+    setObjectsRevision(value=>value+1);
   }, [lockedDrawings]);
 
   useEffect(() => {
     hiddenRef.current = hiddenDrawings;
-    for (const drawing of drawingManager.current?.getAllDrawings() ?? []) drawing.updateOptions({ visible: !hiddenDrawings });
+    for (const drawing of drawingManager.current?.getAllDrawings() ?? []) drawing.updateOptions({ visible: !hiddenDrawings && !(drawing.options as DrawingPresentation).userHidden });
     refreshDrawingCrosshair();
     persistDrawings();
   }, [hiddenDrawings]);
@@ -1774,6 +1824,7 @@ export function MarketChart({
         let best: string | null = null;
         let score = 14;
         for (const line of studyDrawingsRef.current) {
+          if (line.hidden) continue;
           const bundle = renderer.bundles.find((item) => item.id === line.studyId);
           const series = bundle?.series[0];
           if (!bundle || !series) continue;
@@ -1935,6 +1986,7 @@ export function MarketChart({
       manager.on("drawing:cleared", () => persistDrawings(true));
       const syncSelectedDrawing = () => {
         setSelectedDrawingId(manager?.getSelectedDrawing()?.id ?? null);
+        setObjectsRevision(value=>value+1);
         scheduleOverlayRefresh();
       };
       manager.on("drawing:selected", syncSelectedDrawing);
@@ -1943,7 +1995,7 @@ export function MarketChart({
       manager.on("drawing:cleared", syncSelectedDrawing);
 
       const pointers = new Set<number>();
-      let studyEdit: { pointerId:number; original:StudyDrawing; start:{x:number;value:number}; anchor:'a'|'b'|null } | null = null;
+      let studyEdit: { pointerId:number; original:StudyDrawing; start:{x:number;y:number;value:number}; clientX:number;clientY:number;moved:boolean; anchor:'a'|'b'|null } | null = null;
       let pinching = false;
       const aim = (event: PointerEvent) => {
         const gesture = drawingGestureRef.current;
@@ -1989,14 +2041,14 @@ export function MarketChart({
 
         if (!selectedTool) {
           tapGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
-          const drawings = [...currentManager.getAllDrawings()].reverse();
+          const selectedId = currentManager.getSelectedDrawing()?.id;
+          const drawings = [...currentManager.getAllDrawings()].reverse().sort((a,b)=>Number(b.id===selectedId)-Number(a.id===selectedId));
           const hit = drawings.find((drawingItem) => {
             if (!drawingItem.options.visible) return false;
             const viewport = drawingItem.getViewport();
             if (!viewport) return false;
             const controls = drawingItem.getControlPoints(viewport);
-            if (controls.some((control) => pointDistance(point, control) <= 18)) return true;
-            if (controls.some((control, index) => index > 0 && pointToSegmentDistance(point, controls[index - 1], control) <= 12)) return true;
+            if (drawingItem.id === selectedId && controls.some((control) => pointDistance(point, control) <= 22)) return true;
             return [[0,0],[-8,0],[8,0],[0,-8],[0,8]].some(([dx,dy]) => drawingItem.testHit({x:point.x+dx,y:point.y+dy}, viewport));
           }) ?? null;
           if (!hit) {
@@ -2009,18 +2061,20 @@ export function MarketChart({
           currentManager.selectDrawing(hit.id);
           selectedStudyLineRef.current = null;
           setSelectedStudyLine(null);
-          if (hit.options.locked) return;
+          if (hit.options.locked || lockedRef.current) return;
           const start = pointerAnchor(event, false);
           if (!start) return;
           editRef.current = {
             drawing: hit,
             pointerId: event.pointerId,
             startX: event.clientX,
+            startY: event.clientY,
+            moved: false,
             originalPixels: hit.anchors.map((anchor) => drawingX(anchor.time)),
             anchorIndex: (() => {
               const viewport = hit.getViewport();
               if (!viewport) return null;
-              return positionLineIndex(hit as unknown as Parameters<typeof positionLineIndex>[0], point) ?? hit.getControlPoints(viewport).find((control) => pointDistance(point, control) <= 18)?.index ?? null;
+              return hit.id !== selectedId ? null : positionLineIndex(hit as unknown as Parameters<typeof positionLineIndex>[0], point) ?? hit.getControlPoints(viewport).find((control) => pointDistance(point, control) <= 22)?.index ?? null;
             })(),
             start,
             originalAnchors: hit.anchors.map((anchor) => ({ ...anchor })),
@@ -2047,7 +2101,7 @@ export function MarketChart({
             `${selectedTool}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             previewAnchors,
             toolStyle(selectedTool),
-            { ...toolOptions(selectedTool), visible: !hiddenRef.current, locked: lockedRef.current },
+            { ...toolOptions(selectedTool), visible: !hiddenRef.current, locked: false },
           );
           if (!created) return;
           draft = { toolType: selectedTool, requiredAnchors, confirmed: [anchor], drawing: created, continuous, pointerId: continuous ? event.pointerId : null };
@@ -2106,16 +2160,17 @@ export function MarketChart({
         }
         if (!tool && study && !hiddenRef.current) {
           const hit = hitStudyDrawing(study.x, study.y);
+          const wasSelected = selectedStudyLineRef.current === hit;
           selectedStudyLineRef.current = hit;
           setSelectedStudyLine(hit);
           if (hit) {
             drawingManager.current?.deselectAll();
-            if(!lockedRef.current) {
+            if(!lockedRef.current && !studyDrawingsRef.current.find(item=>item.id===hit)?.locked) {
               const line=studyDrawingsRef.current.find(item=>item.id===hit)!;
               const bundle=studyRenderer.current?.bundles.find(item=>item.id===line.studyId);
               let top=0;for(let i=0;i<(bundle?.pane??0);i++)top+=chart.panes()[i].getHeight();
               const distance=(key:'a'|'b')=>{const x=chart.timeScale().timeToCoordinate(line[key].time as UTCTimestamp),y=bundle?.series[0].priceToCoordinate(line[key].value);return x==null||y==null?Infinity:Math.hypot(x-study.x,top+y-study.y);};
-              studyEdit={pointerId:event.pointerId,original:line,start:{x:study.x,value:study.value},anchor:distance('a')<14?'a':distance('b')<14?'b':null};
+              studyEdit={pointerId:event.pointerId,original:line,start:{x:study.x,y:study.y,value:study.value},clientX:event.clientX,clientY:event.clientY,moved:false,anchor:wasSelected?(distance('a')<22?'a':distance('b')<22?'b':null):null};
               chart.applyOptions(chartInteractionOptions(false,preservePageScroll));host.setPointerCapture?.(event.pointerId);
             }
             event.preventDefault();
@@ -2139,6 +2194,8 @@ export function MarketChart({
         if (pinching) return;
         if(studyEdit?.pointerId===event.pointerId) {
           const hit=studyAt(event),edit=studyEdit;
+          if(!edit.moved&&Math.hypot(event.clientX-edit.clientX,event.clientY-edit.clientY)<5){event.preventDefault();event.stopPropagation();return;}
+          edit.moved=true;drawingTapRef.current=null;
           if(hit&&hit.studyId===edit.original.studyId) {
             const move=(key:'a'|'b')=>{
               const old=edit.original[key];
@@ -2193,6 +2250,9 @@ export function MarketChart({
         }
         const edit = editRef.current;
         if (edit && edit.pointerId === event.pointerId) {
+          if (!edit.moved && Math.hypot(event.clientX-edit.startX,event.clientY-edit.startY) < 5) { event.preventDefault(); event.stopPropagation(); return; }
+          edit.moved = true;
+          drawingTapRef.current = null;
           const current = pointerAnchor(event, false);
           if (!current) return;
           const positionTool = edit.drawing.type === "long-position" || edit.drawing.type === "short-position";
@@ -2289,7 +2349,9 @@ export function MarketChart({
         if(studyEdit?.pointerId===event.pointerId) {
           const edit=studyEdit;studyEdit=null;
           const next=event.type==='pointercancel'?studyDrawingsRef.current.map(item=>item.id===edit.original.id?edit.original:item):studyDrawingsRef.current;
-          rememberStudyDrawings(next);chart.applyOptions(chartInteractionOptions(true,preservePageScroll));
+          if(edit.moved||event.type==='pointercancel')rememberStudyDrawings(next);
+          else {const previous=drawingTapRef.current,now=performance.now();if(previous?.id===edit.original.id&&now-previous.time<400){openDrawingSettings(edit.original.id,true);drawingTapRef.current=null;}else drawingTapRef.current={id:edit.original.id,time:now};}
+          chart.applyOptions(chartInteractionOptions(true,preservePageScroll));
           if(host.hasPointerCapture(event.pointerId))host.releasePointerCapture(event.pointerId);
           event.preventDefault();event.stopPropagation();return;
         }
@@ -2343,10 +2405,16 @@ export function MarketChart({
           }else lastStudyTap.current=null;
         }
         if (editRef.current) {
+          const edit = editRef.current;
           editRef.current.drawing.setState("selected");
           editRef.current = null;
           chart.applyOptions(chartInteractionOptions(true, preservePageScroll));
-          persistDrawings(true);
+          if (edit.moved) persistDrawings(true);
+          else {
+            const previous = drawingTapRef.current, now = performance.now();
+            if (previous?.id === edit.drawing.id && now-previous.time < 400) { openDrawingSettings(edit.drawing.id, false); drawingTapRef.current = null; }
+            else drawingTapRef.current = { id: edit.drawing.id, time: now };
+          }
           host.releasePointerCapture?.(event.pointerId);
           event.preventDefault();
           return;
@@ -2374,7 +2442,7 @@ export function MarketChart({
           }
         }
         if ((event.key === "Delete" || event.key === "Backspace") && !draftRef.current) {
-          if (selectedStudyLineRef.current && !lockedRef.current) {
+          if (selectedStudyLineRef.current && !lockedRef.current && !studyDrawingsRef.current.find(line=>line.id===selectedStudyLineRef.current)?.locked) {
             rememberStudyDrawings(studyDrawingsRef.current.filter((item) => item.id !== selectedStudyLineRef.current));
             selectedStudyLineRef.current = null;
             setSelectedStudyLine(null);
@@ -2382,7 +2450,7 @@ export function MarketChart({
             return;
           }
           const selected = drawingManager.current?.getSelectedDrawing();
-          if (selected && !selected.options.locked) {
+          if (selected && !selected.options.locked && !lockedRef.current) {
             drawingManager.current?.removeDrawing(selected.id);
             persistDrawings(true);
             event.preventDefault();
@@ -3197,10 +3265,18 @@ export function MarketChart({
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
-        {editingDrawing && <DrawingSettings key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} onClose={()=>setEditingDrawing(null)} onApply={value=>{
-          if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id?{...line,presentation:value}:line));
-          else { const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});persistDrawings(true);} }
-        }}/>}
+        {editingDrawing && <DrawingSettings key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
+          if (lockedRef.current) return;
+          if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id&&!line.locked?{...line,presentation:value,...(points?{a:{time:points[0].time,value:points[0].value},b:{time:(points[1]??points[0]).time,value:(points[1]??points[0]).value}}:{})}:line));
+          else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points)item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));persistDrawings(true);}}
+          scheduleOverlayRefresh();
+        }} />}
+        {objectsOpen && <DrawingObjects disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={()=>setObjectsOpen(false)} onAction={(item:DrawingObject,action)=>{
+          if(action==='select'){if(item.hidden)drawingAction(item.id,item.study,'hide');if(item.study){drawingManager.current?.deselectAll();selectedStudyLineRef.current=item.id;setSelectedStudyLine(item.id);}else{selectedStudyLineRef.current=null;setSelectedStudyLine(null);drawingManager.current?.selectDrawing(item.id);}setObjectsOpen(false);scheduleOverlayRefresh();}
+          else if(action==='settings'){setObjectsOpen(false);openDrawingSettings(item.id,item.study);}
+          else drawingAction(item.id,item.study,action);
+        }} />}
+        <button type="button" className="chart-object-trigger" aria-label="Open drawing list" title="Drawings" style={{right:priceScaleWidth+8}} onClick={()=>{setObjectsRevision(value=>value+1);setObjectsOpen(true);}}><Layers size={19}/></button>
         {editingLine && <ChartLineColorSettings key={editingLine} name={editingLine === "primary" ? instrument.symbol : overlayCompared.find((item) => item.instrumentKey === editingLine)?.symbol ?? "Compared symbol"} color={editingLine === "primary" ? primaryLineColor : overlayCompared.find((item) => item.instrumentKey === editingLine)?.color ?? compareColor(Math.max(0, overlayCompared.findIndex((item) => item.instrumentKey === editingLine)))} onChange={(color) => {
           if (editingLine === "primary") setPrimaryLineColor(color);
           else setComparedSymbols((current) => current.map((item) => item.instrumentKey === editingLine ? { ...item, color } : item));
@@ -3214,7 +3290,7 @@ export function MarketChart({
         {indicators.psbb && !studySettings.psbb?.hidden && <PsbbMarks key={`${instrument.instrumentKey}:${timeframe}:psbb`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} config={studySettings.psbb} refreshRef={psbbRefreshRef} studyRenderer={studyRenderer} divergenceOnly />}
         {indicators.ema21 && !studySettings.ema21?.hidden && (!studySettings.ema21?.timeframes.length || studySettings.ema21.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && ["DELTA|BTCUSD", "DELTA|ETHUSD", "DELTA|XAUTUSD"].includes(instrument.instrumentKey) && <Ema21EntryMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
         {indicators.ema5 && !studySettings.ema5?.hidden && (!studySettings.ema5?.timeframes.length || studySettings.ema5.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && instrument.instrumentKey === "DELTA|BTCUSD" && <Ema5ReversalMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
-        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} onSettings={id=>{const line=studyDrawingsRef.current.find(item=>item.id===id);if(line&&!lockedRef.current)setEditingDrawing({id,tool:line.tool,study:true,value:{...line.presentation,color:line.presentation?.color??'#6657ee'}});}} onDelete={(id) => { if(lockedRef.current)return; rememberStudyDrawingsRef.current(studyDrawingsRef.current.filter((item) => item.id !== id)); selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} onDone={() => { selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} />
+        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings.filter(line=>!line.hidden)} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} disabled={lockedDrawings} onSettings={id=>openDrawingSettings(id,true)} onAction={(id,action)=>drawingAction(id,true,action)} onDone={()=>{selectedStudyLineRef.current=null;setSelectedStudyLine(null);}} />
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: 72 }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
@@ -3296,11 +3372,7 @@ export function MarketChart({
         {!isReplay && <SessionBoard variant="chip" hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
-        {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions" style={{ left: drawingActions.x, top: drawingActions.y }}>
-          <button type="button" aria-label="Drawing settings" onClick={()=>{const item=drawingManager.current?.getSelectedDrawing();if(item&&!item.options.locked)setEditingDrawing({id:item.id,tool:item.type,study:false,value:{...item.options,color:item.style.lineColor,lineWidth:item.style.lineWidth,lineDash:item.style.lineDash} as DrawingPresentation});}}><Settings2 size={19}/></button>
-          <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
-          <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
-        </div>}
+        {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <DrawingActionBar title={drawingTitle(drawingManager.current?.getSelectedDrawing()?.type??'drawing')} locked={!!drawingManager.current?.getSelectedDrawing()?.options.locked} disabled={lockedDrawings} position={drawingActions} onSettings={()=>openDrawingSettings(selectedDrawingId,false)} onDuplicate={()=>drawingAction(selectedDrawingId,false,'duplicate')} onLock={()=>drawingAction(selectedDrawingId,false,'lock')} onHide={()=>drawingAction(selectedDrawingId,false,'hide')} onDelete={()=>drawingAction(selectedDrawingId,false,'delete')} onDone={()=>drawingManager.current?.deselectAll()} />}
         {!candlesOnly && onOrderSide && (
           <div className="chart-quick-order-buttons" aria-label="Paper trade controls">
             <button className={`chart-sell-button ${orderTool?.enabled && orderTool.side === "SELL" ? "active" : ""}`} onClick={() => onOrderSide("SELL")}><span>Sell</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>
