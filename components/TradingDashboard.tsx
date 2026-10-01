@@ -16,7 +16,7 @@ import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
 
 import {
   Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
-  Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Rocket, ShieldCheck, SlidersHorizontal, Smartphone, Sun,
+  Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Rocket, ShieldCheck, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, Pencil,
 } from "lucide-react";
@@ -2784,10 +2784,6 @@ export function TradingDashboard() {
     setRecentScanners((current) => [label, ...current.filter((item) => item !== label)].slice(0, 4));
   }, []);
 
-  function toggleHomeCard(card: HomeCardId) {
-    setHomeCards((current) => ({ ...current, [card]: !current[card] }));
-  }
-
   function closeAccountModal() {
     setAccountOpen(false);
     setAccountDeleteArmed(false);
@@ -2836,24 +2832,10 @@ export function TradingDashboard() {
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
-                <header><SlidersHorizontal size={17} /><span><b>Your workspace</b><small>Quick access &amp; preferences</small></span><button type="button" className="more-menu-close" onClick={() => setMoreMenuOpen(false)} aria-label="Close workspace menu"><X size={18}/></button></header>
                 <div className="mobile-utility-grid" aria-label="Quick access">
                   <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={20} aria-hidden="true"/><span>Wallet</span></button>
                   <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={20} aria-hidden="true"/> : <Moon size={20} aria-hidden="true"/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
                   <button onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={20} aria-hidden="true"/><span>Coach</span></button>
-                </div>
-                <div className="home-card-toggles">
-                  <b>Home cards</b>
-                  {([['market', 'Market pulse'], ['portfolio', 'Portfolio summary']] as Array<[HomeCardId, string]>).map(([id, label]) => <button key={id} className={homeCards[id] ? "active" : ""} onClick={() => toggleHomeCard(id)} role="switch" aria-checked={homeCards[id]}><span>{label}</span><i /></button>)}
-                </div>
-                <div className="density-picker">
-                  <b>Display density</b>
-                  <div><button className={uiDensity === "comfortable" ? "active" : ""} onClick={() => setUiDensity("comfortable")}>Comfortable</button><button className={uiDensity === "compact" ? "active" : ""} onClick={() => setUiDensity("compact")}>Compact</button></div>
-                </div>
-                <div className="home-card-toggles motion-preference">
-                  <b>Motion</b>
-                  <button type="button" className={motionEnabled ? "active" : ""} onClick={() => setMotionEnabled((value) => !value)} role="switch" aria-checked={motionEnabled} aria-describedby="motion-preference-help"><span>Animations</span><i aria-hidden="true" /></button>
-                  <small id="motion-preference-help">Quick, gentle transitions. Your device’s reduced-motion setting always takes priority.</small>
                 </div>
               </section>
             </>}
