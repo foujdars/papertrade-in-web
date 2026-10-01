@@ -2,7 +2,9 @@
 export function drawingLogicalAtTime(time:number,times:number[]) {
   if(!times.length)return null;
   if(times.length===1)return (time-times[0])/86400;
-  let index=times.findIndex(t=>t>=time);
+  let low = 0, high = times.length;
+  while (low < high) { const mid = (low + high) >>> 1; if (times[mid] < time) low = mid + 1; else high = mid; }
+  let index = low === times.length ? -1 : low;
   if(index===0)index=1;
   if(index<0)index=times.length-1;
   return index-1+(time-times[index-1])/(times[index]-times[index-1]||1);

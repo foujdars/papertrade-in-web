@@ -32,7 +32,7 @@ export function applyCandleTick(candles: Candle[], tick: CandleTick, timeframe: 
   const next = time === last.time
     ? { ...last, high: Math.max(last.high, tick.price), low: Math.min(last.low, tick.price), close: tick.price }
     : { time, open: tick.price, high: tick.price, low: tick.price, close: tick.price, volume: 0 };
-  return [...(time === last.time ? candles.slice(0, -1) : candles), next].slice(-1600);
+  return [...(time === last.time ? candles.slice(0, -1) : candles), next];
 }
 
 // REST has no per-candle trade timestamp. Keep the tick-built bar until the
@@ -48,6 +48,6 @@ export function reconcileLiveCandles(current: Candle[], incoming: Candle[], tick
       ? { ...bar, high: Math.max(bar.high, prior.high), low: Math.min(bar.low, prior.low), close: prior.close, volume: Math.max(bar.volume ?? 0, prior.volume ?? 0) }
       : bar);
   }
-  const result = [...map.values()].sort((a, b) => a.time - b.time).slice(-1600);
+  const result = [...map.values()].sort((a, b) => a.time - b.time);
   return freshTick ? applyCandleTick(result, freshTick, timeframe) : result;
 }

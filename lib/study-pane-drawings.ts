@@ -1,5 +1,5 @@
 export type StudyPoint = { time: number; value: number };
-export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string };
+export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; showPriceLabel?: boolean };
 export type StudyDrawing = {
   id: string;
   studyId: string;
@@ -38,7 +38,7 @@ export function locateStudyPane(chart: { panes: () => Array<{ getHeight: () => n
 
 export function studyLinePoints(tool: string, x1: number, y1: number, x2: number, y2: number, width: number, paneTop: number, paneHeight: number, options: DrawingPresentation = {}) {
   if (tool === "horizontal-line") return { x1: 0, y1, x2: width, y2: y1 };
-  if (tool === "horizontal-ray") return { x1, y1, x2: width, y2: y1 };
+  if (tool === "horizontal-ray") return { x1, y1, x2: options.direction === "left" ? 0 : width, y2: y1 };
   if (tool === "vertical-line") return { x1, y1: paneTop, x2: x1, y2: paneTop + paneHeight };
   if (tool === "rectangle") return null;
   const dx = x2 - x1;
@@ -63,4 +63,10 @@ export function drawingTextPosition(a: {x:number;y:number}, b: {x:number;y:numbe
   const vertical = options.textVertical ?? 'above';
   const y = vertical === 'above' ? Math.min(a.y,b.y)-7 : vertical === 'below' ? Math.max(a.y,b.y)+15 : (a.y+b.y)/2+4;
   return { x, y, align, anchor: align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle' } as const;
+}
+
+/** Single-anchor annotations leave with their candle, even when the line extends. */
+export function drawingTextVisible(tool: string, a: { x: number; y: number }, label: { x: number; y: number }, width: number, height: number) {
+  if (["horizontal-ray", "horizontal-line", "vertical-line"].includes(tool) && (a.x < 0 || a.x > width)) return false;
+  return label.x >= 0 && label.x <= width && label.y >= 0 && label.y <= height;
 }

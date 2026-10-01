@@ -82,8 +82,7 @@ function mergeCandles(groups: ChartCandle[][]) {
     candlesByTime.set(Number(candle.time), candle);
   }
   return [...candlesByTime.values()]
-    .sort((a, b) => Number(a.time) - Number(b.time))
-    .slice(-5_000);
+    .sort((a, b) => Number(a.time) - Number(b.time));
 }
 
 function aggregateAnnualCandles(candles: ChartCandle[]) {
@@ -139,17 +138,19 @@ export async function GET(request: Request) {
       (target !== null && (!Number.isFinite(target) || target < 0 || target > Date.now()))) {
       return Response.json({ ok: false, error: { message: "Choose a valid past date or a daily history range." } }, { status: 400 });
     }
-    const requestedHistory = years > 0 || target !== null;
+    const before = url.searchParams.has("before") ? Number(url.searchParams.get("before")) : null;
+    if (before !== null && (!Number.isFinite(before) || before <= 0 || before > Date.now() / 1000 || years || target !== null)) {
+      return Response.json({ ok: false, error: { message: "Choose a valid history cursor." } }, { status: 400 });
+    }
+    const requestedHistory = years > 0 || target !== null || before !== null;
     const dateOnly = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-    const toDate = target !== null ? dateOnly(Math.min(Date.now(), target + config.lookbackDays * 43200000)) : indiaDate();
+    const toDate = before !== null ? dateOnly(before * 1000 - 1 + 19_800_000) : target !== null ? dateOnly(Math.min(Date.now(), target + config.lookbackDays * 43200000)) : indiaDate();
     const rangeStart = new Date(`${toDate}T00:00:00Z`);
     if (years) rangeStart.setUTCFullYear(rangeStart.getUTCFullYear() - years);
     else rangeStart.setUTCDate(rangeStart.getUTCDate() - config.lookbackDays);
-    // Upstox only publishes daily-or-longer history from January 2000. A
-    // 30-year annual request before that date is rejected rather than clipped.
-    if (["days", "weeks", "months"].includes(config.unit) && rangeStart < new Date("2000-01-01T00:00:00Z")) {
-      rangeStart.setTime(Date.parse("2000-01-01T00:00:00Z"));
-    }
+    const floorDate = ["days", "weeks", "months"].includes(config.unit) ? "2000-01-01" : "2022-01-01";
+    if (rangeStart < new Date(`${floorDate}T00:00:00Z`)) rangeStart.setTime(Date.parse(`${floorDate}T00:00:00Z`));
+    if (toDate < floorDate) return Response.json({ ok: true, candles: [], history: { hasMore: false, nextBefore: before } });
     const fromDate = dateOnly(rangeStart.getTime());
     const encodedKey = encodeURIComponent(instrumentKey);
     const historicalPath = `/v3/historical-candle/${encodedKey}/${config.unit}/${config.interval}/${toDate}/${fromDate}`;
@@ -192,7 +193,8 @@ export async function GET(request: Request) {
       segments = successful.map((result) => result.segment);
     }
 
-    if (!candles.length) {
+    if (before !== null) candles = candles.filter(candle => candle.time < before);
+    if (!candles.length && before === null) {
       return Response.json(
         { ok: false, source: "upstox", error: { code: "NO_CANDLES", message: "Upstox returned no candles for this timeframe." } },
         { status: 404, headers: { "Cache-Control": "no-store" } },
@@ -200,7 +202,7 @@ export async function GET(request: Request) {
     }
 
     return Response.json(
-      { ok: true, source: "upstox", segments, instrumentKey, timeframe, candles, fetchedAt: new Date().toISOString() },
+      { ok: true, source: "upstox", segments, instrumentKey, timeframe, candles, history: { nextBefore: Date.parse(`${fromDate}T00:00:00+05:30`) / 1000, hasMore: fromDate > floorDate }, fetchedAt: new Date().toISOString() },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

@@ -96,14 +96,15 @@ export async function GET(request: Request) {
         if (!Array.isArray(rows)) throw new Error("Candle history is unavailable.");
         return normalizeGlobalCandles(rows);
       }));
-      const unique = new Map(pages.flat().filter(c => c.time >= plan.start && c.time <= Math.min(plan.end, Date.now() / 1000)).map(c => [c.time, c]));
+      const unique = new Map(pages.flat().filter(c => c.time >= plan.start && c.time <= Math.min(plan.end, Date.now() / 1000) && (plan.before === null || c.time < plan.before)).map(c => [c.time, c]));
       const raw = [...unique.values()].sort((a, b) => a.time - b.time);
       const candles = plan.aggregate ? aggregateChartCandles(raw, timeframe) : raw;
-      if (!candles.length) throw new Error("No history is available for this contract on the selected date.");
+      if (!candles.length && plan.before === null) throw new Error("No history is available for this contract on the selected date.");
       return Response.json(
         {
           ok: true,
           candles,
+          history: { nextBefore: plan.start, hasMore: plan.start > 0 && candles.length > 0 },
           source: "Delta Exchange India",
           fetchedAt: Date.now(),
         },

@@ -46,17 +46,20 @@ export function deltaHistoryPlan(timeframe: string, params: URLSearchParams, now
   const date = params.get("date");
   const target = date ? Date.parse(date) / 1000 : null;
   if (target !== null && (!Number.isFinite(target) || target < 0 || target > now / 1000)) throw new Error("Choose a valid past date.");
+  const before = params.has("before") ? Number(params.get("before")) : null;
+  if (before !== null && (!Number.isFinite(before) || before <= 0 || before > now / 1000 || years || target !== null)) throw new Error("Choose a valid history cursor.");
   const lookback = years ? years * 366 * 86400 : seconds >= 604800 ? 10 * 366 * 86400 : seconds * 600;
   let end = Math.floor(now / 1000 / baseSeconds) * baseSeconds + baseSeconds;
+  if (before !== null) end = candleBucket(before, timeframe);
   let start = end - lookback;
   if (target !== null) {
     start = candleBucket(target, timeframe) - Math.min(seconds * 120, 5 * 366 * 86400);
     end = Math.min(end, target + Math.min(seconds * 120, 5 * 366 * 86400));
   }
-  start = Math.max(0, Math.floor(start / baseSeconds) * baseSeconds);
+  start = Math.max(0, candleBucket(Math.floor(start / baseSeconds) * baseSeconds, timeframe));
   const windows: Array<{ start: number; end: number }> = [];
   for (let cursor = start; cursor < end; cursor += baseSeconds * 1500) windows.push({ start: cursor, end: Math.min(end, cursor + baseSeconds * 1500) });
-  return { resolution: base.toLowerCase(), windows, aggregate: base !== timeframe, start, end };
+  return { resolution: base.toLowerCase(), windows, aggregate: base !== timeframe, start, end, before };
 }
 
 const chartCandleCache = new Map<string, Candle[]>();
@@ -93,4 +96,11 @@ export function nearestCandleIndex(candles: Candle[], target: number, timeframe:
   const containing = candles.findIndex(c => candleBucket(Number(c.time) + offset, timeframe) === bucket);
   if (containing >= 0) return containing;
   return candles.reduce((best, c, i) => Math.abs(Number(c.time) - target) < Math.abs(Number(candles[best].time) - target) ? i : best, 0);
+}
+
+/** Older pages never overwrite the fresher candles already on screen. */
+export function prependChartCandles(current: Candle[], older: Candle[]) {
+  const map = new Map(older.map(c => [Number(c.time), c]));
+  for (const candle of current) map.set(Number(candle.time), candle);
+  return [...map.values()].sort((a, b) => Number(a.time) - Number(b.time));
 }
