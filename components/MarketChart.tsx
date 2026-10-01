@@ -33,7 +33,7 @@ import { useChartPreference } from "@/lib/chart-view-preferences";
 import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKind, toStyleSeriesPoint, type ChartStyleId } from "@/lib/chart-style";
 import { compareColor, compareQuote, formatCompareDelta, formatComparePrice } from "@/lib/chart-compare";
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
-import { cachedChartCandles, candleBucket, candlesEqual, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
+import { cachedChartCandles, prependChartCandles, candleBucket, candlesEqual, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
 import { comparisonRequest } from "@/lib/chart-compare";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -400,16 +400,18 @@ function chartDisplayTime(time: Time, timeframe: string) {
     timeZone: chartTimeZone(timeframe),
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
+    year: "numeric",
+    ...(CALENDAR_TIMEFRAMES.has(timeframe) ? {} : { hour: "2-digit" as const, minute: "2-digit" as const, hour12: false }),
   });
 }
 
-function chartTickTime(time: Time, timeframe: string) {
+function chartTickTime(time: Time, timeframe: string, tickType?: number) {
   const timestamp = timeToTimestamp(time);
   const date = new Date(timestamp * 1_000);
-  if (usesIntradayAxisShift(timeframe)) {
+  const timeZone = chartTimeZone(timeframe);
+  if (tickType === 0) return date.toLocaleDateString("en-IN", { timeZone, year: "numeric" });
+  if (tickType === 1) return date.toLocaleDateString("en-IN", { timeZone, month: "short", year: "2-digit" });
+  if (usesIntradayAxisShift(timeframe) && (tickType === undefined || tickType >= 3)) {
     return date.toLocaleTimeString("en-IN", {
       timeZone: "UTC",
       hour: "2-digit",
@@ -418,7 +420,7 @@ function chartTickTime(time: Time, timeframe: string) {
     });
   }
   return date.toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata",
+    timeZone,
     day: "2-digit",
     month: "short",
   });
@@ -589,6 +591,8 @@ export function MarketChart({
   const externalFeed = externalCandles !== undefined || instrument.instrumentKey.startsWith("DELTA|");
   const historyRequestRef = useRef(historyRequest); historyRequestRef.current = historyRequest;
   const [historyMessage, setHistoryMessage] = useState("");
+  const [olderHistory, setOlderHistory] = useState<"idle" | "loading" | "error" | "end">("idle");
+  const retryOlderHistory = useRef<() => void>(() => {});
   const dateArrowRef = useRef<Candle | null>(null);
   const [dateArrow, setDateArrow] = useState<{ x: number; y: number; size: number } | null>(null);
   const [markerSize, setMarkerSize] = useState(14);
@@ -698,8 +702,8 @@ export function MarketChart({
   const [feedMode, setFeedMode] = useState<"loading" | "live" | "stale" | "error">("loading");
   const chartCacheKey = `${instrument.instrumentKey}:${timeframe}`;
   const [paintedCacheKey, setPaintedCacheKey] = useState("");
-  if (!isReplay && !externalFeed && !historyRequest && paintedCacheKey !== chartCacheKey) {
-    const cached = cachedChartCandles(chartCacheKey);
+  if (!isReplay && !historyRequest && paintedCacheKey !== chartCacheKey) {
+    const cached = externalFeed ? undefined : cachedChartCandles(chartCacheKey);
     dataRef.current = cached?.length ? cached : [];
     lastLiveTickRef.current = null;
     setPaintedCacheKey(chartCacheKey);
@@ -710,7 +714,7 @@ export function MarketChart({
   const [drafting, setDrafting] = useState(false);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [studyDrawings, setStudyDrawings] = useState<StudyDrawing[]>([]);
-  const [editingDrawing, setEditingDrawing] = useState<{id:string;study:boolean;value:DrawingPresentation}|null>(null);
+  const [editingDrawing, setEditingDrawing] = useState<{id:string;tool:string;study:boolean;value:DrawingPresentation}|null>(null);
   const studyAimRef = useRef<{studyId:string;time:number;value:number;x:number;y:number}|null>(null);
   const studyGestureRef = useRef<{pointerId:number;x:number;y:number;origin:NonNullable<typeof studyAimRef.current>;moved:boolean}|null>(null);
   const [studyCursor, setStudyCursor] = useState<{ y: number; text: string; color?: string } | null>(null);
@@ -1606,9 +1610,9 @@ export function MarketChart({
         leftPriceScale: { visible: false },
         timeScale: {
           borderColor: neon ? "#2c3859" : "#dfe3ec",
-          timeVisible: true,
+          timeVisible: !CALENDAR_TIMEFRAMES.has(timeframe),
           secondsVisible: timeframe === "1m",
-          tickMarkFormatter: (time: Time) => chartTickTime(time, timeframe),
+          tickMarkFormatter: (time: Time, tickType: number) => chartTickTime(time, timeframe, tickType),
           rightOffset: 8,
           barSpacing: 7,
           minBarSpacing: 2,
@@ -1908,7 +1912,7 @@ export function MarketChart({
       profileRefresh = setInterval(refreshProfiles, 60000);
       drawingRegistry.current = createChartDrawingRegistry(drawing,
         () => dataRef.current.map(c => ({ ...c, time: Number(chartTimeFromEpoch(Number(c.time), timeframe)) })),
-        () => ({ width: chart.timeScale().width(), height: chart.panes()[0]?.getHeight() ?? host.clientHeight, dark: neon }),
+        () => ({ width: chart.timeScale().width(), height: chart.panes()[0]?.getHeight() ?? host.clientHeight, dark: neon, formatPrice: (price: number) => series.priceFormatter().format(price) }),
         (from, to, mode, id) => {
           const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
           const interval = LIVE_TIMEFRAME_SECONDS[timeframe] ?? ({ "1D":86400, "1W":604800, "1M":2678400, "1Y":31622400 }[timeframe] ?? 86400);
@@ -2516,7 +2520,7 @@ export function MarketChart({
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
-    if (!chartGeneration || timeframe === "1W" || timeframe === "1M" || timeframe === "1Y") {
+    if (!chartGeneration || CALENDAR_TIMEFRAMES.has(timeframe)) {
       setSessionShades([]);
       return;
     }
@@ -2532,10 +2536,13 @@ export function MarketChart({
       const x1 = scale.timeToCoordinate(visible.from);
       const x2 = scale.timeToCoordinate(visible.to);
       if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || x1 == null || x2 == null) return;
+      // Session stripes stop being readable at this zoom and become expensive
+      // over years of history. Bring them back automatically when zooming in.
+      if (to - from > 14 * 86400) { setSessionShades([]); return; }
       const plotRight = chart.priceScale("right").width();
       const plotWidth = Math.max(0, width - plotRight);
-      const step = /^(\d+)(m|h)$/.exec(timeframe);
-      const barSeconds = step ? Number(step[1]) * (step[2] === "h" ? 3600 : 60) : 86_400;
+      const step = /^(\d+)(m|h)$/i.exec(timeframe);
+      const barSeconds = step ? Number(step[1]) * (step[2].toLowerCase() === "h" ? 3600 : 60) : 86_400;
       const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
       const bars = dataRef.current;
       const edgeLabel = (ms: number) => {
@@ -2587,7 +2594,12 @@ export function MarketChart({
         ].filter((edge): edge is { x: number; label: string } => edge !== null);
         return [{ key: `${interval.id}-${interval.start}`, left, width: band, color: interval.color, edges }];
       });
-      setSessionShades(next);
+      let lastEdge = -Infinity;
+      const readableEdges = new Set(next.flatMap(shade => shade.edges).sort((a,b) => a.x-b.x).filter(edge => {
+        if (edge.x-lastEdge < 44) return false;
+        lastEdge = edge.x; return true;
+      }));
+      setSessionShades(next.map(shade => ({ ...shade, edges: shade.edges.filter(edge => readableEdges.has(edge)) })));
     };
     const schedule = () => {
       window.cancelAnimationFrame(frame);
@@ -2753,19 +2765,81 @@ export function MarketChart({
     chartApi.current?.applyOptions({ localization: { priceFormatter: (price: number) => price.toLocaleString("en-US", { maximumFractionDigits: precision }) } });
     const initial = dataRef.current.length === 0;
     const previous = dataRef.current;
-    if (previous.length === externalCandles.length && previous.every((c, i) => candlesEqual(c, externalCandles[i]))) return;
-    dataRef.current = externalCandles;
-    if (trailingCandleUpdate(previous, externalCandles)) {
-      // Refresh the former last bar as well when a new candle has opened.
-      if (externalCandles.length > previous.length) paintLastBar(externalCandles.slice(0, -1));
-      paintLastBar(externalCandles);
-    } else paintPriceSeries(externalCandles);
-    setLatestCandle(externalCandles.at(-1));
-    syncIndicatorData(externalCandles);
-    if(initial&&externalCandles.length)applyInitialVisibleRange(externalCandles);
-    setFeedMode(externalCandles.length?'live':'loading');
+    const next = reconcileLiveCandles(previous, externalCandles, null, timeframe);
+    if (previous.length === next.length && previous.every((c, i) => candlesEqual(c, next[i]))) return;
+    dataRef.current = next;
+    if (trailingCandleUpdate(previous, next)) {
+      if (next.length > previous.length) paintLastBar(next.slice(0, -1));
+      paintLastBar(next);
+    } else paintPriceSeries(next);
+    setLatestCandle(next.at(-1));
+    syncIndicatorData(next);
+    if (initial && next.length) applyInitialVisibleRange(next);
+    setFeedMode(next.length ? 'live' : 'loading');
     scheduleOverlayRefresh();
   }, [externalCandles,timeframe,priceIncrement,historyRequest]);
+
+  // Fetch only when the user reaches the loaded history's left edge. Keep the
+  // same candles at the same pixel positions while older bars are prepended.
+  useEffect(() => {
+    const chart = chartApi.current;
+    setOlderHistory("idle");
+    if (!chart || isReplay || historyRequest) return;
+    const controller = new AbortController();
+    let timer = 0, busy = false, ended = false, failed = false, cursor: number | null = null;
+    let emptyPages = 0;
+    const load = async () => {
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (busy || ended || failed || !range || range.from > 40 || !dataRef.current.length || !viewportInteractedRef.current) return;
+      busy = true;
+      setOlderHistory("loading");
+      const before = Math.min(cursor ?? Infinity, Number(dataRef.current[0].time));
+      try {
+        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&before=${before}`, { signal: controller.signal, cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok || !body.ok || !Array.isArray(body.candles)) throw new Error("Older candles unavailable");
+        if (controller.signal.aborted || chartApi.current !== chart) return;
+        const previous = dataRef.current;
+        const older = (body.candles as Candle[]).filter(c => Number(c.time) < before);
+        const next = prependChartCandles(previous, older);
+        const savedRange = chart.timeScale().getVisibleLogicalRange();
+        const added = next.length - previous.length;
+        const nextCursor = Number(body.history?.nextBefore ?? older[0]?.time ?? before);
+        cursor = nextCursor;
+        ended = body.history?.hasMore === false || !Number.isFinite(nextCursor) || nextCursor >= before;
+        emptyPages = added ? 0 : emptyPages + 1;
+        if (added) {
+          dataRef.current = next;
+          if (!externalFeed) rememberChartCandles(chartCacheKey, next);
+          paintPriceSeries(next);
+          syncIndicatorData(next);
+          if (savedRange) chart.timeScale().setVisibleLogicalRange({ from: savedRange.from + added, to: savedRange.to + added });
+          scheduleOverlayRefresh();
+        }
+        // Sparse instruments can have empty weeks. Pause after three pages,
+        // with an explicit retry, rather than looping through years of gaps.
+        failed = !ended && emptyPages >= 3;
+        setOlderHistory(ended ? "end" : failed ? "error" : "idle");
+      } catch {
+        if (!controller.signal.aborted) { failed = true; setOlderHistory("error"); }
+      } finally {
+        busy = false;
+        if (!controller.signal.aborted && !failed && !ended) schedule();
+      }
+    };
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (!busy && !failed && !ended) timer = window.setTimeout(() => void load(), 160);
+    };
+    retryOlderHistory.current = () => { failed = false; emptyPages = 0; viewportInteractedRef.current = true; void load(); };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+      retryOlderHistory.current = () => {};
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule);
+    };
+  }, [chartGeneration, instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 
   useEffect(() => {
     dateArrowRef.current = null;
@@ -2867,7 +2941,7 @@ export function MarketChart({
         if (!historicalOnlyTimeframe) requests.push(pull("intraday"));
         const results = await Promise.allSettled(requests);
         if (controller.signal.aborted) return;
-        if (results.every(result => result.status === "rejected")) {
+        if (results.some(result => result.status === "rejected")) {
           const error = results.find((result): result is PromiseRejectedResult => result.status === "rejected")?.reason;
           throw error instanceof Error ? error : new Error("Upstox candles are unavailable.");
         }
@@ -3111,6 +3185,7 @@ export function MarketChart({
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
         {sessionShades.flatMap((shade) => shade.edges.map((edge) => <span key={`${shade.key}-${edge.label}-${edge.x}`} className="chart-session-edge" style={{ left: edge.x }}>{edge.label}</span>))}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
+        {olderHistory !== "idle" && !historyMessage && <div className="chart-older-history" role="status">{olderHistory === "loading" ? "Loading older candles…" : olderHistory === "end" ? "Start of available history" : <button type="button" onClick={() => retryOlderHistory.current()}>Load older candles · Retry</button>}</div>}
         {historyMessage && <div className="chart-history-message" role="status">{historyMessage}</div>}
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
         {volumeOverlay && <button type="button" className="volume-overlay-heading" style={{top:volumeOverlay.headingTop}} onClick={e=>activateStudyRef.current('volume',e.clientX,e.clientY)}><span>{studyTitle('volume',studySettings.volume??studyDefaults('volume'))}</span><b className="volume-overlay-value" style={{color:volumeOverlay.color}}>{new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(volumeOverlay.value)}</b></button>}
@@ -3122,9 +3197,9 @@ export function MarketChart({
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
-        {editingDrawing && <DrawingSettings key={editingDrawing.id} value={editingDrawing.value} onClose={()=>setEditingDrawing(null)} onApply={value=>{
+        {editingDrawing && <DrawingSettings key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} onClose={()=>setEditingDrawing(null)} onApply={value=>{
           if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id?{...line,presentation:value}:line));
-          else { const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,...options}=value;item.updateOptions(options);if(color && color!==item.style.lineColor)item.updateStyle({lineColor:color});persistDrawings(true);} }
+          else { const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});persistDrawings(true);} }
         }}/>}
         {editingLine && <ChartLineColorSettings key={editingLine} name={editingLine === "primary" ? instrument.symbol : overlayCompared.find((item) => item.instrumentKey === editingLine)?.symbol ?? "Compared symbol"} color={editingLine === "primary" ? primaryLineColor : overlayCompared.find((item) => item.instrumentKey === editingLine)?.color ?? compareColor(Math.max(0, overlayCompared.findIndex((item) => item.instrumentKey === editingLine)))} onChange={(color) => {
           if (editingLine === "primary") setPrimaryLineColor(color);
@@ -3139,7 +3214,7 @@ export function MarketChart({
         {indicators.psbb && !studySettings.psbb?.hidden && <PsbbMarks key={`${instrument.instrumentKey}:${timeframe}:psbb`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} config={studySettings.psbb} refreshRef={psbbRefreshRef} studyRenderer={studyRenderer} divergenceOnly />}
         {indicators.ema21 && !studySettings.ema21?.hidden && (!studySettings.ema21?.timeframes.length || studySettings.ema21.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && ["DELTA|BTCUSD", "DELTA|ETHUSD", "DELTA|XAUTUSD"].includes(instrument.instrumentKey) && <Ema21EntryMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
         {indicators.ema5 && !studySettings.ema5?.hidden && (!studySettings.ema5?.timeframes.length || studySettings.ema5.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && instrument.instrumentKey === "DELTA|BTCUSD" && <Ema5ReversalMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
-        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} onSettings={id=>{const line=studyDrawingsRef.current.find(item=>item.id===id);if(line&&!lockedRef.current)setEditingDrawing({id,study:true,value:{...line.presentation,color:line.presentation?.color??'#6657ee'}});}} onDelete={(id) => { if(lockedRef.current)return; rememberStudyDrawingsRef.current(studyDrawingsRef.current.filter((item) => item.id !== id)); selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} onDone={() => { selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} />
+        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} onSettings={id=>{const line=studyDrawingsRef.current.find(item=>item.id===id);if(line&&!lockedRef.current)setEditingDrawing({id,tool:line.tool,study:true,value:{...line.presentation,color:line.presentation?.color??'#6657ee'}});}} onDelete={(id) => { if(lockedRef.current)return; rememberStudyDrawingsRef.current(studyDrawingsRef.current.filter((item) => item.id !== id)); selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} onDone={() => { selectedStudyLineRef.current = null; setSelectedStudyLine(null); }} />
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: 72 }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
@@ -3222,7 +3297,7 @@ export function MarketChart({
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <div className="chart-selected-drawing" role="toolbar" aria-label="Selected drawing actions" style={{ left: drawingActions.x, top: drawingActions.y }}>
-          <button type="button" aria-label="Drawing settings" onClick={()=>{const item=drawingManager.current?.getSelectedDrawing();if(item&&!item.options.locked)setEditingDrawing({id:item.id,study:false,value:{...item.options,color:item.style.lineColor} as DrawingPresentation});}}><Settings2 size={19}/></button>
+          <button type="button" aria-label="Drawing settings" onClick={()=>{const item=drawingManager.current?.getSelectedDrawing();if(item&&!item.options.locked)setEditingDrawing({id:item.id,tool:item.type,study:false,value:{...item.options,color:item.style.lineColor,lineWidth:item.style.lineWidth,lineDash:item.style.lineDash} as DrawingPresentation});}}><Settings2 size={19}/></button>
           <button type="button" aria-label="Delete selected drawing" title="Delete drawing" onClick={() => { const selected = drawingManager.current?.getSelectedDrawing(); if (selected && !selected.options.locked) { drawingManager.current?.removeDrawing(selected.id); persistDrawings(true); } }}><Trash2 size={19}/></button>
           <button type="button" aria-label="Finish editing drawing" title="Done" onClick={() => drawingManager.current?.deselectAll()}><Check size={21}/></button>
         </div>}

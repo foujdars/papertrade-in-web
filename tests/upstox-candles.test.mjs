@@ -47,3 +47,27 @@ test("1Y candles request only published Upstox history and aggregate monthly bar
   assert.equal(body.candles.length, 2);
   assert.deepEqual([body.candles[0].open, body.candles[0].high, body.candles[0].low, body.candles[0].close, body.candles[0].volume], [100, 115, 90, 111, 30]);
 });
+
+test('older Upstox pages exclude the boundary candle and provide a decreasing cursor', async () => {
+  const { get, paths } = route();
+  const before = Date.parse('2025-02-01T00:00:00+05:30') / 1000;
+  const response = await get(new Request(`https://example.test/api/upstox/candles?instrumentKey=NSE_EQ%7CTEST&timeframe=1D&before=${before}`));
+  const body = await response.json();
+  assert.equal(response.status,200);
+  assert.equal(paths.length,1);
+  assert.match(paths[0],/\/days\/1\/2025-01-31\/2024-02-01$/);
+  assert.equal(body.candles.length,1);
+  assert.ok(body.history.nextBefore < before);
+  assert.equal(body.history.hasMore,true);
+});
+
+test('Upstox historical floor stops paging without invalid provider requests', async () => {
+  const { get, paths } = route();
+  const before = Date.parse('2000-01-01T00:00:00+05:30') / 1000;
+  const response = await get(new Request(`https://example.test/api/upstox/candles?instrumentKey=NSE_EQ%7CTEST&timeframe=1D&before=${before}`));
+  assert.equal(response.status,200);
+  const body = await response.json();
+  assert.deepEqual(body.candles,[]);
+  assert.equal(body.history.hasMore,false);
+  assert.equal(paths.length,0);
+});

@@ -4,7 +4,7 @@ import { useEffect, useId, useState, type MutableRefObject, type PointerEvent as
 import { Check, Trash2, Settings2 } from "lucide-react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
-import { studyLinePoints, drawingTextPosition, type StudyDrawing } from "@/lib/study-pane-drawings";
+import { studyLinePoints, drawingTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
@@ -77,16 +77,16 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
       const ends = studyLinePoints(line.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight, line.presentation);
       const selectedLine = line.id === selectedId;
       const label = drawingTextPosition(from,to,line.presentation);
-      const text = line.presentation?.text && <text x={label.x} y={label.y} textAnchor={label.anchor} fill="#8054da" fontSize={12}>{line.presentation.text}</text>;
+      const text = line.presentation?.text && drawingTextVisible(line.tool, from, label, width, height) && <text x={label.x} y={label.y} textAnchor={label.anchor} fill={line.presentation?.color ?? "#8054da"} fontSize={12} style={{paintOrder:"stroke",stroke:"var(--surface,#fff)",strokeWidth:3,strokeLinejoin:"round"}}>{line.presentation.text}</text>;
       const clip = `study-clip-${clipPrefix}-${line.id}`;
       const wrap = (shape: React.ReactNode) => <g key={line.id}><defs><clipPath id={clip}><rect x={0} y={from.top} width={width} height={from.paneHeight}/></clipPath></defs><g clipPath={`url(#${clip})`}>{shape}{text}{selectedLine && <>{[from,to].map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="white" stroke="#8054da"/>)}</>}</g></g>;
       if (!ends) {
         const x = line.presentation?.extendLeft ? 0 : Math.min(from.x, to.x);
         const right = line.presentation?.extendRight ? width : Math.max(from.x,to.x);
         const y = Math.min(from.y, to.y);
-        return wrap(<rect className={selectedLine ? "selected" : undefined} style={line.presentation?.color ? {stroke:line.presentation.color} : undefined} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
+        return wrap(<rect className={selectedLine ? "selected" : undefined} style={{stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
       }
-      return wrap(<line className={selectedLine ? "selected" : undefined} style={line.presentation?.color ? {stroke:line.presentation.color} : undefined} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
+      return wrap(<line className={selectedLine ? "selected" : undefined} style={{stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
     })}
     </svg>
     {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width, background: cursor.color, color: cursor.color ? "#fff" : undefined }}>{cursor.text}</b>}

@@ -308,3 +308,29 @@ test('holding day boundary uses IST and missing purchase dates are not invented'
  const unknown=holdingPerformance([buy('legacy',1,100,undefined)],'TEST',100,null,today);
  assert.equal(unknown.purchasedAt,null);assert.equal(unknown.dayPnl,0);
 });
+
+test('ray text leaves with its anchor while its price stays on the scale', () => {
+  const registry=createChartDrawingRegistry(drawing,()=>candles,()=>({width:400,height:600,formatPrice:price=>price.toFixed(2)}));
+  const ray=registry.createDrawing('horizontal-ray','ray',[{time:1,price:100}],{}, {visible:true,text:'Support',textHorizontal:'left'});
+  let offset=0;
+  ray.getViewport=()=>({...viewport,timeScale:{timeToCoordinate:()=>offset}});
+  assert.equal(ray.horizontalRayOptions.showPrice,false);
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,1);
+  assert.equal(ray.priceAxisViews()[0].text(),'100.00');
+  assert.equal(ray.priceAxisViews()[0].visible(),true);
+  offset=-2; // Text's +4px alignment must not keep it alive after anchor exits.
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,0);
+  assert.equal(ray.priceAxisViews()[0].visible(),true);
+  offset=401;
+  assert.equal(ray.priceAxisViews()[0].visible(),false);
+  ray.updateOptions({direction:'left',showPriceLabel:false});
+  assert.equal(ray.horizontalRayOptions.direction,'left');
+  assert.equal(ray.priceAxisViews()[0].visible(),false);
+  ray.updateStyle({lineWidth:3,lineDash:[8,5]});
+  const saved=ray.toJSON();
+  const restored=registry.createDrawing(saved.type,saved.id,saved.anchors,saved.style,saved.options);
+  assert.equal(restored.horizontalRayOptions.direction,'left');
+  assert.equal(restored.style.lineWidth,3);
+  assert.deepEqual(restored.style.lineDash,[8,5]);
+  assert.equal(restored.options.showPriceLabel,false);
+});

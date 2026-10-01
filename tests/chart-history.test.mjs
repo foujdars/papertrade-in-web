@@ -64,3 +64,23 @@ test('unfinished profile chart modes stay out of the style menu', () => {
     assert.equal(isChartStyle(style),false);
   }
 });
+
+test('older Delta pages end before the cursor and align calendar buckets', () => {
+  const before = epoch('2025-10-06');
+  for (const frame of ['1m','5m','1D','1W','1M','1Y']) {
+    const plan = deltaHistoryPlan(frame, new URLSearchParams({before:String(before)}), Date.parse('2026-10-01'));
+    assert.ok(plan.end <= before);
+    assert.ok(plan.start < plan.end);
+    assert.equal(plan.start, candleBucket(plan.start,frame));
+  }
+  for (const before of ['NaN','0','-1','999999999999']) assert.throws(()=>deltaHistoryPlan('5m',new URLSearchParams({before})));
+});
+
+test('prepending overlapping pages retains live corrections and all older candles', async () => {
+  const { prependChartCandles } = await import('../lib/chart-history.ts');
+  const current = [bar('2025-10-06',15),bar('2025-10-07',16)];
+  const next = prependChartCandles(current,[bar('2024-10-01'),bar('2025-10-06',10)]);
+  assert.equal(next.length,3);
+  assert.equal(next[0].time,epoch('2024-10-01'));
+  assert.equal(next[1].close,15);
+});

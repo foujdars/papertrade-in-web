@@ -1,5 +1,5 @@
-export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number; anchored?: boolean };
-export type LabelBox = { x: number; y: number; width: number; height: number; fontSize: number; text: string; color?: string };
+export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number; background?: string; anchored?: boolean };
+export type LabelBox = { x: number; y: number; width: number; height: number; fontSize: number; text: string; color?: string; background?: string };
 /** CSS-pixel layout: labels never leave the plot or cover another label in this drawing. */
 export function layoutDrawingLabels(labels: DrawingLabel[], width: number, height: number, measure: (text: string, size: number) => number): LabelBox[] {
   const placed: LabelBox[] = [], padding = 5, top = Math.min(48, height / 5);
@@ -11,7 +11,7 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
       const size = label.fontSize ?? 12, w = measure(label.text, size);
       const offset = label.align === 'center' ? w / 2 : label.align === 'right' || label.align === 'end' ? w : 0;
       if(label.x < 0 || label.x > width || label.y < 0 || label.y > height) continue;
-      placed.push({text:label.text,x:label.x-offset,y:label.y-size,width:w,height:size+5,fontSize:size,color:label.color});
+      placed.push({text:label.text,x:label.x-offset,y:label.y-size,width:w,height:size+5,fontSize:size,color:label.color,background:label.background});
       continue;
     }
     const text = label.text.replaceAll("$", "₹");
@@ -43,6 +43,10 @@ export function paintDrawingLabels(ctx: CanvasRenderingContext2D, labels: Drawin
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   for (const item of layout) {
     ctx.font = `${item.fontSize}px sans-serif`; ctx.fillStyle = item.color ?? "#7851c9";
+    if (item.background) {
+      ctx.strokeStyle = item.background; ctx.lineWidth = 3; ctx.lineJoin = "round";
+      ctx.strokeText(item.text, item.x, item.y, item.width);
+    }
     ctx.fillText(item.text, item.x, item.y, item.width);
   }
   ctx.restore();

@@ -98,3 +98,13 @@ test('equal highs/lows need confirmed pivots, and overnight gaps are excluded on
   assert.equal(analyzeSmc(gap,true).marks.filter(m=>m.kind==='FVG').length,0);
   assert.equal(analyzeSmc(gap,false).marks.filter(m=>m.kind==='FVG').length,1);
 });
+
+test('REST and live ticks retain history beyond the former 1600-bar limit', () => {
+  const history = Array.from({length:2000},(_,i)=>({...bar,time:bar.time-(1999-i)*300}));
+  const withTick = applyCandleTick(history,tick,'5m');
+  assert.equal(withTick.length,2000);
+  assert.equal(withTick[0].time,history[0].time);
+  const refreshed = reconcileLiveCandles(withTick,[{...bar,volume:900}],tick,'5m',at);
+  assert.equal(refreshed.length,2000);
+  assert.equal(refreshed[0].time,history[0].time);
+});

@@ -7,7 +7,7 @@ import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
-import { drawingTextPosition, type DrawingPresentation } from './study-pane-drawings.ts';
+import { drawingTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
 const readableFont = () => "13px sans-serif";
 
 function initialPositionAnchors(type: string, entry: Anchor, source: VolumeCandle[]): Anchor[] {
@@ -46,7 +46,7 @@ export function positionLineIndex(drawing: { type?: string; getViewport?: () => 
   return best?.index ?? null;
 }
 
-export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
+export function createChartDrawingRegistry(drawing: typeof import("lightweight-charts-drawing"), candles: () => VolumeCandle[], plotSize?: () => { width: number; height: number; dark?: boolean; formatPrice?: (price: number) => string }, profileSource?: (from:number,to:number,mode:ProfileMode,id:string)=>ProfileData) {
   // A registry belongs to one chart; replay and live charts must not share a data-source closure.
   type Entry = NonNullable<ReturnType<ReturnType<typeof drawing.getToolRegistry>["get"]>>;
   const entries = new Map(drawing.getToolRegistry().getAll().map(entry => [entry.type, entry]));
@@ -56,10 +56,45 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     getAll() { return [...entries.values()]; },
     createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
       const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      // Native factories only forward their known fields; retain our saved presentation too.
+      if (options) item.updateOptions(options);
       if (type === 'vertical-line' && 'setVerticalLineOptions' in item && typeof item.setVerticalLineOptions === 'function') {
         // The native default prints raw Unix seconds. User text is rendered
         // separately below, including for drawings restored from older builds.
         item.setVerticalLineOptions({ showTime: false, showLabel: false });
+      }
+      // Suppress prices inside the plot. Scale primitives render them in the
+      // chart's own price axis, with its normal collision/alignment handling.
+      const syncNativeOptions = () => {
+        const presentation = item.options as DrawingPresentation;
+        if ('setHorizontalLineOptions' in item && typeof item.setHorizontalLineOptions === 'function') item.setHorizontalLineOptions({ showPrice: false, showLabel: false });
+        if ('setHorizontalRayOptions' in item && typeof item.setHorizontalRayOptions === 'function') item.setHorizontalRayOptions({ showPrice: false, direction: presentation.direction ?? 'right' });
+      };
+      syncNativeOptions();
+      const updateOptions = item.updateOptions.bind(item);
+      item.updateOptions = options => { updateOptions(options); syncNativeOptions(); };
+      if (['horizontal-line','horizontal-ray','trend-line','ray','extended-line','arrow','rectangle'].includes(type)) {
+        Object.assign(item, { priceAxisViews: () => item.anchors.filter((anchor, index, all) => all.findIndex(a => a.price === anchor.price) === index).map(anchor => ({
+          coordinate: () => Number(item.getViewport()?.priceScale.priceToCoordinate(anchor.price) ?? -100),
+          text: () => plotSize?.().formatPrice?.(anchor.price) ?? anchor.price.toLocaleString('en-US', { maximumFractionDigits: 4 }),
+          textColor: () => {
+            const hex = item.style.lineColor.replace('#','');
+            const rgb = hex.length === 6 ? [0,2,4].map(i => parseInt(hex.slice(i,i+2),16)) : [102,87,238];
+            return rgb[0]*.299 + rgb[1]*.587 + rgb[2]*.114 > 160 ? '#111827' : '#ffffff';
+          },
+          backColor: () => item.style.lineColor,
+          tickVisible: () => true,
+          visible: () => {
+            const viewport = item.getViewport();
+            if (!viewport || !item.options.visible || !item.isValid() || (item.options as DrawingPresentation).showPriceLabel === false) return false;
+            const y = viewport.priceScale.priceToCoordinate(anchor.price);
+            const x = viewport.timeScale.timeToCoordinate(anchor.time);
+            if (y === null || y < 0 || y > viewport.height || x === null) return false;
+            if (type === 'horizontal-line') return true;
+            if (type === 'horizontal-ray') return (item.options as DrawingPresentation).direction === 'left' ? x >= 0 : x <= viewport.width;
+            return x >= 0 && x <= viewport.width;
+          },
+        })) });
       }
       // Some native tools serialize their original constructor options after
       // edited options, which would silently undo extension changes on reload.
@@ -88,7 +123,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           if (points.length) {
             const a = {...points[0]}, b = {...points.at(-1)!};
             const label = drawingTextPosition(a,b,presentation);
-            geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
+            if (drawingTextVisible(type,a,label,viewport.width,viewport.height)) geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
           }
         }
         return geometry;
@@ -120,6 +155,8 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
               if(key==="fill")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.fill,ctx,args);};
               if(key==="stroke")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.stroke,ctx,args);};
               if(key==="fillText")return (text:string,x:number,y:number,maxWidth?:number)=>{
+                // Our annotation is painted once below, from its anchor geometry.
+                if (text === (item.options as DrawingPresentation).text) return;
                 const point=baseTransform.inverse().multiply(ctx.getTransform()).transformPoint({x,y});
                 labels.push({text,x:point.x,y:labelBox?point.y-10:point.y,align:ctx.textAlign,color:plotSize?.().dark?"#c4a2ff":item.style.lineColor,anchored:text===(item.options as DrawingPresentation).text});
               };
@@ -133,7 +170,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const text = (item.options as DrawingPresentation).text;
           if (text && !labels.some(label => label.text === text)) {
             const label = item.computeGeometry(viewport).find(shape => shape.type === 'text' && shape.text === text);
-            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:plotSize?.().dark?'#c4a2ff':item.style.lineColor,anchored:true});
+            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:item.style.lineColor,background:plotSize?.().dark?'#0c142b':'#ffffff',anchored:true});
           }
           paintDrawingLabels(scope.context,labels,viewport.width,viewport.height);
           scope.context.restore();
@@ -153,7 +190,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     for(const geometry of item.computeGeometry(viewport)) {
       if(geometry.type==="line"){ctx.beginPath();ctx.moveTo(geometry.start.x,geometry.start.y);ctx.lineTo(geometry.end.x,geometry.end.y);ctx.stroke();}
       if(geometry.type==="text") {
-        labels.push({text:geometry.text,x:geometry.position.x,y:geometry.position.y,align:geometry.align??"left",color:geometry.color??(plotSize?.().dark?"#c4a2ff":item.style.lineColor),fontSize:geometry.font?parseInt(geometry.font):12});
+        labels.push({text:geometry.text,x:geometry.position.x,y:geometry.position.y,align:geometry.align??"left",color:geometry.color??(plotSize?.().dark?"#c4a2ff":item.style.lineColor),fontSize:geometry.font?parseInt(geometry.font):12,anchored:geometry.text===(item.options as DrawingPresentation).text,background:geometry.text===(item.options as DrawingPresentation).text?(plotSize?.().dark?'#0c142b':'#ffffff'):undefined});
       }
     }
     paintDrawingLabels(ctx,labels,size.width,size.height);
