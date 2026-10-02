@@ -8,15 +8,15 @@ import {
   IPO_ALERT_ENABLED_STORAGE_KEY,
   IPO_ALERT_SETTINGS_EVENT,
   IPO_ALERT_STATE_STORAGE_KEY,
-  IPO_GMP_ALERT_THRESHOLD_PERCENT,
   indiaDateKey,
-  formatIpoGmp,
   shouldSendIpoClosingAlert,
   shouldSendDailyGmpAlert,
   shouldSendGmpMoveAlert,
   type IpoListResponse,
   type IpoSummary,
 } from "@/lib/ipo";
+import { freshGmp } from "@/lib/notification-policy";
+import { ipoLocalContent } from "@/lib/ipo-notification-content";
 import { getNativeTradeAlert } from "@/lib/native-alert";
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { IpoLifecycleCard, IpoDetailView } from "./IpoLifecycleCard";
@@ -57,51 +57,20 @@ async function loadIpos(status = "open,upcoming", signal?: AbortSignal, details 
   };
 }
 
-function formatIpoDate(value: string) {
-  if (!value) return "To be announced";
-  const date = new Date(`${value}T00:00:00+05:30`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }).format(date);
-}
-
-
-function showIpoGmpAlert(ipo: IpoSummary) {
-  const today = indiaDateKey();
-  const title = `${ipo.symbol || ipo.name} IPO GMP is above ${IPO_GMP_ALERT_THRESHOLD_PERCENT}%`;
-  const body = `Current GMP is ${formatIpoGmp(ipo)} of the upper issue price. Bidding closes ${formatIpoDate(ipo.biddingEndDate)}.`;
-  addPaperTradeNotification({ id: `ipo-gmp-${ipo.id}-${today}`, kind: "ipo", title, body });
+function showIpoAlert(ipo: IpoSummary, event: "gmp" | "gmp-move" | "closing") {
+  const now = Date.now();
+  const { title, body } = ipoLocalContent(ipo, event, now);
+  const id = `ipo-${event}-${ipo.id}-${event === "gmp-move" ? ipo.gmpPercent : indiaDateKey()}`;
+  const url = "/?screen=ipo";
+  addPaperTradeNotification({ id, kind: "ipo", title, body, url });
   navigator.vibrate?.([180, 90, 180]);
   if (Capacitor.getPlatform() === "android") {
-    void getNativeTradeAlert().show({ title, body, notificationId: `ipo-gmp-${ipo.id}-${today}` }).catch(() => undefined);
+    void getNativeTradeAlert().show({ title, body, notificationId: id, kind: "ipo", url }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-ipo-${ipo.id}` });
-  }
-}
-
-function showIpoGmpMove(ipo: IpoSummary) {
-  const title = `${ipo.name}: GMP updated`;
-  const body = `Current GMP is ${formatIpoGmp(ipo)}. Grey market quotes are unofficial.`;
-  addPaperTradeNotification({ id: `ipo-gmp-move-${ipo.id}-${ipo.gmpPercent}`, kind: "ipo", title, body });
-  navigator.vibrate?.([120, 60, 120]);
-  if (Capacitor.getPlatform() === "android") {
-    void getNativeTradeAlert().show({ title, body, notificationId: `ipo-gmp-move-${ipo.id}-${ipo.gmpPercent}` }).catch(() => undefined);
-  } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-ipo-move-${ipo.id}` });
-  }
-}
-
-function showIpoClosingAlert(ipo: IpoSummary) {
-  const today = indiaDateKey();
-  const title = `${ipo.name}: last day to apply`;
-  const gmp = formatIpoGmp(ipo);
-  const issueSize = ipo.issueSizeCrore ? `Issue size ₹${ipo.issueSizeCrore.toLocaleString("en-IN")} Cr. ` : "";
-  const body = `${issueSize}${gmp ? `Current GMP: ${gmp}. ` : ""}Today is the last day to apply. Do not miss the deadline.`;
-  addPaperTradeNotification({ id: `ipo-closing-${ipo.id}-${today}`, kind: "ipo", title, body });
-  navigator.vibrate?.([180, 90, 180]);
-  if (Capacitor.getPlatform() === "android") {
-    void getNativeTradeAlert().show({ title, body, notificationId: `ipo-closing-${ipo.id}-${today}` }).catch(() => undefined);
-  } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: `papertrade-ipo-closing-${ipo.id}` });
+    const notice = new Notification(title, { body, icon: "/papertrade-icon-192.png", tag: id });
+    // A system notification callback runs outside the mounted router.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    notice.onclick = () => { window.location.assign(url); notice.close(); };
   }
 }
 
@@ -111,12 +80,12 @@ function processIpoAlerts(ipos: IpoSummary[]) {
   const today = indiaDateKey();
   for (const ipo of ipos.filter((item) => item.status === "open")) {
     const current = previous[ipo.id];
-    const shouldAlert = shouldSendDailyGmpAlert(ipo.status, ipo.gmpPercent, current?.lastAlertDate, today);
+    const shouldAlert = freshGmp(ipo, Date.now()) && shouldSendDailyGmpAlert(ipo.status, ipo.gmpPercent, current?.lastAlertDate, today);
     const shouldClosingAlert = shouldSendIpoClosingAlert(ipo.status, ipo.biddingEndDate, current?.lastClosingAlertDate, today);
-    const moved = shouldSendGmpMoveAlert(ipo.status, current?.gmpPercent, ipo.gmpPercent, current?.lastNotifiedGmp);
-    if (shouldClosingAlert) showIpoClosingAlert(ipo);
-    else if (shouldAlert) showIpoGmpAlert(ipo);
-    else if (moved) showIpoGmpMove(ipo);
+    const moved = freshGmp(ipo, Date.now()) && shouldSendGmpMoveAlert(ipo.status, current?.gmpPercent, ipo.gmpPercent, current?.lastNotifiedGmp);
+    if (shouldClosingAlert) showIpoAlert(ipo, "closing");
+    else if (shouldAlert) showIpoAlert(ipo, "gmp");
+    else if (moved) showIpoAlert(ipo, "gmp-move");
     next[ipo.id] = {
       gmpPercent: ipo.gmpPercent,
       lastAlertDate: shouldAlert && !shouldClosingAlert ? today : current?.lastAlertDate,

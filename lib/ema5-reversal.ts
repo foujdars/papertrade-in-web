@@ -1,3 +1,4 @@
+import { alertTime } from "./ipo-notification-content.ts";
 import { shadeChoice, type PushNotice } from "./notification-policy.ts";
 
 export const EMA5_REVERSAL_FRAMES = { "5m": 300, "15m": 900 } as const;
@@ -61,7 +62,7 @@ export function ema5ReversalSignal(candles: Ema5Bar[], frame: Ema5Frame, now: nu
 }
 
 export function ema5AlertTitle(frame: string) {
-  return shadeChoice("📈", [`BTC ${frame} low above 5 EMA`, `BTC ${frame} 5 EMA reversal`]);
+  return shadeChoice("📈", [`BTC ${frame} EMA 5 reversal`]);
 }
 
 export function ema5AlertId(frame: string, candleTime: number) {
@@ -73,7 +74,7 @@ export function ema5AlertNotice(input: { frame: Ema5Frame; candleTime: number; n
     id: ema5AlertId(input.frame, input.candleTime),
     kind: "session",
     title: ema5AlertTitle(input.frame),
-    body: "",
+    body: `BTCUSD, ${input.frame} chart: the completed candle low stayed above EMA 5 after the previous candle touched EMA 5. Candle closed ${alertTime((input.candleTime + EMA5_REVERSAL_FRAMES[input.frame]) * 1000)}. Open the chart to review the setup.`,
     url: `/?symbol=BTCUSD&timeframe=${input.frame}`,
     silent: false,
     expiresAt: input.now + 20 * 60 * 1000,

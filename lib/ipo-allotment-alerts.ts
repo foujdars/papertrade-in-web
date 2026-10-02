@@ -1,3 +1,4 @@
+import { ipoEventTitle, allotmentContext } from "./ipo-notification-content";
 import { Capacitor } from "@capacitor/core";
 import { ALLOTMENT_ALERT_ENABLED_KEY, ALLOTMENT_ALERT_EVENT, ALLOTMENT_ALERT_STATE_KEY, allotmentAlertKey, shouldSendAllotmentAlert, type IpoAllotment } from "./ipo-allotment";
 import { getNativeTradeAlert } from "./native-alert";
@@ -31,7 +32,7 @@ export async function setAllotmentAlertEnabled(enabled: boolean) {
 
 async function showSystemAlert(ipo: IpoAllotment, title: string, body: string, id: string) {
   if (Capacitor.getPlatform() === "android") {
-    await getNativeTradeAlert().show({ title, body, notificationId: id });
+    await getNativeTradeAlert().show({ title, body, notificationId: id, kind: "allotment", url: `/ipo-allotment/${ipo.registrar}` });
   } else if ("Notification" in window && Notification.permission === "granted") {
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.register("/notifications-sw.js", { scope: "/notifications/" });
@@ -66,10 +67,8 @@ export async function processAllotmentAlerts(ipos: IpoAllotment[]) {
     for (const ipo of ipos) {
       if (!shouldSendAllotmentAlert(ipo, seen, enabledAt)) continue;
       const id = allotmentAlertKey(ipo);
-      const title = ipo.state === "published" ? `${ipo.name}: allotment published` : `${ipo.name}: listed — check allotment`;
-      const body = ipo.state === "published"
-        ? "Allotment results are reported available. Open the official registrar website to check your result. Enter your PAN only there."
-        : "Listing is confirmed by Upstox. Check your allotment on the official result website; select the IPO and enter your PAN there.";
+      const title = ipoEventTitle(ipo.name, ipo.state === "published" ? "allotment published" : "listed; check allotment");
+      const body = allotmentContext(ipo);
       addPaperTradeNotification({ id, kind: "ipo", title, body, allotmentRegistrar: ipo.registrar });
       seen[id] = Date.now();
       localStorage.setItem(ALLOTMENT_ALERT_STATE_KEY, JSON.stringify(seen));

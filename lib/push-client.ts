@@ -4,6 +4,9 @@ import { getNativeTradeAlert } from "./native-alert";
 import { getSupabaseBrowserClient } from "./supabase-client";
 import { readNotificationPreferences } from "./notification-preferences";
 
+export const NOTIFICATION_SYNC_EVENT = "papertrade:notification-sync";
+let syncQueue: Promise<unknown> = Promise.resolve();
+let preferenceSync = 0;
 let activeToken = "";
 let reviewCount = 0;
 let connecting: Promise<void> | null = null;
@@ -16,7 +19,28 @@ export function setShockerWatch(instruments: readonly { symbol: string; instrume
   shockerWatch = instruments.slice(0, 50).map((item) => ({ symbol: item.symbol, instrumentKey: item.instrumentKey }));
 }
 export function pushConnected() { return Boolean(activeToken); }
-export async function syncPushDevice(remove = false) {
+export function syncPushDevice(remove = false) {
+  const task = syncQueue.catch(() => undefined).then(() => updatePushDevice(remove));
+  syncQueue = task;
+  return task;
+}
+export async function syncNotificationPreferences() {
+  const revision = ++preferenceSync;
+  try {
+    if (Capacitor.getPlatform() === "android") {
+      const result = await getNativeTradeAlert().configurePush({ preferences: readNotificationPreferences(), requestPermission: false });
+      if (result?.token && !disconnecting) activeToken = result.token;
+    } else {
+      const registration = await navigator.serviceWorker?.getRegistration("/notifications/");
+      registration?.active?.postMessage({ type: "preferences", preferences: readNotificationPreferences() });
+    }
+    await syncPushDevice();
+    if (revision === preferenceSync) window.dispatchEvent(new CustomEvent(NOTIFICATION_SYNC_EVENT, { detail: { ok: true, connected: pushConnected() } }));
+  } catch {
+    if (revision === preferenceSync) window.dispatchEvent(new CustomEvent(NOTIFICATION_SYNC_EVENT, { detail: { ok: false, connected: pushConnected() } }));
+  }
+}
+async function updatePushDevice(remove: boolean) {
   if (!activeToken) return;
   const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
   if (!session) throw new Error("Sign in to enable background notifications.");
@@ -86,13 +110,13 @@ export async function disconnectPush() {
   await connecting?.catch(()=>undefined);
   let token = activeToken;
   if (Capacitor.getPlatform() === "android") {
-    const result = await getNativeTradeAlert().configurePush({ preferences: { ...readNotificationPreferences(), ipo:false, allotment:false, trades:false, reviews:false, practice:false, sessions:false }, requestPermission:false }).catch(()=>undefined);
+    const result = await getNativeTradeAlert().configurePush({ preferences: { ...readNotificationPreferences(), ipo:false, allotment:false, trades:false, reviews:false, practice:false, sessions:false, ema21:false, ema5:false }, requestPermission:false }).catch(()=>undefined);
     token ||= result?.token || "";
     activeToken = token;
     await getNativeTradeAlert().consumeNotifications().catch(()=>undefined);
   } else {
     const registration = await navigator.serviceWorker?.getRegistration("/notifications/");
-    registration?.active?.postMessage({type:"preferences",preferences:{ipo:false,allotment:false,reviews:false,practice:false,trades:false,sessions:false}});
+    registration?.active?.postMessage({type:"preferences",preferences:{ipo:false,allotment:false,reviews:false,practice:false,trades:false,sessions:false,ema21:false,ema5:false}});
     const { getApps } = await import("firebase/app");
     const { getMessaging, deleteToken } = await import("firebase/messaging");
     const app=getApps().find(item=>item.name==="papertrade-push");

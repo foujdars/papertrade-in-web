@@ -6,13 +6,14 @@ import { ema21AlertId, ema21AlertNotice, ema21AlertTitle } from "../lib/ema21-de
 test("EMA 21 default alerts name the broken candle and fit the shade", () => {
   const bullish = ema21AlertTitle("BTC", "5m", "bullish");
   const bearish = ema21AlertTitle("Gold", "15m", "bearish");
-  assert.match(bullish, /BTC 5m broke the red candle/);
-  assert.match(bearish, /Gold 15m broke the green candle/);
+  assert.match(bullish, /BTC 5m EMA 21 bullish/);
+  assert.match(bearish, /Gold 15m EMA 21 bearish/);
   assert.ok(bullish.length <= 42);
   assert.ok(bearish.length <= 42);
   const notice = ema21AlertNotice({ symbol: "BTCUSD", label: "BTC", frame: "5m", side: "bullish", candleTime: 1_700_000_000, now: 1_700_000_100_000 });
   assert.equal(notice.id, ema21AlertId("BTCUSD", "5m", "bullish", 1_700_000_000));
-  assert.equal(notice.body, "");
+  assert.match(notice.body, /broke the red candle high/);
+  assert.match(notice.body, /IST/);
   assert.equal(notice.kind, "session");
   assert.equal(notice.silent, false);
   assert.equal(notice.url, "/?symbol=BTCUSD&timeframe=5m");

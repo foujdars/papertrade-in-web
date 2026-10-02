@@ -7,3 +7,10 @@
 .notification-settings input { width:20px; height:20px; accent-color:var(--purple); flex:none; }
 .notification-settings button { margin:10px 8px 0 0; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--soft); color:var(--purple); font-size:11px; cursor:pointer; }
 .notification-center-panel { overflow-y:auto; }
+
+.notification-settings input[role="switch"] { appearance:none; width:36px; height:22px; border:1px solid var(--line); border-radius:20px; background:var(--muted); position:relative; cursor:pointer; transition:background .15s; }
+.notification-settings input[role="switch"]::before { content:""; position:absolute; width:16px; height:16px; top:2px; left:2px; border-radius:50%; background:white; transition:transform .15s; }
+.notification-settings input[role="switch"]:checked { background:var(--purple); }
+.notification-settings input[role="switch"]:checked::before { transform:translateX(14px); }
+.notification-settings input[role="switch"]:focus-visible { outline:2px solid var(--purple); outline-offset:3px; }
+@media (prefers-reduced-motion: reduce) { .notification-settings input[role="switch"],.notification-settings input[role="switch"]::before { transition:none; } }

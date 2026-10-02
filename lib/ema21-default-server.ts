@@ -48,7 +48,7 @@ export async function dispatchDefaultEma21Alerts(db: Firestore, now = Date.now()
       if (sent >= 40) return { signals: fresh.length, sent };
       const data = device.data();
       const preferences = notificationPreferences(data.preferences);
-      if (typeof data.token !== "string" || preferences.pausedUntil > now || now - Number(data.lastActive || 0) > 90 * 86400000) continue;
+      if (typeof data.token !== "string" || preferences.pausedUntil > now || !preferences.ema21 || now - Number(data.lastActive || 0) > 90 * 86400000) continue;
       try {
         await sendPush(notice, { token: data.token });
         sent += 1;

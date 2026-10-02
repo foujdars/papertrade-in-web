@@ -1,3 +1,4 @@
+import { alertTime } from "./ipo-notification-content.ts";
 import { shadeChoice, type PushNotice } from "./notification-policy.ts";
 
 export const EMA21_DEFAULT_MARKETS = [
@@ -11,9 +12,8 @@ export type Ema21DefaultSide = "bullish" | "bearish";
 
 /** The chart arrow is the candle that breaks the opposite-colour candle after an EMA 21 cross. */
 export function ema21AlertTitle(label: string, frame: string, side: Ema21DefaultSide) {
-  const color = side === "bullish" ? "red" : "green";
   return shadeChoice(side === "bullish" ? "📈" : "📉", [
-    `${label} ${frame} broke the ${color} candle`,
+    `${label} ${frame} EMA 21 ${side}`,
     `${label} ${frame} EMA 21 entry`,
   ]);
 }
@@ -34,7 +34,7 @@ export function ema21AlertNotice(input: {
     id: ema21AlertId(input.symbol, input.frame, input.side, input.candleTime),
     kind: "session",
     title: ema21AlertTitle(input.label, input.frame, input.side),
-    body: "",
+    body: `${input.symbol}, ${input.frame} chart: ${input.side === "bullish" ? "price broke the red candle high" : "price broke the green candle low"} after an EMA 21 cross. Signal observed ${alertTime(input.now)}. Open the chart to review the setup.`,
     url: `/?symbol=${encodeURIComponent(input.symbol)}&timeframe=${input.frame}`,
     silent: false,
     expiresAt: input.now + 20 * 60 * 1000,

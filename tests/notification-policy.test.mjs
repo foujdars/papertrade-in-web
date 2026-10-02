@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
-import { indiaClock, quietTime, notificationSlot, notificationPreferences, ipoDigest, allotmentNotice, reviewNotice } from "../lib/notification-policy.ts";
+import { indiaClock, quietTime, notificationSlot, notificationPreferences, ipoDigest, allotmentNotice, listingNotice, automaticEmaAllowed, reviewNotice } from "../lib/notification-policy.ts";
 
 const at = time => Date.parse("2026-09-14T" + time + "+05:30");
 const issue = (changes = {}) => ({
@@ -33,7 +33,7 @@ test("stale, future-dated and invalid GMP cannot attract users through a high-GM
 test("closing reminders include low-GMP issues without promising profit", () => {
   const notice = ipoDigest([issue({gmpPercent:0,biddingEndDate:"2026-09-14"})],at("13:30:00"));
   assert.match(notice.title, /closes today/);
-  assert.equal(notice.body, "");
+  assert.ok(notice.body.length > 40);
   assert.ok(notice.title.length <= 42);
 });
 test("closed, listed and not-yet-open issues cannot be promoted as accepting applications", () => {
@@ -46,8 +46,8 @@ test("digest is combined, has a stable per-slot ID, and expires instead of pilin
   const now=at("09:05:00"), list=[issue(),issue({id:"two",name:"Second IPO"})];
   const notice=ipoDigest(list,now);
   assert.equal(notice.id,ipoDigest(list,now+60000).id);
-  assert.match(notice.title, /2 IPOs open/);
-  assert.match(notice.title, /Example/);
+  assert.match(notice.title, /^IPO: 2 bidding updates/);
+  assert.match(notice.body, /Example IPO/);
   assert.ok(notice.title.length <= 42);
   assert.equal(notice.expiresAt,now+30*60000);
   assert.equal(ipoDigest(list,at("11:00:00")),null);
@@ -59,8 +59,8 @@ test("allotment notifications require evidence, not an expected date", () => {
   const notice=allotmentNotice([allotment],at("22:00:00"));
   assert.equal(notice.url,"/ipo-allotment/kfin");
   assert.equal(notice.silent,true);
-  assert.match(notice.title, /allotment is out/);
-  assert.equal(notice.body, "");
+  assert.match(notice.title, /allotment published/);
+  assert.ok(notice.body.length > 40);
 });
 test("reviews require today's trades and the chosen evening window", () => {
   assert.ok(reviewNotice(2,"2026-09-14",at("17:15:00")));
@@ -68,15 +68,15 @@ test("reviews require today's trades and the chosen evening window", () => {
   assert.equal(reviewNotice(2,"2026-09-13",at("17:15:00")),null);
   assert.equal(reviewNotice(2,"2026-09-14",at("18:00:00")),null);
 });
-test("shade titles name the IPO, the count and the GMP without overflowing a phone", () => {
+test("IPO digests keep counts visible and give full issuer and GMP context in the body", () => {
   const lead = issue({ name: "Orient Cables (India) IPO", gmpPercent: 18 });
   const others = Array.from({ length: 10 }, (_, index) => issue({ id: `other-${index}`, name: "Other IPO", gmpPercent: 16 }));
   const notice = ipoDigest([lead, ...others], at("09:05:00"));
-  assert.match(notice.title, /11 IPOs open/);
-  assert.match(notice.title, /Orient Cables/);
-  assert.match(notice.title, /GMP \+18%/);
+  assert.match(notice.title, /^IPO: 11 bidding updates/);
+  assert.match(notice.body, /Orient Cables \(India\) IPO/);
+  assert.match(notice.body, /GMP: \+18%/);
   assert.equal(notice.title.includes("(India)"), false);
-  assert.equal(notice.body, "");
+  assert.ok(notice.body.length > 40);
   assert.ok(notice.title.length <= 42, notice.title);
 });
 test("preferences honor opt-outs and bound pauses", () => {
@@ -109,7 +109,9 @@ async function workerHarness(preferences) {
     location:{origin:"https://www.papertrade.site"},
   };
   vm.runInNewContext(await readFile(new URL("../public/notifications-sw.js",import.meta.url),"utf8"),{self,indexedDB,Date,Intl,URL});
-  return {shown,messages,setVisible:value=>{visible=value;},push:async(notice)=>{
+  return {shown,messages,setPreferences:async preferences=>{
+    let task;handlers.message({data:{type:"preferences",preferences},waitUntil:promise=>{task=promise;}});await task;
+  },setVisible:value=>{visible=value;},push:async(notice)=>{
     let task;handlers.push({data:{json:()=>({data:notice})},waitUntil:promise=>{task=promise;}});await task;
   }};
 }
@@ -158,4 +160,45 @@ test("browser push configuration rejects placeholders and requires Firebase-shap
   assert.match(route,/appId.*web:/s);
   assert.match(route,/projectId === firebaseProjectId\(\)/);
   assert.match(route,/!authDomain\.includes\("YOUR_"\)/);
+});
+
+
+test("EMA opt-outs are independent, default on for existing devices, and preserve custom alerts", () => {
+  for (const preferences of [null, {}, {ema21:"false",ema5:0}]) {
+    assert.equal(notificationPreferences(preferences).ema21,true);
+    assert.equal(notificationPreferences(preferences).ema5,true);
+  }
+  const p=notificationPreferences({ema21:false,ema5:true});
+  assert.equal(automaticEmaAllowed("ema21-BTCUSD-5m-bullish-1",p),false);
+  assert.equal(automaticEmaAllowed("ema5-BTCUSD-5m-1",p),true);
+  assert.equal(automaticEmaAllowed("global-custom-ema21-entry-bullish",p),true);
+  assert.equal(automaticEmaAllowed("session-london-2026-09-14",p),true);
+});
+test("worker applies independent EMA switches before deduplication and visible inbox delivery",async()=>{
+  const worker=await workerHarness({ema21:false,ema5:true});
+  const ema21=push({id:"ema21-BTCUSD-5m-bullish-1",kind:"session"});
+  const ema5=push({id:"ema5-BTCUSD-5m-1",kind:"session"});
+  await worker.push(ema21);await worker.push(ema5);
+  assert.equal(worker.shown.length,1);assert.equal(worker.shown[0].tag,ema5.id);
+  await worker.setPreferences({ema21:true,ema5:false});
+  await worker.push(ema21);assert.equal(worker.shown.length,2,"disabled alerts were not marked seen");
+  worker.setVisible(true);
+  await worker.push({...ema5,id:"ema5-BTCUSD-15m-2"});assert.equal(worker.messages.length,0);
+  await worker.push({...ema21,id:"ema21-ETHUSD-15m-bearish-2"});assert.equal(worker.messages.length,1);
+  const defaults=await workerHarness({});await defaults.push(ema21);await defaults.push(ema5);assert.equal(defaults.shown.length,2);
+});
+test("legacy IPO pushes are labelled before foreground and background delivery",async()=>{
+  const worker=await workerHarness({});
+  await worker.push(push({title:"🚀 Company listed",body:""}));
+  assert.equal(worker.shown[0].title,"IPO: Company listed");assert.match(worker.shown[0].body,/Open IPOs/);
+  worker.setVisible(true);await worker.push(push({id:"allotment-2",kind:"allotment",title:"Company allotment",body:""}));
+  assert.match(worker.messages[0].notice.title,/^IPO:/);assert.match(worker.messages[0].notice.body,/registrar/);
+});
+test("listing notices require today's confirmed positive prices and explain the comparison",()=>{
+  const now=at("10:00:00"), ipo=issue({status:"listed",name:"Example Limited",details:{listingDate:"2026-09-14",issuePrice:100,listingPrice:90}});
+  const notice=listingNotice([ipo],now);
+  assert.match(notice.title,/^IPO: Example — listed today$/);
+  assert.match(notice.body,/Example Limited.*₹90; issue price ₹100 \(-10%\)/);
+  assert.match(notice.body,/not a live quote/);
+  for(const details of [{listingDate:"2026-09-13"},{listingPrice:0},{issuePrice:-1},{listingPrice:Infinity},{issuePrice:null}])assert.equal(listingNotice([{...ipo,details:{...ipo.details,...details}}],now),null);
 });
