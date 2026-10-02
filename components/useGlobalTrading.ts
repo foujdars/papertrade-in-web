@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount, type ChartExtreme } from "@/lib/global-order-engine";
 import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
 import { advancePaperBots, type BotObservation } from "@/lib/paper-bot-engine";
-import { BOT_ASSETS } from "@/lib/paper-bot-state";
+import { BOT_ASSETS, botFrames, botScope, type BotFrame } from "@/lib/paper-bot-state";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
 
 export type GlobalSnapshot = { quote: PerpQuote; spec: PerpSpec };
@@ -78,7 +78,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     ...(account?.optionPositions?.map(position => position.symbol) ?? []),
     ...(account?.optionOrders?.map(order => order.symbol) ?? []),
   ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, botVisible, account?.bots, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
-  const botScopes = (account?.bots ?? []).filter(b => b.enabled).map(b => `${b.symbol}:${b.timeframe}:${b.startedAt}`).join(",");
+  const botScopes = (account?.bots ?? []).filter(b => b.enabled).flatMap(b => [...botFrames(b), ...(b.trendTimeframe && b.trendTimeframe !== "off" ? [b.trendTimeframe] : [])].map(frame => `${b.symbol}:${frame}:${b.startedAt}`)).join(",");
   useEffect(() => {
     if (!monitorSymbols) return;
     const controller = new AbortController();
@@ -104,9 +104,9 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           } else {
             if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta perpetual quote unavailable.");
             next[symbol] = { spec: data.spec, quote: data.quote };
-            const scope = botScopes.split(",").find(scope => scope.startsWith(`${symbol}:`));
-            if (scope) {
-              const [, timeframe] = scope.split(":");
+            const scopes = botScopes.split(",").filter(scope => scope.startsWith(`${symbol}:`));
+            await Promise.allSettled(scopes.map(async scope => {
+              const [, timeframe] = scope.split(":") as [string, BotFrame, string];
               try {
                 let observation = candleCache[scope];
                 if (!observation || Date.now() - observation.fetchedAt >= 15000) {
@@ -116,9 +116,9 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
                   observation = { candles: history.candles, fetchedAt: history.fetchedAt };
                   candleCache[scope] = observation;
                 }
-                botObservations[symbol] = observation;
-              } catch { delete candleCache[scope]; } // Never trade on a failed history request.
-            }
+                botObservations[botScope(symbol, timeframe)] = observation;
+              } catch { delete candleCache[scope]; } // Failure on one frame never supplies another frame's history.
+            }));
           }
         }));
         if (controller.signal.aborted || document.hidden) return;
