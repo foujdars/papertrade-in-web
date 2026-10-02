@@ -304,13 +304,14 @@ export function HomeWorkspace({
   return (
     <section className="home-workspace home-hub home-studio" data-market={activeMarket} aria-label="PaperTrade home">
       <div className="home-dashboard-scroll">
-        <div className="home-overview-heading"><div><span className="home-overview-eyebrow">YOUR TRADING DESK</span><h1>{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1></div><button type="button" onClick={onOpenWatchlist} aria-label="Open your watchlists"><Layers3 size={19} aria-hidden="true"/><span>Watchlists</span></button></div>
+        <h1 className="home-overview-title">{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
         <section className="home-hero">
           <div className="home-hero-copy">
             <div className="home-global-search" onBlur={event => { const next = event.relatedTarget as Node | null; if (next && (event.currentTarget.contains(next) || sheetRef.current?.contains(next))) return; if (sheetRef.current) return; setSearchFocused(false); setSearch(""); }} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
               <Search size={18} />
               <input value={search} onFocus={() => { setSearchFocused(true); setShelf(activeMarket === "global" ? "all" : "in"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search Indian stocks and indices…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
               {search && !searchFocused && <button onClick={() => setSearch("")} aria-label="Clear search"><X size={15} /></button>}
+              <button type="button" className="home-search-watchlists" onClick={onOpenWatchlist} aria-label="Open your watchlists"><Layers3 size={19} aria-hidden="true" /></button>
               {searchFocused && typeof document !== "undefined" && createPortal(
                 <>
                   <button type="button" className="home-search-backdrop" aria-label="Close search" onClick={closeSearch} />
