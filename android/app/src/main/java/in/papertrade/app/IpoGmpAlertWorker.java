@@ -94,32 +94,24 @@ public class IpoGmpAlertWorker extends Worker {
                     String closingStateKey = "last_closing_alert_date_" + ipoId;
                     if (!today.equals(preferences.getString(closingStateKey, ""))) {
                         double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
-                        double closingGmpPercent = ipo.optDouble("gmpPercent", Double.NaN);
                         String issueText = Double.isFinite(issueSize) && issueSize > 0
-                            ? String.format(java.util.Locale.ENGLISH, "Issue size Rs %,.2f Cr. ", issueSize)
-                            : "";
-                        String gmpText = Double.isFinite(closingGmpPercent) && closingGmpPercent > 15.0
-                            ? String.format(java.util.Locale.ENGLISH, "GMP is %.2f%%. ", closingGmpPercent)
-                            : "";
-                        String closingBody = issueText + gmpText + "Today is the last day to apply. Do not miss the deadline.";
-                        showNotification(context, name + ": last day to apply", closingBody, ("ipo-closing-" + ipoId + "-" + today).hashCode());
+                            ? String.format(java.util.Locale.ENGLISH, "Issue size Rs %,.2f Cr. ", issueSize) : "";
+                        String closingBody = name + ": bidding closes " + NotificationContent.date(endDate) + ". " + issueText + "Open IPOs to check the bidding deadline and issue details.";
+                        showNotification(context, NotificationContent.ipoTitle(name, "bidding closes today"), closingBody, ("ipo-closing-" + ipoId + "-" + today).hashCode());
                         preferences.edit().putString(closingStateKey, today).apply();
                     }
                     continue;
                 }
                 double gmpPercent = ipo.optDouble("gmpPercent", Double.NaN);
-                if (!Double.isFinite(gmpPercent) || gmpPercent <= 15.0) continue;
+                if (!Double.isFinite(gmpPercent) || gmpPercent <= 15.0 || !NotificationContent.freshGmp(ipo.optString("gmpUpdatedAt"), System.currentTimeMillis())) continue;
                 String stateKey = "last_alert_date_" + ipoId;
                 if (today.equals(preferences.getString(stateKey, ""))) continue;
-                double gmpAmount = ipo.optDouble("gmpAmount", 0.0);
-                String body = String.format(
-                    java.util.Locale.ENGLISH,
-                    "GMP is Rs %.2f (%.2f%% of upper issue price). Bidding closes %s.",
-                    gmpAmount,
-                    gmpPercent,
-                    endDate.isEmpty() ? "soon" : endDate
-                );
-                showNotification(context, "" + symbol + " IPO GMP is above 15%", body, ("ipo-gmp-" + ipoId + "-" + today).hashCode());
+                double gmpAmount = ipo.optDouble("gmpAmount", Double.NaN);
+                String amount = Double.isFinite(gmpAmount) ? String.format(java.util.Locale.ENGLISH, "Rs %.2f / ", gmpAmount) : "";
+                String body = name + ": unofficial GMP " + amount + String.format(java.util.Locale.ENGLISH, "%.2f%% of issue price", gmpPercent)
+                    + ", updated " + NotificationContent.updatedTime(ipo.optString("gmpUpdatedAt")) + ". Bidding closes " + NotificationContent.date(endDate)
+                    + ". This is not a confirmed listing gain. Open IPOs to review issue details.";
+                showNotification(context, NotificationContent.ipoTitle(name, "GMP above 15%"), body, ("ipo-gmp-" + ipoId + "-" + today).hashCode());
                 preferences.edit().putString(stateKey, today).apply();
             }
             return Result.success();
@@ -161,7 +153,8 @@ public class IpoGmpAlertWorker extends Worker {
             manager.createNotificationChannel(channel);
         }
         Intent launchIntent = new Intent(context, MainActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra("notificationPath", "/?screen=ipo");
         PendingIntent contentIntent = PendingIntent.getActivity(
             context,
             notificationId,

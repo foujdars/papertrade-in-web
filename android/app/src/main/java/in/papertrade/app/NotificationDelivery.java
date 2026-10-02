@@ -37,13 +37,19 @@ public final class NotificationDelivery {
   public static synchronized void show(Context context, JSONObject notice) {
     try{
       JSONObject prefs=preferences(context);long now=System.currentTimeMillis();
+      String id=notice.optString("id","event-"+now);
+      if(!NotificationContent.automaticEmaAllowed(id,prefs.optBoolean("ema21",true),prefs.optBoolean("ema5",true)))return;
       String kind=notice.optString("kind","trade"), key="allotment".equals(kind)?"allotment":"portfolio".equals(kind)?"reviews":"practice".equals(kind)?"practice":"ipo".equals(kind)?"ipo":"session".equals(kind)?"sessions":"trades";
       if(prefs.optLong("pausedUntil",0)>now || !prefs.optBoolean(key,!"reviews".equals(key)&&!"practice".equals(key)))return;
       if(notice.optLong("expiresAt",now+60000)<=now)return;
       if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
+      if("ipo".equals(kind)||"allotment".equals(kind)){
+        String title=notice.optString("title").trim();
+        if(!title.matches("(?is)^IPO\\b.*"))notice.put("title","IPO: "+title.replaceFirst("^[^\\p{L}\\p{N}]+", ""));
+        if(notice.optString("body").trim().isEmpty())notice.put("body","An IPO update is available. Open IPOs or the official registrar to check the company and event details.");
+      }
       SharedPreferences state=context.getSharedPreferences(PREFS,0);
       JSONArray seen=new JSONArray(state.getString("seen","[]"));
-      String id=notice.optString("id","event-"+now);
       for(int i=0;i<seen.length();i++)if(id.equals(seen.optString(i)))return;
       JSONArray next=new JSONArray();for(int i=Math.max(0,seen.length()-199);i<seen.length();i++)next.put(seen.get(i));next.put(id);
       JSONArray inbox=new JSONArray(state.getString("inbox","[]"));

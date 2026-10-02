@@ -1,9 +1,13 @@
 import type { IpoSummary } from "./ipo";
 import type { IpoAllotment } from "./ipo-allotment";
+import { ipoEventTitle, ipoBiddingContext, allotmentContext, listingContext } from "./ipo-notification-content.ts";
 
-export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; hideAmounts: boolean; pausedUntil: number };
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, hideAmounts: false, pausedUntil: 0 };
+export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; ema21: boolean; ema5: boolean; hideAmounts: boolean; pausedUntil: number };
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, ema21: true, ema5: true, hideAmounts: false, pausedUntil: 0 };
 export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
+export function automaticEmaAllowed(id: string, preferences: NotificationPreferences) {
+  return !(id.startsWith("ema21-") && !preferences.ema21) && !(id.startsWith("ema5-") && !preferences.ema5);
+}
 const SHADE_LIMIT = 42;
 export function shadeChoice(emoji: string, options: string[]) {
   const prefix = `${emoji} `;
@@ -18,7 +22,6 @@ export function formatAlertPrice(price: number) {
   const rounded = Math.round(price * 100) / 100;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
-const gmpTag = (percent: number) => `GMP ${percent > 0 ? "+" : ""}${Math.abs(percent) >= 10 ? Math.round(percent) : Math.round(percent * 10) / 10}%`;
 export const priceHitTitle = (symbol: string, price?: number) => shadeChoice("💰", [Number.isFinite(price) && price! > 0 ? `${symbol} hit ₹${formatAlertPrice(price!)}` : "", `${symbol} hit your price`].filter(Boolean));
 export const fillTitle = (symbol: string, price: number) => shadeChoice("✅", [`${symbol} filled at ₹${formatAlertPrice(price)}`, `${symbol} order filled`]);
 export const setupTitle = (symbol: string, timeframe?: string) => shadeChoice("📈", [timeframe ? `${symbol} ${timeframe} setup confirmed` : "", `${symbol} setup confirmed`].filter(Boolean));
@@ -52,23 +55,30 @@ export function ipoDigest(ipos: IpoSummary[], now: number): PushNotice | null {
   const rows = (slot === "closing" ? closing : open.filter(ipo => closing.includes(ipo) || (freshGmp(ipo, now) && ipo.gmpPercent! >= 15)))
     .sort((a,b) => Number(b.biddingEndDate === day) - Number(a.biddingEndDate === day) || (b.gmpPercent ?? -Infinity) - (a.gmpPercent ?? -Infinity));
   if (!rows.length) return null;
-  const name = shortIpoName(rows[0].name);
   const count = rows.length;
-  const gmp = freshGmp(rows[0], now) && rows[0].gmpPercent !== null ? gmpTag(rows[0].gmpPercent!) : "";
-  const title = slot === "closing"
-    ? shadeChoice("⏳", count === 1 ? [`${name} bidding closes today`, `${name} closes today`] : [`${count} IPOs close today · ${name}`, `${count} IPOs close today`])
-    : rows[0].biddingEndDate === day
-      ? shadeChoice("⏳", count === 1 ? [`${name} bidding closes today`, `${name} closes today`] : [`${name} closes today · ${count - 1} more open`, `${name} closes today`])
-      : shadeChoice("👀", count === 1 ? [gmp ? `${name} open · ${gmp}` : "", `${name} IPO is open today`].filter(Boolean) : [gmp ? `${count} IPOs open · ${name} ${gmp}` : "", `${count} IPOs open · ${name}`, `${count} IPOs open today`].filter(Boolean));
-  return { id: `ipo-${slot}-${day}`, kind: "ipo", title, body: "", url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
+  const event = rows[0].biddingEndDate === day ? "bidding closes today" : "bidding open";
+  const title = count === 1 ? ipoEventTitle(rows[0].name, event)
+    : `IPO: ${count} ${slot === "closing" ? "issues close today" : "bidding updates"}`;
+  const body = rows.slice(0, 3).map(ipo => ipoBiddingContext(ipo, now)).join("\n")
+    + (count > 3 ? `\n${count - 3} more issues. Open IPOs for the full list.` : "\nOpen IPOs to view issue details.");
+  return { id: `ipo-${slot}-${day}`, kind: "ipo", title, body, url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
 }
 export function allotmentNotice(items: IpoAllotment[], now: number): PushNotice | null {
   const published = items.filter(item => item.state === "published" && !!item.evidenceUrl);
   if (!published.length) return null;
   const first = published[0];
-  const name = shortIpoName(first.name);
-  const title = published.length === 1 ? shadeChoice("🔔", [`${name} allotment is out`, `${name} allotment out`]) : shadeChoice("🔔", [`${published.length} allotments out · ${name}`, `${published.length} allotments are out`]);
-  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title, body: "", url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
+  const title = published.length === 1 ? ipoEventTitle(first.name, "allotment published") : `IPO: ${published.length} allotments published`;
+  const body = published.slice(0, 3).map(allotmentContext).join("\n") + (published.length > 3 ? `\n${published.length - 3} more results. Open IPOs for the full list.` : "");
+  return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title, body, url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
+}
+export function listingNotice(items: IpoSummary[], now: number): PushNotice | null {
+  const listings = items.filter(ipo => ipo.status === "listed" && ipo.details?.listingDate === indiaClock(now).day
+    && Number.isFinite(ipo.details.listingPrice) && ipo.details.listingPrice! > 0 && Number.isFinite(ipo.details.issuePrice) && ipo.details.issuePrice! > 0);
+  if (!listings.length) return null;
+  return { id: `listing-${listings.map(ipo => ipo.id).sort().join("-")}`, kind: "ipo",
+    title: listings.length === 1 ? ipoEventTitle(listings[0].name, "listed today") : `IPO: ${listings.length} issues listed today`,
+    body: listings.slice(0, 3).map(listingContext).join("\n") + (listings.length > 3 ? `\n${listings.length - 3} more listings.` : "") + "\nOpen IPOs for listing details.",
+    url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true };
 }
 export function reviewNotice(count: number, date: string, now: number): PushNotice | null {
   const { day, minutes, weekday } = indiaClock(now);

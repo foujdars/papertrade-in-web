@@ -1,4 +1,7 @@
 import { allotmentLink, type AllotmentRegistrar } from "./ipo-allotment";
+import { automaticEmaAllowed } from "./notification-policy";
+import { readNotificationPreferences } from "./notification-preferences";
+import { ipoPrefixedTitle } from "./ipo-notification-content";
 import type { Instrument } from "./market";
 
 export type PaperTradeNotificationKind = "trade" | "portfolio" | "ipo" | "market";
@@ -19,6 +22,10 @@ export type PaperTradeNotification = {
 };
 
 export const NOTIFICATION_CENTER_EVENT = "papertrade:notification-center-change";
+function withIpoContext(item: PaperTradeNotification): PaperTradeNotification {
+  if (item.kind !== "ipo") return item;
+  return { ...item, title: ipoPrefixedTitle(item.title), body: item.body?.trim() || "An IPO update is available. Open IPOs to check the company and event details.", url: item.url || (item.allotmentRegistrar ? `/ipo-allotment/${item.allotmentRegistrar}` : "/?screen=ipo") };
+}
 const NOTIFICATION_CENTER_KEY = "papertrade-notification-center-v1";
 
 export function readPaperTradeNotifications(): PaperTradeNotification[] {
@@ -26,7 +33,7 @@ export function readPaperTradeNotifications(): PaperTradeNotification[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(NOTIFICATION_CENTER_KEY) ?? "[]") as PaperTradeNotification[];
     return Array.isArray(parsed)
-      ? parsed.filter((item) => item?.id && item?.title && Number.isFinite(item?.createdAt)).slice(0, 100)
+      ? parsed.filter((item) => item?.id && item?.title && Number.isFinite(item?.createdAt)).slice(0, 100).map(withIpoContext)
       : [];
   } catch {
     return [];
@@ -40,15 +47,16 @@ function savePaperTradeNotifications(items: PaperTradeNotification[]) {
 
 export function addPaperTradeNotification(input: Omit<PaperTradeNotification, "id" | "createdAt" | "read"> & { id?: string; createdAt?: number }) {
   if (typeof window === "undefined") return;
+  if (input.id && !automaticEmaAllowed(input.id, readNotificationPreferences())) return;
   const createdAt = input.createdAt ?? Date.now();
   const id = input.id ?? `${input.kind}-${createdAt}-${Math.random().toString(36).slice(2, 7)}`;
   const current = readPaperTradeNotifications().filter((item) => item.id !== id);
-  savePaperTradeNotifications([{ id, kind: input.kind, title: input.title, body: input.body, createdAt, read: false,
+  savePaperTradeNotifications([withIpoContext({ id, kind: input.kind, title: input.title, body: input.body, createdAt, read: false,
     ...(input.url && (/^\/\?screen=(ipo|pnl)$/.test(input.url) || /^\/\?symbol=[A-Za-z0-9%_.~!()*'\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|4H|1D)$/.test(input.url) || /^\/ipo-allotment\/(mufg|kfin|bigshare|bse)$/.test(input.url)) ? { url: input.url } : {}),
     ...(input.kind === "trade" && input.symbol ? { symbol: input.symbol, instrumentKey: input.instrumentKey } : {}),
     ...(input.timeframe && ["1m", "3m", "5m", "15m", "30m", "1H", "4H", "1D"].includes(input.timeframe) ? { timeframe: input.timeframe, instrument: input.instrument } : {}),
     ...(input.kind === "ipo" && allotmentLink(input.allotmentRegistrar) ? { allotmentRegistrar: input.allotmentRegistrar } : {}),
-  }, ...current]);
+  }), ...current]);
 }
 
 export function markPaperTradeNotificationsRead() {

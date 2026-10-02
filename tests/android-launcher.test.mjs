@@ -90,7 +90,7 @@ test("native notifications keep only the left status icon", async () => {
   assert.match(await source("android/app/src/main/java/in/papertrade/app/TradeAlertPlugin.java"), /NotificationDelivery.show/);
   const ipoWorker = await source("android/app/src/main/java/in/papertrade/app/IpoGmpAlertWorker.java");
   assert.match(ipoWorker, /last_closing_alert_date_/);
-  assert.match(ipoWorker, /last day to apply/);
+  assert.match(ipoWorker, /bidding closes today/);
   assert.doesNotMatch(ipoWorker, /!payload\.optBoolean\("gmpFeedConfigured"/);
   const openingWorker = await source("android/app/src/main/java/in/papertrade/app/IpoOpeningAlertWorker.java");
   assert.match(openingWorker, /withHour\(10\)\.withMinute\(20\)/);

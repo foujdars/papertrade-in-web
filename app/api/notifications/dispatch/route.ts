@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { pushConfigured, pushServices, sendPush } from "@/lib/push-admin";
-import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, shadeChoice, shortIpoName, type PushNotice } from "@/lib/notification-policy";
+import { allotmentNotice, indiaClock, ipoDigest, notificationPreferences, reviewNotice, shadeChoice, listingNotice, type PushNotice } from "@/lib/notification-policy";
 import { sessionOpenNotice } from "@/lib/market-sessions";
 import { type VolumeShockerDevice, deliverVolumeShockerAlerts } from "@/lib/volume-shocker-server";
 import { loadAllotments } from "@/lib/ipo-allotment-server";
@@ -36,13 +36,9 @@ export async function GET(request: Request) {
     // First deployment records a baseline: it must not broadcast old results.
     const newResults = saved.exists ? allotments.allotments.filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
     const released = allotmentNotice(newResults, now); if (released) events.push(released);
-    const listings = ipos.filter(ipo => saved.exists && ipo.status === "listed" && ipo.details?.listingDate === day && ipo.details.listingPrice && ipo.details.issuePrice && !saved.data()?.listed?.[ipo.id]);
-    if (listings.length) {
-      const name = shortIpoName(listings[0].name);
-      const pctNum = Math.round((listings[0].details!.listingPrice! / listings[0].details!.issuePrice! - 1) * 100);
-      const pct = `${pctNum > 0 ? "+" : ""}${pctNum}%`;
-      events.push({ id: `listing-${listings.map(ipo=>ipo.id).sort().join("-")}`, kind: "ipo", title: listings.length === 1 ? shadeChoice("🚀", [`${name} listed ${pct}`, `${name} listed today`]) : shadeChoice("🚀", [`${listings.length} IPOs listed · ${name} ${pct}`, `${listings.length} IPOs listed today`]), body: "", url: "/?screen=ipo", expiresAt: now + 2 * 3600000, silent: true });
-    }
+    const listings = ipos.filter(ipo => saved.exists && listingNotice([ipo], now) !== null && !saved.data()?.listed?.[ipo.id]);
+    const listing = listingNotice(listings, now);
+    if (listing) events.push(listing);
     const refs = events.map(event => db.collection("notificationOutbox").doc(hash(event.id)));
     await db.runTransaction(async tx => {
       const existing = await Promise.all(refs.map(ref => tx.get(ref)));

@@ -38,12 +38,13 @@ test("only a fresh closed BTC candle can notify", () => {
 
 test("5 EMA reversal notices name BTC and stay inside the shade", () => {
   const title = ema5AlertTitle("5m");
-  assert.match(title, /BTC 5m low above 5 EMA/);
+  assert.match(title, /BTC 5m EMA 5 reversal/);
   assert.ok(title.length <= 42);
   assert.ok(ema5AlertTitle("15m").length <= 42);
   const notice = ema5AlertNotice({ frame: "5m", candleTime: 1_700_000_000, now: 1_700_000_100_000 });
   assert.equal(notice.id, ema5AlertId("5m", 1_700_000_000));
-  assert.equal(notice.body, "");
+  assert.match(notice.body, /completed candle low stayed above EMA 5/);
+  assert.match(notice.body, /IST/);
   assert.equal(notice.kind, "session");
   assert.equal(notice.silent, false);
   assert.equal(notice.url, "/?symbol=BTCUSD&timeframe=5m");

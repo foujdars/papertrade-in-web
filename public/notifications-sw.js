@@ -7,10 +7,15 @@ self.addEventListener("push",event=>{event.waitUntil((async()=>{
   let payload;try{payload=event.data.json();}catch{return;}
   const notice=payload.data||payload;
   if(!notice.id||typeof notice.title!=="string"||typeof notice.body!=="string"||!["ipo","allotment","portfolio","practice","trade","session"].includes(notice.kind)||Number(notice.expiresAt)<=Date.now()||!Number.isFinite(Number(notice.expiresAt)))return;
+  if(notice.kind==="ipo"||notice.kind==="allotment"){
+    if(!/^IPO\b/i.test(notice.title.trim()))notice.title="IPO: "+notice.title.replace(/^[^\p{L}\p{N}]+/u,"").trim();
+    if(!notice.body.trim())notice.body=notice.kind==="allotment"?"An IPO allotment update is available. Open the official registrar to check the company and your result.":"An IPO update is available. Open IPOs to check the company and event details.";
+  }
   const accepted=await store("readwrite",(state,done)=>{
     const prefs=state.get("preferences");prefs.onsuccess=()=>{
       const p=prefs.result;
       if(p&&p.pausedUntil>Date.now()){done(false);return;}
+      if((String(notice.id).startsWith("ema21-")&&p?.ema21===false)||(String(notice.id).startsWith("ema5-")&&p?.ema5===false)){done(false);return;}
       if(notice.kind==="trade"&&p&&p.hideAmounts){
         notice.title=String(notice.title).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();
         notice.body=String(notice.body).replace(/₹[\d,.]+/g,"").replace(/\s{2,}/g," ").trim();

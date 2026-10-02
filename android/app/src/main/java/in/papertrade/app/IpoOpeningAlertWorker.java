@@ -88,9 +88,9 @@ public class IpoOpeningAlertWorker extends Worker {
                 String endDate = ipo.optString("biddingEndDate", "soon");
                 double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
                 String body = Double.isFinite(issueSize) && issueSize > 0
-                    ? String.format(java.util.Locale.ENGLISH, "Bidding is live until %s. Issue size Rs %,.2f Cr.", endDate, issueSize)
-                    : String.format(java.util.Locale.ENGLISH, "Bidding is live until %s.", endDate);
-                showNotification(context, name + " opened today", body, ("ipo-opening-" + ipoId + "-" + today).hashCode());
+                    ? String.format(java.util.Locale.ENGLISH, "Bidding is live until %s. Issue size Rs %,.2f Cr.", NotificationContent.date(endDate), issueSize)
+                    : String.format(java.util.Locale.ENGLISH, "Bidding is live until %s.", NotificationContent.date(endDate));
+                showNotification(context, NotificationContent.ipoTitle(name, "bidding opened today"), name + ": " + body + " Open IPOs to review issue details.", ("ipo-opening-" + ipoId + "-" + today).hashCode());
                 preferences.edit().putString(stateKey, today).apply();
             }
             return Result.success();
@@ -132,7 +132,8 @@ public class IpoOpeningAlertWorker extends Worker {
             manager.createNotificationChannel(channel);
         }
         Intent launchIntent = new Intent(context, MainActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra("notificationPath", "/?screen=ipo");
         PendingIntent contentIntent = PendingIntent.getActivity(
             context,
             notificationId,
