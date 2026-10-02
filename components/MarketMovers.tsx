@@ -51,13 +51,13 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const high = lists?.high52?.[0];
   const lead = gainers[0];
   const lag = losers[0];
-  const moverTile = (kind: string, row: Mover | undefined) => <span className="home-mover-preview" key={kind}>
+  const moverTile = (kind: string, row: Mover | undefined) => <span className="home-mover-preview" key={kind} data-direction={kind === "Top gainer" ? "up" : "down"} aria-label={`${kind}: ${row ? `${row.symbol} ${percent(row.change)}` : "awaiting quotes"}`}>
     <small>{kind}</small><b title={row?.name}>{row?.symbol ?? '—'}</b>
     <em className={row ? row.change < 0 ? 'down' : row.change > 0 ? 'up' : '' : ''}>{row && (row.change < 0 ? <ArrowDownRight size={14} aria-hidden="true"/> : <ArrowUpRight size={14} aria-hidden="true"/>)}{row ? percent(row.change) : '—'}</em>
   </span>;
   return <div className="home-market-slot">
     <button type="button" className="home-market-card home-market-card-v2" data-kind="movers" onClick={() => setOpen(true)} aria-label={lead ? `Open market movers. Top gainer ${lead.symbol} ${percent(lead.change)}` : "Open market movers"}>
-      <span className="home-market-card-copy"><span className="home-market-card-title"><TrendingUp size={17} aria-hidden="true"/><b>Market movers</b></span><ChevronRight size={17} aria-hidden="true" /></span>
+      <span className="home-market-card-copy"><span className="home-market-card-title"><TrendingUp size={17} aria-hidden="true"/><b>Movers</b></span><ChevronRight size={17} aria-hidden="true" /></span>
       <span className="home-mover-previews">{moverTile('Top gainer', lead)}{moverTile('Top loser', lag)}</span>
       <span className="home-mover-highlight"><small>52-week high</small><b>{high?.symbol ?? '—'}</b><em className={high ? high.change < 0 ? 'down' : 'up' : ''}>{high ? percent(high.change) : '—'}</em></span>
       {!lists && <span className="home-market-empty" role="status">{failed ? 'Quotes unavailable' : 'Loading movers…'}</span>}
