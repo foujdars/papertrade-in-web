@@ -1,3 +1,4 @@
+import type { PaperBot } from "./paper-bot-state";
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
 import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine";
@@ -329,6 +330,7 @@ export const tradingFee = (spec: PerpSpec, notional: number, maker = false, curr
   notional * (maker ? spec.maker : spec.taker) * 1.18 * (currency === "USD" ? 1 : USD_INR);
 
 export type PerpPosition = {
+  botId?: string;
   currency?: "USD";
   protection?: GlobalProtection;
   symbol: PerpSymbol;
@@ -356,6 +358,7 @@ export type PerpOrder = GlobalOrderFields & {
   reserve: number;
 };
 export type PerpEvent = {
+  botId?: string;
   id: string;
   symbol: PerpSymbol;
   at: number;
@@ -367,6 +370,7 @@ export type PerpEvent = {
   detail: string;
 };
 export type PerpAccount = {
+  bots?: PaperBot[];
   currency?: "USD";
   version: 1;
   wallet: number;
@@ -724,6 +728,7 @@ export function closePerp(
   if (!n.positions.length) n.fundingGap = false;
   event(n, {
     symbol,
+    ...(p.botId ? { botId: p.botId } : {}),
     at: now,
     kind,
     contracts,
@@ -793,6 +798,7 @@ export function advancePerps(
           symbol: p.symbol,
           at: now,
           kind: "FUNDING",
+          ...(p.botId ? { botId: p.botId } : {}),
           contracts: p.contracts,
           price: q.mark,
           pnl: applied,

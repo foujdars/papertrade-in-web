@@ -61,3 +61,19 @@ The server merges Upstox historical candles with the official current-trading-da
 ## Attribution
 
 Charts use the open-source [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) library under Apache 2.0 and the MIT-licensed [lightweight-charts-drawing](https://github.com/deepentropy/lightweight-charts-drawing) extension. TradingView attribution remains visible in the chart.
+
+## Automatic virtual trading bot
+
+The **Bot** tab sits to the right of **P&L** on desktop and mobile. It uses the existing Global USD paper wallet, order rules and [Delta India public market-data endpoints](https://docs.delta.exchange/). No exchange credentials, AI subscription, paid bot service or new backend account is required.
+
+1. Open **Bot**, then choose Bitcoin (`BTCUSD`), Ethereum (`ETHUSD`), Solana (`SOLUSD`) or tokenised Gold (`XAUTUSD`). Unavailable contracts remain disabled by the existing market-data validation.
+2. Choose EMA crossover, RSI reversal or range breakout; set the indicator periods, candle timeframe (1m, 5m, 15m or 1H) and long/short direction.
+3. Set USD notional per trade, leverage, stop-loss and take-profit percentages, daily entry and realised loss limits, and entry cooldown. Contract lots round down; prices use the exchange tick size.
+4. Select **Save & start bot**. Only a newly completed candle after starting can trigger a trade. Entry uses current bid/ask with margin, fees and liquidity checks. Existing positions and pending orders block additional bot entries for that asset.
+5. Use **Pause this bot**, **Pause all**, or **Close position & pause**. Pausing stops new entries; existing position protection continues while the app monitors live prices. **View Global P&L** opens the existing analytics with the USD scope.
+
+The engine runs while the app is open and visible, including when navigating away from Bot. It pauses when the browser is hidden, the device sleeps or the app closes. There is no background worker or 24/7 execution. Saved enabled strategies resume on returning, without replaying missed signals or pretending to fill missed stops/targets. TP/SL execute at subsequently observed live prices, so gaps can change the simulated exit price. Daily limits use the India calendar day and block new entries; the loss limit includes realised P&L, entry/exit fees and observed funding, excludes unrealised losses and is not a guaranteed loss cap.
+
+Bot configurations, candle consumption and trades are stored together in this browser's account-scoped dollar wallet under a Web Lock. This makes concurrent browser tabs consume a signal atomically. Data is local to the browser/device and is not a hosted bot or cloud execution service. One strategy per asset is supported. Stops and targets manage exits; opposite signals do not automatically reverse an open position. Manual increases to bot-owned positions are blocked; manual reduce-only exits remain available.
+
+Run `npm run test:bot` for strategy signals, freshness/gap checks, duplicate prevention, persisted state, daily limits, cooldown, protected exits and all four assets. Run `node tests/browser/paper-bot.cjs` against a preview with `TEST_BASE_URL` (default `http://localhost:3232`), `PLAYWRIGHT_MODULE_PATH` and optional `CHROMIUM_PACKAGE` for the browser checks.
