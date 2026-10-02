@@ -17,6 +17,8 @@ import { StockLogo } from "@/components/StockLogo";
 
 import {
   ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
   BriefcaseBusiness,
   CandlestickChart,
   CheckCircle2,
@@ -349,6 +351,7 @@ export function HomeWorkspace({
         </section>
 
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
+          <div className="home-indices-heading"><h2>Indian indices</h2><span>{indices.some(index => index.price !== null) ? feedLive && indices.every(index => index.live) ? 'Live quotes' : 'Latest quotes' : 'Awaiting quotes'}</span></div>
           <div className="home-index-grid" aria-label="Indian market indices">
             {indices.map((index) => {
               const points = index.points;
@@ -356,11 +359,11 @@ export function HomeWorkspace({
               const known = points !== null && change !== null;
               const up = (change ?? 0) >= 0;
               return (
-                <button key={index.symbol} className="home-index-card" data-symbol={index.symbol} data-live={index.live ? "true" : "false"} data-tone={known ? (up ? "up" : "down") : "flat"} onClick={() => onOpenStock(index.symbol)}>
-                  <span>{index.live ? <i aria-hidden="true" /> : null}{index.label}</span>
+                <button type="button" key={index.symbol} className="home-index-card" data-symbol={index.symbol} data-live={index.live ? "true" : "false"} data-tone={known && change !== 0 ? (up ? "up" : "down") : "flat"} onClick={() => onOpenStock(index.symbol)} aria-label={`Open ${index.label} chart`} title={index.asOf ? `Quote as of ${index.asOf}` : undefined}>
+                  <span className="home-index-name">{index.symbol === 'BANKNIFTY' ? 'Bank Nifty' : index.symbol === 'SENSEX' ? 'Sensex' : 'Nifty 50'}<small>{index.symbol === 'SENSEX' ? 'BSE' : 'NSE'}</small></span>
                   <b>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
-                  <small className={known ? (up ? "positive" : "negative") : ""}>
-                    <em>{known ? `${up ? "+" : ""}${change.toFixed(2)}%` : "—"}</em>
+                  <small className={`home-index-change ${known && change !== 0 ? (up ? "positive" : "negative") : ""}`}>
+                    <em>{known && change !== 0 && (up ? <ArrowUpRight size={13} aria-hidden="true"/> : <ArrowDownRight size={13} aria-hidden="true"/>)}{known ? `${up ? "+" : ""}${change.toFixed(2)}%` : "—"}</em>
                     {known ? <em>{`${points >= 0 ? "+" : ""}${points.toFixed(2)}`}</em> : null}
                   </small>
                 </button>
@@ -371,6 +374,11 @@ export function HomeWorkspace({
         </section>}
 
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
+
+        {activeMarket === "india" && <div className="home-market-pair">
+          <MarketMovers onOpen={onOpenStock} />
+          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
+        </div>}
 
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
@@ -393,10 +401,6 @@ export function HomeWorkspace({
           </section>}
 
         </div>
-        {activeMarket === "india" && <div className="home-market-pair">
-          <MarketMovers onOpen={onOpenStock} />
-          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
-        </div>}
         {activeMarket === "india" ? <IndiaPulse /> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
