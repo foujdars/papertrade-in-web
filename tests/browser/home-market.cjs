@@ -22,7 +22,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
     await page.setViewportSize({width,height:900});await page.waitForTimeout(100);
     assert.ok(await page.locator('.home-dashboard-scroll').evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${theme} home fits ${width}`);
     assert.ok(await page.locator('.home-index-card > b').evaluateAll(elements=>elements.every(e=>e.scrollWidth<=e.clientWidth+1)),`${theme} complete index values fit ${width}`);
-    const tiles=await page.locator('.home-market-card-v2').evaluateAll(elements=>elements.map(e=>({bg:getComputedStyle(e).backgroundColor,height:e.getBoundingClientRect().height})));assert.ok(tiles.every(t=>t.height<190),'compact overview cards');assert.ok(tiles.every(t=>t.bg!== 'rgba(0, 0, 0, 0)'));
+    const indices=await page.locator('.home-index-card').evaluateAll(elements=>elements.map(e=>({y:e.getBoundingClientRect().y,height:e.getBoundingClientRect().height})));assert.ok(indices.every(i=>Math.abs(i.y-indices[0].y)<1 && i.height>=44 && i.height<110),'indices share one compact row with usable touch targets');
+    const tiles=await page.locator('.home-market-card-v2').evaluateAll(elements=>elements.map(e=>({bg:getComputedStyle(e).backgroundColor,height:e.getBoundingClientRect().height})));assert.ok(tiles.every(t=>t.height<140),'compact overview cards');assert.ok(tiles.every(t=>t.bg!== 'rgba(0, 0, 0, 0)'));
     if(width===390){await page.locator('.home-dashboard-scroll').evaluate(e=>e.scrollTop=0);await page.screenshot({path:`outputs/home-market-${theme}.png`});await page.locator('.home-market-pair').screenshot({path:`outputs/home-market-cards-${theme}.png`});}
    }
   }
