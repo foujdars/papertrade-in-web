@@ -1,0 +1,50 @@
+.bot-workspace { color: var(--ink); }
+.bot-workspace h2 { display: flex; align-items: center; gap: 9px; }
+.bot-intro p { margin: 0 0 10px; color: var(--muted); }
+.bot-intro > span { display: inline-flex; gap: 7px; align-items: center; color: var(--purple); font-size: 12px; }
+.bot-runtime { display: flex; align-items: center; gap: 16px; margin: 18px 0; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--purple-soft); }
+.bot-runtime b { white-space: nowrap; font-size: 13px; }
+.bot-runtime > span { flex: 1; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.bot-workspace button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; cursor: pointer; }
+.bot-workspace button:disabled { opacity: .5; cursor: default; }
+.bot-workspace :is(button,input,select):focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.bot-assets { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin: 18px 0; }
+.bot-assets button { flex-direction: column; align-items: flex-start; text-align: left; padding: 16px; gap: 8px; }
+.bot-assets button.active { border-color: var(--purple); background: var(--purple-soft); }
+.bot-assets b { font-size: 22px; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.bot-assets small { font-size: 10px; color: var(--muted); }
+.bot-layout { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); align-items: start; gap: 18px; }
+.bot-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.bot-card h3 { font-size: 16px; margin: 9px 0 16px; }
+.bot-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.bot-fields label { display: flex; flex-direction: column; gap: 7px; font-size: 11px; color: var(--muted); }
+.bot-fields :is(input,select) { width: 100%; min-width: 0; height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.bot-rule,.bot-help p,.bot-card > p { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.bot-settings > small { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.bot-workspace .bot-start { width: 100%; margin-top: 14px; background: var(--purple); color: white; border-color: var(--purple); font-weight: 700; }
+.bot-monitor { display: grid; gap: 14px; }
+.bot-card dl { margin: 15px 0; display: grid; gap: 12px; }
+.bot-card dl > div { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; }
+.bot-card dt { color: var(--muted); }
+.bot-card dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.bot-monitor button + button { margin-top: 8px; margin-left: 8px; }
+.bot-notice { padding: 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
+.bot-activity { margin-top: 18px; }
+.bot-activity ul { list-style: none; padding: 0; margin: 0; }
+.bot-activity li { display: flex; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.bot-activity li > span { text-align: right; }
+.bot-activity small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.workspace.section-bot { display: none; }
+@media (max-width: 760px) {
+  .terminal-shell .mobile-bottom-nav { grid-template-columns: repeat(7,minmax(0,1fr)) !important; }
+  .terminal-shell .mobile-bottom-nav::before { width: calc(100% / 7); }
+  .terminal-shell .mobile-bottom-nav button { font-size: 9px; }
+  .bot-assets { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bot-assets b { font-size: 20px; }
+  .bot-layout { grid-template-columns: minmax(0,1fr); }
+  .bot-runtime { flex-wrap: wrap; gap: 9px; }
+  .bot-runtime > span { flex-basis: 100%; order: 3; }
+  .bot-runtime > button { margin-left: auto; }
+  .bot-card { padding: 16px; }
+  .bot-workspace h2 { font-size: 21px; }
+}

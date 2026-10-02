@@ -1,3 +1,4 @@
+import { validateSavedBots } from "./paper-bot-state.ts";
 import {
   advancePerps, availablePerpCash, cancelPerpOrder, closePerp, freshPerpQuote,
   marginRate, newPerpAccount, openPerp, readPerpAccount, tradingFee, USD_INR,
@@ -57,6 +58,7 @@ export function affordableContracts(account: PerpAccount, spec: PerpSpec, price:
 export function readGlobalAccount(text: string | null): PerpAccount {
   if (!text) return { ...newPerpAccount(), currency: "USD", wallet: 10000 };
   let a = readPerpAccount(text);
+  validateSavedBots(a.bots);
   if (a.currency !== undefined && a.currency !== "USD") throw new Error("Unknown global wallet currency.");
   if (!a.currency) a = { ...a, currency: "USD", wallet: a.wallet / USD_INR,
     positions: a.positions.map(p => ({ ...p, currency: "USD", margin: p.margin / USD_INR })),
@@ -142,6 +144,7 @@ export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: 
   const marketable = d.side === "BUY" ? q.ask <= (d.limit ?? 0) : q.bid >= (d.limit ?? Infinity);
   if (d.type === "Maker only" && marketable) throw new Error("Maker-only order would execute immediately. Move the limit away from market.");
   const prior = a.positions.find(p => p.symbol === s.symbol);
+  if (prior?.botId && !d.reduceOnly) throw new Error("Close the bot position before adding a manual entry for this asset.");
   if (d.reduceOnly && (!prior || prior.side === d.side || d.contracts > prior.contracts)) throw new Error("Reduce-only quantity must fit the opposite open position.");
   if (d.reduceOnly && d.protection) throw new Error("Attach TP/SL to an entry or edit the existing position.");
   if (d.type === "Market" || d.type === "Limit" && marketable) return execute(a, s, q, d, now);
