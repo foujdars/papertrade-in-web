@@ -87,7 +87,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
   return <div id="equity-watch" className="home-market-slot">
     <button type="button" className="home-market-card home-market-card-v2" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
-      <span className="home-market-card-copy"><span className="home-market-card-title"><ChartNoAxesColumnIncreasing size={17} aria-hidden="true"/><b>Equity market watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
+      <span className="home-market-card-copy"><span className="home-market-card-title"><ChartNoAxesColumnIncreasing size={17} aria-hidden="true"/><b>Equity watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
       <span className="home-market-subtitle">Constituent breadth</span>
       <span className="home-breadth-previews">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
     </button>

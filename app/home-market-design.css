@@ -57,12 +57,76 @@
   .terminal-shell .home-hub.home-studio .home-index-card > b { text-align: left; font-size: 26px; }
   .terminal-shell .home-hub.home-studio .home-index-card > .home-index-change { display: flex; justify-content: start; gap: 8px; align-items: center; }
 }
+/* Compact dashboard: one glance at indices and two market summaries per row. */
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding: 12px 16px 80px; gap: 8px; }
+.terminal-shell .home-hub.home-studio .home-section { margin-top: 0; }
+.home-overview-eyebrow { display: none; }
+.home-overview-heading h1 { margin: 0; font-size: 20px; }
+.home-overview-heading > button { min-height: 44px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button { min-height: 44px; padding-block: 5px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser button small { display: none; }
+.home-indices-heading { padding: 10px 12px 6px; }
+.terminal-shell .home-hub.home-studio .home-index-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px 12px 10px; }
+.terminal-shell .home-hub.home-studio .home-index-card { grid-template-columns: minmax(0, 1fr); min-height: 80px; padding: 0 10px; gap: 5px; border-bottom: 0; border-right: 1px solid var(--line); align-content: center; }
+.terminal-shell .home-hub.home-studio .home-index-card:first-child { padding-left: 0; }
+.terminal-shell .home-hub.home-studio .home-index-card:last-child { padding-right: 0; }
+.terminal-shell .home-hub.home-studio .home-index-card > .home-index-name { font-size: 11px; }
+.terminal-shell .home-hub.home-studio .home-index-name small { display: none; }
+.terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 18px; text-align: left; letter-spacing: -.5px; white-space: nowrap; }
+.terminal-shell .home-hub.home-studio .home-index-card > .home-index-change { justify-content: start; justify-items: start; gap: 3px; }
+.terminal-shell .home-hub.home-studio .home-index-change em:first-child { padding: 0; background: none; }
+.terminal-shell .home-hub.home-studio .home-pulse-section .home-session-board { padding: 4px 10px; }
+.terminal-shell .home-hub.home-studio .home-market-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.terminal-shell .home-market-card-v2 { padding: 10px; border-radius: 14px; height: 100%; }
+.home-market-card-v2 .home-market-card-copy { min-height: 20px; margin-bottom: 8px; gap: 4px; }
+.home-market-card-title { gap: 5px; }
+.home-market-card-v2 .home-market-card-copy b { font-size: 12px; }
+.home-market-card-title > svg { width: 14px; height: 14px; }
+.home-market-card-v2 .home-market-card-copy > svg { width: 12px; height: 12px; flex: none; }
+.home-mover-previews { grid-template-columns: 1fr; gap: 8px; }
+.home-mover-preview { grid-template-columns: minmax(0, 1fr) auto; gap: 3px; align-items: baseline; }
+.home-mover-preview > small { grid-column: 1 / -1; }
+.home-mover-preview > b { font-size: 11px; letter-spacing: 0; }
+.home-mover-preview > em { font-size: 10px; gap: 0; }
+.home-mover-preview > em svg { display: none; }
+.home-mover-preview + .home-mover-preview { border: 0; padding: 0; }
+.home-mover-highlight { display: none; }
+.home-market-card-v2 .home-market-subtitle { display: none; }
+.home-breadth-previews { grid-template-columns: 1fr; gap: 7px; }
+.home-breadth-preview { grid-template-columns: auto minmax(0, 1fr); gap: 4px; align-items: center; }
+.home-breadth-preview > b { font-size: 10px; }
+.home-breadth-counts { justify-content: end; gap: 5px; }
+.home-breadth-counts > em { font-size: 10px; }
+.home-breadth-counts svg { width: 10px; height: 10px; }
+.home-breadth-meter { grid-column: 1 / -1; height: 3px; }
+.terminal-shell .home-hub.home-studio .home-section > header { padding: 6px 12px; }
+.terminal-shell .home-portfolio-row { padding: 0 10px 10px; gap: 5px; }
+.terminal-shell .home-portfolio-row button { min-height: 48px; padding: 6px; }
+.terminal-shell .home-portfolio-row strong { font-size: 18px; }
+.terminal-shell .india-pulse-board { gap: 8px; padding: 0 10px 10px; }
+.terminal-shell :is(.india-ad,.india-vix,.india-pcr) { padding: 10px; }
+.terminal-shell .india-ad-chart { height: 160px; }
+.terminal-shell .india-ad-bar { margin-block: 6px; }
+.terminal-shell :is(.india-vix-value,.india-pcr-main) strong { font-size: 26px; }
+.terminal-shell .india-vix-value { margin-block: 4px; }
+.terminal-shell .india-pcr-track { margin-block: 4px; }
+.terminal-shell .india-flow-summary { margin-block: 4px; }
+.terminal-shell .india-flow-chart { height: 156px; }
+.terminal-shell .india-flow-stats > div { padding: 6px 8px; }
+.terminal-shell .india-flow-range-trigger { min-height: 44px; }
+@media (min-width: 761px) {
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding-inline: 24px; gap: 12px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 24px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > .home-index-name { font-size: 13px; }
+  .home-market-card-v2 .home-market-card-copy b { font-size: 14px; }
+  .home-mover-preview > b, .home-breadth-preview > b { font-size: 12px; }
+  .home-mover-preview > em, .home-breadth-counts > em { font-size: 12px; }
+}
 @media (max-width: 360px) {
-  .home-indices-heading { padding-inline: 12px; }
-  .terminal-shell .home-hub.home-studio .home-index-grid { padding-inline: 12px; }
-  .terminal-shell .home-hub.home-studio .home-index-card { gap: 7px; grid-template-columns: 74px minmax(0, 1fr) 70px; }
-  .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 17px; letter-spacing: -.5px; }
-  .terminal-shell .home-hub.home-studio .home-index-card > .home-index-name { font-size: 12px; }
-  .terminal-shell .home-market-card-v2 { padding-inline: 12px; }
-  .home-breadth-previews { gap: 12px; }
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding-inline: 10px; }
+  .terminal-shell .home-hub.home-studio .home-index-grid { padding-inline: 10px; }
+  .terminal-shell .home-hub.home-studio .home-index-card { padding-inline: 6px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 15px; letter-spacing: -.4px; }
+  .terminal-shell .home-market-card-v2 { padding: 8px; }
+  .home-market-card-v2 .home-market-card-copy b { font-size: 11px; }
 }
