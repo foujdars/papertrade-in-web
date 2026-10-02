@@ -1,5 +1,5 @@
 "use client";
-import { ChevronRight, X } from "lucide-react";
+import { ArrowUp, ArrowDown, ChartNoAxesColumnIncreasing, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
@@ -77,18 +77,23 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const breadthLine = (label: string, quotes: WatchQuote[] | null) => {
     const rising = quotes?.filter(row => row.change > 0).length ?? 0;
     const falling = quotes?.filter(row => row.change < 0).length ?? 0;
-    return <span className="home-breadth-line" key={label}><b>{label}</b>{quotes ? <em><i className="up">{rising} rising</i><i className="down">{falling} falling</i></em> : <em>—</em>}</span>;
+    const total = quotes?.length ?? 0;
+    return <span className="home-breadth-preview" key={label} aria-label={total ? `${label}: ${rising} rising, ${falling} falling, ${total - rising - falling} unchanged` : `${label}: awaiting quotes`}>
+      <b>{label}</b><span className="home-breadth-counts">{total ? <><em className="up"><ArrowUp size={12} aria-hidden="true"/>{rising}</em><em className="down"><ArrowDown size={12} aria-hidden="true"/>{falling}</em></> : <em>—</em>}</span>
+      <span className="home-breadth-meter" aria-hidden="true">{total > 0 && <><i className="rising" style={{width:`${rising / total * 100}%`}}/><i className="unchanged" style={{width:`${(total - rising - falling) / total * 100}%`}}/><i className="falling" style={{width:`${falling / total * 100}%`}}/></>}</span>
+    </span>;
   };
   const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
   return <div id="equity-watch" className="home-market-slot">
-    <button type="button" className="home-market-card" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
-      <span className="home-market-card-copy"><b>Equity market</b><ChevronRight size={16} aria-hidden="true" /></span>
-      <span className="home-market-lines">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
+    <button type="button" className="home-market-card home-market-card-v2" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
+      <span className="home-market-card-copy"><span className="home-market-card-title"><ChartNoAxesColumnIncreasing size={17} aria-hidden="true"/><b>Equity market watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
+      <span className="home-market-subtitle">Constituent breadth</span>
+      <span className="home-breadth-previews">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
     </button>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />
-      <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Equity market watch">
+      <div className="home-side-sheet home-market-sheet" role="dialog" aria-modal="true" aria-label="Equity market watch">
         <header><span><small>Equity market</small><b>{title}</b></span><button type="button" aria-label="Close" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <div className="home-mover-tabs" role="tablist" aria-label="Index">{WATCH_INDICES.map(item => <button key={item.id} type="button" role="tab" aria-selected={index === item.id} onClick={() => setIndex(item.id)}>{item.label}</button>)}</div>
         <div className="home-watch-sort" role="group" aria-label="Sort">{sorts.map(item => <button key={item.id} type="button" aria-pressed={sort === item.id} onClick={() => setSort(item.id)}>{item.label}</button>)}</div>

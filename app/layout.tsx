@@ -33,6 +33,7 @@ import "./global-markets.css";
 import "./home-studio.css";
 import "./trading-watchlist.css";
 import "./android-studio.css";
+import "./home-market-design.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
