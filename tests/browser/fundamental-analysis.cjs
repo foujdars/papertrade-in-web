@@ -51,6 +51,16 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     assert.match(await page.locator(".fa-run-summary").innerText(), /2026-03-31/);
     await page.locator(".fa-company-link").filter({ hasText: "Reliance Industries" }).click();
     const review = page.locator(".fa-company-review");
+    assert.equal(await review.locator(".fa-metrics").evaluate(el => el.open), true);
+    assert.equal(await review.locator(".fa-metrics dt").count(), 22);
+    assert.deepEqual(await review.locator(".fa-metrics").evaluate(el => Object.fromEntries([...el.querySelectorAll("dt")].map(dt => [dt.textContent, dt.nextElementSibling.textContent]))), {
+      ROE: "15%", ROCE: "18%", "Operating margin": "12%", "P/E": "20", PEG: "1.1",
+      "Debt / equity": "0.3", "Current ratio": "2", "Quick ratio": "1.5", "Promoter holding": "50%", "Promoter pledge": "0%", "FII holding": "10%", "DII holding": "10%",
+      "Quarterly sales (₹ Cr)": "Missing", "Quarterly sales growth": "Missing", "Sales TTM (₹ Cr)": "Missing", "Prior-year sales (₹ Cr)": "Missing", "Sales growth · 3Y": "14%",
+      "Quarterly profit (₹ Cr)": "Missing", "Quarterly profit growth": "Missing", "Profit TTM (₹ Cr)": "200", "Prior-year profit (₹ Cr)": "Missing", "Profit growth · 3Y": "12%",
+    });
+    assert.equal(await review.locator("form").evaluate(el => getComputedStyle(el).display), "grid", "Legacy modal form styles must not override the compact review layout");
+    assert.ok(await page.locator(".fa-results .fa-number").evaluateAll(cells => cells.every(cell => getComputedStyle(cell).textAlign === "right")));
     await review.getByLabel("Review decision").selectOption("approved");
     await review.getByLabel("Research notes").fill("Reviewed annual results");
     await review.getByRole("button", { name: "Save review", exact: true }).click();
@@ -65,6 +75,9 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.getByRole("button", { name: "Peer comparison", exact: true }).click();
     await page.getByLabel("Compare industry").selectOption("Oil & Gas");
     assert.equal(await page.locator(".fa-peer-table thead th").count(), 4);
+    assert.equal(await page.locator(".fa-peer-table tbody tr:not(.fa-peer-group)").count(), 23, "Keep the rating row and every existing peer metric");
+    const peRow = page.locator(".fa-peer-table tbody tr").filter({ has: page.getByRole("rowheader", { name: "P/E", exact: true }) });
+    assert.deepEqual(await peRow.locator("td").allTextContents(), ["19", "20", "18"]);
     assert.match(await page.locator(".fa-peer-table").innerText(), /Quarterly sales/);
     const checkboxes = page.locator(".fa-peer-picker input");
     await checkboxes.nth(0).uncheck(); await checkboxes.nth(1).uncheck();
