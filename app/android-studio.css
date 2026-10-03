@@ -152,17 +152,21 @@
   .mobile-utility-grid > button { min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; color: var(--purple); background: var(--soft); font-size: 12px; font-weight: 600; }
   .terminal-shell .more-menu-panel .home-card-toggles > button { min-height: 48px; }
   .terminal-shell .more-menu-panel .density-picker button { min-height: 44px; }
-  .terminal-shell .mobile-bottom-nav { background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: none; padding-inline: 4px; box-shadow: 0 -4px 20px #19263b06; }
-  .terminal-shell .mobile-bottom-nav::before { display: none; }
-  .terminal-shell .mobile-bottom-nav button { position: relative; isolation: isolate; color: var(--muted); gap: 4px; font-size: 10px; font-weight: 550; text-shadow: none; }
-  .terminal-shell .mobile-bottom-nav button svg { width: 21px; height: 21px; flex-basis: 21px; stroke-width: 1.8px; }
-  .terminal-shell .mobile-bottom-nav button.active { color: var(--purple); font-weight: 750; text-shadow: none; background: transparent; }
-  .terminal-shell .mobile-bottom-nav button.active::before { content: ''; position: absolute; top: 4px; width: 46px; height: 28px; border-radius: 10px; background: var(--purple-soft); z-index: -1; }
   .terminal-shell .trade-cockpit .chart-controls { min-height: 48px; height: 48px; flex-basis: 48px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger { min-height: 42px; }
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { min-height: 42px; border-radius: 10px; }
   .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-style-link,.chart-compare-link,.chart-derivatives-link) { min-height: 42px; border-radius: 10px; }
   .terminal-shell .trade-symbol-menu { border-radius: 18px; background: var(--surface); box-shadow: 0 12px 36px #0003; }
+}
+/* Keep the bottom bar consistent wherever mobile navigation is visible. */
+@media (max-width: 940px) {
+  .terminal-shell .mobile-bottom-nav { display: flex !important; align-items: stretch; gap: 0; height: calc(56px + env(safe-area-inset-bottom, 0px)); padding: 0 0 calc(7px + env(safe-area-inset-bottom, 0px)); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: none; box-shadow: 0 -4px 20px #19263b06; }
+  .terminal-shell .mobile-bottom-nav::before { display: none; }
+  .terminal-shell .mobile-bottom-nav > button { position: relative; isolation: isolate; flex: 1 1 0; width: 0; min-width: 0; max-width: none; height: 48px; min-height: 48px; margin: 0; padding: 0; color: var(--muted); gap: 4px; font-size: clamp(10px, 2.8vw, 11px); font-weight: 550; text-shadow: none; text-align: center; }
+  .terminal-shell .mobile-bottom-nav > button svg { display: block; width: 22px; height: 22px; flex: 0 0 22px; stroke-width: 1.8px; }
+  .terminal-shell .mobile-bottom-nav > button span { display: block; width: 100%; line-height: 14px; }
+  .terminal-shell .mobile-bottom-nav button.active { color: var(--purple); font-weight: 750; text-shadow: none; background: transparent; }
+  .terminal-shell .mobile-bottom-nav button.active::before { content: ''; position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 44px; max-width: calc(100% - 8px); height: 28px; border-radius: 10px; background: var(--purple-soft); z-index: -1; }
 }
 @media (max-width: 359px) {
   .terminal-shell .topbar { padding-inline: 10px; }

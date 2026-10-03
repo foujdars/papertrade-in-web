@@ -215,7 +215,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
         await page.keyboard.press("Escape");
         await page.getByRole("dialog", { name: "Review decision", exact: true }).waitFor({ state: "hidden" });
       }
-      const labels = await nav.locator("button").allTextContents(); assert.deepEqual(labels.slice(-2), ["Fundamentals", "P&L"]);
+      const labels = await nav.locator("button").allTextContents(); assert.deepEqual(labels.slice(-2), [width <= 940 ? "Analysis" : "Fundamentals", "P&L"]);
     }
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole("button", { name: "Use neon dark theme" }).click();
@@ -231,7 +231,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.locator(".home-workspace").waitFor();
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileNav = page.locator(".mobile-bottom-nav");
-    assert.deepEqual(await mobileNav.locator("button").allTextContents(), ["Home", "Charts", "Watchlist", "IPO", "Fundamentals", "P&L"]);
+    assert.deepEqual(await mobileNav.locator("button").allTextContents(), ["Home", "Charts", "Watchlist", "IPO", "Analysis", "P&L"]);
     await mobileNav.getByRole("button", { name: "Watchlist", exact: true }).click();
     await page.locator(".market-section-tabs").filter({ visible: true }).getByRole("button", { name: "Watchlist", exact: true }).click();
     const selectList = async name => {
