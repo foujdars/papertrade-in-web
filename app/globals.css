@@ -466,7 +466,8 @@ button { color: inherit; }
 .brand b { color: var(--purple); }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 34px; }
 .brand-logo-image { display: block; width: 100%; height: 100%; object-fit: contain; }
-.main-nav { height: 100%; display: flex; align-items: stretch; gap: 2px; }
+.main-nav { height: 100%; min-width: 0; display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.main-nav button { flex-shrink: 0; white-space: nowrap; }
 .main-nav button { position: relative; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 650; cursor: pointer; }
 .main-nav button:hover, .main-nav .nav-active { color: var(--ink); }
 .main-nav .nav-active::after { content: ""; position: absolute; height: 3px; border-radius: 3px 3px 0 0; left: 14px; right: 14px; bottom: 0; background: var(--purple); }
@@ -2654,4 +2655,13 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
   .terminal-shell:not([data-section="home"]),
   .terminal-shell[data-platform="android"]:not([data-section="home"]) { --mobile-header-height: env(safe-area-inset-top, 0px); }
   .terminal-shell:not([data-section="home"]) > .topbar { flex-basis: var(--mobile-header-height); height: var(--mobile-header-height); min-height: 0; padding: 0; overflow: hidden; border: 0; visibility: hidden; pointer-events: none; }
+}
+
+.workspace.section-fundamentals { display: none !important; }
+/* Keep all eight destinations in one compact, horizontally scrollable mobile row. */
+@media (max-width: 760px) {
+  .mobile-bottom-nav { display: flex !important; overflow-x: auto !important; scrollbar-width: none; }
+  .mobile-bottom-nav::-webkit-scrollbar { display: none; }
+  .mobile-bottom-nav button { flex: 0 0 64px; min-width: 64px; font-size: 10px; }
+  .mobile-bottom-nav button[aria-label="Fundamental Analysis"] { flex-basis: 88px; }
 }

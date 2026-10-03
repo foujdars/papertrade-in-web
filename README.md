@@ -2,6 +2,47 @@
 
 A responsive Indian-market paper-trading simulator built with Next.js, vinext and TradingView Lightweight Charts.
 
+## Fundamental Analysis
+
+The **Fundamentals** tab sits immediately before **Bot** on desktop and mobile.
+It adapts the screening rules and weighted company rating from
+[foujdars/stock-scout](https://github.com/foujdars/stock-scout) at commit
+`adc9324a51a21102554aae5e6d2e7a6c8ea576a2`.
+
+- Import a Screener CSV (up to 100 MB). Evaluation runs in a browser worker;
+  results are paginated, searchable and filtered by industry and review status.
+- Ordinary companies and financial businesses use different gates. Missing
+  data fails its gate; financial ratings remain preliminary. Rankings include
+  only companies passing all gates and use the original 0–10 company rating.
+- Compare up to four companies within an industry against medians calculated
+  from every company in that industry in the import. View profitability,
+  growth, valuation, leverage, ownership, quarterly and TTM metrics.
+- Rate a single company by pasting factual JSON or loading the blank template.
+- Record notes and review decisions. CSV research is saved in IndexedDB for
+  this browser and account; single-company JSON reviews last for the session.
+  Importing another CSV replaces the saved run. Export the complete JSON audit
+  before replacing a run, clearing browser data or moving devices.
+- **Open chart** resolves NSE/BSE codes or a valid ISIN, switches to the existing
+  daily Charts workspace and selects the delivery product. Existing candles,
+  indicators, drawing tools, comparisons, alerts and paper tickets are reused.
+  Opening a chart does not submit an order. Unknown instruments stay disabled.
+
+Financial data is supplied by CSV/JSON; no live fundamental provider or
+Screener subscription is bundled. The optional data date is applied to the next
+CSV import and displayed separately from import time. Live charts continue to
+use the app's existing Upstox configuration; exported prices never replace live
+quotes. There is no separate token entry or new backend database requirement.
+
+Validation:
+
+```sh
+node --experimental-strip-types --test tests/fundamental-analysis.test.mjs
+npx next build
+node scripts/verify-coach-assets.mjs
+# With the production app running locally:
+node tests/browser/fundamental-analysis.cjs
+```
+
 ## Features
 
 - Dynamic TradingView Lightweight Charts candlesticks with pan, mouse-wheel/pinch zoom, OHLC crosshair magnet, right-side INR price scale and bottom time scale
