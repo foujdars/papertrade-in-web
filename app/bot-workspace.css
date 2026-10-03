@@ -36,7 +36,6 @@
 .bot-activity small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .workspace.section-bot { display: none; }
 @media (max-width: 760px) {
-  .terminal-shell .mobile-bottom-nav button { font-size: 9px; }
   .bot-assets { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .bot-assets b { font-size: 20px; }
   .bot-layout { grid-template-columns: minmax(0,1fr); }
