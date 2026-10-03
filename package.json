@@ -6,7 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "test:bot": "node --experimental-strip-types --test tests/paper-bot.test.mjs tests/global-order-engine.test.mjs",
+    "test:bot": "node --experimental-strip-types --test tests/paper-bot.test.mjs tests/paper-bot-ema.test.mjs tests/global-order-engine.test.mjs",
     "test:psbb": "node --experimental-strip-types --test tests/psbb.test.mjs tests/psbb-watchlist.test.mjs tests/psbb-scan-route.test.mjs",
     "test:price-actions": "node --experimental-strip-types --test tests/price-actions.test.mjs",
     "test:global-orders": "node --experimental-strip-types --test tests/global-order-engine.test.mjs tests/global-markets.test.mjs tests/global-option-orders.test.mjs tests/market-directory.test.mjs",
