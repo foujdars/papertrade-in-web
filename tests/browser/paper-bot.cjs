@@ -38,7 +38,7 @@ const walletKey = "papertrade-perpetual-wallet-v1:guest";
     }
     await page.locator(".mobile-bottom-nav").waitFor({ timeout: 60000 });
     console.log("Dashboard loaded");
-    assert.deepEqual(await page.locator(".mobile-bottom-nav button").allTextContents(), ["Home", "Charts", "F&O", "Watchlist", "IPO", "P&L", "Bot"]);
+    assert.deepEqual(await page.locator(".mobile-bottom-nav button").allTextContents(), ["Home", "Charts", "F&O", "Watchlist", "IPO", "P&L", "Fundamentals", "Bot"]);
     await page.getByRole("button", { name: "Bot", exact: true }).last().click();
     await page.getByRole("heading", { name: "Paper trading bot" }).waitFor();
     console.log("Bot workspace opened");

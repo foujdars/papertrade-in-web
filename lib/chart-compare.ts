@@ -10,7 +10,7 @@ export function isCompareMode(value: unknown): value is CompareMode {
 export function isCompareColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 }
-export const COMPARE_KEY_PATTERN = /^(NSE_EQ|NSE_INDEX|BSE_INDEX|DELTA|TVC)\|[\w .|&-]{1,80}$/;
+export const COMPARE_KEY_PATTERN = /^(NSE_EQ|BSE_EQ|NSE_INDEX|BSE_INDEX|DELTA|TVC)\|[\w .|&-]{1,80}$/;
 
 export type ComparedSymbol = {
   instrumentKey: string;
