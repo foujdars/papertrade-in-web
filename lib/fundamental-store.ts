@@ -13,6 +13,7 @@ type RunRecord = {
   id: string;
   fileName: string;
   importedAt: string;
+  sourceVersion?: string;
   dataAsOf?: string;
   missingColumns: string[];
   resultCount: number;
@@ -96,6 +97,7 @@ export async function saveLocalRun(ownerId: string, payload: ScreeningRunPayload
     id: runId,
     fileName: payload.fileName,
     importedAt: payload.importedAt,
+    sourceVersion: payload.sourceVersion,
     dataAsOf: payload.dataAsOf,
     missingColumns: payload.missingColumns,
     resultCount: payload.results.length,
@@ -142,6 +144,7 @@ export async function loadLatestLocalRun(ownerId: string): Promise<ScreeningRunP
     id: run.id,
     fileName: run.fileName,
     importedAt: run.importedAt,
+    sourceVersion: run.sourceVersion,
     dataAsOf: run.dataAsOf,
     missingColumns: run.missingColumns,
     results: records

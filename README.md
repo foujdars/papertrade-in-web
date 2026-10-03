@@ -9,8 +9,10 @@ It adapts the screening rules and weighted company rating from
 [foujdars/stock-scout](https://github.com/foujdars/stock-scout) at commit
 `adc9324a51a21102554aae5e6d2e7a6c8ea576a2`.
 
-- Import a Screener CSV (up to 100 MB). Evaluation runs in a browser worker;
+- After sign-in, the latest monthly Screener CSV is loaded automatically from a
+  private Supabase Storage bucket. Evaluation still runs in a browser worker;
   results are paginated, searchable and filtered by industry and review status.
+  Manual CSV import remains available as a fallback (up to 100 MB).
 - Ordinary companies and financial businesses use different gates. Missing
   data fails its gate; financial ratings remain preliminary. Rankings include
   only companies passing all gates and use the original 0–10 company rating.
@@ -20,18 +22,22 @@ It adapts the screening rules and weighted company rating from
 - Rate a single company by pasting factual JSON or loading the blank template.
 - Record notes and review decisions. CSV research is saved in IndexedDB for
   this browser and account; single-company JSON reviews last for the session.
-  Importing another CSV replaces the saved run. Export the complete JSON audit
-  before replacing a run, clearing browser data or moving devices.
+  Importing another CSV—including a new monthly server version—replaces the
+  saved run. Export the complete JSON audit before replacing a run, clearing
+  browser data or moving devices.
 - **Open chart** resolves NSE/BSE codes or a valid ISIN, switches to the existing
   daily Charts workspace and selects the delivery product. Existing candles,
   indicators, drawing tools, comparisons, alerts and paper tickets are reused.
   Opening a chart does not submit an order. Unknown instruments stay disabled.
 
-Financial data is supplied by CSV/JSON; no live fundamental provider or
-Screener subscription is bundled. The optional data date is applied to the next
-CSV import and displayed separately from import time. Live charts continue to
-use the app's existing Upstox configuration; exported prices never replace live
-quotes. There is no separate token entry or new backend database requirement.
+Financial data is supplied by the monthly CSV generated from your authorized
+Screener screens. The scraper posts the completed file to a protected Vercel
+route, which stores only the latest CSV and manifest in a private Supabase
+Storage bucket. Screener credentials and the upload token stay on the scraper
+machine; neither is sent to the browser. The optional data date is displayed
+separately from import time. Live charts continue to use the app's existing
+Upstox configuration; exported prices never replace live quotes. Manual CSV
+import remains available when no server file exists.
 
 Validation:
 
@@ -93,7 +99,15 @@ The debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Hosting
 
-Vercel uses the native Next.js build configured in `vercel.json`. Add `UPSTOX_ACCESS_TOKEN` as a Production environment variable and redeploy. Do not prefix it with `NEXT_PUBLIC_`; the browser must never receive the token. To enable Google login, also add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, then follow `SETUP_FROM_SCRATCH.md`.
+Vercel uses the native Next.js build configured in `vercel.json`. Add
+`UPSTOX_ACCESS_TOKEN` as a Production environment variable and redeploy. Do
+not prefix it with `NEXT_PUBLIC_`; the browser must never receive the token.
+To enable Google login and automatic fundamentals, also add
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` and a long random `FUNDAMENTAL_UPLOAD_TOKEN`.
+The service-role key and upload token are server-only variables. Run both SQL
+migrations in `supabase/migrations/` and follow `SETUP_FROM_SCRATCH.md` for
+the scraper configuration.
 
 ## Data and safety
 

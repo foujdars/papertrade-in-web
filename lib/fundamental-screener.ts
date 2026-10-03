@@ -68,6 +68,8 @@ export type ScreeningRunPayload = {
   id?: string;
   fileName: string;
   importedAt: string;
+  /** Version supplied by the server-side monthly data feed, when available. */
+  sourceVersion?: string;
   dataAsOf?: string;
   results: ScreeningResult[];
   missingColumns: string[];

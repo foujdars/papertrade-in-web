@@ -16,6 +16,18 @@ This guide assumes you have only a Gmail account, the GitHub repository and the 
 
 The SQL enables Row Level Security. A signed-in user can access only their own portfolio state.
 
+### 1A. Create the private fundamentals bucket
+
+1. In the repository, open `supabase/migrations/0002_fundamental_data_storage.sql`.
+2. In Supabase **SQL Editor → New query**, paste the complete file and select
+   **Run**.
+3. Open **Storage**. Confirm that a bucket named `fundamental-data` exists and
+   that its **Public** switch is off.
+
+The CSV is written and read only by the server routes using the service-role
+key. Do not make this bucket public and do not put the service-role key in a
+`NEXT_PUBLIC_` variable.
+
 ## 2. Create Google login credentials
 
 1. Open <https://console.cloud.google.com/>.
@@ -61,13 +73,57 @@ The custom `in.papertrade.app` URL returns Google login from the Android system 
 5. Add:
    - `NEXT_PUBLIC_SUPABASE_URL` = your Project URL
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = your Publishable key
-6. Enable them for **Production**, **Preview** and **Development**.
-7. Keep `UPSTOX_ACCESS_TOKEN` as a server-only variable. It must never begin with `NEXT_PUBLIC_`.
+   - `SUPABASE_SERVICE_ROLE_KEY` = the server-only service-role key from
+     **Project Settings → API**
+   - `FUNDAMENTAL_UPLOAD_TOKEN` = a new random secret, for example generate
+     one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`
+6. Enable these variables for **Production**, **Preview** and **Development**.
+7. Keep `UPSTOX_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY` and
+   `FUNDAMENTAL_UPLOAD_TOKEN` server-only. None may begin with `NEXT_PUBLIC_`.
 8. Open **Deployments**, select the latest deployment menu and choose **Redeploy**.
 
-Before these two Supabase variables exist, the app intentionally remains in setup mode without blocking access. After redeployment, Google login becomes mandatory.
+Before the public Supabase variables exist, the app intentionally remains in
+setup mode without blocking access. After redeployment, Google login and the
+server-backed fundamentals feed are enabled.
 
-## 5. Test the website login
+## 5. Configure the monthly CSV upload
+
+The scraper can upload the finished CSV directly after a successful scrape. In
+the scraper folder, edit `stock_scout_config.env`:
+
+```dotenv
+FUNDAMENTAL_UPLOAD_URL=https://YOUR-VERCEL-DOMAIN/api/fundamentals/upload
+FUNDAMENTAL_UPLOAD_TOKEN=the_same_value_as_vercel
+```
+
+Use the exact production domain of the `papertrade-in-web` Vercel project, not
+the placeholder domain above. Keep this file on the scraper machine only; do
+not commit it or paste the token into the website frontend. The script saves
+the local CSV first and then uploads it, so a failed upload never destroys the
+successful scrape.
+
+Run one manual test from the scraper folder. The final lines should include:
+
+```text
+Saved 410 companies and 41 columns
+Uploaded fundamental CSV to the live server (version ...)
+```
+
+Then sign in to the website, open **Fundamental Analysis**, and refresh the
+page. The latest version is downloaded automatically; no file picker is needed.
+If no file has been uploaded yet, the manual CSV control remains available.
+
+For a monthly run on Windows, create a **Task Scheduler** task that starts
+`run-scraper-windows.bat` on the last day of the month (or on the first day of
+the next month if the Screener data closes later). Set **Start in** to the
+scraper folder and use the same Windows account that can read the config and
+master CSV. On Oracle/Linux, use a cron entry such as `5 23 28-31 * *` together
+with a small wrapper that exits unless tomorrow is day 1; run only one job at a
+time. The server stores only the latest CSV in Supabase, so the Oracle disk is
+not used for a growing archive. Remove old local CSV/log files if the runner's
+disk is nearly full.
+
+## 6. Test the website login
 
 1. Open <https://papertrade-in-web.vercel.app/> in an incognito/private browser window.
 2. Confirm that the PaperTrade IN login page appears.
@@ -80,7 +136,7 @@ Before these two Supabase variables exist, the app intentionally remains in setu
 
 If the account panel says **Cloud setup required**, run the SQL migration from section 1.
 
-## 6. Test the Android app on your own phone
+## 7. Test the Android app on your own phone
 
 1. Install the current stable Android Studio from <https://developer.android.com/studio>.
 2. During installation, include the Android SDK and Android Virtual Device. Android Studio's bundled Java runtime is sufficient.
@@ -101,7 +157,7 @@ If the account panel says **Cloud setup required**, run the SQL migration from s
 
 The Android package name is permanently set to `in.papertrade.app`. Do not create a different Play Console package name.
 
-## 7. Prepare the Play Store account
+## 8. Prepare the Play Store account
 
 1. Open <https://play.google.com/console/signup>.
 2. Register a **Personal** developer account unless you operate a registered company.
@@ -111,7 +167,7 @@ The Android package name is permanently set to `in.papertrade.app`. Do not creat
 
 New personal accounts must normally complete a closed test with at least 12 testers continuously opted in for 14 days before requesting production access.
 
-## 8. Create the signed Android App Bundle
+## 9. Create the signed Android App Bundle
 
 1. In Android Studio open **Build → Generate Signed Bundle / APK**.
 2. Select **Android App Bundle** (`.aab`). Google Play requires an app bundle for new apps.
@@ -121,7 +177,7 @@ New personal accounts must normally complete a closed test with at least 12 test
 6. Choose the `release` build and generate the bundle.
 7. Before every later upload, increase `versionCode` in `android/app/build.gradle`. The user-facing `versionName` should also be updated.
 
-## 9. Complete the Play Console listing
+## 10. Complete the Play Console listing
 
 Prepare these assets and answers:
 
@@ -138,7 +194,7 @@ Prepare these assets and answers:
 
 Do not describe the application as a broker or promise profits. Consistently call it an educational paper-trading simulator.
 
-## 10. Testing and production release
+## 11. Testing and production release
 
 1. Upload the signed `.aab` to **Internal testing** and test it yourself first.
 2. Fix all Play pre-launch report crashes and policy warnings.

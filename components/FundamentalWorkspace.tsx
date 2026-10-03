@@ -6,6 +6,7 @@ import type { Instrument } from "@/lib/market";
 import { recommendedColumns, screenerCompanyUrl, type Decision, type ScreeningResult, type ScreeningRunPayload } from "@/lib/fundamental-screener";
 import { companyJsonTemplate, evaluateCompanyJson, metricMedian, peerFields, rateFundamentalCompany, resolveFundamentalInstrument } from "@/lib/fundamental-analysis";
 import { loadLatestLocalRun, saveLocalRun, updateLocalDecision } from "@/lib/fundamental-store";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { StockLogo } from "./StockLogo";
 import { AppDialog } from "./AppDialog";
 import { ModernSelect } from "./ModernSelect";
@@ -23,6 +24,21 @@ const METRIC_GROUPS = [
 ].map(group => ({ title: group.title, fields: group.keys.map(key => peerFields.find(field => field.key === key)!) }));
 const PAGE_SIZE = 50;
 const number = (value: number | null, suffix = "") => value == null ? "Missing" : `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}${suffix}`;
+
+type RemoteFundamentalManifest = {
+  available?: boolean;
+  version?: string;
+  generatedAt?: string;
+  dataAsOf?: string;
+  fileName?: string;
+  rowCount?: number;
+};
+
+type ImportOptions = {
+  sourceVersion?: string;
+  dataAsOf?: string;
+  automatic?: boolean;
+};
 
 function downloadFile(content: string, fileName: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -52,12 +68,44 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
 
   useEffect(() => {
     let active = true;
-    loadLatestLocalRun(ownerId).then(saved => {
-      if (!active) return;
-      setRun(saved); setSelectedId(saved?.results[0]?.id ?? ""); setDataAsOf(saved?.dataAsOf ?? "");
-    }).catch(() => { if (active) setNotice("Saved research could not be loaded. You can import a CSV and export a backup."); })
-      .finally(() => { if (active) setLoading(false); });
+    const load = async () => {
+      let saved: ScreeningRunPayload | null = null;
+      try {
+        saved = await loadLatestLocalRun(ownerId);
+        if (active) {
+          setRun(saved); setSelectedId(saved?.results[0]?.id ?? ""); setDataAsOf(saved?.dataAsOf ?? "");
+        }
+      } catch {
+        if (active) setNotice("Saved research could not be loaded. The latest server CSV will be tried automatically.");
+      }
+
+      try {
+        const client = getSupabaseBrowserClient();
+        const session = (await client?.auth.getSession())?.data.session;
+        if (session) {
+          const headers = { Authorization: `Bearer ${session.access_token}` };
+          const manifestResponse = await fetch("/api/fundamentals/manifest", { headers, cache: "no-store" });
+          if (manifestResponse.ok) {
+            const manifest = await manifestResponse.json() as RemoteFundamentalManifest;
+            if (manifest.version && manifest.version !== saved?.sourceVersion) {
+              const csvResponse = await fetch("/api/fundamentals/latest", { headers, cache: "no-store" });
+              if (!csvResponse.ok) throw new Error("The latest fundamental CSV could not be downloaded.");
+              const csv = await csvResponse.text();
+              const file = new File([csv], manifest.fileName || "screener_results_merged.csv", { type: "text/csv" });
+              await importCsv(file, { sourceVersion: manifest.version, dataAsOf: manifest.dataAsOf, automatic: true });
+            }
+          }
+        }
+      } catch (caught) {
+        if (active && !saved) setNotice(caught instanceof Error ? caught.message : "The latest server CSV could not be loaded. You can import a CSV manually.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
     return () => { active = false; worker.current?.terminate(); worker.current = null; };
+  // importCsv is a stable function declaration; ownerId is the only load scope.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownerId]);
 
   const industries = useMemo(() => [...new Set(run?.results.map(result => result.industry) ?? [])].sort(), [run]);
@@ -74,8 +122,8 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
   const selected = run?.results.find(result => result.id === selectedId) ?? null;
   const passing = run?.results.filter(result => result.gateStatus === "review").length ?? 0;
 
-  async function importCsv(file: File) {
-    if (importing.current || loading) return;
+  async function importCsv(file: File, options: ImportOptions = {}) {
+    if (importing.current) return;
     setError(""); setNotice("");
     if (!file.name.toLowerCase().endsWith(".csv")) { setError("Select a Screener CSV export."); return; }
     if (file.size > 100 * 1024 * 1024) { setError("The CSV limit is 100 MB. Split larger exports into smaller files."); return; }
@@ -94,11 +142,16 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
       });
       if (!payload.results.length) throw new Error("This CSV contains no company rows.");
       if (!payload.results.some(result => result.name !== "Company 1" && (result.nseCode || result.bseCode))) throw new Error("Use a Screener export containing Name and NSE Code or BSE Code columns.");
-      const dated = { ...payload, dataAsOf: dataAsOf || undefined };
+      const dated = {
+        ...payload,
+        sourceVersion: options.sourceVersion,
+        dataAsOf: (options.dataAsOf ?? dataAsOf) || undefined,
+      };
       let next: ScreeningRunPayload = dated;
       try { next = await saveLocalRun(ownerId, dated, file); setNotice("Research saved on this browser for this account. Export an audit for a portable backup."); }
       catch { setNotice("Analysis is ready, but browser storage could not save it. Export an audit before leaving this tab."); }
-      setRun(next); setSelectedId(next.results[0].id); setDrawerOpen(false); setView("screen"); setSearch(""); setStatus("all"); setIndustry("all"); setPage(0);
+      if (options.automatic) setNotice("Latest fundamental data loaded automatically from the server.");
+      setRun(next); setDataAsOf(next.dataAsOf ?? ""); setSelectedId(next.results[0].id); setDrawerOpen(false); setView("screen"); setSearch(""); setStatus("all"); setIndustry("all"); setPage(0);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not import this CSV."); }
     finally { setBusy(false); importing.current = false; }
   }
@@ -121,13 +174,13 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
       <div className="modal-head"><div><span className="eyebrow">Indian equities</span><h2><BookOpenCheck size={22} /> Fundamental Analysis</h2></div><button className="icon-button" onClick={onClose} aria-label="Close fundamental analysis"><X size={20} /></button></div>
       <div className="fa-toolbar">
         <nav className="fa-tabs" aria-label="Fundamental analysis sections">{VIEWS.map(tab => <button key={tab.id} aria-pressed={view === tab.id} onClick={() => { setView(tab.id); setPage(0); setDrawerOpen(false); }}>{tab.label}</button>)}</nav>
-        <div className="fa-file-actions"><label className={`fa-upload ${busy || loading ? "disabled" : ""}`}><Upload size={16} />{busy ? "Screening…" : "Import CSV"}<input type="file" accept=".csv,text/csv" aria-label="Import fundamental CSV" disabled={busy || loading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importCsv(file); }} /></label><button disabled={!run || busy} onClick={() => run && downloadFile(JSON.stringify({ ...run, exportedAt: new Date().toISOString() }, null, 2), "papertrade-fundamental-audit.json", "application/json")}><Download size={16} />Export audit</button></div>
+        <div className="fa-file-actions"><label className={`fa-upload ${busy || loading ? "disabled" : ""}`}><Upload size={16} />{busy ? "Screening…" : "Import CSV manually"}<input type="file" accept=".csv,text/csv" aria-label="Import fundamental CSV" disabled={busy || loading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importCsv(file); }} /></label><button disabled={!run || busy} onClick={() => run && downloadFile(JSON.stringify({ ...run, exportedAt: new Date().toISOString() }, null, 2), "papertrade-fundamental-audit.json", "application/json")}><Download size={16} />Export audit</button></div>
       </div>
       {error && <p className="fa-message fa-error" role="alert">{error}</p>}
       {notice && <p className="fa-message" role="status">{notice}</p>}
       {loading ? <p role="status">Loading saved research…</p> : <>
         {run && <div className="fa-run-summary"><b>{run.results.length} companies</b><span>{passing} passed gates</span><span>{run.results.length - passing} failed</span><span>{run.results.filter(result => result.decision === "approved").length} approved</span></div>}
-        {view === "rate" ? <CompanyRating instruments={instruments} onOpenChart={onOpenChart} /> : !run ? <div className="fa-empty"><BookOpenCheck size={32} /><h3>Import your company fundamentals</h3><p>Use the same Screener CSV export as stock-scout. Analyse financial ratios, compare industry peers and open each company in your existing chart workspace.</p><button onClick={() => downloadFile(`${recommendedColumns.join(",")}\n`, "fundamental-columns.csv", "text/csv")}>Download column template</button><button onClick={() => setView("rate")}>Rate one company with JSON</button></div> : <>
+        {view === "rate" ? <CompanyRating instruments={instruments} onOpenChart={onOpenChart} /> : !run ? <div className="fa-empty"><BookOpenCheck size={32} /><h3>Loading the latest company fundamentals</h3><p>After sign-in, the latest monthly Screener CSV is loaded from the server automatically. Manual CSV import remains available as a fallback.</p><button onClick={() => downloadFile(`${recommendedColumns.join(",")}\n`, "fundamental-columns.csv", "text/csv")}>Download column template</button><button onClick={() => setView("rate")}>Rate one company with JSON</button></div> : <>
           {run.missingColumns.length > 0 && <details className="fa-missing"><summary>{run.missingColumns.length} screening columns missing · missing values fail their gates</summary><p>{run.missingColumns.join(" · ")}</p></details>}
           {view === "peers" ? <PeerComparison key={run.importedAt} run={run} instruments={instruments} onOpenChart={openChart} /> : <>
             <div className="fa-stock-toolbar"><button ref={stockTrigger} className="fa-stock-trigger" aria-label="Open stock list" aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls={drawerId} onClick={() => setDrawerOpen(true)}><PanelRight size={18} />Stocks<span className="fa-stock-count">{filtered.length}</span><ChevronRight size={16} /></button></div>
@@ -141,7 +194,7 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
           </>}
         </>}
       </>}
-      <details className="fa-help"><summary>Data, rules and chart connections</summary><p>Fundamental values come from your imported CSV or pasted company JSON. Import time is separate from the financial data date. Missing values stay visible; prices from an export are not live quotes.</p><p>Passing gates makes a company ready for your review. Financial businesses also need checks of asset quality, capital adequacy and their specific business model. Rankings describe supplied data and do not predict returns.</p><p>Open chart resolves the NSE/BSE code or ISIN into the existing Charts workspace, with its current market data, drawings, indicators, alerts and paper order controls. An unavailable instrument needs a valid code and ISIN. Screening and saved reviews stay in this browser for the current account.</p><a href="https://github.com/foujdars/stock-scout" target="_blank" rel="noreferrer">Source: your stock-scout repository</a></details>
+      <details className="fa-help"><summary>Data, rules and chart connections</summary><p>Fundamental values come from the latest server CSV after sign-in, or from a manual CSV/JSON fallback. Import time is separate from the financial data date. Missing values stay visible; prices from an export are not live quotes.</p><p>Passing gates makes a company ready for your review. Financial businesses also need checks of asset quality, capital adequacy and their specific business model. Rankings describe supplied data and do not predict returns.</p><p>Open chart resolves the NSE/BSE code or ISIN into the existing Charts workspace, with its current market data, drawings, indicators, alerts and paper order controls. An unavailable instrument needs a valid code and ISIN. Screening and saved reviews stay in this browser for the current account.</p><a href="https://github.com/foujdars/stock-scout" target="_blank" rel="noreferrer">Source: your stock-scout repository</a></details>
     </section>
   </div>;
 }
