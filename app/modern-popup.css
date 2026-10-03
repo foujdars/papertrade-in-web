@@ -1,0 +1,41 @@
+/* Shared popup surfaces retain the terminal's theme and typography. */
+.app-dialog { color: var(--ink); background: var(--surface); border-color: var(--line); font: inherit; overscroll-behavior: contain; }
+.app-dialog::backdrop { background: #09071c65; backdrop-filter: blur(2px); }
+.app-dialog :is(button, input, [role="option"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.terminal-shell .modal:not(.navigation-page) { border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--surface); box-shadow: 0 20px 70px #13092e2b; }
+.terminal-shell .modal:not(.navigation-page) .modal-head { gap: 12px; }
+.terminal-shell .modal:not(.navigation-page) .modal-head > .icon-button { flex: none; border-radius: 10px; background: var(--soft); color: var(--muted); }
+.terminal-shell .modern-select-dialog { border-radius: 16px; box-shadow: 0 18px 60px #13092e30; }
+.modern-select-content h3 { font-size: 18px; letter-spacing: normal; }
+.modern-select-content { padding: 14px; }
+.modern-select-options { gap: 3px; }
+.terminal-shell .modern-select-content header > button { display: grid; place-items: center; flex: 0 0 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; color: var(--muted); background: var(--soft); }
+.terminal-shell .modern-select-options > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 10px; border: 1px solid transparent; border-radius: 10px; color: var(--ink); background: transparent; font: inherit; text-align: left; }
+.terminal-shell .modern-select-options > button[aria-selected="true"] { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 20%, transparent); background: var(--purple-soft); }
+.terminal-shell .modern-select-options > button:disabled { opacity: .45; cursor: not-allowed; }
+.terminal-shell .watchlist-selector-menu { position: fixed; inset: 0; margin: auto; padding: 0; width: min(440px, calc(100vw - 24px)); max-width: none; max-height: min(80dvh, 680px); border: 1px solid var(--line); border-radius: 18px; color: var(--ink); background: var(--surface); box-shadow: 0 20px 70px #13092e30; }
+.terminal-shell .watchlist-selector-menu > header { position: sticky; top: 0; z-index: 1; min-height: 66px; padding: 12px 14px; background: var(--surface); }
+.terminal-shell .watchlist-selector-menu > header b { font-size: 18px; font-weight: 650; }
+.terminal-shell .watchlist-selector-menu > header small { color: var(--muted); font-size: 12px; }
+.terminal-shell .watchlist-selector-options { padding: 10px; gap: 4px; }
+.terminal-shell .watchlist-selector-options > button { min-height: 52px; padding: 9px 11px; border: 1px solid transparent; border-radius: 10px; color: var(--ink); background: var(--surface); }
+.terminal-shell .watchlist-selector-options > button.active { color: var(--purple); border-color: var(--purple); background: var(--purple-soft); }
+.terminal-shell .watchlist-selector-options b { color: inherit; font-size: 14px; font-weight: 600; }
+.terminal-shell .watchlist-selector-options small { color: var(--muted); font-size: 11px; }
+.terminal-shell .watchlist-selector-options em { color: var(--muted); background: var(--soft); font-size: 12px; }
+.terminal-shell .watchlist-selector-menu > footer { position: sticky; bottom: 0; background: var(--surface); }
+.terminal-shell .watchlist-selector-menu > footer button { min-height: 42px; font-size: 13px; font-weight: 600; }
+.terminal-shell .mobile-utility-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.terminal-shell .mobile-utility-grid > button { min-width: 0; }
+.terminal-shell .workspace.section-watchlist > :not(.watchlist-panel) { visibility: hidden; pointer-events: none; }
+.terminal-shell .watchlist-panel > .fno-lists-panel { position: static; inset: auto; display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; overflow: hidden; background: var(--surface); }
+.watchlist-panel > .fno-lists-panel .market-discovery-list { flex: 1; min-height: 0; overflow: auto; }
+.watchlist-panel > .fno-lists-panel .market-search { flex: none; }
+@media (max-width: 600px) {
+  .terminal-shell .modern-select-dialog { border-radius: 20px 20px 0 0; }
+  .modern-select-content { padding: 10px 14px max(16px, env(safe-area-inset-bottom)); }
+  .modern-select-handle { margin-bottom: 12px; }
+  .modern-select-content header { margin-bottom: 12px; }
+  .terminal-shell .modern-select-options > button { min-height: 50px; }
+  .terminal-shell .watchlist-selector-menu { inset: auto 0 0; width: 100%; margin: 0; max-height: 85dvh; border-radius: 20px 20px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
