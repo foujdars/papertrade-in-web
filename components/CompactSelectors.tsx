@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, Clock3, List, Plus, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useTransientBack } from './useTransientBack';
+import { AppDialog } from "./AppDialog";
 
 export const CHART_TIMEFRAMES = ["1m", "2m", "3m", "5m", "10m", "15m", "30m", "1H", "2H", "3H", "4H", "1D", "1W", "1M", "1Y"] as const;
 
@@ -77,15 +77,12 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
 type WatchlistChoice = { id: string; name: string; count: number; custom?: boolean; description?: string };
 
 export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onClose }: { activeId: string; choices: WatchlistChoice[]; onSelect: (id: string) => void; onNewList: () => void; onClose: () => void }) {
-  useTransientBack(true, onClose);
-  useEscape(onClose);
   return (
-    <div className="watchlist-selector-backdrop" role="presentation" onPointerDown={onClose}>
-      <section className="watchlist-selector-menu" role="dialog" aria-modal="true" aria-label="Choose watchlist" onPointerDown={(event) => event.stopPropagation()}>
+      <AppDialog className="watchlist-selector-menu" label="Choose watchlist" initialFocus='[aria-pressed="true"]' onClose={onClose}>
         <header><div><List size={18} /><span><b>Watchlists</b><small>Choose the list to display</small></span></div><button onClick={onClose} aria-label="Close watchlist selector"><X size={18} /></button></header>
         <div className="watchlist-selector-options">
           {choices.map((choice) => (
-            <button key={choice.id} className={activeId === choice.id ? "active" : ""} onClick={() => onSelect(choice.id)}>
+            <button type="button" key={choice.id} aria-pressed={activeId === choice.id} className={activeId === choice.id ? "active" : ""} onClick={() => onSelect(choice.id)}>
               <span><b>{choice.name}</b><small>{choice.description ?? (choice.custom ? "Custom watchlist" : "NSE market list")}</small></span>
               <em>{choice.count}</em>
               {activeId === choice.id && <Check size={15} />}
@@ -93,8 +90,7 @@ export function WatchlistSelector({ activeId, choices, onSelect, onNewList, onCl
           ))}
         </div>
         <footer><button onClick={onNewList}><Plus size={15} /> Create custom watchlist</button></footer>
-      </section>
-    </div>
+      </AppDialog>
   );
 }
 

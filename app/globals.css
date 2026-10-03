@@ -2658,10 +2658,10 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 }
 
 .workspace.section-fundamentals { display: none !important; }
-/* Give every destination a visible slot at the same breakpoint as the header. */
+/* Keep the six main destinations visible at the same breakpoint as the header. */
 @media (max-width: 940px) {
-  .terminal-shell .mobile-bottom-nav { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
-  .terminal-shell .mobile-bottom-nav::before { width: calc(100% / 8); }
+  .terminal-shell .mobile-bottom-nav { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+  .terminal-shell .mobile-bottom-nav::before { width: calc(100% / 6); }
 }
 
 /* Utilities and navigation have separate compact rows, so neither crowds out tabs. */
