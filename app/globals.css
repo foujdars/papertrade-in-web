@@ -2658,10 +2658,17 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 }
 
 .workspace.section-fundamentals { display: none !important; }
-/* Keep all eight destinations in one compact, horizontally scrollable mobile row. */
-@media (max-width: 760px) {
-  .mobile-bottom-nav { display: flex !important; overflow-x: auto !important; scrollbar-width: none; }
-  .mobile-bottom-nav::-webkit-scrollbar { display: none; }
-  .mobile-bottom-nav button { flex: 0 0 64px; min-width: 64px; font-size: 10px; }
-  .mobile-bottom-nav button[aria-label="Fundamental Analysis"] { flex-basis: 88px; }
+/* Give every destination a visible slot at the same breakpoint as the header. */
+@media (max-width: 940px) {
+  .terminal-shell .mobile-bottom-nav { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
+  .terminal-shell .mobile-bottom-nav::before { width: calc(100% / 8); }
+}
+
+/* Utilities and navigation have separate compact rows, so neither crowds out tabs. */
+@media (min-width: 941px) {
+  .topbar { height: 73px; flex-basis: 73px; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 40px 32px; gap: 0 14px; padding: 0 14px; }
+  .topbar > .brand { grid-column: 1; grid-row: 1; }
+  .topbar > .top-actions { grid-column: 2; grid-row: 1; justify-self: end; }
+  .main-nav { grid-column: 1 / -1; grid-row: 2; overflow: visible; }
+  .terminal-shell :is(.home-workspace, .market-discovery-panel) { top: 73px; }
 }
