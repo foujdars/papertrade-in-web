@@ -1,19 +1,20 @@
 "use client";
 
 import { Check, ChevronDown, X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { useTransientBack } from "./useTransientBack";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { AppDialog } from "./AppDialog";
 
-export type SelectChoice<T extends string> = { value: T; label: string; description?: string };
+export type SelectChoice<T extends string> = { value: T; label: string; description?: string; disabled?: boolean };
 
 /** Native dialog supplies modality/focus containment; the options stay app-themed on Android. */
 export function ModernSelect<T extends string>({ label, ariaLabel = label, value, choices, onChange, hideLabel = false }: {
   label: string; ariaLabel?: string; value: T; choices: readonly SelectChoice<T>[]; onChange: (value: T) => void; hideLabel?: boolean;
 }) {
-  const id = useId(), trigger = useRef<HTMLButtonElement>(null), dialog = useRef<HTMLDialogElement>(null);
+  const id = useId(), trigger = useRef<HTMLButtonElement>(null), options = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false), [position, setPosition] = useState<CSSProperties>({});
+  const [focusedValue, setFocusedValue] = useState(value);
   const chosen = choices.find(choice => choice.value === value);
-  useTransientBack(open, () => setOpen(false));
+  const openChoices = () => { setFocusedValue(value); setOpen(true); };
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -31,37 +32,33 @@ export function ModernSelect<T extends string>({ label, ariaLabel = label, value
     return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const node = dialog.current;
-    node?.showModal();
-    node?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus({ preventScroll: true });
-    return () => { node?.close(); if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true }); };
-  }, [open]);
-
   function focusOption(event: React.KeyboardEvent, index: number) {
+    const enabled = choices.map((choice, i) => choice.disabled ? -1 : i).filter(i => i >= 0);
+    if (!enabled.length) return;
     let next = index;
-    if (event.key === "ArrowDown") next = (index + 1) % choices.length;
-    else if (event.key === "ArrowUp") next = (index - 1 + choices.length) % choices.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = choices.length - 1;
+    const current = enabled.indexOf(index);
+    if (event.key === "ArrowDown") next = enabled[(current + 1) % enabled.length];
+    else if (event.key === "ArrowUp") next = enabled[(current - 1 + enabled.length) % enabled.length];
+    else if (event.key === "Home") next = enabled[0];
+    else if (event.key === "End") next = enabled[enabled.length - 1];
     else if (event.key.length === 1 && /[a-z0-9]/i.test(event.key)) {
-      const match = choices.findIndex((_, offset) => choices[(index + 1 + offset) % choices.length].label.toLowerCase().startsWith(event.key.toLowerCase()));
-      if (match < 0) return;
-      next = (index + 1 + match) % choices.length;
+      const ordered = [...enabled.slice(current + 1), ...enabled.slice(0, current + 1)];
+      const match = ordered.find(i => choices[i].label.toLowerCase().startsWith(event.key.toLowerCase()));
+      if (match == null) return;
+      next = match;
     } else return;
-    event.preventDefault(); dialog.current?.querySelectorAll<HTMLElement>('[role="option"]')[next]?.focus();
+    event.preventDefault(); options.current?.querySelectorAll<HTMLElement>('[role="option"]')[next]?.focus();
   }
 
   return <div className="modern-select">
     {!hideLabel && <span className="modern-select-label" id={`${id}-label`}>{label}</span>}
-    <button ref={trigger} type="button" className="modern-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={`${id}-dialog`} onClick={() => setOpen(true)} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }}><span>{chosen?.label ?? "Choose"}</span><ChevronDown size={15} aria-hidden="true" /></button>
-    {open && <dialog ref={dialog} id={`${id}-dialog`} className="modern-select-dialog" style={position} aria-labelledby={`${id}-title`} onCancel={event => { event.preventDefault(); setOpen(false); }} onClick={event => { event.stopPropagation(); if (event.target === event.currentTarget) setOpen(false); }}>
+    <button ref={trigger} type="button" className="modern-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={`${id}-dialog`} onClick={openChoices} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openChoices(); } }}><span>{chosen?.label ?? "Choose"}</span><ChevronDown size={15} aria-hidden="true" /></button>
+    {open && <AppDialog id={`${id}-dialog`} className="modern-select-dialog" style={position} labelledBy={`${id}-title`} returnFocus={trigger} initialFocus='[aria-selected="true"]:not(:disabled)' onClose={() => setOpen(false)}>
       <div className="modern-select-content">
         <div className="modern-select-handle" aria-hidden="true" />
-        <header><div><small>CHOOSE YOUR VIEW</small><h3 id={`${id}-title`}>{label}</h3></div><button type="button" aria-label={`Close ${label.toLowerCase()} choices`} onClick={() => setOpen(false)}><X size={20} /></button></header>
-        <div role="listbox" aria-label={ariaLabel} className="modern-select-options">{choices.map((choice, index) => <button key={choice.value} type="button" role="option" aria-selected={choice.value === value} tabIndex={choice.value === value ? 0 : -1} onKeyDown={event => focusOption(event, index)} onClick={() => { onChange(choice.value); setOpen(false); }}><span><b>{choice.label}</b>{choice.description && <small>{choice.description}</small>}</span><span className="modern-select-check" aria-hidden="true">{choice.value === value && <Check size={17} />}</span></button>)}</div>
+        <header><div><h3 id={`${id}-title`}>{label}</h3></div><button type="button" aria-label={`Close ${label.toLowerCase()} choices`} onClick={() => setOpen(false)}><X size={20} /></button></header>
+        <div ref={options} role="listbox" aria-label={ariaLabel} className="modern-select-options">{choices.map((choice, index) => <button key={choice.value} type="button" role="option" aria-selected={choice.value === value} aria-disabled={choice.disabled || undefined} disabled={choice.disabled} tabIndex={!choice.disabled && choice.value === focusedValue ? 0 : -1} onFocus={() => setFocusedValue(choice.value)} onKeyDown={event => focusOption(event, index)} onClick={() => { onChange(choice.value); setOpen(false); }}><span><b>{choice.label}</b>{choice.description && <small>{choice.description}</small>}</span><span className="modern-select-check" aria-hidden="true">{choice.value === value && <Check size={17} />}</span></button>)}</div>
       </div>
-    </dialog>}
+    </AppDialog>}
   </div>;
 }
