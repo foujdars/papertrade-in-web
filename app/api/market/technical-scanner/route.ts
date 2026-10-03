@@ -1,4 +1,3 @@
-import { rankResearch, researchFactors } from "@/lib/research";
 import { analyzeNimbleCandles, NIMBLE_STRATEGIES, type NimbleCandle, type NimbleStrategy, type ScannerTimeframe, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { UpstoxServerError, upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
@@ -107,8 +106,7 @@ async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
     const toDate = indiaDateKey(Date.now());
     const fromDate = indiaDateKey(Date.now() - 1_100 * 86_400_000);
     const history = await upstoxFetch<CandlePayload>(`/v3/historical-candle/${encodedKey}/days/1/${toDate}/${fromDate}`);
-    const candles = parseCandles(history, timeframe);
-    return { match: analyzeNimbleCandles(candles, strategy, timeframe), factors: researchFactors(candles.map(c => ({ ...c, time: c.timestamp / 1000 })), []) };
+    return analyzeNimbleCandles(parseCandles(history, timeframe), strategy, timeframe);
   }
   const intraday = await upstoxFetch<CandlePayload>(`/v3/historical-candle/intraday/${encodedKey}/minutes/${timeframe}`);
   let candles = parseCandles(intraday, timeframe);
@@ -120,7 +118,7 @@ async function loadCandles(item: LiquidInstrument, strategy: NimbleStrategy) {
     const history = await upstoxFetch<CandlePayload>(`/v3/historical-candle/${encodedKey}/minutes/${timeframe}/${toDate}/${fromDate}`);
     candles = mergeCandles(parseCandles(history, timeframe), candles);
   }
-  return { match: analyzeNimbleCandles(candles, strategy, timeframe), factors: researchFactors(candles.map(c => ({ ...c, time: c.timestamp / 1000 })), []) };
+  return analyzeNimbleCandles(candles, strategy, timeframe);
 }
 
 export async function POST(request: Request) {
@@ -144,20 +142,15 @@ export async function POST(request: Request) {
     let rateLimitError: UpstoxServerError | null = null;
     const scanned = await mapWithConcurrency(liquid, 5, async (item) => {
       try {
-        return { item, ...await loadCandles(item, strategy), failed: false };
+        return { item, match: await loadCandles(item, strategy), failed: false };
       } catch (error) {
         if (error instanceof UpstoxServerError && error.code === "RATE_LIMITED") rateLimitError = error;
-        return { item, match: null, factors: {}, failed: true };
+        return { item, match: null, failed: true };
       }
     });
     const successfulScans = scanned.filter((result) => !result.failed).length;
     if (rateLimitError && successfulScans === 0) throw rateLimitError;
-    const rankDirection = (sign: number) => new Map(rankResearch(scanned.filter(r => !r.failed).map(r => ({ symbol: r.item.symbol, raw: { ...r.factors, ...(r.factors.momentum !== undefined ? { momentum: r.factors.momentum * sign } : {}), ...(r.factors.trend !== undefined ? { trend: r.factors.trend * sign } : {}) } }))).map(r => [r.symbol, r]));
-    const longScores = rankDirection(1), shortScores = rankDirection(-1);
-    const scores = new Map(scanned.map(r => [r.item.symbol, (r.match?.signal === "short" || r.match?.signal === "breakdown" ? shortScores : longScores).get(r.item.symbol)]));
     const rows: TechnicalScannerRow[] = scanned.flatMap(({ item, match }) => match ? [{
-      qualityScore: scores.get(item.symbol)?.score,
-      scoreFactors: scores.get(item.symbol)?.factors,
       symbol: item.symbol,
       name: item.name,
       instrumentKey: item.instrumentKey,
@@ -171,7 +164,7 @@ export async function POST(request: Request) {
       target1: match.target1,
       indicatorValue: match.indicatorValue,
     }] : []);
-    rows.sort((left, right) => Number(right.setupStatus === "triggered") - Number(left.setupStatus === "triggered") || (right.qualityScore ?? 0) - (left.qualityScore ?? 0) || Math.abs(right.changePercent) - Math.abs(left.changePercent));
+    rows.sort((left, right) => Number(right.setupStatus === "triggered") - Number(left.setupStatus === "triggered") || Math.abs(right.changePercent) - Math.abs(left.changePercent));
     const responsePayload = {
       ok: true,
       source: "Upstox live quotes + completed candles",

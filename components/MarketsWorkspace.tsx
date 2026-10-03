@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Activity, ArrowRight, Clock3, RefreshCw, ScanSearch } from "lucide-react";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { CandleLoader } from "./CandleLoader";
@@ -246,7 +245,6 @@ export function MarketsWorkspace({
 
   return (
     <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
-      <Link className="research-link" href="/research">Daily ranked research · fundamentals & dated news</Link>
 
       <MarketSectionTabs active={scannerGroup} onChange={(section) => {
         if (section === "WATCHLIST") onOpenWatchlist();
@@ -275,9 +273,9 @@ export function MarketsWorkspace({
             : deriveNetChange(row.lastPrice, row.changePercent);
           const displayNetChange = liveQuote?.netChange ?? rowNetChange;
           return (
-            <button key={row.symbol} className="trend-stock-row" title={isTechnicalRow(row) && row.scoreFactors ? Object.entries(row.scoreFactors).map(([factor, value]) => `${factor}: ${value?.toFixed(0)}th percentile of scanned liquid stocks`).join(" · ") : undefined} onClick={() => onSelectCash(item, displayPrice)}>
+            <button key={row.symbol} className="trend-stock-row" onClick={() => onSelectCash(item, displayPrice)}>
               <StockLogo symbol={row.symbol} instrumentKey={item.instrumentKey} />
-              <span><b>{row.symbol}</b><small>{row.name} · NSE{isTechnicalRow(row) && row.qualityScore !== undefined ? ` · Score ${row.qualityScore.toFixed(0)}/100` : ""}</small></span>
+              <span><b>{row.symbol}</b><small>{row.name} · NSE</small></span>
               <span><b>{formatInr(displayPrice)}</b><small className={`market-move-line ${displayChangePercent >= 0 ? "positive" : "negative"}`}>{formatSignedMarketMove(displayNetChange, displayChangePercent)}</small></span>
               <span className="scanner-open-chart"><ArrowRight size={15} /></span>
             </button>

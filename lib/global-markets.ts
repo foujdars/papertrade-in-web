@@ -1,5 +1,3 @@
-import type { BotExitState } from "./bot-protection";
-import type { WalletRisk, EquitySample } from "./portfolio-risk";
 import type { PaperBot } from "./paper-bot-state";
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
@@ -332,7 +330,6 @@ export const tradingFee = (spec: PerpSpec, notional: number, maker = false, curr
   notional * (maker ? spec.maker : spec.taker) * 1.18 * (currency === "USD" ? 1 : USD_INR);
 
 export type PerpPosition = {
-  botExit?: BotExitState;
   botId?: string;
   currency?: "USD";
   protection?: GlobalProtection;
@@ -373,9 +370,6 @@ export type PerpEvent = {
   detail: string;
 };
 export type PerpAccount = {
-  riskLimits?: WalletRisk;
-  equityPeak?: number;
-  equitySamples?: EquitySample[];
   bots?: PaperBot[];
   currency?: "USD";
   version: 1;

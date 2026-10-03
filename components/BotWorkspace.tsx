@@ -1,9 +1,5 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
-import { WalletRiskSettings } from "./WalletRiskSettings";
-import { PortfolioEquity } from "./PortfolioEquity";
-import { BotBacktestPanel } from "./BotBacktestPanel";
 import { Bot, Pause, Play, ShieldCheck, X } from "lucide-react";
 import { BOT_ASSETS, BOT_FRAMES, BOT_STRATEGIES, configureBot, defaultBot, type BotConfig, type BotSymbol, type PaperBot } from "@/lib/paper-bot-state";
 import { botDailyStats } from "@/lib/paper-bot-engine";
@@ -46,9 +42,6 @@ export function BotWorkspace({ trading, onClose, onPnl }: { trading: GlobalTradi
         })}
       </div>
       {(notice || trading.error) && <p className="bot-notice" role="status">{trading.error || notice}</p>}
-      <Link className="research-link" href="/research">NSE daily research · ranked stocks, fundamentals & dated news</Link>
-      <WalletRiskSettings key={JSON.stringify(account?.riskLimits)} trading={trading} />
-      {account && <PortfolioEquity account={account} quotes={Object.fromEntries(Object.entries(trading.snapshots).map(([key, value]) => [key, value?.quote]))} now={trading.clock} />}
       <div className="bot-layout">
         <BotSettings key={`${symbol}:${selected?.startedAt ?? 0}`} bot={selected ?? defaultBot(symbol)} trading={trading} onSaved={() => setNotice("Settings saved. Waiting for a new completed candle.")} />
         <aside className="bot-monitor">
@@ -63,10 +56,10 @@ export function BotWorkspace({ trading, onClose, onPnl }: { trading: GlobalTradi
 }
 
 function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: GlobalTrading; onSaved: () => void }) {
-  const [config, setConfig] = useState<BotConfig>({ sizingMode: "notional", riskPercent: 1, stopMode: "percent", atrPeriod: 14, atrMultiplier: 2, breakEvenR: 0, trailAtr: 0, firstExitPercent: 0, secondExitPercent: 0, firstExitR: 1.5, secondExitR: 3, regimeFilter: "any", ...bot });
+  const [config, setConfig] = useState<BotConfig>(bot);
   const [error, setError] = useState("");
   const field = (key: keyof BotConfig, label: string, min: number, max: number, step = 1) => <label>{label}<input type="number" required min={min} max={max} step={step} value={config[key]} onChange={e => setConfig(c => ({ ...c, [key]: e.target.value === "" ? "" : Number(e.target.value) }))} /></label>;
-  return <div className="bot-config-stack"><form className="bot-card bot-settings" onSubmit={async e => {
+  return <form className="bot-card bot-settings" onSubmit={async e => {
     e.preventDefault(); setError("");
     try {
       configureBot(bot, config, true, Date.now());
@@ -84,18 +77,8 @@ function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: Global
     <p className="bot-rule">{config.strategy === "ema" ? "Long when the fast EMA crosses above the slow EMA; short on the opposite crossover." : config.strategy === "rsi" ? "Long when RSI crosses back above oversold; short when it crosses back below overbought." : "Long when the candle closes above prior range highs; short below prior range lows."}</p>
     <h3>Trade size & protection</h3><div className="bot-fields">{field("notional", "Notional per trade (USD)", 1, 100000, .01)}{field("leverage", "Leverage (×)", 1, 20)}{field("stopPercent", "Stop loss (%)", .1, 25, .1)}{field("targetPercent", "Take profit (%)", .1, 50, .1)}{field("maxEntries", "Maximum entries per day", 1, 100)}{field("maxDailyLoss", "Daily realised loss limit (USD)", 1, 10000, .01)}{field("cooldown", "Cooldown between entries (candles)", 0, 100)}</div>
     <p className="bot-rule">Notional is the total position value. Actual lots round down to the contract increment. Entries include spread, fees, margin and liquidity checks.</p>
-    <details className="research-card"><summary>Risk sizing, market filters & automatic exits</summary><div className="bot-fields">
-      <label>Size method<select aria-label="Size method" value={config.sizingMode} onChange={e => setConfig(c => ({ ...c, sizingMode: e.target.value as BotConfig["sizingMode"] }))}><option value="notional">Fixed notional</option><option value="risk">Risk percentage of equity</option></select></label>
-      {field("riskPercent", "Equity risk per entry (%)", .01, 10, .01)}
-      <label>Stop method<select aria-label="Stop method" value={config.stopMode} onChange={e => setConfig(c => ({ ...c, stopMode: e.target.value as BotConfig["stopMode"] }))}><option value="percent">Fixed percentage</option><option value="atr">ATR volatility stop</option></select></label>
-      {field("atrPeriod", "ATR period", 2, 100)}{field("atrMultiplier", "Initial stop ATR multiple", .1, 10, .1)}
-      <label>Market condition<select aria-label="Market condition" value={config.regimeFilter} onChange={e => setConfig(c => ({ ...c, regimeFilter: e.target.value as BotConfig["regimeFilter"] }))}><option value="any">Any condition</option><option value="trend">Trend only</option><option value="range">Range only</option></select></label>
-      {field("breakEvenR", "Move to breakeven at R (0 off)", 0, 10, .1)}{field("trailAtr", "Trail ATR multiple (0 off)", 0, 10, .1)}
-      {field("firstExitPercent", "First partial exit (%)", 0, 90, 1)}{field("firstExitR", "First target (R)", .1, 20, .1)}
-      {field("secondExitPercent", "Second partial exit (%)", 0, 90, 1)}{field("secondExitR", "Second target (R)", .1, 30, .1)}
-    </div><p className="research-help">R is the original entry-to-stop distance. Risk sizing includes estimated entry/exit fees and caps size at the notional above. Trend/range filters use this asset’s EMA and ATR; stress conditions block filtered entries. With partial targets enabled, the remaining lots use the stop and optional trail instead of the fixed percentage target. At least one lot remains as a runner.</p></details>
     {error && <p role="alert" className="negative">{error}</p>}
     <button className="bot-start" disabled={!trading.account || trading.busy} type="submit"><Play size={16} /> {bot.enabled ? "Save & restart strategy" : "Save & start bot"}</button>
     <small>Starts on the next candle close. Changes apply to future entries; existing position protection stays as placed.</small>
-  </form><BotBacktestPanel config={config} trading={trading} /></div>;
+  </form>;
 }

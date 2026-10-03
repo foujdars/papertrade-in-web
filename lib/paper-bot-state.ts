@@ -3,9 +3,6 @@ export type BotSymbol = keyof typeof BOT_ASSETS;
 export const BOT_FRAMES = { "1m": 60, "5m": 300, "15m": 900, "1H": 3600 } as const;
 export const BOT_STRATEGIES = { ema: "EMA crossover", rsi: "RSI reversal", breakout: "Range breakout" } as const;
 export type BotConfig = {
-  sizingMode?: "notional" | "risk"; riskPercent?: number; stopMode?: "percent" | "atr"; atrPeriod?: number; atrMultiplier?: number;
-  breakEvenR?: number; trailAtr?: number; firstExitPercent?: number; secondExitPercent?: number; firstExitR?: number; secondExitR?: number;
-  regimeFilter?: "any" | "trend" | "range";
   symbol: BotSymbol; strategy: keyof typeof BOT_STRATEGIES; timeframe: keyof typeof BOT_FRAMES;
   direction: "both" | "long" | "short"; fast: number; slow: number; period: number;
   oversold: number; overbought: number; notional: number; leverage: number;
@@ -24,11 +21,6 @@ export function validateBotConfig(c: BotConfig) {
   if (!bounded(c.oversold, 1, 49) || !bounded(c.overbought, 51, 99)) throw new Error("RSI thresholds must be 1–49 and 51–99.");
   if (!bounded(c.notional, 1, 100000) || !bounded(c.leverage, 1, 20, true)) throw new Error("Use $1–$100,000 notional and 1–20× leverage.");
   if (!bounded(c.stopPercent, .1, 25) || !bounded(c.targetPercent, .1, 50)) throw new Error("Stop loss must be 0.1–25% and target 0.1–50%.");
-  if (c.sizingMode !== undefined && !["notional", "risk"].includes(c.sizingMode) || c.stopMode !== undefined && !["percent", "atr"].includes(c.stopMode) || c.regimeFilter !== undefined && !["any", "trend", "range"].includes(c.regimeFilter)) throw new Error("Choose valid sizing, stop and market filters.");
-  for (const [key, lo, hi, integer] of [["riskPercent", .01, 10, false], ["atrPeriod", 2, 100, true], ["atrMultiplier", .1, 10, false], ["breakEvenR", 0, 10, false], ["trailAtr", 0, 10, false], ["firstExitPercent", 0, 90, false], ["secondExitPercent", 0, 90, false], ["firstExitR", .1, 20, false], ["secondExitR", .1, 30, false]] as const) {
-    const value = c[key]; if (value !== undefined && !bounded(value, lo, hi, integer)) throw new Error(`Check ${key}.`);
-  }
-  if ((c.firstExitPercent ?? 0) + (c.secondExitPercent ?? 0) >= 100 || (c.firstExitR ?? 1.5) >= (c.secondExitR ?? 3)) throw new Error("Keep a runner portion and put the second target after the first.");
   if (!bounded(c.maxEntries, 1, 100, true) || !bounded(c.maxDailyLoss, 1, 10000) || !bounded(c.cooldown, 0, 100, true)) throw new Error("Check daily limits and cooldown (0–100 candles).");
 }
 export function validateSavedBots(bots: PaperBot[] | undefined) {

@@ -1,8 +1,6 @@
-import { entryGeometry, initialBotExit, manageBotProtection, averageTrueRange } from "./bot-protection.ts";
-import { portfolioRisk, walletEntryReason } from "./portfolio-risk.ts";
 import type { Candle } from "./market";
 import { freshPerpQuote, type PerpAccount, type PerpQuote, type PerpSpec } from "./global-markets.ts";
-import { sizeToContracts, submitGlobalOrder } from "./global-order-engine.ts";
+import { roundGlobalPrice, sizeToContracts, submitGlobalOrder } from "./global-order-engine.ts";
 import { BOT_FRAMES, BOT_STRATEGIES, botDay, validateBotConfig, type PaperBot } from "./paper-bot-state.ts";
 
 export type BotObservation = { candles: Candle[]; fetchedAt: number };
@@ -56,12 +54,7 @@ export function botSignal(bot: PaperBot, rows: Candle[], now: number) {
     if (last.close < Math.min(...prior.map(c => c.low))) side = "SELL";
   }
   if (bot.direction === "long" && side === "SELL" || bot.direction === "short" && side === "BUY") side = null;
-  const atr = averageTrueRange(candles), trendSeries = ema(values, Math.min(20, values.length - 2));
-  const trendDistance = atr ? Math.abs(last.close - trendSeries.at(-1)!) / atr : 0;
-  const regime = atr && atr / last.close > .05 ? "stress" : trendDistance >= 1 ? "trend" : "range";
-  if (bot.regimeFilter && bot.regimeFilter !== "any" && (regime === "stress" || regime !== bot.regimeFilter)) side = null;
-  return { candle: last.time, side, regime };
-
+  return { candle: last.time, side };
 }
 export function botDailyStats(account: PerpAccount, symbol: string, now: number) {
   const events = account.events.filter(e => e.botId === symbol && botDay(e.at) === botDay(now));
@@ -69,10 +62,7 @@ export function botDailyStats(account: PerpAccount, symbol: string, now: number)
 }
 /** Called within the same wallet lock as manual orders. Candle consumption and fills save atomically. */
 export function advancePaperBots(account: PerpAccount, data: Record<string, { quote: PerpQuote; spec: PerpSpec } | undefined>, observations: Record<string, BotObservation | undefined>, now: number): PerpAccount {
-  const quotes = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value?.quote]));
-  const histories = Object.fromEntries((account.bots ?? []).map(b => [b.symbol, observations[b.symbol] && now - observations[b.symbol]!.fetchedAt <= 30000 ? observations[b.symbol]!.candles.filter(c => c.time + BOT_FRAMES[account.positions.find(p => p.botId === b.symbol)?.botExit?.timeframe ?? b.timeframe] <= now / 1000) : undefined]));
-  let next = manageBotProtection(account, quotes, histories, now);
-
+  let next = account;
   for (const original of account.bots ?? []) {
     if (!original.enabled) continue;
     const bot = { ...original };
@@ -96,22 +86,14 @@ export function advancePaperBots(account: PerpAccount, data: Record<string, { qu
       if (signal.side) {
         const { quote, spec } = snapshot;
         const entry = signal.side === "BUY" ? quote.ask : quote.bid;
-        const closed = observation.candles.filter(c => c.time + BOT_FRAMES[bot.timeframe] <= now / 1000);
-        const geometry = entryGeometry(bot, closed, entry, spec, signal.side);
-        const stats = portfolioRisk(next, quotes, now);
-        if (bot.sizingMode === "risk" && (stats.missing || stats.unsupported)) throw new Error("Risk sizing needs fresh marks and supported exposure for the whole wallet");
-        const feePerUnit = (entry + geometry.stop) * spec.taker * 1.18;
-        const riskLots = Math.floor(Math.max(0, stats.equity) * (bot.riskPercent ?? 1) / 100 / ((geometry.distance + feePerUnit) * spec.lot));
-        const contracts = bot.sizingMode === "risk" ? Math.min(riskLots, sizeToContracts(bot.notional, "USD", spec, entry)) : sizeToContracts(bot.notional, "USD", spec, entry);
-        const reason = walletEntryReason(next, quotes, now, spec, entry, contracts, geometry.stop);
-        if (reason) throw new Error(reason);
-
+        const sign = signal.side === "BUY" ? 1 : -1;
+        const contracts = sizeToContracts(bot.notional, "USD", spec, entry);
         if (!contracts) throw new Error("Trade size is below one contract lot");
         next = submitGlobalOrder(next, spec, quote, {
           type: "Market", side: signal.side, contracts, leverage: bot.leverage,
-          protection: { source: "mark", stopLoss: { mode: "Market", trigger: geometry.stop }, takeProfit: bot.firstExitPercent || bot.secondExitPercent ? undefined : { mode: "Market", trigger: geometry.target } },
-        }, now, quotes);
-        next = { ...next, positions: next.positions.map(p => p.symbol === bot.symbol ? { ...p, botId: bot.symbol, botExit: initialBotExit(bot, geometry.stop, entry, contracts) } : p), events: next.events.map((e, i) => i === next.events.length - 1 ? { ...e, botId: bot.symbol, detail: `Bot · ${BOT_STRATEGIES[bot.strategy]} · ${e.detail}` } : e) };
+          protection: { source: "mark", stopLoss: { mode: "Market", trigger: roundGlobalPrice(entry * (1 - sign * bot.stopPercent / 100), spec) }, takeProfit: { mode: "Market", trigger: roundGlobalPrice(entry * (1 + sign * bot.targetPercent / 100), spec) } },
+        }, now);
+        next = { ...next, positions: next.positions.map(p => p.symbol === bot.symbol ? { ...p, botId: bot.symbol } : p), events: next.events.map((e, i) => i === next.events.length - 1 ? { ...e, botId: bot.symbol, detail: `Bot · ${BOT_STRATEGIES[bot.strategy]} · ${e.detail}` } : e) };
         bot.lastEntryAt = now;
         bot.status = `${signal.side === "BUY" ? "Long" : "Short"} paper entry · ${contracts} lots`;
       }

@@ -93,7 +93,7 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
       const ok = await transact((a, data) => {
         const live = data[symbol];
         if (!live) throw new Error("Fresh market data is unavailable.");
-        return submitGlobalOrder(a, live.spec, live.quote, { type, side, contracts, leverage: Number(leverage), limit: needsLimit(type) ? Number(limit) : undefined, trigger: needsTrigger(type) ? Number(trigger) : undefined, trail: type === "Trailing stop" ? Number(trail) : undefined, source, reduceOnly, protection }, Date.now(), Object.fromEntries(Object.entries(data).map(([key, value]) => [key, value?.quote])));
+        return submitGlobalOrder(a, live.spec, live.quote, { type, side, contracts, leverage: Number(leverage), limit: needsLimit(type) ? Number(limit) : undefined, trigger: needsTrigger(type) ? Number(trigger) : undefined, trail: type === "Trailing stop" ? Number(trail) : undefined, source, reduceOnly, protection }, Date.now());
       });
       if (ok) { setNotice(`${type} paper order accepted · ${contracts} lot${contracts === 1 ? "" : "s"}`); onTab(type === "Market" ? "Positions" : "Open orders"); }
     } catch (e) { setLocalError(e instanceof Error ? e.message : "Check the order fields."); }
