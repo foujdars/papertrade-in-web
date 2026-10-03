@@ -38,6 +38,8 @@ export type NimbleMatch = {
 };
 
 export type TechnicalScannerRow = {
+  qualityScore?: number;
+  scoreFactors?: Partial<Record<"momentum" | "trend" | "volume", number>>;
   symbol: string;
   name: string;
   instrumentKey: string;

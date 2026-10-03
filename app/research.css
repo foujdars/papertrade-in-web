@@ -1,0 +1,41 @@
+.research-workspace { position: fixed; inset: 0; max-width: 1100px; margin: 0 auto; padding: 24px 18px; overflow-y: auto; overscroll-behavior: contain; color: var(--ink); font-size: 16px; }
+.research-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.research-top h1 { margin: 4px 0; font-size: 28px; }
+.research-workspace a,.research-card a { color: var(--purple); }
+.research-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 12px 0; color: var(--ink); overflow-wrap: anywhere; }
+.research-card h3 { font-size: 16px; margin: 8px 0 14px; }
+.research-card p { font-size: 14px; line-height: 1.6; }
+.research-card summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.research-card > form,.research-card > .bot-fields { margin-top: 16px; }
+.research-card button,.research-toolbar button { cursor: pointer; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-top: 10px; }
+.research-card button:disabled,.research-toolbar button:disabled { opacity: .6; cursor: default; }
+.research-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.research-toolbar label { display: grid; gap: 6px; font-size: 14px; flex: 1; min-width: 180px; }
+.research-toolbar :is(input,select) { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 16px; width: 100%; }
+.research-help { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.research-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.research-metrics > span,.research-factors > span { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+.research-metrics b,.research-factors b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.research-stock summary { display: grid; grid-template-columns: 25px 1fr 120px 65px; align-items: center; gap: 12px; }
+.research-stock summary small { display: block; color: var(--muted); font-size: 13px; font-weight: 400; margin-top: 4px; }
+.research-rank { color: var(--muted); }
+.research-stock-body { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
+.research-stock-body h3 { margin-top: 22px; }
+.research-factors { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.research-screen { font-size: 13px; text-transform: capitalize; }
+.research-screen.flag { color: var(--red); }
+.research-screen.pass { color: var(--green); }
+.research-news { padding-left: 20px; }
+.research-news li { padding: 8px 0; font-size: 14px; }
+.research-news small { display: block; font-size: 13px; margin-top: 6px; color: var(--muted); }
+.research-table-wrap { overflow-x: auto; margin: 12px 0; }
+.research-card table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+.research-card th,.research-card td { padding: 10px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.research-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 12px 0; }
+.equity-history { grid-column: 1 / -1; }
+.equity-history svg { width: 100%; max-height: 200px; margin-top: 16px; }
+.equity-history svg text { fill: var(--muted); font-size: 12px; }
+.bot-workspace .research-card :is(input,select),.bot-workspace .research-card button { font-size: 14px; }
+.research-link { display: inline-block; margin: 8px 0; font-size: 14px; color: var(--purple); }
+.research-workspace :is(button,input,select,summary,a):focus-visible,.research-card :is(button,input,select,summary,a):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+@media(max-width: 700px) { .research-metrics,.research-factors { grid-template-columns: repeat(2,minmax(0,1fr)); } .research-stock summary { grid-template-columns: 20px 1fr 95px; gap: 8px; } .research-screen { grid-column: 2 / -1; } .research-top h1 { font-size: 24px; } .research-top a { font-size: 14px; } .research-workspace { padding: 16px 12px; } }

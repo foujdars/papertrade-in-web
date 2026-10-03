@@ -1,0 +1,80 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { defaultBot, configureBot } from "../lib/paper-bot-state.ts";
+import { readGlobalAccount, submitGlobalOrder } from "../lib/global-order-engine.ts";
+import { walletEntryReason, defaultWalletRisk, portfolioRisk, samplePortfolio, equityMetrics } from "../lib/portfolio-risk.ts";
+import { manageBotProtection, initialBotExit, entryGeometry } from "../lib/bot-protection.ts";
+import { advancePaperBots } from "../lib/paper-bot-engine.ts";
+import { backtestBot } from "../lib/bot-backtest.ts";
+const base = 1800000000000, now = base + 25 * 300000 + 1000;
+const spec = { symbol: "BTCUSD", lot: .01, tick: .01, initial: .01, maintenance: .005, initialScale: 0, maintenanceScale: 0, scalingThreshold: 100000, maxNotional: 5000000, maker: .0002, taker: .0005, liquidation: .0005, fundingSeconds: 28800, operational: true, fetchedAt: now };
+const q = { symbol: "BTCUSD", last: 110, mark: 110, index: 110, bid: 110, ask: 110, bidSize: 10000, askSize: 10000, funding: 0, change: 1, at: now, operational: true };
+const candleRows = prices => prices.map((close, i) => ({ time: base / 1000 + i * 300, open: close, high: close + .5, low: close - .5, close, volume: 100 }));
+test("wallet gates combine all symbols, require fresh exposure and keep reductions available", () => {
+  const account = { ...readGlobalAccount(null), riskLimits: { ...defaultWalletRisk(), enabled: true, maxDailyEntries: 1 } };
+  const first = submitGlobalOrder(account, spec, q, { type: "Market", side: "BUY", contracts: 10, leverage: 1, protection: { source: "mark", stopLoss: { mode: "Market", trigger: 100 } } }, now);
+  assert.match(walletEntryReason(first, { BTCUSD: q }, now, { ...spec, symbol: "ETHUSD" }, 100, 10, 90), /daily entry/);
+  assert.match(walletEntryReason(first, {}, now, spec, 100, 10, 90), /fresh prices/);
+  assert.doesNotThrow(() => submitGlobalOrder(first, spec, q, { type: "Market", side: "SELL", contracts: 10, leverage: 1, reduceOnly: true }, now));
+});
+test("multiple assets can enter with complete quotes and portfolio risk remains bounded", () => {
+  let a = { ...readGlobalAccount(null), riskLimits: { ...defaultWalletRisk(), enabled: true } };
+  a = submitGlobalOrder(a, spec, q, { type: "Market", side: "BUY", contracts: 10, leverage: 1, protection: { source: "mark", stopLoss: { mode: "Market", trigger: 100 } } }, now);
+  const eth = { ...q, symbol: "ETHUSD" };
+  a = submitGlobalOrder(a, { ...spec, symbol: "ETHUSD" }, eth, { type: "Market", side: "BUY", contracts: 10, leverage: 1, protection: { source: "mark", stopLoss: { mode: "Market", trigger: 100 } } }, now, { BTCUSD: q, ETHUSD: eth });
+  assert.equal(a.positions.length, 2);
+  assert.ok(portfolioRisk(a, { BTCUSD: q, ETHUSD: eth }, now).openRisk < 5);
+});
+test("risk sizing rounds down and automatic partials preserve one runner and attribution", () => {
+  const rows = candleRows([...Array(24).fill(100), 110]);
+  const cfg = { ...defaultBot("BTCUSD"), strategy: "breakout", period: 10, sizingMode: "risk", riskPercent: .01, notional: 10000, firstExitPercent: 35, secondExitPercent: 35, firstExitR: 1.5, secondExitR: 3, breakEvenR: 1 };
+  const bot = configureBot(undefined, cfg, true, now - 300000);
+  const a = advancePaperBots({ ...readGlobalAccount(null), bots: [bot] }, { BTCUSD: { quote: q, spec } }, { BTCUSD: { candles: rows, fetchedAt: now } }, now);
+  const p = a.positions[0]; assert.ok(p.contracts * spec.lot * (1.1 + 220 * spec.taker * 1.18) <= 1);
+  assert.equal(p.protection.takeProfit, undefined);
+  const nextQ = { ...q, mark: 114, last: 114, bid: 114, ask: 114, at: now + 1000 };
+  const b = manageBotProtection(a, { BTCUSD: nextQ }, { BTCUSD: rows }, now + 1000);
+  assert.equal(b.events.filter(e => e.kind === "CLOSE").length, 2);
+  assert.ok(b.positions[0].contracts > 0 && b.positions[0].contracts < p.contracts);
+  assert.ok(b.positions[0].protection.stopLoss.trigger > p.entry);
+  assert.ok(b.events.every(e => e.botId === "BTCUSD"));
+  assert.deepEqual(manageBotProtection(b, { BTCUSD: nextQ }, { BTCUSD: rows }, now + 1000), b);
+  assert.deepEqual(readGlobalAccount(JSON.stringify(b)), JSON.parse(JSON.stringify(b)));
+});
+test("equity history includes unrealised loss and fees; unknown marks do not create snapshots", () => {
+  const a = submitGlobalOrder(readGlobalAccount(null), spec, q, { type: "Market", side: "BUY", contracts: 100, leverage: 1 }, now);
+  const down = { ...q, mark: 100, at: now + 1000 };
+  const s = portfolioRisk(a, { BTCUSD: down }, now + 1000); assert.ok(s.equity < a.wallet);
+  assert.equal(samplePortfolio(a, {}, now).equitySamples, undefined);
+  const sampled = samplePortfolio(a, { BTCUSD: down }, now + 1000); assert.equal(sampled.equitySamples[0].equity, s.equity);
+  assert.equal(equityMetrics([{ day: "1", at: 1, equity: 100, wallet: 100, benchmark: 10 }, { day: "2", at: 2, equity: 80, wallet: 80, benchmark: 11 }]).maxDrawdownPercent, 20);
+});
+test("short ATR exits tighten monotonically, preserve the runner and ignore stale marks", () => {
+  const rows = candleRows(Array(25).fill(110));
+  const config = { ...defaultBot("BTCUSD"), stopMode: "atr", atrPeriod: 14, atrMultiplier: 2, breakEvenR: 1, trailAtr: 2, firstExitPercent: 35, secondExitPercent: 35 };
+  const geometry = entryGeometry(config, rows, 110, spec, "SELL");
+  assert.equal(geometry.stop, 112);
+  let a = submitGlobalOrder(readGlobalAccount(null), spec, q, { type: "Market", side: "SELL", contracts: 100, leverage: 1, protection: { source: "mark", stopLoss: { mode: "Market", trigger: geometry.stop } } }, now);
+  a = { ...a, positions: a.positions.map(p => ({ ...p, botId: "BTCUSD", botExit: initialBotExit(config, geometry.stop, 110, 100) })) };
+  const down = { ...q, mark: 103, bid: 103, ask: 103, at: now + 1000 };
+  const b = manageBotProtection(a, { BTCUSD: down }, { BTCUSD: rows }, now + 1000);
+  assert.equal(b.positions[0].contracts, 30); assert.equal(b.positions[0].protection.stopLoss.trigger, 105);
+  const bounce = { ...down, mark: 104, bid: 104, ask: 104, at: now + 2000 };
+  assert.equal(manageBotProtection(b, { BTCUSD: bounce }, { BTCUSD: rows }, now + 2000).positions[0].protection.stopLoss.trigger, 105);
+  assert.deepEqual(manageBotProtection(b, { BTCUSD: down }, { BTCUSD: rows }, now + 60000), b);
+});
+test("drawdown and concentration gates use total wallet equity rather than per-bot counters", () => {
+  const a = { ...readGlobalAccount(null), equityPeak: 12000, riskLimits: { ...defaultWalletRisk(), enabled: true } };
+  assert.match(walletEntryReason(a, {}, now, spec, 110, 10, 109), /drawdown/);
+  assert.match(walletEntryReason({ ...a, equityPeak: 10000 }, {}, now, spec, 110, 5000, 109), /concentration/);
+});
+test("backtest uses next-bar entry, costs, adverse-first exits and no future-data decisions", () => {
+  const prices = [...Array(24).fill(100), 110, 111, 114, 108, ...Array(8).fill(108)];
+  const rows = candleRows(prices), cfg = { ...defaultBot("BTCUSD"), strategy: "breakout", period: 10 };
+  const options = { initialEquity: 10000, spreadBps: 2, slippageBps: 2 };
+  const a = backtestBot(cfg, rows, spec, options), b = backtestBot(cfg, [...rows.slice(0, -1), { ...rows.at(-1), close: 999, high: 1000 }], spec, options);
+  assert.ok(a.costs > 0); assert.equal(a.account.events.find(e => e.kind === "OPEN").price, 111 * 1.0003);
+  const cut = rows.at(-1).time * 1000;
+  assert.deepEqual(a.account.events.filter(e => e.at < cut && !e.detail.includes("end of sample")), b.account.events.filter(e => e.at < cut && !e.detail.includes("end of sample")));
+  assert.throws(() => backtestBot(cfg, rows.filter((_, i) => i !== 5), spec, options), /contiguous/);
+});

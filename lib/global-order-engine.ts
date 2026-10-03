@@ -1,4 +1,5 @@
-import { validateSavedBots } from "./paper-bot-state.ts";
+import { validateWalletRisk, walletEntryReason } from "./portfolio-risk.ts";
+import { BOT_FRAMES, validateSavedBots } from "./paper-bot-state.ts";
 import {
   advancePerps, availablePerpCash, cancelPerpOrder, closePerp, freshPerpQuote,
   marginRate, newPerpAccount, openPerp, readPerpAccount, tradingFee, USD_INR,
@@ -59,6 +60,11 @@ export function readGlobalAccount(text: string | null): PerpAccount {
   if (!text) return { ...newPerpAccount(), currency: "USD", wallet: 10000 };
   let a = readPerpAccount(text);
   validateSavedBots(a.bots);
+  if (a.riskLimits) validateWalletRisk(a.riskLimits);
+  if (a.equityPeak !== undefined && (!Number.isFinite(a.equityPeak) || a.equityPeak < 0)) throw new Error("Invalid saved equity peak.");
+  if (a.equitySamples && (!Array.isArray(a.equitySamples) || a.equitySamples.length > 730 || a.equitySamples.some(p => !/^\d{4}-\d{2}-\d{2}$/.test(p.day) || ![p.at, p.equity, p.wallet].every(Number.isFinite) || p.equity < 0 || p.benchmark !== null && !(Number.isFinite(p.benchmark) && p.benchmark > 0)))) throw new Error("Invalid saved equity observations.");
+  for (const p of a.positions) if (p.botExit && (!p.botId || !Object.hasOwn(BOT_FRAMES, p.botExit.timeframe) || ![p.botExit.initialStop, p.botExit.initialContracts, p.botExit.best, p.botExit.firstR, p.botExit.secondR].every(n => Number.isFinite(n) && n > 0) || ![p.botExit.breakEvenR, p.botExit.trailAtr, p.botExit.firstPercent, p.botExit.secondPercent, p.botExit.atrPeriod].every(n => Number.isFinite(n) && n >= 0) || !Number.isInteger(p.botExit.initialContracts) || p.botExit.firstPercent + p.botExit.secondPercent >= 100 || typeof p.botExit.firstTaken !== "boolean" || typeof p.botExit.secondTaken !== "boolean")) throw new Error("Invalid saved automatic exit plan.");
+
   if (a.currency !== undefined && a.currency !== "USD") throw new Error("Unknown global wallet currency.");
   if (!a.currency) a = { ...a, currency: "USD", wallet: a.wallet / USD_INR,
     positions: a.positions.map(p => ({ ...p, currency: "USD", margin: p.margin / USD_INR })),
@@ -101,6 +107,7 @@ const cloneProtection = (plan?: GlobalProtection): GlobalProtection | undefined 
 export function setGlobalProtection(a: PerpAccount, symbol: PerpSymbol, plan: GlobalProtection | undefined, q: PerpQuote, now: number) {
   const p = a.positions.find(p => p.symbol === symbol);
   if (!p || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("A position and fresh quote are required.");
+  if (!plan?.stopLoss && a.riskLimits?.enabled) throw new Error("Wallet risk: keep a stop loss on every position.");
   if (plan) {
     validateProtection(plan, p.spec, p.side, q.mark);
     if (!triggerValue(q, plan.source)) throw new Error("Selected trigger price is unavailable.");
@@ -109,13 +116,17 @@ export function setGlobalProtection(a: PerpAccount, symbol: PerpSymbol, plan: Gl
   if (protection) { delete protection.activeExit; if (protection.stopLoss?.mode === "Trail") protection.stopLoss.anchor = triggerValue(q, protection.source); }
   return { ...a, revision: a.revision + 1, positions: a.positions.map(v => v.symbol === symbol ? { ...v, stop: undefined, target: undefined, protection } : v) };
 }
-function execute(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft, now: number) {
+function execute(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft, now: number, riskQuotes: Partial<Record<string, PerpQuote>> = { [q.symbol]: q }) {
   if (d.reduceOnly) {
     const p = a.positions.find(p => p.symbol === s.symbol);
     if (!p || p.side === d.side) throw new Error("Reduce only needs an opposite open position.");
     const next = closePerp(a, s.symbol, q, Math.min(d.contracts, p.contracts), now, "CLOSE", `${d.type} · reduce only`, d.type === "Maker only");
     return next;
   }
+  const stop = d.protection?.stopLoss;
+  const stopPrice = stop?.mode === "Trail" ? (d.side === "BUY" ? q.mark - stop.trail! : q.mark + stop.trail!) : stop?.trigger;
+  const reason = walletEntryReason(a, riskQuotes, now, s, d.side === "BUY" ? q.ask : q.bid, d.contracts, stopPrice);
+  if (reason) throw new Error(reason);
   let next = openPerp(a, s, q, d.side, d.contracts, d.leverage, now, undefined, undefined, undefined, d.type === "Maker only");
   if (d.protection) {
     const protection = cloneProtection(d.protection)!;
@@ -124,7 +135,7 @@ function execute(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft,
   }
   return next;
 }
-export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft, now: number): PerpAccount {
+export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft, now: number, riskQuotes: Partial<Record<string, PerpQuote>> = { [q.symbol]: q }): PerpAccount {
   if (a.currency !== "USD") throw new Error("Use the dollar global wallet.");
   if (!freshPerpQuote(q, now) || q.symbol !== s.symbol || !s.operational || now - s.fetchedAt > 3600000 || s.fetchedAt > now + 5000) throw new Error("Waiting for fresh Delta market data and contract rules.");
   if (!GLOBAL_ORDER_TYPES.includes(d.type) || !Number.isSafeInteger(d.contracts) || d.contracts < 1 || !validPositive(d.leverage) || d.leverage < 1) throw new Error("Enter valid lots and leverage.");
@@ -147,7 +158,12 @@ export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: 
   if (prior?.botId && !d.reduceOnly) throw new Error("Close the bot position before adding a manual entry for this asset.");
   if (d.reduceOnly && (!prior || prior.side === d.side || d.contracts > prior.contracts)) throw new Error("Reduce-only quantity must fit the opposite open position.");
   if (d.reduceOnly && d.protection) throw new Error("Attach TP/SL to an entry or edit the existing position.");
-  if (d.type === "Market" || d.type === "Limit" && marketable) return execute(a, s, q, d, now);
+  if (d.type === "Market" || d.type === "Limit" && marketable) return execute(a, s, q, d, now, riskQuotes);
+  if (!d.reduceOnly) {
+    const stop = d.protection?.stopLoss, stopPrice = stop?.mode === "Trail" ? (d.side === "BUY" ? q.mark - stop.trail! : q.mark + stop.trail!) : stop?.trigger;
+    const reason = walletEntryReason(a, riskQuotes, now, s, reference, d.contracts, stopPrice);
+    if (reason) throw new Error(reason);
+  }
   // Core margin checks reserve funds for pending entries; reduce-only exits need no new margin.
   const pending = d.reduceOnly ? { ...a, orders: [...a.orders], revision: a.revision + 1 } : openPerp(a, s, q, d.side, d.contracts, d.leverage, now, undefined, undefined, roundGlobalPrice(reference, s));
   const o: PerpOrder = { ...d, source, anchor: observed, triggered: false, protection: cloneProtection(d.protection), id: `${now}:${pending.revision}`, symbol: s.symbol, limit: reference, at: now, reserve: d.reduceOnly ? 0 : pending.orders[pending.orders.length - 1].reserve };
@@ -220,7 +236,7 @@ export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<Perp
     if (JSON.stringify(o) !== JSON.stringify(old)) n = { ...n, revision: n.revision + 1, orders: n.orders.map(v => v.id === o.id ? o : v) };
     if ((needsTrigger(type) || type === "Trailing stop") && !o.triggered) continue;
     if (needsLimit(type) && (o.side === "BUY" ? q.ask > o.limit : q.bid < o.limit)) continue;
-    try { n = execute({ ...n, orders: n.orders.filter(v => v.id !== o.id) }, s, q, { ...o, type }, now); } catch { /* Reserved order remains pending; no fabricated fills. */ }
+    try { n = execute({ ...n, orders: n.orders.filter(v => v.id !== o.id) }, s, q, { ...o, type }, now, quotes); } catch { /* Reserved order remains pending; no fabricated fills. */ }
   }
   return n;
 }

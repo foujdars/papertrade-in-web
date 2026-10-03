@@ -61,3 +61,7 @@ next-env.d.ts
 .gradle-local/
 android/.gradle-local/
 android/android/
+
+# Intermediate daily research inputs
+.research-input.json
+scripts/__pycache__/

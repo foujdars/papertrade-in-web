@@ -98,6 +98,7 @@ export function executeOption(account: PerpAccount, spec: DeltaOptionSpec, quote
   if (contracts > (side === "BUY" ? quote.askSize : quote.bidSize)) throw new Error("Order exceeds visible Delta liquidity.");
   const current = positions(account).find(item => item.symbol === spec.symbol);
   if (current && current.side !== side) return closeOption(account, spec.symbol, quote, contracts, now);
+  if (account.riskLimits?.enabled) throw new Error("Wallet risk mode requires a separate option risk review; new option exposure is paused.");
   if (!current && positions(account).length >= 100) throw new Error("Maximum 100 open option positions.");
   const margin = optionMargin(spec, quote, side, contracts, price, leverage);
   const fee = optionFee(spec, quote, price, contracts);
@@ -140,6 +141,7 @@ export function placeOptionLimit(account: PerpAccount, spec: DeltaOptionSpec, qu
   if (orders(account).length >= 20) throw new Error("Maximum 20 pending option orders.");
   const current = positions(account).find(item => item.symbol === spec.symbol);
   const reduceOnly = !!current && current.side !== side;
+  if (!reduceOnly && account.riskLimits?.enabled) throw new Error("Wallet risk mode pauses new option exposure.");
   if (reduceOnly && contracts > current!.contracts) throw new Error("Close lots exceed the open position.");
   if (side === "BUY" ? quote.ask <= limit : quote.bid >= limit) return executeOption(account, spec, quote, side, contracts, leverage, now);
   const reserve = reduceOnly ? 0 : optionMargin(spec, quote, side, contracts, limit, leverage) + optionFee(spec, quote, limit, contracts);
