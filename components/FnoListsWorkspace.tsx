@@ -17,6 +17,7 @@ export function FnoListsWorkspace({
   onSelect,
   onFutureSelect,
   onStar,
+  list,
 }: {
   quotes: Record<string, NormalizedQuote>;
   starredSymbols: ReadonlySet<string>;
@@ -25,8 +26,10 @@ export function FnoListsWorkspace({
   onFutureSelect: (underlying: FnoUnderlying) => void;
   onStar: (underlying: FnoUnderlying) => void;
   onClose?: () => void;
+  list?: FnoListTab;
 }) {
   const [tab, setTab] = useState<FnoListTab>("indices");
+  const activeTab = list ?? tab;
   const [underlyings, setUnderlyings] = useState<FnoUnderlying[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,19 +55,19 @@ export function FnoListsWorkspace({
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const type = tab === "indices" ? "INDEX" : "EQUITY";
+    const type = activeTab === "indices" ? "INDEX" : "EQUITY";
     return underlyings.filter((item) => item.underlyingType === type
       && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term)));
-  }, [search, tab, underlyings]);
+  }, [search, activeTab, underlyings]);
 
   return (
     <section className="market-discovery-panel fno-lists-panel" aria-label="Indices and F&O lists">
 
-      <nav className="trend-tabs fno-list-tabs" aria-label="F&O market lists">
+      {!list && <nav className="trend-tabs fno-list-tabs" aria-label="F&O market lists">
         <button className={tab === "indices" ? "active" : ""} onClick={() => { setTab("indices"); setSearch(""); }}>Indices</button>
         <button className={tab === "fno" ? "active" : ""} onClick={() => { setTab("fno"); setSearch(""); }}>F&amp;O stocks</button>
-      </nav>
-      <label className="market-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === "indices" ? "Search indices" : "Search F&O stocks"} /></label>
+      </nav>}
+      <label className="market-search"><Search size={17} /><input aria-label={activeTab === "indices" ? "Search indices" : "Search F&O stocks"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeTab === "indices" ? "Search indices" : "Search F&O stocks"} /></label>
       <div className="market-discovery-list">
         {filtered.map((item) => {
           const quote = quotes[item.instrumentKey] ?? quotes[item.symbol];
