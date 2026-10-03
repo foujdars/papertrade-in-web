@@ -72,7 +72,7 @@ const walletKey = "papertrade-perpetual-wallet-v1:guest";
     for (const width of [320, 390, 768, 1280]) {
       await page.setViewportSize({ width, height: 844 });
       assert.ok(await page.locator(".bot-workspace").evaluate(e => e.scrollWidth <= e.clientWidth + 1), `Bot fits ${width}px`);
-      const nav = width < 761 ? ".mobile-bottom-nav" : ".main-nav";
+      const nav = width <= 940 ? ".mobile-bottom-nav" : ".main-nav";
       assert.equal(await page.locator(`${nav} button`).last().innerText(), "Bot");
     }
     if (process.env.BOT_SCREENSHOT) await page.screenshot({ path: process.env.BOT_SCREENSHOT, fullPage: true });

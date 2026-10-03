@@ -38,7 +38,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     const nav = await page.locator(".main-nav button").allTextContents();
     assert.deepEqual(nav.slice(-2), ["Fundamentals", "Bot"]);
     const open = async () => {
-      const nav = await page.viewportSize().width < 761 ? ".mobile-bottom-nav" : ".main-nav";
+      const nav = page.viewportSize().width <= 940 ? ".mobile-bottom-nav" : ".main-nav";
       await page.locator(nav).getByRole("button", { name: /Fundamental/ }).click();
       await page.getByRole("heading", { name: "Fundamental Analysis", exact: true }).waitFor();
       await page.getByLabel("Import fundamental CSV").waitFor();
@@ -80,11 +80,23 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Export audit", exact: true }).click();
     assert.equal((await download).suggestedFilename(), "papertrade-fundamental-audit.json");
-    for (const width of [320, 390, 768, 1280]) {
+    for (const width of [320, 390, 768, 900, 940, 941, 1024, 1280, 1600]) {
       await page.setViewportSize({ width, height: 900 });
+      // Check before clicking: Playwright would otherwise scroll hidden tabs into view.
+      const nav = page.locator(width <= 940 ? ".mobile-bottom-nav" : ".main-nav");
+      const hidden = await nav.evaluate(el => {
+        const bounds = el.getBoundingClientRect();
+        return [...el.querySelectorAll("button")].filter(button => {
+          const box = button.getBoundingClientRect();
+          return box.width < 24 || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.right > innerWidth + 1;
+        }).map(button => button.textContent);
+      });
+      assert.deepEqual(hidden, [], `Navigation clips tabs at ${width}px`);
+      await nav.getByRole("button", { name: "Bot", exact: true }).click();
+      await page.getByRole("heading", { name: "Paper trading bot", exact: true }).waitFor();
+      await open();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `Body overflows at ${width}px`);
       assert.equal(await page.locator(".fundamental-workspace").evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, `Workspace overflows at ${width}px`);
-      const nav = page.locator(width < 761 ? ".mobile-bottom-nav" : ".main-nav");
       const labels = await nav.locator("button").allTextContents(); assert.deepEqual(labels.slice(-2), ["Fundamentals", "Bot"]);
     }
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -99,6 +111,6 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.keyboard.press("Escape");
     await page.locator(".home-workspace").waitFor();
     assert.deepEqual(errors, []);
-    console.log("Fundamentals verified: CSV worker, gates, reviews/reload, ranking, peers, rating, audit, NSE chart, navigation, light/dark and four viewport sizes.");
+    console.log("Fundamentals verified: CSV worker, gates, reviews/reload, ranking, peers, rating, audit, NSE chart, all navigation tabs visible, Bot/Fundamentals open, light/dark and nine viewport sizes.");
   } finally { await browser.close(); server?.kill(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
