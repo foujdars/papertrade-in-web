@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": 1791029907811,
+  "generatedAt": 1791034732998,
   "scanDay": "2026-10-03",
   "source": "Yahoo Finance charts + Screener reports + Google News RSS",
   "requested": 20,
@@ -18,7 +18,7 @@
         "trend": -0.00832021488476542,
         "volume": 1.7266994828211233,
         "relativeStrength": 0.06452775057957616,
-        "sentiment": 0.29934025757968746
+        "sentiment": 0.3043188433188
       },
       "fundamentalData": {
         "pe": 13.5,
@@ -28,7 +28,7 @@
         "revenueGrowth": 11,
         "profitMargin": 16.498180800447805,
         "sector": "Information Technology",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/INFY/consolidated/"
@@ -70,7 +70,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.29934025757968746,
+        "score": 0.3043188433188,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -173,13 +173,6 @@
             "score": 1
           },
           {
-            "title": "Infosys Ltd. Share Price Today - Infosys Ltd. Stock Price Live NSE/BSE - CNBC TV18",
-            "publishedAt": 1790850540000,
-            "url": "https://news.google.com/rss/articles/CBMidEFVX3lxTFB2V1U1ZktaS0l6MzBNR3g0aFBIYXh5SnVaN2w0Mnptdi1yWlB1bFZnU01sZFpEaFJudnJ1LVZfWUxfZFctR0VqMHcxU0ZhNktNNHhTVnRhQ0R6YWFzV1VLNkZQaUx2aElMQ1dUbUhDNDk3Rnoz?oc=5",
-            "source": "CNBC TV18",
-            "score": 0
-          },
-          {
             "title": "Infosys Prediction for Monday: 5 Oct 2026 - Univest",
             "publishedAt": 1790850480000,
             "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxOMklybW4tZ1hPYVNYZ2pBXzN0LXBUc2V2VG5adThGWFhhb0otWVdMMEJ2MHJYVU5PYVp2NHBQd2VlRTVvS1loMndBeTNSZ1dhVTdWeFk1S0JqOWVGTVo3Y2pUVDk1NUN5dFNwelFHWkVUQTJ5R3Zxbm0zUmZHMmNwV1NJdzRCdC1x?oc=5",
@@ -201,17 +194,10 @@
             "score": 0
           },
           {
-            "title": "Infosys Limited (INFY.NS) stock price, news, quote and history - Yahoo Finance UK",
-            "publishedAt": 1790840159000,
-            "url": "https://news.google.com/rss/articles/CBMiVkFVX3lxTE9GOEV1amlGdG5lR3Y1YVgydHJWMTlvWGZqSWlWMlIxLV9JbE5XNV85VXo4bHUxaHZwc2FGUVpvNjV5TGNXQjZ5aTdmSlJkNHhMZVNCZDZn?oc=5",
-            "source": "Yahoo Finance UK",
-            "score": 0
-          },
-          {
-            "title": "Infosys Share Price - Live NSE: INFY Stock Price & Chart - Upstox",
+            "title": "Infosys Share Price - Live NSE: INFY Stock Price & Chart - upstox.com",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE5BbEJTdmZNbE5BN0ZRWWZpd2tZZnRCZWV0MFdhYW5nQ2NSSTgzUlI4TjVPaU5BV1FxQkpYUnFWa05Fb09uMkxlNDhUWVpvV2JLWGIxUmh3SUFKSzEwUHZpX1IyTVM?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -220,6 +206,13 @@
             "url": "https://news.google.com/rss/articles/CBMi-gFBVV95cUxPSzhiTDFIMmZnYTZGRXpJT3BaTERUVmpIcUludVlkNlVwVjBfS2E3bHgydnVHbk9kc0NfOEhhVURHV0xFZnZ5dnJBLVpBNWdxRVZEb2ZfLWZIWmRjZDlQcmRTamt5elNPcGhZa3ZURWJxX0RrQXh2eGIxcV9zZmUtZ1Y5bklwYktzME02NmVncnRqWk8tMnYxSTFhWWdWUm5DOGVpaGZ4TTNkRVNRcW1Nay0yMU1TcnBUOE9IWFI2cExscUNnVGtqZzU5WURLZ2RIZmhXdjR4VVJPXzA0Nk5kSVJ3R3FyYzQzd3lvRl9wQlFESXVQSFZWSDJR0gGCAkFVX3lxTFBWLVJXMTFGRXV3cElYOFMySG1YQllxS0hzRDE2TUZCXzVOakNNekNOeFhyZGJiTFN6QUdjcHJ0ejZ4T2R1SlJ5SkxjWFFSNWNaWThZT3Nva0Z5X2wtZmtfcW1Gbnhnb3B2N1lLcDhEMC01cHBkOXQtTFNSOUsyOGRpdDVBX2pIVE9LeTZSSG1BcmIyY1RrYW1qVlJTN0VWRlBYX2tXYUU5V0REVnprWWpUdjFaU0JhQlJwWWFxOE51MkdwVlZYeHV3ZkVyc3JJcEx3QzRia0lEaUxpMnhqcng1XzdlLUl6bEhMUUpPakdveXM5TFNwbkNHSWRraEV2WGZfQQ?oc=5",
             "source": "NDTV Profit",
             "score": 1
+          },
+          {
+            "title": "Stocks to watch: RIL, NSE, HDFC Bank, IRFC, Infosys, Cupid, Blue Dart, OMCs - Business Standard",
+            "publishedAt": 1790822726000,
+            "url": "https://news.google.com/rss/articles/CBMizwFBVV95cUxQRkJWcmRzYUZMUUp2a2FscFhZRmhXejhiMGJQNFB5dDNGaUhJb3V1MUJZTXNrNUZrZ0xrWmpKRmRXV2tTVzZ4N1FkeUhkSHpDLW1INnptR1ZTYXB2VlVDN3FTMHg2U0xBVC1DNVp1emVFTzJUWlJGYVU4ZmlxYmxfR3dTem1xREdIcDFkREwzSVlLcXRsNUtMajJhbGV2ajZBdGxrdTVsVGdpaWlrVllRRndoRHN3eWZ4N1o4WS1PNkVFcnA3di1XNDl3c191OEnSAdQBQVVfeXFMTktQazF5ZDQxTE1YbEtKOXNvbDBxSTAybElWMUJKaG1mUmVTcHk1OWhQenVpTFBlZUpqUWRxSkhJSDNreVZiem81aVpaWmYtaVlfZnpRRk5IZ3V3Q0tHVkxpR2lMalc1MFdMMzkxSkZHWlIzRUhUSEU3Yk5GUkJPZlpBYXhDalctQmhJYl82MFQ5R3BiWk9vS0xhZGREVWhrWUxHVDh1V2Y3ZnBSSW5uWE54MTVoN1NtYXNZZUdKbUdEYkZMMTVPcTdPTVhoMTJiZHMyS1Q?oc=5",
+            "source": "Business Standard",
+            "score": 0
           },
           {
             "title": "Top stocks to watch today: Infosys, IRFC, Muthoot Finance among shares in focus on Thursday, 1 Oct | Full list - Livemint",
@@ -255,6 +248,13 @@
             "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxQdm9ScG45Q28yX0pPbXNWSEhiVXRsaWZxZjlTWUVpTzJrang0cUV5em5HMGd2bmVPUUZPTFhGb0dNNER5bFNQTnJYc3pnem5Lanpuc3Bsa2s5dzNXVnFLNEw5NmVQdTdLLVR6Z3JxWG83NmVLS3dXQXotUWoySzc4a0lXVURYWXBvaC1yOGw3d1p2cE9wVUxVT0l4R0N0cDVxNWpoSzNCNF9zV01maEFnYjR1aThjUUh2ckd5cFpGcXlZVEtPTnlFM1VVdHFvQQ?oc=5",
             "source": "IndiaIPO",
             "score": 1
+          },
+          {
+            "title": "Infosys Limited (INFY) stock price, news, quote and history - Yahoo Finance Singapore",
+            "publishedAt": 1790753730000,
+            "url": "https://news.google.com/rss/articles/CBMiUkFVX3lxTE81Vk82d2I1M1JmYWJ2QktDV01ncWo2TVgwbzlfU0FyQ1VodnJnZmw1THBTdkNLcjNRalFtM0QxMGtuNFNSaEV0ZUZiUUlPUjNYemc?oc=5",
+            "source": "Yahoo Finance Singapore",
+            "score": 0
           },
           {
             "title": "Infosys, Wipro shares crash to 6-year lows as IT sell-off gathers pace; what is weighing on the sector? - Livemint",
@@ -309,7 +309,7 @@
         "trend": -0.029865293744467558,
         "volume": 1.5730863125010344,
         "relativeStrength": 0.024161904500857645,
-        "sentiment": 0.02754322389506934
+        "sentiment": 0.027213333366084017
       },
       "fundamentalData": {
         "pe": 34.2,
@@ -319,7 +319,7 @@
         "revenueGrowth": 11,
         "profitMargin": 19.68629195032671,
         "sector": "Healthcare",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/SUNPHARMA/consolidated/"
@@ -361,7 +361,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.02754322389506934,
+        "score": 0.027213333366084017,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -450,6 +450,13 @@
             "score": 0
           },
           {
+            "title": "ERIS Share Price Today - Eris Lifesciences on NSE/BSE - scanx.trade",
+            "publishedAt": 1790764457000,
+            "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE81ZGhEZy1TZVk2NlJTSlJsdWVHV0RzNzBmYm1LY2I2OV9UdlMxNmpCM1ZZU0xCSzBfcGMxRDlOSFhnSFV0WEF6NlM0MEppQllYeWppTXE3NFBVOEl3R3c?oc=5",
+            "source": "scanx.trade",
+            "score": 0
+          },
+          {
             "title": "Sun Pharmaceutical Industries slips Wednesday, underperforms market - MarketWatch",
             "publishedAt": 1790764320000,
             "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxPbWxWM2plU2lCNlRDM1YtaFVwcHVaRHRjVnBsN0lpTG96azBVODJfQnRMNDZqUUN6Z1o0SnpaVmxsS2I4d3E1X2tsenZZZW9IbUVhWlJPZkFXajh0S29NYjM4Q3BnRkhWdWVLc2x0R25NRGdhdWlyalczZkhfY0FpaTdNbnIyNzZmSktGaTFlQXJmSnhUdDZrOXNEdlpFQjI4U3k2NVVZZXVPc3FXUmlxLUF3c0FJY3BRUDk2NFJzYw?oc=5",
@@ -517,13 +524,6 @@
             "publishedAt": 1790676780000,
             "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxOU0UtUHVSWGxSd09kbWJ5a3REVHhRSG1ldUJzTnhxYlJCekZXR25WZGNrTzVjZzhNNHNjT2RIa2JlU0htcFMxcHNHV2FiWjhRYkZna3VQLVN4V1l3d0hUeERGdTRLbmM0ZUhPR3hkMzZXWXp1eFkwMjRTaW9EWkpDeGt6S3BpQ3g0Uk1ZeDFR?oc=5",
             "source": "Univest",
-            "score": 0
-          },
-          {
-            "title": "NSE slips to 12th spot in list of most valuable Indian stocks; experts see more dip — check support, resistance, outlook - Livemint",
-            "publishedAt": 1790673669000,
-            "url": "https://news.google.com/rss/articles/CBMikwJBVV95cUxOLUN2bGpaUURRUmVRSHNlTG9pWEw2VjA0Y1dudmMtdnhwMVdiTXBYZDdKUjNLajIxVTRsazRySHdpYkVQT1hEUXFyQ2JnSi1VTFFIUWlEUC1TYldoN3ZxRk5CSndDbEZqdmVlc1NKbF9GZVpka3FNU1NqVERBUU9RVEs5WGI4X0lPcmIyM0pCdWVTekQzczE0NFNYV1BaellMVGhXazl5TUhKeGNTWlhhMXA0SjhCLXN5R2dJd0tlbHlBWUNKUjVwSkcyRVRZRXNGbEhEQkxsYS1Kclpuekc5dy10Y1dPUENtLS1KNzg0TTJlSTBSYWxkZlZ1ZGZFQldLZ3ZUTU5xY1VEaWpQTE9lTHVFb9IBmAJBVV95cUxORk4xbjljaWN4VnRqZHFDdWotMXhIcUxnWFV3Y2VfOGZ3bTZWODRQRmdCWnZtbERkWXJaNWpxbjJVeUp5M0o4bGJTSjljbFV5eG5hWlg1N2VKLVI1QllLVl9fa1dBSU1hUVpCSTE4NjdZRHNTVFQxTUJFcWhDdnpDS1VyS091M0twQmhkMDlNUXlER0c4d25WcU5VRTRuVnU2cnpna0hJdzNhSWlyalVXRkdwdm1UenJTT28yQjZvZ3pUSFRNWHlMU1AtNVdGTVpGckVTYVZQSjloV3FGV05JSHJ1RkZXbnJmYlFYZ0puM0Fhb2hwNlp2UFBna1g1Uk9xZjVfVzE0aXhqUWwzRlpBYXJqTV9VU1lV?oc=5",
-            "source": "Livemint",
             "score": 0
           },
           {
@@ -600,7 +600,7 @@
         "trend": -0.03211220772856971,
         "volume": 1.1506177105402424,
         "relativeStrength": 0.07277546623828912,
-        "sentiment": 0.18643549506858884
+        "sentiment": 0.1808621083625345
       },
       "fundamentalData": {
         "pe": 14,
@@ -610,7 +610,7 @@
         "revenueGrowth": 8,
         "profitMargin": 18.520640698671638,
         "sector": "Information Technology",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/TCS/consolidated/"
@@ -652,7 +652,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.18643549506858884,
+        "score": 0.1808621083625345,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -699,6 +699,13 @@
             "score": 0
           },
           {
+            "title": "Tata Consultancy Services Limited (TCS.NS) stock price, news, quote and history - Yahoo Finance Singapore",
+            "publishedAt": 1790854261000,
+            "url": "https://news.google.com/rss/articles/CBMiVEFVX3lxTE4yZG1MMUJWTjQzeUxZdV9QMF90azdyZlhNOTctMFZTMTYyRVhVWlZKbDFRenlSZXN2aEpLWTRkVHlROVpBNmpZYWZ5V3EwZ2FQU2loLQ?oc=5",
+            "source": "Yahoo Finance Singapore",
+            "score": 0
+          },
+          {
             "title": "Stock markets fall for 4th day on relentless foreign fund outflows; Sensex drops 570 points - The New Indian Express",
             "publishedAt": 1790852809000,
             "url": "https://news.google.com/rss/articles/CBMi3wFBVV95cUxOR3Jud1NKdVJ6Tlc0cnM3THd5MWYxdjVjbTZpOG1BcDY1eFlUUmlwT1BKWXBfMGcwaUVpMWh4cWFwV2VFWDRUYU9XYk40Sy1RYkVBMFdpV2VVb3pwMnpfbTNERkRqaTAzbHczM0E4QzJ5YUdzNzRha293MVI4MDNkTHN2OVZiclZ1MF93SFIzRkk3Z1N2OTJHLTNtYS1hdGhPY0J1QzBaRVZqenNrQVNubUpSdTVHa28wazZjb3FiRlRvVklka3dZN2pESXo1N1FubVNPOE5JYTNsS0Vfcy1J0gHsAUFVX3lxTE1pc2Nsd3h4N2lsY0JTWXBaLUpHUVExcTlRWmZRbnVNYWZQa1BUUVBzRHpnMGpOMWJURzlVS1NVbjFfbk1LbG5pdjg1cUhqN0hLMWNkaEtubzRpXzNvd1ZYY0FiWGdaNFZMUGM0Y3BYNDJMeFpZTXc1bTZhbFIwUTVCLWQtSUdnMmF5UDVqLVpzUVNvY3h5XzRhSEh2cmNibUppNnJrd3lrLUEweGMtMGJrVHVELXdHOFRHRjZFQzZ2aG15YXdUcjlqLWF2eDFKZG1wUXpnV3pkc1VqcWpNQlRCd0pPcEMyUXVfRk9y?oc=5",
@@ -727,6 +734,13 @@
             "score": 0
           },
           {
+            "title": "ACE Alpha Tech Ltd Share Price - Business Today",
+            "publishedAt": 1790838000000,
+            "url": "https://news.google.com/rss/articles/CBMifkFVX3lxTE54VTVkNjBtTkxVbWkzU1JKeXZheUd4TWxmV1U4WjZnS0ZzZ3d6eVpqVjRjdm5LVlBrbnZERkE0WkdCa2tiRmJ3QndxaURPVTVzMk1IS1gyVUUtVVpFSXB1X2NlTlJHbFZWS0pVZUlJUXRSekJFNkt2V1VIN1lYUQ?oc=5",
+            "source": "Business Today",
+            "score": 0
+          },
+          {
             "title": "Novus Loyalty Ltd Share Price - Business Today",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTFBoVFpsRnhRb0NwWWYydHlPTEw1THl0WTROazRiNlpBLTZKajBweHo1MXVmVlNyb2VnVHFPTTZoQUNvbUtNa1lMcks5OHc1TGNta2YzSG9lNXpVQkU2VmJfTGpPRGRKTGRfTk5FOWMwNFIyVW1ua3NfNGJpblQ?oc=5",
@@ -738,13 +752,6 @@
             "publishedAt": 1790827215000,
             "url": "https://news.google.com/rss/articles/CBMihgJBVV95cUxQbnNhN0Q0bXhyM0xaWVlPS0RtSEpuNDR6WkdydXVMVU94NEpqaHMzSHVESDU2QmFXb0gtU01jZmtheXdQaExhNGY0UkJteHdFNFNGYnAyMmpjeFhQUGFnSmhKN0RuMFd4MU1VaTd5N1lJNUt3a1BYLUhxSXNMeGZJQ0owVU81UVVsZHVQVEdZelZxMDRubUpHN1RBdzYzajVBNjNDYWtpMG1RTFBaV0R5VTk0QnFIV0hwbXo3U0pUbDVRTkZUY2x1cHg4RWVGVDJTT2dlVkYzdVFXLUlmM2dpM1VlQmlqVXFQbHhGWHRRSWVTeXQ2R3dLVGZCbmhrams4dWVLTHd30gGLAkFVX3lxTFBBcnE2cV9YYXc4VW9xYWRmWWVUQjdQT2R5SDBndXdIMnAyemg3d29CZmQyVzlya1NSMmNCZ2FmNGZfU0VSVVd2d3pTYUtxbEQ1eS1DV2t1aVFlN3RSODVyNnA5QTc1VXNEOHd2OHp4b1ZLR0RRNGRvWGliQUN6MUlwdEEwVVBGOTlydTlCWGg4RmZQUVFtTEdhNVM0UHItQlNHMDlBMVZmUkVrNHgxSHdPbkQwLTlxUFcxZ2RoQndvejh5WUU3aExEVTZfS2FUUHA0elVQaENqXzl2MjVjdElfS0FscHVpMUhuWVQtUGN6VmxKcEkyNWpCSWxHcTlJQVdQeV9udFNSSWZ5cw?oc=5",
             "source": "Livemint",
-            "score": 0
-          },
-          {
-            "title": "Tata Consultancy Services Limited (TCS.BO) stock price, news, quote and history - Yahoo Finance UK",
-            "publishedAt": 1790786297000,
-            "url": "https://news.google.com/rss/articles/CBMiVEFVX3lxTE9nbWhGS0pQMTRLajQtckN3RGY3eUowZS1EdlVUWjAyNFRMMjZ2R0dodWg3QTMwZGZwMWhKWWdSU2F2T0VQVFlYRHJHbTBKbzNwMVgwag?oc=5",
-            "source": "Yahoo Finance UK",
             "score": 0
           },
           {
@@ -787,13 +794,6 @@
             "publishedAt": 1790751077000,
             "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxQdUY1ZWplU3pLTWVtVEYxTTFocDZXZU12bkdvXzk0UWJrMUtYLWFZUTh0Y2VpRmFNMXRaXzNxQ1NjU3VUTVd6ZDJWQUtMTHAyUUs4d0hmVXIyTnpWdWZ4VkZrNzJUeE1jWVJPLXdvVHlQNGxCclFtai1LOVRTTTNrYkFTaFU?oc=5",
             "source": "Samco",
-            "score": 0
-          },
-          {
-            "title": "Stock Market Today: Sensex, Nifty Rise; Top Gainers From BSE Barometer - ETV Bharat",
-            "publishedAt": 1790742229000,
-            "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxOZHMzTlNLR3ZoVU9XVUtMSW5JR0dkd2VuenlLZFNHRmpHbjVETUVFXzYwYWlBd3BXYXFucWxXV252RXhHd2FtNXpRYmpzdXBjZHdIZ0FCZ1duXzFLdk82MmxaMV9BSDZzRU5rbWR6cDRBNE9wRllCNk5EMnBKWDJuX3dXZHJ4QmJzUHZoR2daMnc1c1FFd00tRmU5NDJNYi1yRUs0a3Y5Q0NuYnNOMzhZVmhRMmxjbW0wdzNMbGtQNWtoaDZjYjUwWtIByAFBVV95cUxOZHMzTlNLR3ZoVU9XVUtMSW5JR0dkd2VuenlLZFNHRmpHbjVETUVFXzYwYWlBd3BXYXFucWxXV252RXhHd2FtNXpRYmpzdXBjZHdIZ0FCZ1duXzFLdk82MmxaMV9BSDZzRU5rbWR6cDRBNE9wRllCNk5EMnBKWDJuX3dXZHJ4QmJzUHZoR2daMnc1c1FFd00tRmU5NDJNYi1yRUs0a3Y5Q0NuYnNOMzhZVmhRMmxjbW0wdzNMbGtQNWtoaDZjYjUwWg?oc=5",
-            "source": "ETV Bharat",
             "score": 0
           },
           {
@@ -891,7 +891,7 @@
         "trend": -0.029882968117069475,
         "volume": 2.1119861442126924,
         "relativeStrength": 0.008414324253911643,
-        "sentiment": -0.038019033216027974
+        "sentiment": -0.03801903321602797
       },
       "fundamentalData": {
         "pe": 36.6,
@@ -901,7 +901,7 @@
         "revenueGrowth": 17,
         "profitMargin": 9.250723065798988,
         "sector": "Construction Materials",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/ULTRACEMCO/consolidated/"
@@ -943,7 +943,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.038019033216027974,
+        "score": -0.03801903321602797,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -997,10 +997,10 @@
             "score": 1
           },
           {
-            "title": "NIFTY 100 Indices - NIFTY 100 Share/Stock Price LIVE Today - Livemint",
+            "title": "IEX Share Price - upstox.com",
             "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBmTFc0M29CWm9pVmtqdF9FYzJtSVZiMl95RF9tNTNDUndicE5BQ2p4eklBT1V6bkdmN0JiTnBvRGs3VzJMalp6cTFLcnBsUnVTckdMb0NnR3FaX3VGbHZRenQ4d0s?oc=5",
-            "source": "Livemint",
+            "url": "https://news.google.com/rss/articles/CBMibEFVX3lxTE1yQ1ZkQXg0anVXWjI4WUMtQjdHanhIa1BtQ0pkVmVQNnlkdDhFMW9KX0Y1LTM3WGdQY1h4YnY5aW41cU1STmRzUGZTUHZJY1otSFd2UzJjalB1SE9jR1lheFhRZTdUXzloUHpJcg?oc=5",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1081,10 +1081,10 @@
             "score": 0
           },
           {
-            "title": "Ambuja Cements Share Price - Live NSE: AMBUJACEM Stock Price & Chart - Upstox",
+            "title": "Ambuja Cements Share Price - Live NSE: AMBUJACEM Stock Price & Chart - upstox.com",
             "publishedAt": 1790698888000,
             "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE42ZVdIbkxOanEyV1BSX3c5M1Fxc2hwc2o4MEM0S09HODJVMDFsLTVIOVNuV0tLMWJLei1LcWlGWjQ4cmtDbk9Oc243MXBaVGZ0V2h4SzRrc0pEY01VZlFYREhtdmNqRjlo?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1182,7 +1182,7 @@
         "trend": -0.028129391525677172,
         "volume": 1.4959107930217788,
         "relativeStrength": 0.01258773091900367,
-        "sentiment": 0.025924247471783624
+        "sentiment": 0.007904854218109972
       },
       "fundamentalData": {
         "pe": 16.8,
@@ -1192,7 +1192,7 @@
         "revenueGrowth": 4,
         "profitMargin": 29.67759120572898,
         "sector": "Financial Services",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/ICICIBANK/consolidated/"
@@ -1234,7 +1234,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.025924247471783624,
+        "score": 0.007904854218109972,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -1295,13 +1295,6 @@
             "score": 0
           },
           {
-            "title": "[6-K] ICICI BANK LTD Current Report (Foreign Issuer) | IBN SEC Filing - Form 6-K - Stock Titan",
-            "publishedAt": 1790885205000,
-            "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxOeWxYSUhtYnptS3pCaXhKN21uZzYteC01NGxvVjhjSGhUbmp3UnZFX19QampjX21ONm9kVGIwcmpqY0tyWXFqWWdaUWJpTVJISEdXT0daaEplT1lobmM5MkxRenR3dDZ4N1VwdGl6OXRxc2FZWVNRaG5vSnpRZjZ0Q3VlTUJlZ0tESUstaEI2aEt1c2ZiZ1VqUVlDTUxNeVBkZjVQdTgyTGJBWDNoaXc?oc=5",
-            "source": "Stock Titan",
-            "score": 0
-          },
-          {
             "title": "ICICI Bank Limited (IBN) Stock Price, News, Quote & History - ca.finance.yahoo.com",
             "publishedAt": 1790879506000,
             "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE8yYTd5anN5bjFIWTZrZU1LQmFCbHZ6MlNOeWl6SUwycGFLOVF2N0RldWNDd0tra1JyTHljSTAwdnl1cE9YY3lhN25nUGVtcnpf?oc=5",
@@ -1358,13 +1351,6 @@
             "score": 0
           },
           {
-            "title": "ICICI Bank is top pick for Elara Securities amid strong auto demand outlook - CNBC TV18",
-            "publishedAt": 1790828732000,
-            "url": "https://news.google.com/rss/articles/CBMisgFBVV95cUxPTDBSRU1idmZ3UGtKZzdla3ItRG1SeUpCWHhtQUNpRnEyTHU3SUJRdFFlVHlvcEZKdkZzWHlsTlU3R3VfMjR6Z3dLdUk2R1A2ZGE5OWxGQUdkQzR5b09Zd0dxWFdxakE1REVuaWJfTUtzQnlYYXptSlpEcXRQR1N2TlV1QUkxVUo2OUloQVNDczN3bjBQU2FTZXlpUi1zc0RwWVliWFhUSjl0NjlCdzBTQkV30gG3AUFVX3lxTFBEVlFLemFidnhlVDdLWGNjczhQTndjNG5iMFNNMDVCR2RuaHNfekFvNVlrS3RpNXhKNl80dWg0UEVNRXpYQV93NVFiVlZueXFFVHdfNXNKTEdUSFdXdmhUVjNDMG9HUE1uVm81MmtNdVNwRFFBVFNVcWRyVi0wSFY2dmZ4eUk5WXNSeWtqLUl6NzhlMzVZdUowdHdCLW9zZ1A0MzV5RldNVnlpblR0MlpIVS1rbjVMVQ?oc=5",
-            "source": "CNBC TV18",
-            "score": 1
-          },
-          {
             "title": "ICICI Bank (ICICIBANK) Share Price, News, Stock Market Cap NSE/BSE - TechGraph",
             "publishedAt": 1790776331000,
             "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE43RUtDcmY5ZGhDMDBkeVBpRmZZcVExaWpyb3hLYTVvZzBYUzZTYWhaMGVYcElIMW1RRExSTTJTQ1ZZaG5kRHRZQklMX3U5NG9IV1ZaQmhDejYteFZIUkdRbWdQTQ?oc=5",
@@ -1393,10 +1379,10 @@
             "score": 0
           },
           {
-            "title": "SENSEX, NIFTY50 edge higher led by gains in ICICI Bank, Reliance Industries - Upstox",
+            "title": "SENSEX, NIFTY50 edge higher led by gains in ICICI Bank, Reliance Industries - upstox.com",
             "publishedAt": 1790740975000,
             "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxPS1BCVEhYeXlEaVRGQllWRkphU1pKN1doOWxGZHYtNTVfMTJyNGs1MjROWEFTMHlJaEEzamZYNmlhQ21nb1c0UWpyRUhQSGJ4cy1XVmhHdEFiYmZ1ano1em5YZVV4RExpN3pJWHNuTHlGM09EckNyOWRpazFPYnliV0tHajRtRXJyMVJlalBWcFE1cUx6RFRJY0ctVmdiZGlBQ3pOTERjbkVpZTgwQzBXSU0wbVJzcXRzOE5maFhRQldJTUNjZnl2blJNUmZWdw?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1421,10 +1407,10 @@
             "score": 0
           },
           {
-            "title": "SENSEX, NIFTY50 decline for second straight session dragged by Reliance, ICICI Bank - Upstox",
+            "title": "SENSEX, NIFTY50 decline for second straight session dragged by Reliance, ICICI Bank - upstox.com",
             "publishedAt": 1790677543000,
             "url": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxNaGRiejUwVjNWaXlDZzNsODV2UGpydVV2cmlBZ2FQNTlXQ1R0OFJGSG1YbHJMcGIzanVwa3NRRWI5ZHJ6cVpOMmlFWFpkMndJblZ6cnZKUnUtd0phZy14V2hzRmdNYmtlM283MTlUbE8ycUo5OG92SjhTeFhXVGRLbVBnNUl1WEN2VTNrMHR2blI1VWw1RkMtWkYxY3lrSHBHVzJqZVJ5X3ZrM1pPTExlVDVLR1BMa01HT3pkanhGaUhXd0I1Y3Z2b3pGRHhuT0Y4aW1xeVJWb2E?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": -1
           },
           {
@@ -1447,19 +1433,33 @@
             "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE5IUnhfR1ZTZjNYVWZRMkptZTg5Zy1MblZmc2hyQk90RzNVanMyUjNLX0EwMFMyVFhvNEdBT1FNbTlzRVhuMmdtSFk4VGhZM2hieHljX0t0RGk0SU1ielkyaWRqMWYxNXhFQlhB?oc=5",
             "source": "BusinessLine",
             "score": 0
+          },
+          {
+            "title": "ICICI Bank - 10 Nifty stocks that Motilal Oswal analysts are bullish on. How many do you own? - The Economic Times",
+            "publishedAt": 1790661739000,
+            "url": "https://news.google.com/rss/articles/CBMi8wFBVV95cUxPS2JwSjVfUHEwXzl5OGs3b0poTFE2RUZaYllpNl9jWWRLZGQybTlwdmRNU202TjhwbHc4Y0p5dlNGQnBZZW1iY01BWjExUC00MDFkX2NkMkQ5WW5UZlh4aDFsQmNUWl9FVFBVMmYtZ1p1dWdJWmYzd3hHX3lkTGZSV29RVE9STDRzaEw0NjF5aXNXT0h2Qm10MGpnVERCTWpxX3pvOGFySVNKcFJwLTIzOUxDMW9uS01GV1d4ZktDQ0hNUHhQbDl3NnNDbnlIbTQ2cldwQmJFMm5Ma2Y5N3E4SkVtUVFMSUZHeGRQUXFnMW9PNDQ?oc=5",
+            "source": "The Economic Times",
+            "score": 0
+          },
+          {
+            "title": "Govt vs private banks dividend comparison: SBI, HDFC, ICICI, PNB, BoB, Axis, Canara - Which bank tops the yield chart? - IndiaIPO",
+            "publishedAt": 1790622664000,
+            "url": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxOSE96YkplUlBHWjN3cHJnYm4tT3cyS1dUVDJDQ21vbjhkQktJVDBaaHlWYUJ4bUtPYVdpSmJ6UTRXMWJFSkdVa1hhOG10QXZsMjRLdEdBblNrcHc0MU1Za2llblgtZlZqaVV2eXJzUTdISnNjdzk2LXZIZEFqdHFJeGZ0dFR2Yk5SMzVCYlQ3QThURVJmZ2lPQm5YOGpHc3RzWkZfWGt0NWttQXlIR3hDbFRGUzhzaHo5clhVVURsTzBFLUZHUFhoVURpUnlDem1XTHlpTjJiZHF6TTBC?oc=5",
+            "source": "IndiaIPO",
+            "score": 1
           }
         ],
         "coverage": "30 dated headlines · last 5 days"
       },
       "errors": [],
       "rank": 5,
-      "score": 70.52631578947368,
+      "score": 70.26315789473684,
       "factors": {
         "momentum": 68.42105263157895,
         "trend": 84.21052631578947,
         "volume": 57.89473684210527,
         "relativeStrength": 73.68421052631578,
-        "sentiment": 52.63157894736842
+        "sentiment": 47.368421052631575
       }
     },
     {
@@ -1473,7 +1473,7 @@
         "trend": -0.039678233384471184,
         "volume": 1.9062846179395403,
         "relativeStrength": 0.014007098001263318,
-        "sentiment": 0.005713434605450405
+        "sentiment": 0.03237088689643974
       },
       "fundamentalData": {
         "pe": 18.8,
@@ -1483,7 +1483,7 @@
         "revenueGrowth": 11,
         "profitMargin": 4.6894115619884555,
         "sector": "Metals & Mining",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/TATASTEEL/consolidated/"
@@ -1525,10 +1525,17 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.005713434605450405,
+        "score": 0.03237088689643974,
         "count": 30,
         "excluded": 0,
         "headlines": [
+          {
+            "title": "Vedanta, Tata Steel, Hindustan Zinc, Nalco, Hindustan Copper: Why Are Metal Stocks Falling Today? - Goodreturns",
+            "publishedAt": 1791025595000,
+            "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxONC1EdmV1VDF5bjlKWExUQzNJNFZIaVdwVDRUY1gxUC1IZ19hcy0tU3hlc0daRXhXWk5KcnRvVVh2al9neW1jMkM2bGNLN2p2SWoyRjliNWIzSjhKbmxaNzBWTVhPQTlaZUZqNnRSLWY0SHpISTVZNWRnWURoeklXUmxjdm10bjlqbWRiQ1lmZ1N3RUJXX25yZEFGb0FGc3JHLW1aYzZXVVZXX0EyV1VrN0dRWV9ONTVxNWI2T0laV2JYOW1Qay1jUV9XOTFfWDAtcGc?oc=5",
+            "source": "Goodreturns",
+            "score": 0
+          },
           {
             "title": "Steel sector eyes stronger quarters as demand and realisations improve - Business Standard",
             "publishedAt": 1790955831000,
@@ -1537,10 +1544,10 @@
             "score": 0
           },
           {
-            "title": "50% of Nifty stocks slip into bear territory, down up to 40% - What should investors do now? Experts view - Livemint",
-            "publishedAt": 1790878661000,
-            "url": "https://news.google.com/rss/articles/CBMi_gFBVV95cUxQRzYwYU00SmhtMEpjb3E1UDctaHZoUS1rTFoxamIxbXJDR1AzbzFlSERCNjNvQkhST20zLU82RlRuNjZxSTltMWsxYnhEQTlQMUdVeGFnaDdXYmZEbTAxTGtCbWg1dmVBeTJoU2E2SkpZRHU5R2tXRGZCcHlSUFhqX20yYWx3cS1va1lGM2xsMWZlOUlta3JzWXlDeGduZU1nX1F4TWp3bEZtdjJXR1ZLU0lsRDMyODBwdjRxcGlqbUtySFFuOXlzYnI3bkZCbnoyMnlnX0YxcUVDOEhRcGFFd2lSOXh5ajlEN1h2TjRBQXg1NkVlcEZuZU5uR3dQZ9IBgwJBVV95cUxNTDNSUFpFbmROWF9NUXBnMElfY25JZjNuV1pCOWdEZ0RaQmVjTnREb3hEbWVNWXVIVzYtUTV2SHRZSFNtVHBENURFVThXWUVNTGxJZTl3MFNKNXlsbDl6bTJzN2tXNkc3Yk14cUJ5N09RSjZiRVpCSXBmM0VBR0VqOENrbGNYOVhZX3EzMzZ1WVdyS0xRcnhoenhac2NpWVhRODdJWGlnckFsdXJRX3ZwUXY1MUNIN3ZkdDlSZEtFalI3V0NWR0xBckk2a3dLZXJocUtjd1JwaXZxa3Y5aEdHc0tTaVQweXBaUmxad3VWbGJPSXlSRWdfc3lXTkRuMDlkd2ww?oc=5",
-            "source": "Livemint",
+            "title": "Tata Steel receives tribunal approval for subsidiary merger - Investing.com India",
+            "publishedAt": 1790900260000,
+            "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxPVVVlS0hHSnBVY0pkMU9PaGNfSWVfdHVRZFZGa2syYmd5Z3BPZFVPZmYwWnlxa21wM09fLXV0a29kNHNVUGZDRWZ6ZWZxUkc1Um9KMXFHaHRhSTBDZTJCLXlhSXk1dGZwLUF5enF3VjRPQ29rNHQ3dExWRUtqaGdZSjc0bUJYRTlVWE9Va013cVFKR0pKVXg4dW1IWndqeHR1VzFzUmVjLTQzQ2N4OEh3dDA3cTd2T0RDTEgyNw?oc=5",
+            "source": "Investing.com India",
             "score": 0
           },
           {
@@ -1565,10 +1572,10 @@
             "score": 0
           },
           {
-            "title": "Tata Steel Share Price - Live NSE: TATASTEEL Stock Price & Chart - Upstox",
+            "title": "Tata Steel Share Price - Live NSE: TATASTEEL Stock Price & Chart - upstox.com",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTE1LRXJEU2pOS05Zc1RWQTRTNXNFT19YSXA3NG5Fek51VUNvMGpoNG9vNW9jem5MUTd5dEJITmJqLUtmcnhaZnRsbEVlTEt0YTdWM1IxbUFiMmZIVDUteE8zNmNpMTR6ai1L?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1586,18 +1593,11 @@
             "score": 0
           },
           {
-            "title": "NIFTY Metal Indices - NIFTY Metal Share/Stock Price LIVE Today - Livemint",
-            "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTFBKelNJYnNSMmJPZXJoNlF5SjZHRUFOdFl5OENZb1VHY1V6cGpubEtZdmYtamtkZERTZkhnTUpyc1oycWQxNFh1QndiNFpSX2JwalcxRlhudGJpOG40aEloMGVOcnpLUTQ?oc=5",
-            "source": "Livemint",
-            "score": 0
-          },
-          {
-            "title": "Tata Steel का शेयर रडार पर, नया Ludhiana प्लांट लॉन्च के करीब; विवरण यहां जानें । - Alice Blue",
-            "publishedAt": 1790822866000,
-            "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxOQlVQOVU1WFRLQ3IxcUg3Q1k4M3BnX2lRNERNRjVwcUdMcVFxZklXbXJmdm9rS3ZveW5IQUdLU2ZBZnlPYUN3SjJ0bk9JeVdNZm4tdzRzZkZiY0s5N0ZNQ2RLN2lHT0ZZNlhFMEQ5V3VnRW52UXFHekRsb0w3d1h2bUJZRXRLaTAzZXdLeWV4NGNEY3dCc25pZjZZbmtSTGQyM2duMENxX1hBc0x5cVFLT1ZjMXdMSGZlMHc?oc=5",
-            "source": "Alice Blue",
-            "score": 0
+            "title": "North Eastern Carrying Corp. wins ₹78.19 crore Tata Steel transport order - scanx.trade",
+            "publishedAt": 1790774096000,
+            "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxPVVRoUXlpTTZSM2tWaHktQkVZSnMwVTB0cVFJOEc4MVg3d2FxOTgteHZhRVVseHJEWDdSWVQ1QUFockxlb1dzdHZSSkd4TWU0VmZ0eFVhMVNDajAxd19icmZWYVc3WktMN0h4bUs3MDRFWmI4Qkx5b1FmaTJGQW1QeFNyOU9pNjdmSDRiWlF1Nk9CRllTcnZEZ2JLUm9OZ0FuZXgtc3RSa2habFYtdF9LZGpmVFc1SWU5Uzc0alJ2UkJ4TF9i?oc=5",
+            "source": "scanx.trade",
+            "score": 1
           },
           {
             "title": "Linde India completes acquisition of Tata Steel ASUs, starts gas supply - scanx.trade",
@@ -1656,10 +1656,10 @@
             "score": 0
           },
           {
-            "title": "Tata Steel acquires 394 crore shares in subsidiary T Steel Holdings for ₹3,260 crore - IndiaIPO",
+            "title": "Tata Steel acquires 394 crore shares in subsidiary T Steel Holdings for ₹3,260 crore - indiaipo.in",
             "publishedAt": 1790699846000,
             "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxQb3ZnbjhUZnZhYnlFM29Zb2lTOVVPeWRuSWxSMEU3UlZmb005dUttSGVVZzMtd3p1UHBHVlRGZTk5Skp4aFJDLWF4WFFmcEFaZXZoWFlfYzlFVTJXZWI3bHIyNlpnNUM1aWJUakVGS05xVlpwTEpvaHIzTjREOGxFVVVxYVJheFpocHF2dEQ1b1RmMTdBN0w5OGwxZkNSSUkwU0FNLWE5SFNFU1BRd1AtVFUwYjY5elpDdUE?oc=5",
-            "source": "IndiaIPO",
+            "source": "indiaipo.in",
             "score": 0
           },
           {
@@ -1726,10 +1726,10 @@
             "score": 0
           },
           {
-            "title": "Stocks to watch, Sept 29: Tata Group stocks, NCC, Vikram Solar, Coforge, Ola Electric, IRFC, Power Mech, HCLTech - Upstox",
+            "title": "Stocks to watch, Sept 29: Tata Group stocks, NCC, Vikram Solar, Coforge, Ola Electric, IRFC, Power Mech, HCLTech - upstox.com",
             "publishedAt": 1790649262000,
             "url": "https://news.google.com/rss/articles/CBMi9AFBVV95cUxNYTZBN1JWXzhDcjlWSXVLSDhIVjB3WTYzNlZXVWhVR05OZWpKc19DMUtYc2RqakdWZWVkaEo5UHJFOEdabjZsTUc3cnRuS2VoLU5pM3lGbkpscEhpalBjcC1nSWR0Z0FLcGJNYkFFUWFKTC1DZEhyWHhnbVZxYUxBcFJiaElPNVVfMzFmYkZMQUJIVXd3NEVzZUVQVXBUdkVtcmo0QjlTb2FMZUE2YnotQ0VVaVVkSFJsNWhtdDBWQjRHVk9qYmZmVVdZcGFTQ3pLa0FvOVFWYXBiUHZuODNCYi16N0FRVm81LWxrRmlRZFVTM0hj?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1744,13 +1744,13 @@
       },
       "errors": [],
       "rank": 6,
-      "score": 67.63157894736842,
+      "score": 68.42105263157896,
       "factors": {
         "momentum": 73.68421052631578,
         "trend": 42.10526315789473,
         "volume": 84.21052631578947,
         "relativeStrength": 78.94736842105263,
-        "sentiment": 47.368421052631575
+        "sentiment": 63.1578947368421
       }
     },
     {
@@ -1774,7 +1774,7 @@
         "revenueGrowth": 45,
         "profitMargin": 5.792153818048959,
         "sector": "Consumer Durables",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/TITAN/consolidated/"
@@ -1870,10 +1870,10 @@
             "score": 0
           },
           {
-            "title": "Closing Bell: Market fails to hold gains; Nifty at 22,620, Sensex flat amid volatility - IndiaIPO",
+            "title": "Closing Bell: Market fails to hold gains; Nifty at 22,620, Sensex flat amid volatility - indiaipo.in",
             "publishedAt": 1790751600000,
             "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxNMWlLUmJvbDB0VGJVYkxEcVN1MTdNUmlEVGVfU29KdVlVaWktY0hvdjBmUVBrX2pFeVNGWHdzaU9icW1sUEEweHhRUmRueXB3UHVQX2JLck5nRFRNazBXblZSOWhBaTJmRnQ4VlMwd1h3RUgyRzJpamJ6d1E0NVZrWE1Zc1BvSHdBZzlnaHYzV0p3SDF2ZTB1V2p5SHZVaFlvMVUyNFBvME9WYm9SdGNMaFVsV1ZWeGo1UXc?oc=5",
-            "source": "IndiaIPO",
+            "source": "indiaipo.in",
             "score": 0
           },
           {
@@ -1884,10 +1884,10 @@
             "score": 0
           },
           {
-            "title": "Closing Bell: Nifty below 22,750 on expiry day; Sensex falls 240 pts - IndiaIPO",
+            "title": "Closing Bell: Nifty below 22,750 on expiry day; Sensex falls 240 pts - indiaipo.in",
             "publishedAt": 1790721552000,
             "url": "https://news.google.com/rss/articles/CBMiowFBVV95cUxQcTkxT2s4X2hnRDZ3V01COV9MQ0VCdWozd1Y3YnNDSWNKZ3RCSktTU3gyeHFBbHZpNVRaSG0wQTh2XzFwaGlvMmU3SzdtdkM5S2JueWhNU0RuXzVWV3Z0M2lQX2FTdXQxRk04QlVSWlVabEJNSFhRNTdRdTFkVE91bWdVb0tHZkZFV0NGS0hVVTNaVDlOSVFJZ1hDNW92T3BnaF9J?oc=5",
-            "source": "IndiaIPO",
+            "source": "indiaipo.in",
             "score": 0
           },
           {
@@ -1905,10 +1905,10 @@
             "score": 0
           },
           {
-            "title": "Top gainers and losers, September 29: Titan, Wipro shares fall 3%, Adani Enterprises surges 5%; check list - Upstox",
+            "title": "Top gainers and losers, September 29: Titan, Wipro shares fall 3%, Adani Enterprises surges 5%; check list - upstox.com",
             "publishedAt": 1790679240000,
             "url": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxOTDBSWVZzVmpwT2NMSWRBcWFkTzVxZDA1b1NRSzZNdUNGeUlMRnEwblBvTXFYVkhwdk9Jd3lTbTk2SEVMak1odThqWkwxbEkzYmdyak11ZVRZY05KSlVMMXo0VFJRaUh5ZkFwclMzUWRETVA1Nml6WGpvbFVZSUtPLWtpeEVNWGE4NkxiUV9kVU1yZFJ0dERkQTRjV3UzQVZ3am1DTGJhN25FNjBvWG9CN1VmSWdGV2pUakxQeXFjeWIyOEZBaE5oZzFfSnZqemI2ckRiMkpSVEx2WjdGREF2Q3U2MmRFdG1IektsUE1MRQ?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1926,10 +1926,10 @@
             "score": 0
           },
           {
-            "title": "KABRA JEWELS LIMITED Share Price - Live NSE: KKJEWELS Stock Price & Chart - Upstox",
+            "title": "KABRA JEWELS LIMITED Share Price - Live NSE: KKJEWELS Stock Price & Chart - upstox.com",
             "publishedAt": 1790665200000,
             "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE10YnZtYVIwMTFhWXM0VzByc3ZaU0dDSlZUMHMzd3NNSG9xZUxkOWJaS2tMdGVFMWJBWExZUkVJbklhNkJMQTdvbUp0elpxZVQzdnNvT21SWWlHRVB1ajZWaGZ2TDdBSzFXVm00?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -1971,7 +1971,7 @@
         "trend": -0.012391721133672262,
         "volume": 1.4902347640890157,
         "relativeStrength": -0.016260381861534112,
-        "sentiment": -0.024410107951860667
+        "sentiment": -0.024418670989442354
       },
       "fundamentalData": {
         "pe": 13.6,
@@ -1981,7 +1981,7 @@
         "revenueGrowth": 6,
         "profitMargin": 20.03048182408064,
         "sector": "Financial Services",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/AXISBANK/consolidated/"
@@ -2023,7 +2023,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.024410107951860667,
+        "score": -0.024418670989442354,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -2035,10 +2035,10 @@
             "score": 0
           },
           {
-            "title": "Small Fees, Massive Margins: How IRDAI’s Commission Reset Could Halve Bank Insurance Income For These Lenders - Outlook Money",
+            "title": "Small Fees, Massive Margins: How IRDAI’s Commission Reset Could Halve Bank Insurance Income For These Lenders - outlookmoney.com",
             "publishedAt": 1790941769000,
             "url": "https://news.google.com/rss/articles/CBMi2gFBVV95cUxNb3dJQzNaamhNOTljT2w5R3pkamg3TmNvN0g2WGpmTHRia3NrUFhPTklOblQ5UmZDR1BscVRpRWtjRVpaMS1PeUFNVjJjOEtxOWJCbGdYRWxJWWRvcmUtc2ExbFBSQWlUSHRNVHl5c2hINnVfZk5JcUZGYmFqUHVvSmIwLW05TXlXZUNHRUtobWJISkN1MHI0R3pjTWRtMUk0OWRvTERKOUFZTEdtck9iZTh3bVFwcUpLeXFZeW9WMTN5aG9HcHhCUVgtNWJZVkRESktiNHA4bW5qQdIB5wFBVV95cUxNT0xwQzRMYlBRaWdZQjlpZml1ZW1pRklBLW0xX0pra0x6LUNYOHdXN1Awdk9PSU9EN3NqcVFsc2hUc3pSUjNJd0tWcWNaNktlOEcydmxocG1vUW4ydExLeFF4cmRZMkppV2swREh0NXNuNzIxT2xrYVpGek53SExEa3RzZUN5R2ZGM3hmWDNrdUNwRHBqVkMyZ01kVml2bVFnSWlDV1NDc3I4WWdiZ3hxdVk0MzlQZDhLQlBJX3hmdExQUUNvYXN5MDFqY0N0QlhycUtiN2xTZnk1WEhUc2dhRi1PSGp1amc?oc=5",
-            "source": "Outlook Money",
+            "source": "outlookmoney.com",
             "score": 0
           },
           {
@@ -2060,13 +2060,6 @@
             "publishedAt": 1790844504000,
             "url": "https://news.google.com/rss/articles/CBMiygFBVV95cUxQQWJwOEtGSE9HQ3VlZWVDdDhyRkhoSGJlRDhZbTYxZUZjUzVqN2RWZjV1MHdud1Q0RENJNy1qSVZRdmZkbTZRWVZrM3lhem83TGJHbGxmSHplcXBRNGhldkdnUFRUc3FEVjc4b3MtTlpIcDdrZThqQjlNazRSZFRvRmdORUpXZVVsXzJ0SjFQemhhQTh1ZXhDNXB6clZFUGZ4d1JXWWg5aHFpTEl3MGJsQ05HdTJGZWN2VHdyWHk1TVBLNlFBZFdia0xB0gHKAUFVX3lxTFBBYnA4S0ZIT0dDdWVlZUN0OHJGSGhIYmVEOFltNjFlRmNTNWo3ZFZmNXUwd253VDREQ0k3LWpJVlF2ZmRtNlFZVmszeWF6bzdMYkdsbGZIemVxcFE0aGV2R2dQVFRzcURWNzhvcy1OWkhwN2tlOGpCOU1rNFJkVG9GZ05FSldlVWxfMnRKMVB6aGFBOHVleEM1cHpyVkVQZnh3UldZaDlocWlMSXcwYmxDTkd1MkZlY3ZUd3JYeTVNUEs2UUFkV2JrTEE?oc=5",
             "source": "Moneycontrol.com",
-            "score": 0
-          },
-          {
-            "title": "Axis Bank wants to double its Rs 8,688 crore data centre exposure - The Economic Times",
-            "publishedAt": 1790839500000,
-            "url": "https://news.google.com/rss/articles/CBMi6wFBVV95cUxQeDJCcXdxaHk0MDYwb3hmbGdOSFZBdFJIYlZGQXRpaWNDUnZDUC0xTE5VLUh1VnRKd1dPdXdmSG5WQkVXMUJIeGZMS3dyTHV6ZDRLdmgwRWhmVTNkT2YyUGQ5NGhZN3F4N1F0c3FvQXZ1elNvQnpGdVlLS0VWWXVQemVSUTFFdDRPNmpWTnh6R2NfWWtUdkppelNvVW9GVXlUSlY3dHJrTG04NW1TYVRfNFowNThxZUY3UldWNVAwLXhPOGxqYWVTUHAwQ09VU3I3dXpzaDRnQ09aVzkyWDQ4QXB3a1k2UVU0XzZ30gHrAUFVX3lxTFB4MkJxd3FoeTQwNjBveGZsZ05IVkF0UkhiVkZBdGlpY0NSdkNQLTFMTlUtSHVWdEp3V091d2ZIblZCRVcxQkh4ZkxLd3JMdXpkNEt2aDBFaGZVM2RPZjJQZDk0aFk3cXg3UXRzcW9BdnV6U29CekZ1WUtLRVZZdVB6ZVJRMUV0NE82alZOeHpHY19Za1R2Sml6U29Vb0ZVeVRKVjd0cmtMbTg1bVNhVF80WjA1OHFlRjdSV1Y1UDAteE84bGphZVNQcDBDT1VTcjd1enNoNGdDT1pXOTJYNDhBcHdrWTZRVTRfNnc?oc=5",
-            "source": "The Economic Times",
             "score": 0
           },
           {
@@ -2094,6 +2087,13 @@
             "title": "Yes Bank Ltd Share Price Today,, YESBANK Share Price NSE, BSE - Business Today",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxPVHl4X0pYSXplNkc4T09nQTU0MHRxTWNjWU9HS0ZWbFF2ZU1FUHExZ1JvNThqNEg4d0hyajVUbXhCODRMSnlPUmE2clhaWFFZcWpnaEZTeGxKZWFXTnBXcjdqN01mc1p6VWh6YlpMUDZINUxnLXItMXN4ZHJGZzNjeQ?oc=5",
+            "source": "Business Today",
+            "score": 0
+          },
+          {
+            "title": "HDFC Bank Ltd Share Price Today,, HDFCBANK Share Price NSE, BSE - Business Today",
+            "publishedAt": 1790838000000,
+            "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxQYl9PSEdSWjNuX0l2V1g2UGEydHExQ2lVREdwNzB4dUthSDV6Y0FCYVdXNHVPRG51dXFWbXQ4RjAwSnlFZGlhOTNYWUZpaVJfaHM4ZzFEOUlISGNDVHg2OWFzN1B0eDd1Wml1NWI4U2tUVGdaMjNYME1HNGZVVmZoRHFyYw?oc=5",
             "source": "Business Today",
             "score": 0
           },
@@ -2224,10 +2224,10 @@
             "score": 0
           },
           {
-            "title": "Govt vs private banks dividend comparison: SBI, HDFC, ICICI, PNB, BoB, Axis, Canara - Which bank tops the yield chart? - IndiaIPO",
+            "title": "Govt vs private banks dividend comparison: SBI, HDFC, ICICI, PNB, BoB, Axis, Canara - Which bank tops the yield chart? - indiaipo.in",
             "publishedAt": 1790622664000,
             "url": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxOSE96YkplUlBHWjN3cHJnYm4tT3cyS1dUVDJDQ21vbjhkQktJVDBaaHlWYUJ4bUtPYVdpSmJ6UTRXMWJFSkdVa1hhOG10QXZsMjRLdEdBblNrcHc0MU1Za2llblgtZlZqaVV2eXJzUTdISnNjdzk2LXZIZEFqdHFJeGZ0dFR2Yk5SMzVCYlQ3QThURVJmZ2lPQm5YOGpHc3RzWkZfWGt0NWttQXlIR3hDbFRGUzhzaHo5clhVVURsTzBFLUZHUFhoVURpUnlDem1XTHlpTjJiZHF6TTBC?oc=5",
-            "source": "IndiaIPO",
+            "source": "indiaipo.in",
             "score": 1
           },
           {
@@ -2262,7 +2262,7 @@
         "trend": -0.04298077174594572,
         "volume": 1.5092409692165216,
         "relativeStrength": -0.006571941811133297,
-        "sentiment": 0.039990604344267495
+        "sentiment": 0.013675842668967103
       },
       "fundamentalData": {
         "pe": 28.8,
@@ -2272,7 +2272,7 @@
         "revenueGrowth": 10,
         "profitMargin": 6.6301937217095634,
         "sector": "Construction",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/LT/consolidated/"
@@ -2314,15 +2314,15 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.039990604344267495,
+        "score": 0.013675842668967103,
         "count": 30,
         "excluded": 0,
         "headlines": [
           {
-            "title": "Top 5 Companies With the Most Bonus Issues in India: Wipro Leads With 14 - Dalal Street Investment Journal",
+            "title": "Top 5 Companies With the Most Bonus Issues in India: Wipro Leads With 14 - insights.dsij.in",
             "publishedAt": 1791023514000,
             "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxPaExjSl8zeUxPMjJfNGcxQTdnSEJjd3poWkhXcFlodmRRbEtZSVROUW9ybzl2QkhXZUlXYVhDYTFCVGdYbDRMUUliRS1oVUdkLW5YVFFCZTFXRW05dXhIMFZNVHdOTkdwRmZhVHNBLWVxaVgwU1R4SXhEcE9VamJVM1JWOWdtWTVpMGJTS1BzYXJiTXlYMmg4d3pzaHlOcEdMWFdqOEt4WGgwLW15MDB2TlNmR2VqUjNxZE5zag?oc=5",
-            "source": "Dalal Street Investment Journal",
+            "source": "insights.dsij.in",
             "score": 0
           },
           {
@@ -2375,16 +2375,16 @@
             "score": 1
           },
           {
-            "title": "Nifty 500 Index Price Today, Nifty 500 share price, Nifty 500 Live Charts - Business Today",
+            "title": "Nifty 50 Index Price Today, Nifty 50 share price, Nifty 50 Live Charts - Business Today",
             "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE9sRjlRRU9KcnNHVXFuTkRrMkx1T0pBTXJ5LTY5dFpraHMteWljNW1iX0dnck9Pdm1CdE5xZTVoODg4ZzBmcGQ0WmdpLU5HcXBlbWh2SVFBc0pxUQ?oc=5",
+            "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTFBiYnlGX25DMU9DTWlRWHVaeGY2RWlmRkI2RWN0ZXlWdnlUb2VOYlRWUE1PNjhncldZYkEyRDVkVnZtaDk4WEVtU3d2Z0pqM29EdnJvYXhLbmE?oc=5",
             "source": "Business Today",
             "score": 0
           },
           {
-            "title": "Nifty 50 Index Price Today, Nifty 50 share price, Nifty 50 Live Charts - Business Today",
+            "title": "BSE Dollex 30 Index Price Today, BSE Dollex 30 share price, BSE Dollex 30 Live Charts - Business Today",
             "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTFBiYnlGX25DMU9DTWlRWHVaeGY2RWlmRkI2RWN0ZXlWdnlUb2VOYlRWUE1PNjhncldZYkEyRDVkVnZtaDk4WEVtU3d2Z0pqM29EdnJvYXhLbmE?oc=5",
+            "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE93bUhPT2QxNmdnVHU4QTV3YXdpUFlENm93VFdRUDZRZUJ4bU5tZDZLUTRBcmRKRXF2Z2NMOHhTWmhZTXlzbjc5TTRmVnlXdkFYQ3BuSEtFcXlyUXhmeDhQZE9CTQ?oc=5",
             "source": "Business Today",
             "score": 0
           },
@@ -2403,11 +2403,11 @@
             "score": 0
           },
           {
-            "title": "Univastu wins Rs 23.74 crore L&T order for Mumbai Metro Line 4 CCTV system - scanx.trade",
-            "publishedAt": 1790796846000,
-            "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxNbmRwN0YzWnVTdGRscVhxamRVTkc0bkZUVFpRNThVLS1ZbW1MNzZfaTNPdXZiM0lmMmdlT3A5SndlVVQ5UVNwQ0dqbXAxMXloazJVTUN2cEY3R29vUTdYNjdBT0gySEZUWE1LeGNrRWFHcEQ5cGhlbnJzZHVNTndrSzdITUpkeEhub3FMRGR2cDRzeUFULUVoMU9TNmxoLWQzTHdsQ0RtcFVTRzFPeXhlVS1CSXFJam1RdnNsYUZtVQ?oc=5",
-            "source": "scanx.trade",
-            "score": 1
+            "title": "L&T का शेयर चर्चा में, भारत भर में ₹2,500 करोड़ तक के नए ऑर्डर मिलने के बाद। - Alice Blue",
+            "publishedAt": 1790812749000,
+            "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxPaVJ0RDVWbTdDbjZuQVU4R0piSkJjWkF4TGdvbDlxNURxSFdNaW9LbGhGblRYSnJPNXBSaVlnZWlTQnVRdWo1RU9fa2dkOW9SR0VSRDFocWdzYU1pa1R0LXdrSGo4a1Fxd1F1SUExU2lyZ2hIN3dZM21IdDRlb29CUUxoQjA1aUp2Q0UzYkFzel9fYk5oU2dtdXBkaEVDcEtObklrUkJIZ3FMN08yeGVPWDZzNmFFYm5PNE9BS09SNG9CLVF1SEcteEdIUQ?oc=5",
+            "source": "Alice Blue",
+            "score": 0
           },
           {
             "title": "HAL, BEL, L&T, KEI Among Jefferies’ Top Bets; Brokerage Picks Defence & Power Stocks Amid India Capex Boom - Goodreturns",
@@ -2533,13 +2533,13 @@
       },
       "errors": [],
       "rank": 9,
-      "score": 47.368421052631575,
+      "score": 46.84210526315789,
       "factors": {
         "momentum": 47.368421052631575,
         "trend": 31.57894736842105,
         "volume": 63.1578947368421,
         "relativeStrength": 47.368421052631575,
-        "sentiment": 63.1578947368421
+        "sentiment": 52.63157894736842
       }
     },
     {
@@ -2553,7 +2553,7 @@
         "trend": -0.034390699071238706,
         "volume": 0.917688893323769,
         "relativeStrength": -0.006418358234451027,
-        "sentiment": 0.11888982857871548
+        "sentiment": 0.1044529886693176
       },
       "fundamentalData": {
         "pe": 10.5,
@@ -2563,7 +2563,7 @@
         "revenueGrowth": 6,
         "profitMargin": 16.830539118681457,
         "sector": "Financial Services",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/SBIN/consolidated/"
@@ -2605,7 +2605,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.11888982857871548,
+        "score": 0.1044529886693176,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -2691,6 +2691,13 @@
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE9RSFVXUTBPanFDdXFpODBLclY5LWxXV2o0RWVHMzJjQVVGTUs2UmhndGczRUZVdlUzOVpuTTBIbDB2UnJLZ25wUi1oSkx5T1VoSXhQS3c2RDdkQ3puUGl6LWN4N0RoRHhaN3hGanFDQzVQNnVfdjdKM2h6WC0?oc=5",
             "source": "Livemint",
+            "score": 0
+          },
+          {
+            "title": "ICICI Bank Ltd Share Price Today,, ICICIBANK Share Price NSE, BSE - Business Today",
+            "publishedAt": 1790838000000,
+            "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxNNnU5b1E5Q3hTbEk3azd3T05ON0c2VW0zQWZPSXAtWkR5aHdoendpcFVkWi01dGFMZVEwSVZGX2FDejZIZy1Bd2pwYS1MZG9FQkdHVDVOLXgwVERjZ01qMUdFY05kVzJ1ckNybGh4eXRiX1FYeXA4cFlWVnF0cDN1VlVKcDY5QQ?oc=5",
+            "source": "Business Today",
             "score": 0
           },
           {
@@ -2785,13 +2792,6 @@
             "score": 1
           },
           {
-            "title": "Bank Nifty Crashes 1,800 Points In Two Sessions To Three-Month Low. Will The Fall Continue? - NDTV Profit",
-            "publishedAt": 1790659047000,
-            "url": "https://news.google.com/rss/articles/CBMi9wFBVV95cUxPZXdsM3huc2J5WkYzcktCTTQ0X25VWXlPV2dyZUVUWll4VG8zQTg4dlc5NFJfSEVIZE9kTUNCVWE2ZDRCWXUzTDNaMEJWZTF0a3dmMHd6RzNudGpKS25TUDVYRWV1UXdXRzRxS1U2TTkyZGZLUFUzY05QVmV2aldTVFdrWEczNUNqbWh6U09SZzdjSnNwS3loVW1oUzRnSUVoOUVMazg0NUd6bVJQekh5b0NMSU1GTjJrOXA1WjNPem80d1JCcEwxRjdYYW93endmUGgzUVVFajJZV0ktNU9WYkZRR0F2VFVfX3AzemdGeDJwdDBsVjlN0gH_AUFVX3lxTE5udndUV1FHcWhkOTlBdXdxbUdMZzB1TVdaT0draGRyUE5XQTJpU3ZkSlZjTmRKZWZwOG9DdFl6bkxjUmVKODFYQTV2WElTckk1V29HX1VLeXlNZzRSOTBmSDlTYUZLX3RvTmtMeTFZYjVvMllxZ2ZYek1jckd3OVFBZTdLaklOVWpSVVprUWZkbG9iWENqWDV3OVU2R2ZTZm5vNUJOMjMwOUZQbU5mLU5Gcy1jRFVuaXRSUUJYZHdSLVlHb3Y5OEhsZ05wQkkyVDg4UVppQ3p1cmlpNm1qd05MWFFsd3ZzTmpDR2lLQXRuM3JSMXI1SXVsS0FSZlZsOA?oc=5",
-            "source": "NDTV Profit",
-            "score": 1
-          },
-          {
             "title": "Bank of India (BANKINDIA.NS) Slides 5.76% to ₹129.99 as PSU Bank Stock Tests Key Support - Dividend Stock Picks - siam.in",
             "publishedAt": 1790650052000,
             "url": "https://news.google.com/rss/articles/CBMiwgFBVV95cUxOVTZibW9QWXFKckFqd3RmcURYYThTeUppd2NkQ2ttN25fR1dCTnRpQWZBanVydmxZRFJILS1ZekpyOFVsREYwd2E1SFJnNkdnVXFxMmUxakYwbjF0RlU0NU1tdmlocXQzM21McWhtTHNlYlNyenhxMTI4cS1oMXlOYVhNMkhKR1gyZFNCR2NEOE4wVFBPMHV1WjVOY2NyOHFxdGstSEw0azlmTzMzeGFvUzlneEV6Q3I2RnppMjh5STIwUQ?oc=5",
@@ -2806,17 +2806,17 @@
             "score": 0
           },
           {
-            "title": "Govt vs private banks dividend comparison: SBI, HDFC, ICICI, PNB, BoB, Axis, Canara - Which bank tops the yield chart? - IndiaIPO",
+            "title": "Govt vs private banks dividend comparison: SBI, HDFC, ICICI, PNB, BoB, Axis, Canara - Which bank tops the yield chart? - indiaipo.in",
             "publishedAt": 1790622664000,
             "url": "https://news.google.com/rss/articles/CBMi3AFBVV95cUxOSE96YkplUlBHWjN3cHJnYm4tT3cyS1dUVDJDQ21vbjhkQktJVDBaaHlWYUJ4bUtPYVdpSmJ6UTRXMWJFSkdVa1hhOG10QXZsMjRLdEdBblNrcHc0MU1Za2llblgtZlZqaVV2eXJzUTdISnNjdzk2LXZIZEFqdHFJeGZ0dFR2Yk5SMzVCYlQ3QThURVJmZ2lPQm5YOGpHc3RzWkZfWGt0NWttQXlIR3hDbFRGUzhzaHo5clhVVURsTzBFLUZHUFhoVURpUnlDem1XTHlpTjJiZHF6TTBC?oc=5",
-            "source": "IndiaIPO",
+            "source": "indiaipo.in",
             "score": 1
           },
           {
-            "title": "Oil shock batters Indian stocks as bank shares lead rout - pressinsider.com",
+            "title": "Oil shock batters Indian stocks as bank shares lead rout - PRESS Insider",
             "publishedAt": 1790612224000,
             "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxQb0tXX1RuU1MzTWgtV2hqU2JkMHRGbVJ5Y2I0VE9RaUFvTTlGYXdzcnlnb1pxM203Y2RRZmpZaExhUzRBWFU2RzVmRTFYOWVwcEZXYWRYVFRJTlRpLTFsaDVLRHJnN0E1cFpFMEpSVWJzOERkTjJLbFBYRGxKa2tTNWFOZE5CLTlvU3NLRTV3SzQ?oc=5",
-            "source": "pressinsider.com",
+            "source": "PRESS Insider",
             "score": 0
           }
         ],
@@ -2844,7 +2844,7 @@
         "trend": -0.040581456692737494,
         "volume": 1.0504142110445824,
         "relativeStrength": -0.0009724562264818992,
-        "sentiment": 0.04258086493976487
+        "sentiment": 0.10814979449916678
       },
       "fundamentalData": {
         "pe": 34.8,
@@ -2854,7 +2854,7 @@
         "revenueGrowth": 20,
         "profitMargin": 16.031909296450255,
         "sector": "Telecommunication",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/BHARTIARTL/consolidated/"
@@ -2896,7 +2896,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.04258086493976487,
+        "score": 0.10814979449916678,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -2908,10 +2908,17 @@
             "score": 0
           },
           {
-            "title": "Airtel Money sets London IPO price at discount to expected valuation - easterneye.biz",
+            "title": "Indus Towers AGM approves FY26 financials, dividend and director reappointments - scanx.trade",
+            "publishedAt": 1790974303000,
+            "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxQbEVuWkdJT0R5OGw4M2o5dTVXRmRMM1NDR1dtS2lQZ3J1dW51Nl9oRERlMC0xX293X1NJVXhsSGtsNXJCbG5wYjl3Z1lZY1p1ZVVLX0MyMmZVRWhZSWZ0RFZrLUNnRk80djNBY2RVc2trX3pXODBBU1RxRVFuYmJrMlJlUXFCQ1hUWEVTQmN2eFZUMW1zakIyTWZwUmhOeVNRT2s0ODNuWmdKRTg?oc=5",
+            "source": "scanx.trade",
+            "score": 1
+          },
+          {
+            "title": "Airtel Money sets London IPO price at discount to expected valuation - EasternEye",
             "publishedAt": 1790962107000,
             "url": "https://news.google.com/rss/articles/CBMinAFBVV95cUxNNlBKamdpNkFnV0xkV3NxQ0tEeGZ1ZnpRWVFybDZNU3JNcGNFU3VmUHhxekpHdkZVSWhsaWZLWjhmODZINzJzRnR0RlZoN0szdFJJSWU0Y3ZRQmMxX3ZwUEpBU0lyUElxU0Y5a2VGU2pIUjFKcmpocHAzMllKTjZsUDVFRzJoSEwwUzhFcW9XZ24zTExrMTNTX0cxbm0?oc=5",
-            "source": "easterneye.biz",
+            "source": "EasternEye",
             "score": 0
           },
           {
@@ -2940,13 +2947,6 @@
             "publishedAt": 1790872833000,
             "url": "https://news.google.com/rss/articles/CBMixgFBVV95cUxNb0tFQ3Q0dW5LVndJQTl1OXVDQTVKSUhpVXkyQ00zbVlEUi1uTW9aeTBaS2ItRUhoYWp4QVo0akZlNlA0UTVNWkNKQWdkOXhjOFY5UXUzbzBxQ3pTUUZkdHZVRUM1MkIwQnZXOEdTNElYUGQ4TXYtUC15dS1vRDlMQzRpQWdMeTFTOVNYTWQ5TENGRy01Q0ZpeDFwd3F4N21KaEFGOXZKVTJBaHZVRC1EblYwb0d1NThFNnU4aEFNa2VoSWRJQ3c?oc=5",
             "source": "AD HOC NEWS",
-            "score": 0
-          },
-          {
-            "title": "IFC backs Airtel Money with USD 90 million ahead of LSE IPO - The Paypers",
-            "publishedAt": 1790861828000,
-            "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxNRXY5X0pucGE3VGVrcnNFenpFUDNwTXRYdVdtYkVYeHIzOXVzaGduc3J2Xy1OTmlia1otTm1ZTnZUS19yNzFBTS1aRWtpQW5BMHVBNk5aZ3BhbTducGhtT3kyeFhvX2RjLW53TFFFOEVWclRRYWFLWmwxSEF6dVRnaEdVYmFMblB3ZTNaRUxJTlpUbkV6MHZHTFk3aVFuSEJU?oc=5",
-            "source": "The Paypers",
             "score": 0
           },
           {
@@ -2992,17 +2992,17 @@
             "score": 0
           },
           {
-            "title": "Bharti Airtel Share Price - Live NSE: BHARTIARTL Stock Price & Chart - Upstox",
+            "title": "Bharti Airtel Share Price - Live NSE: BHARTIARTL Stock Price & Chart - upstox.com",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMibEFVX3lxTE5yVGN2YlBzbU5xc0FJSkctUlVUMzAzSHdiOENtSzV1TlJyZHhSVGZIVVVyUEw0MVpwMm1HVDRxOGM3akMyaGhNaUZUZ09TQ0N4b2Vjd3lLaW1DaEg4QXRJbU5BQjZJcjN3MGlBSQ?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
-            "title": "BHARTI AIRTEL LIMITED Option Chain - Live BHARTI AIRTEL LIMITED Option Chain Data, OI & Price - Upstox",
+            "title": "BHARTI AIRTEL LIMITED Option Chain - Live BHARTI AIRTEL LIMITED Option Chain Data, OI & Price - upstox.com",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTE8tVGUwdUxrNU1qVGtMckJYMTdNVGtndWZKR2hGX0FRUG1GNG9xZTlKa1lCSVhOLTQwems5YmpHempJM2VYZFIyMUo1bG4teGJkdWdra1RNbm5xMUc5Y01wNlRYV3U?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -3076,10 +3076,10 @@
             "score": 0
           },
           {
-            "title": "Bharti Airtel, Vodafone Idea, MTNL: How did telecom stocks perform on Sept 29 after TRAI's data release? - Upstox",
+            "title": "Bharti Airtel, Vodafone Idea, MTNL: How did telecom stocks perform on Sept 29 after TRAI's data release? - upstox.com",
             "publishedAt": 1790676205000,
             "url": "https://news.google.com/rss/articles/CBMi8AFBVV95cUxQb2NrdDh5X1pMbFVKR2dPU0NFcDVLNDdBSGkxckxvd28zR3VGUlNzZkZxN1FCbklDS3EzblRDTm5ZZmhXNWFVdmpfZnNxaFZnQ0M5dmNoeXNldE5Gb3NDcTdiS2lmalpfbEZJT05VWG1fVWZNYW5SUC12WGEtM2x4RjJlZFh4TXQ3OHh6YlhPcmNDYTZjeVNPS18xSktCLUs0ZE5reV9hdUJhVWF1OWI2dnQzMFdOTkM4NGdNSl84X1AwTEJ3eE5obmVBYy1QSy1PMnVyeFZsTXpJNUs2MTNCY01PY1pqZzhHZloza0lFeWo?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -3115,13 +3115,13 @@
       },
       "errors": [],
       "rank": 11,
-      "score": 44.210526315789465,
+      "score": 44.99999999999999,
       "factors": {
         "momentum": 52.63157894736842,
         "trend": 36.84210526315789,
         "volume": 15.789473684210526,
         "relativeStrength": 63.1578947368421,
-        "sentiment": 68.42105263157895
+        "sentiment": 84.21052631578947
       }
     },
     {
@@ -3135,7 +3135,7 @@
         "trend": -0.0006420295625380046,
         "volume": 1.3396246681214088,
         "relativeStrength": -0.023503819765686274,
-        "sentiment": -0.07183545025045522
+        "sentiment": -0.07183545025045525
       },
       "fundamentalData": {
         "pe": 14.1,
@@ -3145,7 +3145,7 @@
         "revenueGrowth": 3,
         "profitMargin": 22.72392180485636,
         "sector": "Financial Services",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/HDFCBANK/consolidated/"
@@ -3187,14 +3187,14 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.07183545025045522,
+        "score": -0.07183545025045525,
         "count": 30,
         "excluded": 0,
         "headlines": [
           {
             "title": "Vaishali Parekh's top 3 stocks to buy: HDFC Bank, NRB Bearings, Lalithaa Jewellery | Target, stop-loss, market outlook - Livemint",
             "publishedAt": 1791027011000,
-            "url": "https://news.google.com/rss/articles/CBMijAJBVV95cUxNUTRWUUpuamg2OWhydzV5dUhTWnFyQk9ndE40dlhvcktoRzNLWVUxNl9TNW1TWTVmclZuQUY3ZkZnRHIyZzBPZmxQNjkxYjc4WnBuS0I0UWY0TThIVkxsQ0ZtVWluYkxOeDdnTW1lS2xTd3NySXFGRUVNa1ZEcUtnMUNKNEd2RGNoREIyWF9odHVzYnhoRG0xNjBBQ1pMdGtaTUpoZ2dEV2U3Ri10VDZ2eHpTUkhjWWliS1Y2ZVlWWXpDV2tXYzA3YnRTcDhzbDltcmd4S3VMTnRGVXRTVXVkWV9ILU5oRGpCclBia2I2UXo0MjY5UEJFRG5CNEtRd0E0cU5uVUN0V095Ri1n0gGSAkFVX3lxTE9IcnlmLUVwX3JfenZnYXZ3QkZFYkFOdURzLUR6M0gtVXhVSk1nd2kxYXdoSWdBWUhIRUVVSmlGRU02YlZkaF9lT3A2NU1TWWFVOVdjbEVsR3RTNzJnWkRNYUpSYll6LWZsMHc5Uk44dDFQWF9JbzFOOGJFQ2cxNGVEZnVoMWpKWV9JUVBldDVsaVVZQnNpeWp0WWZDZHFUZDBkd2IwT2lXTk9uSVhWVHp1cnZxTDhLSEdBNEM0cVZqMlJvRjNIdTh4ZU82cFpqeXhjWjRnUlY1UXJaZy0wbXhIQ3QtTXFDZVIzb0lHeVRtclBvSllxOHd6U0d0VWNsUTJxckRvSnlYQnp0eTNYaHRhUUE?oc=5",
+            "url": "https://news.google.com/rss/articles/CBMikgJBVV95cUxPSHJ5Zi1FcF9yX3p2Z2F2d0JGRWJBTnVEcy1EejNILVV4VUpNZ3dpMWF3aElnQVlISEVFVUppRkVNNmJWZGhfZU9wNjVNU1lhVTlXY2xFbEd0UzcyZ1pETWFKUmJZei1mbDB3OVJOOHQxUFhfSW8xTjhiRUNnMTRlRGZ1aDFqSllfSVFQZXQ1bGlVWUJzaXlqdFlmQ2RxVGQwZHdiME9pV05PbklYVlR6dXJ2cUw4S0hHQTRDNHFWajJSb0YzSHU4eGVPNnBaanl4Y1o0Z1JWNVFyWmctMG14SEN0LU1xQ2VSM29JR3lUbXJQb0pZcTh3elNHdFVjbFEycXJEb0p5WEJ6dHkzWGh0YVFB0gGSAkFVX3lxTE9IcnlmLUVwX3JfenZnYXZ3QkZFYkFOdURzLUR6M0gtVXhVSk1nd2kxYXdoSWdBWUhIRUVVSmlGRU02YlZkaF9lT3A2NU1TWWFVOVdjbEVsR3RTNzJnWkRNYUpSYll6LWZsMHc5Uk44dDFQWF9JbzFOOGJFQ2cxNGVEZnVoMWpKWV9JUVBldDVsaVVZQnNpeWp0WWZDZHFUZDBkd2IwT2lXTk9uSVhWVHp1cnZxTDhLSEdBNEM0cVZqMlJvRjNIdTh4ZU82cFpqeXhjWjRnUlY1UXJaZy0wbXhIQ3QtTXFDZVIzb0lHeVRtclBvSllxOHd6U0d0VWNsUTJxckRvSnlYQnp0eTNYaHRhUUE?oc=5",
             "source": "Livemint",
             "score": -1
           },
@@ -3276,10 +3276,10 @@
             "score": 0
           },
           {
-            "title": "HDFC Bank: RBI Approves Anup Bagchi As CEO For 3 Years Succeeding Sashidhar Jagdishan - Sahi",
+            "title": "HDFC Bank: RBI Approves Anup Bagchi As CEO For 3 Years Succeeding Sashidhar Jagdishan - sahi.com",
             "publishedAt": 1790867056000,
             "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxNRXhsRy1Kb09XMlpsNWozNGRCRkpQMGZYeXRHRDlpM0oxNGloM2FYMWtxZ0ZZM3RmMGIzVzU0MDc3YnVKc29pTEc1UEdMNmpPQzE1aGhrY3lFSVNPVm96Z05WRHRUb0hWNTBZSTBvN0lVYy1lbi0yNmxJYlpTU1pkMDJ0UjdsM3Q4VFcwZTlWSWM1eHhzOFIyQjNPX1ZFeUFVSkJ3ZmNHMnltcllRY1Vr?oc=5",
-            "source": "Sahi",
+            "source": "sahi.com",
             "score": 0
           },
           {
@@ -3423,10 +3423,10 @@
       "priceAsOf": 1790826300000,
       "raw": {
         "momentum": -0.11222898908418255,
-        "trend": -0.03334027954921559,
+        "trend": -0.033340279549214924,
         "volume": 1.535468453560691,
         "relativeStrength": -0.04125627947169597,
-        "sentiment": 0.09217591249457276
+        "sentiment": 0.10060180303642083
       },
       "fundamentalData": {
         "pe": 16.2,
@@ -3436,7 +3436,7 @@
         "revenueGrowth": -3,
         "profitMargin": 26.649591722878736,
         "sector": "Fast Moving Consumer Goods",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/ITC/consolidated/"
@@ -3478,8 +3478,8 @@
         "status": "flag"
       },
       "sentiment": {
-        "score": 0.09217591249457276,
-        "count": 27,
+        "score": 0.10060180303642083,
+        "count": 25,
         "excluded": 0,
         "headlines": [
           {
@@ -3501,13 +3501,6 @@
             "publishedAt": 1790910453000,
             "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQU1U4di1tQUpqTloweHlTWmdyNHMyNktRbHJLU3Fha3R1a0Q1UkpBTVJnT1NVLWNMeDJJYmhxbHFwZXN2SUdOTzI4WUx4akRjcTFMSmpYZFI4LXZVMXpqaW8wVDVQSndBS1lXNHVyR3ktbWJsOHhkZkRXUzU0Y2t1ZTRrQ282b1psREM0YURLNTc3bGpfMlFVVllWdHo1UmxwTi02ZVFrWGRYNEtrRllUYmVQQjlIWlRqLXBqNV9IUkhLNE9mcDVwOQ?oc=5",
             "source": "AD HOC NEWS",
-            "score": 0
-          },
-          {
-            "title": "Netlist Files Trade Complaint Seeking Import Block on Micron Memory Chips - TIKR.com",
-            "publishedAt": 1790857916000,
-            "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE4tYkpXZDhtTm5YVW9XYzY0MmE4M0k1UUMzSUhpTl91YjNnWllqbTJkMGhVTzFCVEVRSnRldlhBQUZURzFrSmNCREtMX05pU1RLT2xRdDdIYkhvWHgycnlwUU5fTDJqeUhRS19Pejdoa0JDTU9xTDlmQzFfNHFYMHM?oc=5",
-            "source": "TIKR.com",
             "score": 0
           },
           {
@@ -3550,13 +3543,6 @@
             "publishedAt": 1790834540000,
             "url": "https://news.google.com/rss/articles/CBMijgJBVV95cUxNQWlRUy1EMUFhb3ZKS1VwU2drYS1pNktpbERCeUExazBpWDdRY3RpckNlRldHUHZVQ2RLUzBBN0E5THQxWG1rYkZZTTJQcm9EVC1ocmxSR3JMOU1kOGVJZjh1ckVnSk9kQlUwLTZaNS1reUtMYXFYS0xHRU13aGhvSEs0Tzc0eGFvQnAtU2JUbWdOUnA1VDJ0MFhyRF9icm9qTFZjak1ZTEtySTdnODVCMVBsajkzak1qRVhMemFKWU5JUXh4QjhnMXFFd3pDcEsySHVBUE43S0plOFFtZ3g3LXVzeS1WdWlPYXBHRzJWaVVoUmJsVW82M2ZFcEpXT0ZBYTdnUUs4TWJOTlJORGc?oc=5",
             "source": "The Economic Times",
-            "score": 0
-          },
-          {
-            "title": "HDFC Bank, Infosys, ITC shares: FPI favourites hit as 2026 outflows top Rs 2.5L cr mark - BusinessToday - IndiaIPO",
-            "publishedAt": 1790777434000,
-            "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxOVGFRdlhfbDctU2Nld2NaNzlhbmdFdzdTN05JZmQyUlRWWFlnaDBRM3Z5OFRWM0duUTBZR1Z3YnRmNXJEVEdjN0x0b0dkQ1lOVmx4amJRc1VkbEdzVmpWNVlpRloxTmV4SjNnR1g2MkRKVTNuNFdWalN5UU50enA4WXhGaW8tbWhOemdQdEg5LTlzNDE1TXZtanR1cEp5a0xaRFZFcm1KQlJYckFLM1lGUGN6TE03d21YOHJLVU1GaXd3NGVlNmRwUnFDRHRTdw?oc=5",
-            "source": "IndiaIPO",
             "score": 0
           },
           {
@@ -3616,10 +3602,10 @@
             "score": 0
           },
           {
-            "title": "Markets mixed as Petronet LNG, HCL Tech and ITC fall - NewsBytes",
+            "title": "Markets mixed as Petronet LNG, HCL Tech and ITC fall - newsbytesapp.com",
             "publishedAt": 1790662029000,
             "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxOZXY3YkFxTUxlbjNjeFdmWERfakdFd2tuemtyTGY2cVRWMEw5NkliVDlCYkppR0JxWXNqN3p0Rk5IY0swcUp2YldScVNIdWdMdHRvRmszelh3OWdlOTloUFY2Z25WTkR0VXNadTBIZlFibHg3T2M4cTJGNUFQR2dXcWU3T3NLSmtjMzB6clNrdUJXZUNsTGVpUXJJRFJ6N0Mx?oc=5",
-            "source": "NewsBytes",
+            "source": "newsbytesapp.com",
             "score": 0
           },
           {
@@ -3637,10 +3623,10 @@
             "score": 0
           },
           {
-            "title": "Stocks to Watch, September 29: BSE, Honasa Consumer, NCC, IRFC, ITC and other stocks in focus today - Zee Business",
+            "title": "Stocks to Watch, September 29: BSE, Honasa Consumer, NCC, IRFC, ITC and other stocks in focus today - zeebiz.com",
             "publishedAt": 1790648040000,
             "url": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxPMlZKZS1haWZyZktxaEoxc3NyZkdxYWpqbmlLa2tobHpTQ1lJczhwdlJiOTBCSkwyR1RnZUZVXzVKSnlZa2hrTTZRMTFDY0tUVFZOQ2k2SzNWcWcyTHZpWFhtcjRGOGh6cHllVUZkS0Zvc1NndlBvNE1VYnZ3bU1QT1oyMGxua3hienduSHd1bC02aUN0cXJvMEdNdWpLNElsdFhHZjNyRzJUTFRhRVVTUE5iMGk5cGhQZTZSbm5CT3JVM3dlRGVKMjFQcjVRTm90YUhkNmI4VQ?oc=5",
-            "source": "Zee Business",
+            "source": "zeebiz.com",
             "score": 0
           },
           {
@@ -3672,7 +3658,7 @@
             "score": 0
           }
         ],
-        "coverage": "27 dated headlines · last 5 days"
+        "coverage": "25 dated headlines · last 5 days"
       },
       "errors": [],
       "rank": 13,
@@ -3696,7 +3682,7 @@
         "trend": -0.06398739062180103,
         "volume": 2.8880054973203055,
         "relativeStrength": -0.012094013284063787,
-        "sentiment": -0.02318458648295433
+        "sentiment": -0.023066650278560086
       },
       "fundamentalData": {
         "pe": 18.6,
@@ -3706,7 +3692,7 @@
         "revenueGrowth": 26,
         "profitMargin": 9.37479548326361,
         "sector": "Automobile and Auto Components",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/M%26M/consolidated/"
@@ -3748,7 +3734,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.02318458648295433,
+        "score": -0.023066650278560086,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -3781,17 +3767,17 @@
             "score": 0
           },
           {
-            "title": "Mahindra & Mahindra Share Price - Live NSE: M&M Stock Price & Chart - Upstox",
+            "title": "Mahindra & Mahindra Share Price - Live NSE: M&M Stock Price & Chart - upstox.com",
             "publishedAt": 1790924068000,
             "url": "https://news.google.com/rss/articles/CBMibEFVX3lxTFBVV2ZnV0tzMXc3aFRTcXJJcDNwcXQ1eG5acHdXc00tUzdDQV9fTi1sREpSang3cG9ZMDNNQV80VEV5M3lRQm01T2xNUEZjMU9HOG5yRkFNQWVKbE9zQU9yc2tTa3pUbEZ6MmJlUg?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
-            "title": "Tech Mahindra Share Price - Live NSE: TECHM Stock Price & Chart - Upstox",
+            "title": "Tech Mahindra Share Price - Live NSE: TECHM Stock Price & Chart - upstox.com",
             "publishedAt": 1790911161000,
             "url": "https://news.google.com/rss/articles/CBMibEFVX3lxTE9QQm0zbE8ydTFJNzV3VTNXX2FIRnA0WmI2czZ1UWE1a2k2Mi01a2dzZnBpaGEwSHo2Q0ticnJxSGQ0YWpTMzRRbjF0aDhkaG9oRTdSeGlEbERSWTlrVEVFdTdGSXR4ckZKSm4tZA?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -3823,13 +3809,6 @@
             "score": 0
           },
           {
-            "title": "52 Week Low Shares BSE | 52 Week Low Today | Shares Trading 52 Week Low BSE - Livemint",
-            "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiW0FVX3lxTFAyLUpKTk1QbzNOQWNzLUN0bk52RkdaUFBRNXRPblFlUGszMGhRSm5DXzd3VXZ2SzRPdTlCdDBqT2pPZzJDTUlIU3YyQ1J2N0VGTk9tdTdOdUl3RGs?oc=5",
-            "source": "Livemint",
-            "score": 0
-          },
-          {
             "title": "Why is Mahindra & Mahindra stock sliding today? - Investing.com",
             "publishedAt": 1790836809000,
             "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxPUWQtblZnUUNFUzBadlcyZGhPWkZuRmU4NUJTcnhrMmg2cDF5Y0o2RzMxVHFmLUVBaFRZc0tMVmNZdHFKaDFYb2lSQlBBNV9KaFhLdUlDQUx6QUVGSnZZdC1LWW1Vam1JZXI2Y2E3UzBiZF9GRlVabGJ2QVVycnRCZExQWFhRVktnNkVKeExpam11c19mOHdPM0gtYnpkUm5zTlZaaEpsbTAtLU0?oc=5",
@@ -3837,10 +3816,10 @@
             "score": 0
           },
           {
-            "title": "Auto stocks crash: Bajaj Auto, M&M, Eicher Motors tumble up to 9%; what's hurting the sentiment? - Upstox",
+            "title": "Auto stocks crash: Bajaj Auto, M&M, Eicher Motors tumble up to 9%; what's hurting the sentiment? - upstox.com",
             "publishedAt": 1790836777000,
             "url": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxORE5GQzlNeDVnUE9HUHVSMS1aWTJ5R2pUdEUwZlJHU21VaG1xSkZabGd2Vkh5dUw0RWdPa24zelFoclJ6Tm1zUzJMai1YU3Vsd0ZFaGJ0ZDZsdDFxOGxYOTQ5WjJaeHEtS3VrVkNJWVE1aWQxNU9qSl9TR1VBaW9EZWdfSmhKQmZON1VhRktFNDBhOEdBWFQyWFphUGdVdmlmQ3pjRFhYeDQ5OGE5Z2ZqMG9mM203U2xueHdRbV9JbEd4VEd2Q0l3QmxxNmQ0ZktRSms1RlY3V0VmaTlCRjYyaWpmaHVvTGsx?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -3893,9 +3872,23 @@
             "score": 0
           },
           {
+            "title": "Mahindra & Mahindra Ltd Technical Momentum Shifts Amid Bearish Signals - MarketsMojo",
+            "publishedAt": 1790830344000,
+            "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxOLXpNdXlMZmRJTzF3d28xVXlXQ2VqdmM3THBDV25tQnpCMlAtODhCbTVjd2o0NENhMW1uM3VVSW9aeVZyaVEyUURGS2wycVhlZVBzdXctc29FXzBHQWVmQzVvX2Z3VkUzS2xDMGhVZlZoUDNPUk16eXJZd2E2OUZ2UEJyZEx4SHdnNlUwSzA5bU9PRFVQdjZBaVpfX3ZKYkxoV0pDVEM0cENBQVk0MFJVRTNUSjFGRUZfUExOMU1rVmNWMjhJ?oc=5",
+            "source": "MarketsMojo",
+            "score": 0
+          },
+          {
             "title": "Rs 2,900 Puts — 0.7% Below Current Price — Draw 2,563 Contracts on Mahindra & Mahindra Ltd - MarketsMojo",
             "publishedAt": 1790830344000,
             "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxPRFFObDNNTzBVU2hUMGRna3ZiYWkzb3p1Y29ZU2ZnU21EZzZ5Q09xZTJSbkowcHJ2c09wR3FKbDZjMnFMOWRnWG9yaURrdWZrQ0VDOVZhZU9jT09YazNsaUVMblIxZVdEMk1pZU8xdDJxZVpHMEdXTTlZcWhlN1pNVzlMTE1zdjVxeVMzWjlXZXJrQ1ZkVm5MeWk5YVp2YWlxZEw5Y1o4azFwb09IbFdZVlFVZnN0RC0tdnc5eXVDTVJ3X3V1c0M0SA?oc=5",
+            "source": "MarketsMojo",
+            "score": 0
+          },
+          {
+            "title": "Mahindra & Mahindra Ltd Sees High-Value Trading Amid Downward Pressure - MarketsMojo",
+            "publishedAt": 1790830343000,
+            "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxQMlQzNzh1T1Y0NVpncUlQMnFmQ09Wa2FKbFJSQ1VYaTl5Sm51UjJ2RHlyRzBERm9BSEowYnk3ZTdNa1FJWmtjc3VEMGpETS1IRXZMMFVOWUdYaEFpdFh5b2VMTFdlamNyNFRBdV91OHMyYlRCcUxjTE8zNzVrbTNmTGN3S3pfcUV5RmNWN1NkZWpPaU1lRW1Gam5LbmoxV1A0MnpJZ1lGTkc2bFBib0JHVlE0ZjN2WXZUdTFIMTFFbjBOSFN5?oc=5",
             "source": "MarketsMojo",
             "score": 0
           },
@@ -3928,13 +3921,6 @@
             "score": 0
           },
           {
-            "title": "Raja Venkatraman recommends two stocks for 1 October - Livemint",
-            "publishedAt": 1790814657000,
-            "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxPYlVLb21rTEpMeHdmQkdpRkYydzNvaElEaFdRSG9jUzJOeXNvaWtja3Y5dVVXTGR6V21TelFfYzBxN3l1Y2lDV2JzdXA5MXpTc2FOc1A0b1oycDJiUGpBcThRT2E4YjVmTjRlR2laX19GTFpUSUQ2Ml9kQ0xQYlRSQXpOWlRndVpoQmkxTk9wczFycktzZXU3TFRvSkExMVVTQ29JWW0tN0hHbEF4SGJ0N0JJb3FwTUdBbzdpakdFd9IBxAFBVV95cUxPYUk0VE00bC0zYzNzZG9iNVF1M19kbThwaXozdmRiMWJQSHBYUk91X2JHTFo0WVRycmlNR1NXS3NuU1FoNTY4NjA0TkdrLWRaNlVJNDk2cXA2dTM3dk5Ka0wwTGt0Sk9xT250WS1ieTBvVllheWs1NmNhOUYwVUY0aVpQb0lkMS1LZmpiVDFYMExRU242RHhuYWFrZE9ockpIUFRkWDVRZ25WRGhNLWdTbnVDX1VhakJzZnlJempPeUk3WDdw?oc=5",
-            "source": "Livemint",
-            "score": 0
-          },
-          {
             "title": "Mahindra & Mahindra falls Wednesday, underperforms competitors - MarketWatch",
             "publishedAt": 1790764320000,
             "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxORklZYkc0RUxjRHNObl9Hb1FYb2FBWllzTnJEQTEzcm55UGk0bm9vdXZkZzlSU08xZ0hiTEI1c3laUk1FZFdiWTBTeUpzem5pLWg1N3VkQXBPR3B3SnkwNzBmdXdwaUlMMTRQMFYwX3hQU3FpRzk2ZlRfR0R6MnNxTTYtMW9UMHM4RXBEVndoOFhwOHNBQVRRM1BrSGE3Q25kel9xNmNKTkR1SURKOGFGQ1RUMVIzdw?oc=5",
@@ -3949,10 +3935,10 @@
             "score": 0
           },
           {
-            "title": "Maruti Suzuki vs TVS Motor vs Mahindra: Which auto stock to buy ahead of festive season? Check target price - Livemint",
-            "publishedAt": 1790698928000,
-            "url": "https://news.google.com/rss/articles/CBMihgJBVV95cUxOU3VaNWs0QWpvQjdkNjMyeFRnckRmZGx6ZVBEa0UzdDR0RGhjdlBtUTV3eDJ0ZVJoNVMxMU5UZi1BRkxFeUxXRDN1RjZWNmN6ZGlyYkhLS0FpRXc5TUsxMDB5Z1JvMG9QMTMtY2h4Q0RhMmpBTnRSa0pSWkEyQTFfQVA0U2VYSFZRMVZoQ0tuZFBMT21CVFdRUHVoSG9iblBSVl9SaHJJSnRnVHJlbTRJaG5MZnBTZ3Q5MWtMcHZnTS1kRy05c05LeHhwbXlyRktHVGs0ZjNib3dwV1B6U2JRaGh5YVRIX1JCVmxBUUE1VlZKdllPUEgyUUtIWVYybTJoVGxDTUZB0gGLAkFVX3lxTE9rcjBGWElBbHBNR2x6WTN5NEVRYjU1aGlXenJjYWtpYzlZRTBGVDdBU28tczQ4X20tQ3FZNFYxaHAzZk45d19hT2JWTENMdjJURW1pT2g1b2I3OC1CeDVBTU5BRDlGMnBXbmhqMHJib0xvc2VIQWhQUjlSM2VjX0FQYVZrbjZIV1p4bG9IMzJLQUhYWGJvS3VWQVdSTnJWQndVQ1ltSTZXNlpQbkZCbjdXckZYMC1qbGlYZ3pDZmhSLU5XaDlfRGRkdjZLdlZUQ0xMamh6a0VLNzl6dWJ3Tl9zai1BZUloSEU3WHctMG9FM1FSb3hsWDlQaWNlckhfR2Itcl95aWllLUtuZw?oc=5",
-            "source": "Livemint",
+            "title": "Mahindra & Mahindra Ltd Technical Momentum Shifts Amid Market Pressure - MarketsMojo",
+            "publishedAt": 1790743760000,
+            "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxOQ0xDNXVEY0xXVUlpVTRFbjBtT3h3MGx2MFhUZlZsNmt4MnZFNjN5WUgtNVhsakFWY25ORDJDVmNzLTZXTmJHUVQ0MW10VDF5WlByUlJaMzBMUmlEeTIxVlgzOHV1VzVXNGZiR1ZJbUpSeHdJVzFheHlxTG13NE4zUTJXaGxWVDh0dkI5UzJQNGVrbm9kLVlia0FtczhkWV82R1prNGJRTVEtdWZqMWNTTW5OUTZrSmQ2aXNoZ25oQXlVN2Yw?oc=5",
+            "source": "MarketsMojo",
             "score": 0
           },
           {
@@ -3987,7 +3973,7 @@
         "trend": -0.03461010921873031,
         "volume": 1.4230750749386716,
         "relativeStrength": -0.03027792150320563,
-        "sentiment": 0.13352100831107144
+        "sentiment": 0.04285948859389506
       },
       "fundamentalData": {
         "pe": 11,
@@ -3997,7 +3983,7 @@
         "revenueGrowth": 2,
         "profitMargin": 14.700216132561303,
         "sector": "Power",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/NTPC/consolidated/"
@@ -4039,8 +4025,8 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.13352100831107144,
-        "count": 23,
+        "score": 0.04285948859389506,
+        "count": 22,
         "excluded": 0,
         "headlines": [
           {
@@ -4049,13 +4035,6 @@
             "url": "https://news.google.com/rss/articles/CBMijAJBVV95cUxOcFZHTkYyTEdvS1lzbDA5LTlIRHl0T2k4MElObGx2b1ZQaG1OZGMzZTFDZ3dBb3AwUDJfdmNITXpRTno3dmNxVFFGdUhySV8yZ0FhejlIUnhzbjV2ZGZsT0loVXFPalNOd2JZNnkyZE9OVGptc3d6MVFXOXdQYjBXUE9fZHd0U0NhNWsyYlZLSzRyaVg2SFNZTXhuU1UzbUpRa01MaWQ1dGRaQURhUl9KNVEwdjFuTm9icFZwYTJCdjZld1dDS3FFUmpwT1RHUXRlWUc3bGRLQzNJWDd0VEp3OFo3WjNCb0JpLVB5U1Jkdl81RVRZTTZXNVBhZ0hRZ1BTMlBpam1YWWdsMWY40gGSAkFVX3lxTFBJUFNoR3hnbVNZQlZpMVdKMlBONHhCWWRuXy1IbzJncjVpdnlPZV83UXVHU1laSmZNRWtqb2s0TVJVUDRod2tjbUxiQjA1ektoT1Jfd2FtbVFYVEFLeHJUT2tzbkxQMmhIZlJodzdtdlhteVltZHRMRHFFSWpuZmhlcTFTVzB0X1piVUZ4YVJ2WDRxMktzUHY1YnNkME1qSXYxWUNxTUpoc1RmZU5wcDE3TnYxS20wdjVyd3hIbjMxM2VDQURjeGNEdFJJZHdjYm56dXFYSWR2dERORFdNMU9Gci1mT1V6YzY5aVVJWVN4YThBbmdrbS0wbExtQ2hVNG1wNmpJZ28yb0I5M0c0R3lscmc?oc=5",
             "source": "Livemint",
             "score": 0
-          },
-          {
-            "title": "NTPC fixes Sept 2 record date for ₹3.50 final dividend - scanx.trade",
-            "publishedAt": 1790974643000,
-            "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQSHNwa2UtTzI2Wmdla3hudDRiVkZnMGdkSmNkaFlmWXpIdFBna0VZcG4yVlExUUE4M1NVWGpzRFVWb1YtNmdFUnhLUXplVFhoeng4Y0ROOTVOZGppOUhfYnlfLTlUU3pYNm03Q0prdVMya2prcm9vTGtPVUlFMVdORTdSWURQa1BGUGpkV09nNE80MDRmYUhyYmNJV09QcFhxLUY3Zmc1ZnBoQ041Wlg0?oc=5",
-            "source": "scanx.trade",
-            "score": 1
           },
           {
             "title": "Suzlon Energy vs NTPC Green vs NHPC: Wind, Solar or Hydro? Which Energy Stock Deserves Spot In Your Portfolio? - Goodreturns",
@@ -4072,10 +4051,10 @@
             "score": 0
           },
           {
-            "title": "PSU stocks today, October 1: MRPL falls 3.18%, NTPC Green down 1.72%, Garden Reach drops 1.65% - Business Upturn",
+            "title": "PSU stocks today, October 1: MRPL falls 3.18%, NTPC Green down 1.72%, Garden Reach drops 1.65% - businessupturn.com",
             "publishedAt": 1790847298000,
             "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxQLXZ1c3owMG9oSDNjNlIzME5LNlR6aXB4TEk5elFDaTFkMDdTZWZFdHJMSUd1V19UUXcyVEVZd042ZExuR01vcDRVX0pib1JmTDFnUzZUNVdicFJndEphR3FUazhSa08tMlVUT2VqVl9RaWZadHgwV21yLWViQjZEdUdRY3Z1ZnlodURqbWFGVENZOVVSSXZIdlZjc3J2RExKVmJFa2xyX2dJWEZzSEVyY1RNV1FrbzlncFZvRXVWOFd5UWpLXzVXUjZROHNZaF9CeWc?oc=5",
-            "source": "Business Upturn",
+            "source": "businessupturn.com",
             "score": 0
           },
           {
@@ -4205,17 +4184,17 @@
             "score": 0
           }
         ],
-        "coverage": "23 dated headlines · last 5 days"
+        "coverage": "22 dated headlines · last 5 days"
       },
       "errors": [],
       "rank": 15,
-      "score": 39.47368421052631,
+      "score": 38.68421052631578,
       "factors": {
         "momentum": 31.57894736842105,
         "trend": 52.63157894736842,
         "volume": 42.10526315789473,
         "relativeStrength": 21.052631578947366,
-        "sentiment": 84.21052631578947
+        "sentiment": 68.42105263157895
       }
     },
     {
@@ -4229,7 +4208,7 @@
         "trend": -0.06069767369062917,
         "volume": 0.945829937879491,
         "relativeStrength": -0.004392313406982984,
-        "sentiment": -0.009530109557655275
+        "sentiment": -0.009399242041220139
       },
       "fundamentalData": {
         "pe": 28.8,
@@ -4239,7 +4218,7 @@
         "revenueGrowth": 18,
         "profitMargin": 23.579923156675,
         "sector": "Financial Services",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/BAJFINANCE/consolidated/"
@@ -4281,14 +4260,14 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.009530109557655275,
+        "score": -0.009399242041220139,
         "count": 29,
         "excluded": 1,
         "headlines": [
           {
             "title": "Bajaj Finance shares: Jefferies India's top stock pick — 35% upside seen despite negative YTD return | Target price - Livemint",
             "publishedAt": 1791022063000,
-            "url": "https://news.google.com/rss/articles/CBMijwJBVV95cUxQNXQ0WXdpWWdxdGVmUVVIUzFZTjM3MVg3RE02VEl4SDZFc3h1OUNzQ050dFRxNVpWTVZ6amVVM0lPWHJSa1VhcnY2VWc2TFlzNFd2azRJZ0R6ajRTR1lYT3BwNGQ5V213bmhZTEpkTjZ2d3dBZ1paOTJXTkMtVFh4dHBhdExDa3RiUXprVnFzWUpyWDBIZFIyWnNqc1MzYkNLWENRUzhzYlhlMlFTRGdsTzAwYW1ITXdtRm85dUwxMDZydnFsYmMya2FNMTVHV0ZGbllPalAydkk3Q0tWaV9wd05ob2o0akJMUmF0ajFTOFFpS3Z0cEtNSlRaeDUtWDlxbERSaWgwQTBaT01Md1pj0gGPAkFVX3lxTFA1dDRZd2lZZ3F0ZWZRVUhTMVlOMzcxWDdETTZUSXhINkVzeHU5Q3NDTnR0VHE1WlZNVnpqZVUzSU9YclJrVWFydjZVZzZMWXM0V3ZrNElnRHpqNFNHWVhPcHA0ZDlXbXduaFlMSmRONnZ3d0FnWlo5MldOQy1UWHh0cGF0TENrdGJRemtWcXNZSnJYMEhkUjJac2pzUzNiQ0tYQ1FTOHNiWGUyUVNEZ2xPMDBhbUhNd21Gbzl1TDEwNnJ2cWxiYzJrYU0xNUdXRkZuWU9qUDJ2STdDS1ZpX3B3TmhvajRqQkxSYXRqMVM4UWlLdnRwS01KVFp4NS1YOXFsRFJpaDBBMFpPTUx3WmM?oc=5",
+            "url": "https://news.google.com/rss/articles/CBMiigJBVV95cUxPR2NmUnZ4WVNYTDBNcWlPMGpXOGtQd3N1VlloS2d2RjRzQ1Nkel9uekNrX25rZEc5SWI5MldBejhwcnFoVi1GeWJfR0JSWFc3a0NlZnkxN1QzWVgwVGZQWmkyanFHVjJ3THRNaU5OMGI3UEhfV0d4ckJjUkRjbWkyWXdXeVpzSzdkelB6UmVlVzdYMl9saE1PLUtwVm5EY0xGZkJxVVhFZllmTnd5RUlTdVhkNUhfeEZCemVwV21pb216X2FRUVRUOXNBTGtIakpkeDRvS2xRUks3X3F6UmNvZTJDVGFJU2NzMHdJcVlqTlVpX2xIMHZ6VW9qNU5hb216Smd2V1BMWUJHZ9IBjwJBVV95cUxQNXQ0WXdpWWdxdGVmUVVIUzFZTjM3MVg3RE02VEl4SDZFc3h1OUNzQ050dFRxNVpWTVZ6amVVM0lPWHJSa1VhcnY2VWc2TFlzNFd2azRJZ0R6ajRTR1lYT3BwNGQ5V213bmhZTEpkTjZ2d3dBZ1paOTJXTkMtVFh4dHBhdExDa3RiUXprVnFzWUpyWDBIZFIyWnNqc1MzYkNLWENRUzhzYlhlMlFTRGdsTzAwYW1ITXdtRm85dUwxMDZydnFsYmMya2FNMTVHV0ZGbllPalAydkk3Q0tWaV9wd05ob2o0akJMUmF0ajFTOFFpS3Z0cEtNSlRaeDUtWDlxbERSaWgwQTBaT01Md1pj?oc=5",
             "source": "Livemint",
             "score": 0
           },
@@ -4419,17 +4398,24 @@
             "score": -1
           },
           {
-            "title": "Bajaj Finance Ltd Share Price Today,, BAJFINANCE Share Price NSE, BSE - Business Today",
-            "publishedAt": 1790838000000,
-            "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQVDBBRkZBTC12WWo5a2J0VmNjS2h0aV9pcElpSFpaSkR1OE1mT01ORmRRZzFNSzdSNG16cDhINkx0SmpKYnpNRTZIUW1Ua0tNY0JSMzdESmZBcm43NXhEMWZZNzdHUEwtcTNTb21mN1dwMFN0RmRMdndscDk1V3ZOc21iV19USmlldEpB?oc=5",
-            "source": "Business Today",
-            "score": 0
-          },
-          {
             "title": "SBI Funds Management Ltd Share Price Today,, SBIFUNDS Share Price NSE, BSE - Business Today",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQYTZGNzdGdjdxbTJVa3pwV0VpQlViVG1aWkR6TnExY3Z0NFE1cFlQTWR3Nld5UVJaVThaOUtOcDlXa3JqSUdhWDhtRnNFNEl1X2c5aGN0RHBIQU1idDEzMjVReGl5c2JjQ1FrRHV3OFM4bHMtRlBMTGw2WW05WWFRamxhR2NWQ1U5a2wzdWV6dmJRUQ?oc=5",
             "source": "Business Today",
+            "score": 0
+          },
+          {
+            "title": "Market News: Share Market Today, NIFTY, BSE/NSE LIVE, Sensex Today, Latest Share Market News Live Updates - Livemint",
+            "publishedAt": 1790838000000,
+            "url": "https://news.google.com/rss/articles/CBMiRkFVX3lxTFA2eURra0RNN0hZR0ZxYmMxV00ycGZkVS14M1JaTGFnc2lGeVdLS3NUaDQ0Q0pKSkpLbDcwMUhQN1lwcHJNbmc?oc=5",
+            "source": "Livemint",
+            "score": 0
+          },
+          {
+            "title": "Kotak Mahindra Bank shares gain over 3% after RBI approves Anup Saha as new MD & CEO - CNBC TV18",
+            "publishedAt": 1790823261000,
+            "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQOVQ0RlFFUWtkdElMQ3I0Vko5a1dZNzItWG11UVdFQVJLSUFLUV9xWGZQUG5iWS1SSTh6VkpqTzBpS2Y2cFlBeXFSQy1tM0VtV0taTVFzYWxUUllLQjFXUkJJM01XR0ZiZ2hEQzFJRzZkM1BCamNyTkh6TTVLWFVXeTZxME9qZTZxai0zaF9PYllJSVNXZFdzS2JveWNKakk5R3ZZdnFwLTQ2d2hjQmFDYU5NVGpnZk5Nb0lIRExCWEdFVWUzd19sWdIBzgFBVV95cUxOR2NKQmFBR2R2cTVHbGRkbDU3Vmh2Q3VLVTZ6dGpUWkhNV2Vya0Y0U1BRMDZ2VVYwbFJmMktwdV95Y3F4SEdteHFvZzBIdm1mOUZmNXczSmdUaFcyWENGWXIxdXZrX2xvaGhTLWVBWTM2LXRTWjJ1eHdfaGgyWENlZnFYbG15eWtPelJYY1lZN3FtbFVtS3ZzWXNLV3U1WGVLZGJUUTh1YVVGaE9vTjAzbUtJZlg3NVg3QnlabFJBUnotX2dEa2c2WDlmRU9WQQ?oc=5",
+            "source": "CNBC TV18",
             "score": 0
           },
           {
@@ -4480,13 +4466,6 @@
             "url": "https://news.google.com/rss/articles/CBMi4gFBVV95cUxNT1FuM1F3b3BxU2xyMW9fdVBDaW1pRHBST2FwcHRXTFc2WjQ3MFNibU1FbXRYYkpWeDhRVFdLenNCeDVJeXVhV1Z6ajVmUGpOZE1CQ3Y3X2lINzhhNWlRbENWUFBUMDB2VTZVbkxxMlBwWWl6dHhhcmU2TTh5bVA4UlU0aUR1MVVHTFVmRVdEWEl2aTQ5bjduUTZ2OFF5aVAyajk3bkpibGVBTFJnRVliT09NTHg3NDNtRzl1QU1fU0o2TzUwdlE1NHNwQ0xIN2ZRSE9NUk1mS0djaVBnTXdydEF30gHvAUFVX3lxTE5hdExqMktXSXk5TTZqMVFpaE5Ocm81TGVyUlhSUlNOVVRZc0M4TmwyZnJkbDZ4c0tXR1MzSUJUb0Q5Nkx5ekszaVlzNEN5eW4xVmRjTTIycWJhZVR1Q0c4bEpyZ1g5Sk5JdVJENVpRdWNjTm1PN1hUbkNzNy1vRFdrWE5TYmwtM3dRYjZoVWlJdHBkT3MxbG1lVHJkUWdCd0tmOEZZbDJiZm04bnd5NDZJOEJwN18yMXQxTUQ0eUJGTVFxTF9rZGk4WUR0dFJSeTlqd05FbVRSYnNGQjUyUFZDLXctcGlFRW9ORDVsMTU0?oc=5",
             "source": "The New Indian Express",
             "score": 0
-          },
-          {
-            "title": "Sensex Today Tanks 695 Points | Nifty Below 22,600 | Bajaj Finance & Kotak Mahindra Top Losers - Equitymaster",
-            "publishedAt": 1790656530000,
-            "url": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxPUmtIclVqa0NJUmlUZm4tdEVBSjlYWUdrbVZBUExiZmhjR05ZbG9XakxpMldKV0IwZVN6WmU5VXR5UVJYUzE4bFdham1PdDlNb1gxdVZIenBmeHhfT1pBcjNJUEloU3lhLTVYZ25ZMFhWNVVYQTZVWDVSa3JnX1ZUVWZsSVp3bmdFRjlPeTNNMFhRRGhaZlNvei1rZURqUEhQcUdSdFRsRmQwM0h5TjM0VnFlaTVINmlDWVRBbGlrMVZ0MS1ZZ1JSaktTbzNQc1RPblMwR3A5dkJGZ3BNVlVsR0p4TWw?oc=5",
-            "source": "Equitymaster",
-            "score": 0
           }
         ],
         "coverage": "29 dated headlines · last 5 days"
@@ -4513,7 +4492,7 @@
         "trend": -0.03870144870457337,
         "volume": 1.1528698121145446,
         "relativeStrength": -0.03538591966118776,
-        "sentiment": 0.25685306498035154
+        "sentiment": 0.25499724216162173
       },
       "fundamentalData": {
         "pe": 14.9,
@@ -4523,7 +4502,7 @@
         "revenueGrowth": 2,
         "profitMargin": 34.08298204694755,
         "sector": "Power",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/POWERGRID/consolidated/"
@@ -4565,13 +4544,13 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": 0.25685306498035154,
-        "count": 22,
+        "score": 0.25499724216162173,
+        "count": 23,
         "excluded": 0,
         "headlines": [
           {
             "title": "PFC shareholders approve FY26 financials, dividend; board appointments cleared - scanx.trade",
-            "publishedAt": 1791026676000,
+            "publishedAt": 1791028528000,
             "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxNVU5Pa0trdDFXd25MeHNLRGVhcmZuTUhLYUFHUmJBX241cXpzbkg1SktvUTlrTkhSRHhNdlFXUDc4Mmd5RGZPWmZtV1VFbUk0RkZ2NnhSQmQ3c1FBRkhwaDdfQzYwWkNwS0dxTHBsZnBNODRwdzRJakUtMTdjN3JkZU5NSWs0WXBnN2pOTWI0aExDOWNoalUyc0ZCYTVBcGZwclk1SVJtSmVBM0xYNW9IMW0zcEV3QQ?oc=5",
             "source": "scanx.trade",
             "score": 1
@@ -4591,10 +4570,10 @@
             "score": 1
           },
           {
-            "title": "Power Grid Corp Share Price - Live NSE: POWERGRID Stock Price & Chart - Upstox",
+            "title": "Power Grid Corp Share Price - Live NSE: POWERGRID Stock Price & Chart - upstox.com",
             "publishedAt": 1790909169000,
             "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE81Z0M1TlZBcTl0ZnYxei1LeDBXN1hNaElqT3lJTUlFZmpEZGwyeDliNER1N0VsUkNnMEtEWWdDYURHd1haMHR6c01uM3F1NU9Fb192NTlYek1nUUdpV1M3dVJYQS12TzFNTFE?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -4619,17 +4598,17 @@
             "score": 0
           },
           {
-            "title": "GEC-III Rollout: Power Grid, KEC International, and Tata Power Shares In Focus Amid Centre's Energy Infra Push - Outlook Money",
+            "title": "GEC-III Rollout: Power Grid, KEC International, and Tata Power Shares In Focus Amid Centre's Energy Infra Push - outlookmoney.com",
             "publishedAt": 1790849124000,
             "url": "https://news.google.com/rss/articles/CBMi2gFBVV95cUxNNThmUlRoU3U0UEpKSEplQ05oREFMOW1nOVoxVUM0NmFwcWl6UWcyS3owekVUc1JodnU5T2M3V1JkUEt5MnZ2cjhSekRxV0EwaDVMRm02QzF6VFBpR2RZaHItYXU4ZV9TTktrTlFIQjBZbERiSFRwTExCUmxMcTJtcGZqaF8wNHQ0X2ExS3VscTZyRGVJZnVKSVlIUkxIOERSaHd0cTVEVktDZTExYVl1ZUh1RGZqbGZFZzF5VndjVUZIOFdDUjVfd1M1ZmhMVFdzZEZPOXlsVGZ1QdIB5wFBVV95cUxQLTJWY2NDN0RhS0hSTXNDVTJWUV93bGI1X3FYaUx6UncwVzVMTUJDc2xrSy1PdWdwcnhtWS1OdWVpVE5zbDZ5cHU1UjVwOTRXajV6S05CTjZscFYxX2tKdC1ZaTFTQU5LdFN2R3lPU1JUcFd0NTBmZDE2U3FHeWJNWC1Sd0FSbF8zM2xBU0tYdUVfMGk3WUlfNS1sTG9VWFFQdWNvTU53alBhWWIweVFheF9COGVsLW40STB1WlhWaEo5THpiLUNvOC1QaEF2Z3dhbGJGd28wN1pOMEVTek5HaXphMTNGbms?oc=5",
-            "source": "Outlook Money",
+            "source": "outlookmoney.com",
             "score": 0
           },
           {
-            "title": "GE Vernova T&D and Hitachi Energy shares in focus as India clears ₹1.86 lakh crore Green Energy Corridor Phase III for 135 GW renewable evacuation - Business Upturn",
+            "title": "GE Vernova T&D and Hitachi Energy shares in focus as India clears ₹1.86 lakh crore Green Energy Corridor Phase III for 135 GW renewable evacuation - businessupturn.com",
             "publishedAt": 1790847298000,
             "url": "https://news.google.com/rss/articles/CBMihgJBVV95cUxQa0Q3bF9TYmswZmQ0QjlGeGkyTjRDS2Y2LVBTWWY2UlFTeFNkVUlYZFlqRVZkZVhLWDJxYXg2V3YtNFJxdFgtUGQwaUVjczhMUjZLeHVtaDZOS3Z0UldrMUs0Vjk4WVpjUnhEMk1QSDBTTDNPNmZXVEx5WGktd1REQmZFTWNEeVN0ZC0wMHlSLTYxckYxaTY1VFJlWEFVNFEyTWFOdmJXZU9LY1VOX2lIaTF1WjFlVDhHb0FzQ24yRDgwR2xPNkJxc1hMSmdnd3hmdGpfMFVLblVOYnJxSV9Qa1poMzlFTmxtSGFjcDdnUnVtcC13OU1LNHo0WEc5bUc3UXNwNkJB?oc=5",
-            "source": "Business Upturn",
+            "source": "businessupturn.com",
             "score": 0
           },
           {
@@ -4675,17 +4654,17 @@
             "score": 0
           },
           {
-            "title": "TARIL, Adani Energy, Exide Industries jump up to 10% after PM-DHARA boost: What’s driving the rally - Upstox",
+            "title": "TARIL, Adani Energy, Exide Industries jump up to 10% after PM-DHARA boost: What’s driving the rally - upstox.com",
             "publishedAt": 1790824844000,
             "url": "https://news.google.com/rss/articles/CBMi7gFBVV95cUxNVkljSnJSYS11dlRRRzdlS1BWRkVJMDE2eEJzd2tJaE9IWGNHNlh5TFhjNV8tRnJQMmhUS0p1dG0ySy0tVVFDN2FEcFQwVmJaYnVUWGx4Um1qVTAzZzVRMUJyOUIzSmxJNUtlYVdRanRuNTctaG9FT3huaHdMZlZPRC1nQzE5VnFub3BNNWYyOFFxcnNadWFTTXJBd2NOSnd2ZFkxNmxVelp6dTNvY1JxZDBteWl4ZEdobm9XWmozM2ppZm1IVTJKeklmNTRXMXVSRnNQYUUtNlpVZkZOdlI0LWUyZHM4SDQ5eVhlMzJn?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
-            "title": "GEC-3: Rs 1.86 trillion transmission capex approved; JPMorgan and Nomura name beneficiaries - Business Upturn",
+            "title": "GEC-3: Rs 1.86 trillion transmission capex approved; JPMorgan and Nomura name beneficiaries - businessupturn.com",
             "publishedAt": 1790822010000,
             "url": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxOUldkVmJDSlBYblA1T3RzZVRqQ1NNWWNVOUNrWGdRcjVCOHNVYm5CZWpTZk9rM1BvbmFuODZNekRvYkV6cDFsWmd2Y05PZGZqeldxaldsX3h3T2dIZ2ZBMHAwallaMWNrb2NWRFFuWWkxVUVIeVZYUi1wV1FUSUhVeVl2ZVpqeTg2V0JlZXZkQnJaaDZMU08zR044YUZwWVBqV0V3eTd3Y01sU2NESVpzY0ctMkhWMkh1R0F5TXZjaUhSMFBWamhuZ2VidHMxX0k2ajUtYnpBRWw?oc=5",
-            "source": "Business Upturn",
+            "source": "businessupturn.com",
             "score": 1
           },
           {
@@ -4700,6 +4679,13 @@
             "publishedAt": 1790751060000,
             "url": "https://news.google.com/rss/articles/CBMiekFVX3lxTE14aGtfQTlCVjdRUHNUazZWXzBOU0xzZU5KNEpXTHRJTTMxbU9ueVVIWml1bmFFdktuQTNsZklJWFFkSGtGS2FqMzRxd2Q2TERKTjdqYklQWnhNV2I2dEs3eV9uOWh1bU1HV1JlMWRuaUowUjNZNGNxLUlR?oc=5",
             "source": "Samco",
+            "score": 0
+          },
+          {
+            "title": "NTPC Green Energy Share Price and Sector Analysis Today - Univest",
+            "publishedAt": 1790676000000,
+            "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE1qQWkyWThmLVgxRnI1R3JEbDd4SmpnLS1WY1JPUGNyMEppZDNEYTBITWVzSTFxajc4X3JkaXRYT3BGTXpjUDh3SG91SWFWOVVFeEplVlRQWWNodWp4MXl6bm5Rc0pjR1ZjT3JNa3NYNXFyb2ZmVVB6RkNpTXNsTEU?oc=5",
+            "source": "Univest",
             "score": 0
           },
           {
@@ -4724,7 +4710,7 @@
             "score": 0
           }
         ],
-        "coverage": "22 dated headlines · last 5 days"
+        "coverage": "23 dated headlines · last 5 days"
       },
       "errors": [],
       "rank": 17,
@@ -4748,7 +4734,7 @@
         "trend": -0.05327210862311149,
         "volume": 1.4588720605851813,
         "relativeStrength": -0.02834675823541888,
-        "sentiment": 0.005065244872462159
+        "sentiment": 0.0047329609232076505
       },
       "fundamentalData": {
         "pe": 21.2,
@@ -4758,7 +4744,7 @@
         "revenueGrowth": 15,
         "profitMargin": 9.069503116179508,
         "sector": "Oil, Gas & Consumable Fuels",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/RELIANCE/consolidated/"
@@ -4800,7 +4786,7 @@
         "status": "flag"
       },
       "sentiment": {
-        "score": 0.005065244872462159,
+        "score": 0.0047329609232076505,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -4809,6 +4795,13 @@
             "publishedAt": 1790961611000,
             "url": "https://news.google.com/rss/articles/CBMiwwFBVV95cUxPcFFDNnhNaU52N1hNamxKQVR1ZFZ5VXZtU0lvTW5XdGFFYVRfODVJNkZkZ1dhZU5JT3VNV2dYZmUtcWlTYjBUN1RrZkRldnZBem54dllXX19ZTGtxSnU4Nm5XVllYVURqX1hWTHVFeFBqX0JUdW53S3FoY0pEbTdzeVM1aTJ2UnBNVUhuaUlnaTg0QW5MUDRNdVVlTGowc1l5MUcwcTNocktzU1U1c1NDaGRlNWhueWNXUVBCNHdfR29CM3c?oc=5",
             "source": "AD HOC NEWS",
+            "score": 0
+          },
+          {
+            "title": "Alok Industries Share Crash Continues: Stock Plunges 11% To Fresh 52-Week Low, Falls 32% In 5 Days - Goodreturns",
+            "publishedAt": 1790945251000,
+            "url": "https://news.google.com/rss/articles/CBMi1wFBVV95cUxQeHVtMm5wNzBNZ3RrYlA1VlEwbC1FR29RN1h5WHFocV9MdTNLcHRWUGdHUG5ZS3U2MDVNcU02ZjhQTm1oVXJaOVR1UndCeEhXU19jUHVVSXpLZVpsaEtwTGdNZGNqTS1yejJVNGdOUGhLQTZieXZkdEN1M1diekMyM2J1eEVPbjRIamhsX1JzZjlRTkVkc1lyQXB3WVZGN3Jzd0NmWXZSZGFzeFFTLXZ3ZGNSSjloYkVNYjhwd2N6WFh1VlRPaGxZdVpWcGJmcTZVakJTS2p1aw?oc=5",
+            "source": "Goodreturns",
             "score": 0
           },
           {
@@ -4868,10 +4861,10 @@
             "score": 0
           },
           {
-            "title": "RELIANCE INDUSTRIES LTD Option Chain - Live RELIANCE INDUSTRIES LTD Option Chain Data, OI & Price - Upstox",
+            "title": "RELIANCE INDUSTRIES LTD Option Chain - Live RELIANCE INDUSTRIES LTD Option Chain Data, OI & Price - upstox.com",
             "publishedAt": 1790838000000,
             "url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE5OdHF5TnRwdDlXSDBCSVhpT0VHV1lLY09DbnFvcUNSTTdGUzhDRTBGR2YzRi0ta0FZdlJaWFZmdmozNV9DM3YzVWNmZDBLNHJTaXRuRkswQzZNbkVJZ2RBVTU0cUxZeFE?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -4910,6 +4903,13 @@
             "score": 0
           },
           {
+            "title": "Reliance Industries (NSEI:RELIANCE) Stock Forecast & Analyst Predictions - Simply Wall Street",
+            "publishedAt": 1790751600000,
+            "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxQODVZTmlNNzAxUlJYYWNvVnlCSk5qNWdpVUM4bUhZNmxVSHhDbExNaDYzVTZzeU9PVUdUSW5ORlBOakRrRUEwSVYta25RaThpdWlZamhPajcyTS1GbjIwQmRiREdCUFpKWWZpbEVxbFFSbW5MZXZKa3BXSkh4YWpMSzd0bmJjTUtSZHE0V1Z3?oc=5",
+            "source": "Simply Wall Street",
+            "score": 0
+          },
+          {
             "title": "ETFs Investing in Reliance Industries Ltd Sponsored GDR 144A Stocks - TradingView",
             "publishedAt": 1790751144000,
             "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE1kZV9KTkJSenhxeDhKeHRLZkE2SmhMckpmMEs2N1FOY3BISkF2dEdmbWlhaExyRFIyNHhNdWxjTjZMa0pJZlpqTmVzbHJkem9yUk5id1dLUnRPYnB2QUE?oc=5",
@@ -4917,10 +4917,10 @@
             "score": 0
           },
           {
-            "title": "SENSEX, NIFTY50 edge higher led by gains in ICICI Bank, Reliance Industries - Upstox",
+            "title": "SENSEX, NIFTY50 edge higher led by gains in ICICI Bank, Reliance Industries - upstox.com",
             "publishedAt": 1790740975000,
             "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxPS1BCVEhYeXlEaVRGQllWRkphU1pKN1doOWxGZHYtNTVfMTJyNGs1MjROWEFTMHlJaEEzamZYNmlhQ21nb1c0UWpyRUhQSGJ4cy1XVmhHdEFiYmZ1ano1em5YZVV4RExpN3pJWHNuTHlGM09EckNyOWRpazFPYnliV0tHajRtRXJyMVJlalBWcFE1cUx6RFRJY0ctVmdiZGlBQ3pOTERjbkVpZTgwQzBXSU0wbVJzcXRzOE5maFhRQldJTUNjZnl2blJNUmZWdw?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -4928,13 +4928,6 @@
             "publishedAt": 1790740500000,
             "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxQazR5VUJBaG5fZC1BamRyVW8yQ19lSjE1ZENQS0tJN2lnLU9nZFA0WmwyQnJHdEdhQWp0RmtUZ19STTRwMlU1enVHdVJkdjBzQndMbnlfZWU0N2FFT05RZkhrLVlhNXd4SXYzTThIU3UxS0tURHVvbXJpaEF2d0xIalNZckw4TVo3REl6eS1CblI?oc=5",
             "source": "Univest",
-            "score": 0
-          },
-          {
-            "title": "Pace Digitek soars 4% after arm bags ₹1,587 million Reliance Industries order - Alice Blue",
-            "publishedAt": 1790734866000,
-            "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxQQ25SVmV5YzBZb0h2RnlLWXJLRTVyR0hlNks0MkwyMkhKRVE4bE5DQ01iTlk4QWJaUEdfTUtoSktoMHYtanJycnFkaFJuN0hVWlQ0SXZ3eVgtNVFhamNPS1Q2b0hWSkpxa2JXWVdQVHdHZGYzLWdGanJqY0dKcVlzUzNTZTNiZHpSZVZleWRqSXFVZVRqSnlySVdMTHNHSnlFV1R4blVhWlhIWGNFaWU1cGRIVzZTWWFNMnBnag?oc=5",
-            "source": "Alice Blue",
             "score": 0
           },
           {
@@ -5006,13 +4999,6 @@
             "url": "https://news.google.com/rss/articles/CBMivgFBVV95cUxQMmd2SjRQN3N1QkRGZWluX3lwUGY1b0FfOHVGSEFVcC0wUWxtV3FBbEdBN0dkdXlCNEtyR2FtM3gtOFVfY1h5bDlZLThvWDEzTDhtZ3RtR21wdFFYLXYzU1J2RS1Tem1RTEdxTFRYT1pOWGszdlhyZm04Smo1b2VXX3RRc3BSWUx3YWo2dHBqM2ZGUWFRVEtiQzBNWGNxU3VhcEJod0RNNFVYaHA3b0ZrS1Bpemd0aE1tSFRBa1hn?oc=5",
             "source": "AD HOC NEWS",
             "score": 0
-          },
-          {
-            "title": "Reliance shares hit a fresh 52-week low; stock plunges 24% YTD - Time to buy or stay away? - TradingView",
-            "publishedAt": 1790600146000,
-            "url": "https://news.google.com/rss/articles/CBMi2gFBVV95cUxQMWJBWm1QVlduRTl6eTd0TXk3Y0dad0w5eG5qb0lIekJTN05rLU5tSWxzUUpSZ1hnY2tEMVdjQ1VCR0xwX2xOMGI1amFWRmt3Ym4tbXpScjVMUTlfLWYwblR3LUN1ZG5tT2NMZm5QMkM2TUY1dElZdENCdV9jRU1wcTRiVDRkTkM5VG1QdXdaV0JZeVF4MHJuTTVSTWxIU1BvTG15cmlzX282eFZSbERvLUR0aUNUR2VUVklCQlkwR21FQUV3MUp6aFpTTkZnSXNfa3JHeXBTcU5GUQ?oc=5",
-            "source": "TradingView",
-            "score": 0
           }
         ],
         "coverage": "30 dated headlines · last 5 days"
@@ -5039,7 +5025,7 @@
         "trend": -0.07154721752270066,
         "volume": 2.499444141590963,
         "relativeStrength": -0.12329662949071085,
-        "sentiment": -0.14403165019602482
+        "sentiment": -0.1022595378332539
       },
       "fundamentalData": {
         "pe": 25,
@@ -5049,7 +5035,7 @@
         "revenueGrowth": 27,
         "profitMargin": 8.008029850094918,
         "sector": "Automobile and Auto Components",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/MARUTI/consolidated/"
@@ -5091,15 +5077,15 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.14403165019602482,
+        "score": -0.1022595378332539,
         "count": 30,
         "excluded": 0,
         "headlines": [
           {
-            "title": "Maruti Suzuki Share Price - Upstox",
+            "title": "Maruti Suzuki Share Price - upstox.com",
             "publishedAt": 1790912986000,
             "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTE1RNTd2UVdUcFQwTzlWUl8tX05yTHQ4c3JkeGRFUmZfRm9FMjVPTE1kRHRtel8zd2FidnF0cEVJR1ZzTV9tZmtqREd1V3pLTk9vY2NXSl9jZEpHeXpjaVlsRFVOelM1aTVNWWp5dXFvNA?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -5110,11 +5096,11 @@
             "score": 0
           },
           {
-            "title": "Maruti Suzuki India Receives Rs 149.64 million Income Tax Penalty Order for FY23, Says Financial Impact Likely to Be Insignificant - StudyCafe",
-            "publishedAt": 1790858089000,
-            "url": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxQY0VGUHFIU2xyTXUtbXg5Rm5Kb3JNeExId0g2dEJORlVUYUk3R09wZmd5VDJkVEs2U3BLYXpXb3Z3LURjS0dVSnZkaUxLOWZlbl9tcmtEbW9YaFJoQ1dUWERkR0FEVi1va2NUUURCZmJEcTJGSWs3eW5fZGdlaTFKSkFnTm9BRC1pS0hHb1VLNmx6YlNycVR1MWkyQUxVQWZ1bjdqcWhBSE85NnlUYTNqY21NRVlXMlMzTW5mNWpNTC1iU0ZIYjFGenh4dTZKc0JhYnd4NlFoRGo3dTgwM0pjUnJqZEhRMGhT?oc=5",
-            "source": "StudyCafe",
-            "score": -1
+            "title": "Top Gainers & Losers, October 1, 2026 at 3:30 PM IST: Infosys Leads Gainers - HDFC Sky",
+            "publishedAt": 1790850927000,
+            "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE80X3JNSE1EX0hSbVBsWUZFaFZJVGhDcHM3SnNvZVAzV1JhcGotTzNqeDVibi1YM3daWnNqLXJfZU5UNFJZOU82Z0F5VUkwdWU4MngzUkpLVmNkZUdHcW5VRzgzeHBkSW85NDdYMzk0X2pIYkVOQ3A1cw?oc=5",
+            "source": "HDFC Sky",
+            "score": 0
           },
           {
             "title": "India shares lower at close of trade; Nifty 50 down 0.88% - Investing.com India",
@@ -5138,10 +5124,10 @@
             "score": 0
           },
           {
-            "title": "Maruti Suzuki September Sales: UV volumes jump 62%, But stock falls 5% - Zee Business",
+            "title": "Maruti Suzuki September Sales: UV volumes jump 62%, But stock falls 5% - zeebiz.com",
             "publishedAt": 1790850085000,
             "url": "https://news.google.com/rss/articles/CBMisgFBVV95cUxPaGVHREE1Ym1JVHRzTWNiX2RIemh5S1RkMlZ3bUU1M2FNT3UyU19FRi1LaW51MmdrUG14Y2FhMWRQX1ZwSTZWSkpmM2EyYTg3dXBpTmZLTWttaUl5QTloN0tNeTVvM3JuSE1fdXZNeTR6anVOWFpwOXJIRXNMbmRNakRrb3hSRjNCRXJTbG1KeUVGUkVmMmlzRHlwMlhBdzIzMWQ3MHN6WDdMajZVbmwxeF9R?oc=5",
-            "source": "Zee Business",
+            "source": "zeebiz.com",
             "score": 0
           },
           {
@@ -5149,6 +5135,13 @@
             "publishedAt": 1790844600000,
             "url": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxPMmJQOHpyVHV6VUF4ZjBTRFVNdXJDdWlld3pSQ2tkNHFGcmh4ZWRvVGsyVXNVSE5xYkNRUUtGcTZNWUlMWHJOUjhxQVd0MUlhZTUwLTR1R1hHaFhwM2tFQ2pBSGtENGUxTnpMOHZNUXNPbnRUWDROOVhTcFA4NVFDUHBIQjVDV2FjYm9OTWV4U0hKNFRNUFdjZk8zM2FaU2NGcVpiVkR4anBvOWp4VjRvMWs5ZFUyNGMwa0JMcFJVWUk3M0dMRUdHNm9IbnhFemo4WWc1S1R5ME13c2k0Tjh5dC0yNmtKMWw5SDhLM9IB7AFBVV95cUxPMmJQOHpyVHV6VUF4ZjBTRFVNdXJDdWlld3pSQ2tkNHFGcmh4ZWRvVGsyVXNVSE5xYkNRUUtGcTZNWUlMWHJOUjhxQVd0MUlhZTUwLTR1R1hHaFhwM2tFQ2pBSGtENGUxTnpMOHZNUXNPbnRUWDROOVhTcFA4NVFDUHBIQjVDV2FjYm9OTWV4U0hKNFRNUFdjZk8zM2FaU2NGcVpiVkR4anBvOWp4VjRvMWs5ZFUyNGMwa0JMcFJVWUk3M0dMRUdHNm9IbnhFemo4WWc1S1R5ME13c2k0Tjh5dC0yNmtKMWw5SDhLMw?oc=5",
             "source": "The Economic Times",
+            "score": 0
+          },
+          {
+            "title": "Maruti Suzuki September production rises to 242,011 units YoY - scanx.trade",
+            "publishedAt": 1790844337000,
+            "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxNR1NodjlvdW9RTERMM3dNaklqSnhsTmQ1VTM0WlNXbkhaOVlVVGtwYmJFanZPQWJYQ2xrbnJ3S1d3d0F1UXFuSk9sdW9kSTgzd3BhMWRtYkpZZTY1ZTJiUW5lMDdIRXoweXE1YWtzRFNWNk1fSmxnR1Y0TDNlaWxZNFVGcE43VjlCU1EweWhESnFMT1NCREg2ZTVwMHpKQ19taHpvcGlPbUVydUxQSzFGSDQ1SEZmdw?oc=5",
+            "source": "scanx.trade",
             "score": 0
           },
           {
@@ -5222,10 +5215,10 @@
             "score": 0
           },
           {
-            "title": "Stocks to watch, Oct 1: Auto stocks, Tech Mahindra, NCC, Aurobindo Pharma, Linde India, Mahindra Lifespace, Transrail Lighting - Upstox",
+            "title": "Stocks to watch, Oct 1: Auto stocks, Tech Mahindra, NCC, Aurobindo Pharma, Linde India, Mahindra Lifespace, Transrail Lighting - upstox.com",
             "publishedAt": 1790821917000,
             "url": "https://news.google.com/rss/articles/CBMigAJBVV95cUxORlpaTWRlTWFhSERweDFaaFIxRUgyRjZNSWdzWENoU0w5TDhTcmlBUWQtY0M5Y2J6STVLb1dPRTRFWExUTDVKZ0ZwWUItVVBBUk9zWkpmNDhDbEVtVlg3Y2ZVVGhoZDhnVG5PMWZfWC1EbEs0T3M4OHBLelVaY2VhQnRvaGNRR3RQZkFTN0l2NTBZaXhGNzFGN2JOWVloZy12Sy1qb3ZfQV94ZU52ME0tX3lLN2U3WUEtWElZenp1RXhVRTkwc0tfSVpFdXQ0SFdoWjc2ajMwUlZET0RLRjZvdTVrNXZDVjQ4UjBPR0lXTGNjREFjekkyR0RVV253azdC?oc=5",
-            "source": "Upstox",
+            "source": "upstox.com",
             "score": 0
           },
           {
@@ -5297,13 +5290,6 @@
             "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxQQ25yeGRRUHZxTXB6eFBGeUVWNmhLZGpIT0VRcHVva3lYU0xZRmFZMnFfZHVzVDFvOTYtUWNGZ2lLdXh0bWhsSFhpTEJyM1cyb2JaS3RKX3ZkcHZxNFlELXNCNVVjdlZyc3ZCN1Zsc2RtdFdOQTVCMFlseDAtQThVNGdwVnBmbXNFbjZTdHZzZ0swS3c?oc=5",
             "source": "Univest",
             "score": 0
-          },
-          {
-            "title": "Maruti Suzuki India CCI hearing adjourned to November 2, 2026 - scanx.trade",
-            "publishedAt": 1790598654000,
-            "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNQ2lYcTN2OXYtdWJKN3hjbTBvNFFDM1ZBM1BhV0JoNkptZzctWWpiekZ0Vk9GU0NvNDdKaUVrSTBJeWFrcmxsTTgtdFpfUkZURHZ4ck9YNFhqbU5tX2R4NDN2Y1Y5YWtBOXl5R2RJTEZIemtESGhkVE0tVGtaZ2RBWTFFZzhEOHRRaDUxSmFJRmhhYkI4dm9abzNPYUltNks5YWlHQjhDeEZFdUxJSHVmYm1MUDA?oc=5",
-            "source": "scanx.trade",
-            "score": 0
           }
         ],
         "coverage": "30 dated headlines · last 5 days"
@@ -5330,7 +5316,7 @@
         "trend": -0.048281763474641415,
         "volume": 1.0392976218637102,
         "relativeStrength": -0.0897316663179818,
-        "sentiment": -0.002441916706064635
+        "sentiment": -0.0024616310995447532
       },
       "fundamentalData": {
         "pe": 39.1,
@@ -5340,7 +5326,7 @@
         "revenueGrowth": 6,
         "profitMargin": 23.35887572128808,
         "sector": "Fast Moving Consumer Goods",
-        "asOf": 1791029907811,
+        "asOf": 1791034732998,
         "financialPeriod": 1774915200000,
         "source": "Screener reports (annual margin/debt; reported ROE and TTM growth)",
         "sourceUrl": "https://www.screener.in/company/HINDUNILVR/consolidated/"
@@ -5382,7 +5368,7 @@
         "status": "pass"
       },
       "sentiment": {
-        "score": -0.002441916706064635,
+        "score": -0.0024616310995447532,
         "count": 30,
         "excluded": 0,
         "headlines": [
@@ -5443,10 +5429,10 @@
             "score": 0
           },
           {
-            "title": "FMCG Stocks In Free Fall! Nifty FMCG Hits Fresh 52-Week Low As Selling Intensifies - Dalal Street Investment Journal",
+            "title": "FMCG Stocks In Free Fall! Nifty FMCG Hits Fresh 52-Week Low As Selling Intensifies - insights.dsij.in",
             "publishedAt": 1790840269000,
             "url": "https://news.google.com/rss/articles/CBMiygFBVV95cUxNeUFoY2p5N1Nfb1ZGYnI3dU1HdDMzYWhmTGhKdDhvb2NQQnkxMkZiOUlFN0hTTTJ0SGlMVFJ4QmlCNTI3aF9TRnJpcTNabndzWDhSZWgtQUlsTXhtLWNzZ3R2aHBJb01BN1AydUZRaVJPZk4wWUw1cXE0THlJc01yaG9vQlVlV3R2TUlTNjBJaEJEbFZvY1AxZFpKS0NCUE9xZXlnUXFocHAxbHNncmY1RUx1RkFJdnU4aVZRMmlmaTJySDRBQ2ZFcGhn?oc=5",
-            "source": "Dalal Street Investment Journal",
+            "source": "insights.dsij.in",
             "score": 0
           },
           {
@@ -5478,10 +5464,10 @@
             "score": 0
           },
           {
-            "title": "Hindustan Unilever's Festive Outlook Lifts On Strong Q2 Consumer Goods Demand - Sahi",
+            "title": "Hindustan Unilever's Festive Outlook Lifts On Strong Q2 Consumer Goods Demand - sahi.com",
             "publishedAt": 1790829410000,
             "url": "https://news.google.com/rss/articles/CBMipgFBVV95cUxQcFVUR2dLMHJfNThTV082bVFyRUNkVzQycEdfR0sxYkxkNWYyaVZzcGUwZjJCaFR6YWlxTFh3QVpPMGNYVE5Xa1Z3Z3V1UldGNGNpamxQRUhQQm1nN2dNdUtrU043WURiNnZfZEFUSDc0cTEtTThDRDF5Z01BWUFwY2ExZFB3U19GcU5Fd0QwZGNDTFp1MzY5ZURucUd2NTlMNUtoanRR?oc=5",
-            "source": "Sahi",
+            "source": "sahi.com",
             "score": 1
           },
           {
@@ -5527,16 +5513,16 @@
             "score": 0
           },
           {
-            "title": "Madhur Knit Crafts Q3 Results 2026 - Find Madhur Knit Crafts Q3 Earnings Result | MADHURKNIT Q3 results - Livemint",
-            "publishedAt": 1790751600000,
-            "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQcGNiQTh5MGFFUWlrdEUxVHRPRms0ZXgzZV9oMElwaW1rY0MyaVJPLUpLUDZqS1JWWW52MllFLXpMSFpvZWtFakNWUGUzblBKN3E4UEFpWF9Ick1fTkhIVjgyMGVkYjdQWUlxSzdQYm1MOU5vb0VDOVVLSnRHRDBUWGRkTVFkcDFrN2hJ?oc=5",
+            "title": "These top 3 developments from US stock markets have a direct impact on Sensex, Nifty, Bank Nifty, Nifty IT - Livemint",
+            "publishedAt": 1790737294000,
+            "url": "https://news.google.com/rss/articles/CBMigwJBVV95cUxNaElFSTd5Tm02MUliUk56RHI5RWFBSktBZjk4OWx0UzR4eEM3WHMzR0xrVzZ3cUI5N2dGTjFWWWtackFVcV9Ed3FkWXZxU2pUVnZ5eU8yMUwtTXA4UjRNRG1IX2pGQmh3US1FdWVhbnIzUzJLS1ZVM0FTclpYVkhyek9tTy00WmU4Ri1BMGdDN29IRU9qejNWUHdySjJla3FHcFp0SnF5b2tnbHNSUDBBVS1mZFhKNG1Pd1lBM0J5cUlfMVNCNE9IZVQxRHg0cTlTMXFNay1yWjZVd1hjeTFzY1B5S2ZMc3g0WHVGNnhFZmZXNWVkNW9kaEhIZUV0c2xyNGFF0gGIAkFVX3lxTE9kSkF0a3ZSZlJXc2tjSjFwOE1Hb2RVTnd5S3FrVnIxa3pDS1FoUE52VHc3Q2t3OXZIQ2pydmJUSWVzcm5ub0VGdnpNdDlOX18yYmF5MnNhejhubFMydlVYdmNlYlZXQ0NnV2RReFg2ekdfTUI0SXFJbmF2cjV1RXB5VVBYS3dQY1hCYXdIRVZ5YTIteV9Pek1ZSmx1RXdQVW9HMndYSVhVcDIwcmlhSDQ5MnpwUVpxbC0tbTBUT0JPZndPRWlYcmlqY0F2bm90UE5YMnU0UWx2ZV9GTzVQb1hTMjlwMUxSOGhXRVVUZ2Vpc25TZzJsLWlWT2J3aUFraTNMbTdDQ0ltLQ?oc=5",
             "source": "Livemint",
             "score": 0
           },
           {
-            "title": "These top 3 developments from US stock markets have a direct impact on Sensex, Nifty, Bank Nifty, Nifty IT - Livemint",
-            "publishedAt": 1790737294000,
-            "url": "https://news.google.com/rss/articles/CBMigwJBVV95cUxNaElFSTd5Tm02MUliUk56RHI5RWFBSktBZjk4OWx0UzR4eEM3WHMzR0xrVzZ3cUI5N2dGTjFWWWtackFVcV9Ed3FkWXZxU2pUVnZ5eU8yMUwtTXA4UjRNRG1IX2pGQmh3US1FdWVhbnIzUzJLS1ZVM0FTclpYVkhyek9tTy00WmU4Ri1BMGdDN29IRU9qejNWUHdySjJla3FHcFp0SnF5b2tnbHNSUDBBVS1mZFhKNG1Pd1lBM0J5cUlfMVNCNE9IZVQxRHg0cTlTMXFNay1yWjZVd1hjeTFzY1B5S2ZMc3g0WHVGNnhFZmZXNWVkNW9kaEhIZUV0c2xyNGFF0gGIAkFVX3lxTE9kSkF0a3ZSZlJXc2tjSjFwOE1Hb2RVTnd5S3FrVnIxa3pDS1FoUE52VHc3Q2t3OXZIQ2pydmJUSWVzcm5ub0VGdnpNdDlOX18yYmF5MnNhejhubFMydlVYdmNlYlZXQ0NnV2RReFg2ekdfTUI0SXFJbmF2cjV1RXB5VVBYS3dQY1hCYXdIRVZ5YTIteV9Pek1ZSmx1RXdQVW9HMndYSVhVcDIwcmlhSDQ5MnpwUVpxbC0tbTBUT0JPZndPRWlYcmlqY0F2bm90UE5YMnU0UWx2ZV9GTzVQb1hTMjlwMUxSOGhXRVVUZ2Vpc25TZzJsLWlWT2J3aUFraTNMbTdDQ0ltLQ?oc=5",
+            "title": "This single stock made Rekha Jhunjhunwala richer by over ₹1,000 crore in Q2FY27 so far - Should you buy it now? - Livemint",
+            "publishedAt": 1790681548000,
+            "url": "https://news.google.com/rss/articles/CBMiiAJBVV95cUxNU3JsYUF5bVpwbUtpTXhDbG1sWk10Q0JHTGxkeEl1bWdmRG4wWTB3RXl5dFJvVnlJbkNBa0h6b1drX0E2RzZ6dGNiWjkzMVZ2Y3JUSXA0VFB1cjVNQmZCbFRnenVqWC1BcGs0MzRkNlBVemVENjdObEdHbTZZclJRaFk3NzlORmExSnBKMlVuWDVjNGFqZkI4aVdscmgwNThhVXlzVDhiYWo1Y0p4OFYyRUhUSkZRRWdXekxsZEU1X1JHVlpNMFgxdHRhOFQ3UktXeUFVc0RTcHY3SXdZNXdKZTU2Q1g2eDM3eG1qY1JqUXFCcWNpaVY2V2JBNlotU1MwdWJ0VEkzck7SAY4CQVVfeXFMTW5jMWRrX3lxQU5FNEcyVFpFb2FHLWUyLWZqVVp3a1hUN216anRtN3MyZmVJR2p1cW41bkt4UGI4b21BUUx6YWpLeTlYVXB3LVJGVjFzOEZ3OThmREVZS1NMeGgzSTloYTRWY0NpN2doenk5cVhHTnNhWTBLU0pNZGxLdjBWSUZSaXBuRU5GVV9Qc0s2bFcyOEhMRnlKM3B4OUNLOFROOC1wWGhXQk9VRmJJREExSjkwTF9qdk5XY2JUaWs5NlFRMG01Z1RDbm94SHVUajBVVmJKM05KdWVjVEp3RGxPYnFFeTQyc1lXcjg1OE56LTNmN2lkS0hCaTFzaE9IRzdqTGVYM3FsbXJ3?oc=5",
             "source": "Livemint",
             "score": 0
           },
@@ -5590,10 +5576,10 @@
             "score": 0
           },
           {
-            "title": "Indian stock market crashes, 7.4 lakh crore wiped out: What is driving the fall? - wionews.com",
+            "title": "Indian stock market crashes, 7.4 lakh crore wiped out: What is driving the fall? - WION",
             "publishedAt": 1790625061000,
             "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxOZ3ZwWkRNRjJrZ1RQN0tCaXBfTGZORVVIeFJ2d1FmTkJpZ3RFM2ZUNW52alVyTDVSLXNzN0hRWUE0YUZ1NXBJZWEzbWVuV2NDUFRxNmRmWXVSdnkzZ0MtLV9UMm9FeTVaM2VGckptZWt1Wnhpd2F6TmVjcEpXVEJhNXpKWkVFd0NCelczRTBidmMxam1zVjRfM1J0aDVHaVl5MWtkQ1RvS2xXNm9lMTlraE9IQXBqd9IBuwFBVV95cUxQdU1hSjhhcHpRbXBFRmlSLUVvakR5c3ZwYlpORGl2M1hiaEhqa2dDWTVIdHhmY2NsNkVUWFZKT1c4MHROTG1fbEtCYnZnM0VMOHFEXzB5cFotZEtGNHgyVDR6ZkpwM19JM1JaVmlFMElpSUw0OHRMUXNKVUlvSEswOFdQcXlLLVVZZWpDVlE5bHplYkZoNUp4bUVEV2VhaWFVZzNDN1dpRFVUMUROeGtLQ3VlZFJjUDZ5Rmd3?oc=5",
-            "source": "wionews.com",
+            "source": "WION",
             "score": 0
           }
         ],
