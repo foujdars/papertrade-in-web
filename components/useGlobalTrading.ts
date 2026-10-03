@@ -1,4 +1,5 @@
 "use client";
+import { samplePortfolio } from "@/lib/portfolio-risk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount, type ChartExtreme } from "@/lib/global-order-engine";
 import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
@@ -71,6 +72,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
   const monitorSymbols = useMemo(() => [...new Set([
     selected,
     selectedOption,
+    ...(account ? ["BTCUSD"] : []),
     ...(botVisible ? Object.keys(BOT_ASSETS) : []),
     ...(account?.bots?.filter(bot => bot.enabled).map(bot => bot.symbol) ?? []),
     ...(account?.positions.map(position => position.symbol) ?? []),
@@ -78,7 +80,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     ...(account?.optionPositions?.map(position => position.symbol) ?? []),
     ...(account?.optionOrders?.map(order => order.symbol) ?? []),
   ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, botVisible, account?.bots, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
-  const botScopes = (account?.bots ?? []).filter(b => b.enabled).map(b => `${b.symbol}:${b.timeframe}:${b.startedAt}`).join(",");
+  const botScopes = (account?.bots ?? []).filter(b => b.enabled || account?.positions.some(p => p.botId === b.symbol && p.botExit)).map(b => `${b.symbol}:${account?.positions.find(p => p.botId === b.symbol)?.botExit?.timeframe ?? b.timeframe}:${b.startedAt}`).join(",");
   useEffect(() => {
     if (!monitorSymbols) return;
     const controller = new AbortController();
@@ -136,7 +138,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           if (document.hidden || controller.signal.aborted) return a;
           const now = Date.now();
           const advanced = advanceOptions(advanceGlobalAccount(a, quotes, specs, now, extremesRef.current), observedOptions, now);
-          return advancePaperBots(advanced, next, botObservations, now);
+          return samplePortfolio(advancePaperBots(advanced, next, botObservations, now), quotes, now);
         }, true);
       } finally { running = false; }
     };

@@ -1,4 +1,6 @@
 "use client";
+import { PortfolioEquity } from "./PortfolioEquity";
+import type { PerpAccount, PerpQuote } from "@/lib/global-markets";
 import { createContext, useContext, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { ArrowDownRight, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import type { ClosedPaperTrade } from "@/lib/trade-analytics";
@@ -152,7 +154,7 @@ function PnlCalendar({ trades, scope, onScope, now, onSelect }: { trades: Closed
   </section>;
 }
 
-export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now, currency = "INR" }: { trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number; currency?: PnlCurrency }) {
+export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now, currency = "INR", globalAccount, globalQuotes }: { globalAccount?: PerpAccount | null; globalQuotes?: Partial<Record<string, PerpQuote>>; trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number; currency?: PnlCurrency }) {
   const stats = useMemo(() => summarisePnl(trades), [trades]), curve = useMemo(() => pnlCurve(trades), [trades]);
   const money = useMemo(() => moneyFor(currency), [currency]);
   const { rupees } = money;
@@ -179,6 +181,7 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
       <div><span>Average net P&amp;L / trade</span><b className={signClass(stats.average ?? 0)}>{rupees(stats.average)}</b></div>
       <div><span>Charges</span><b>{rupees(stats.charges)}</b><small>Included in net P&amp;L</small></div>
     </div></>}
+    {tab === "overview" && currency === "USD" && globalAccount && <PortfolioEquity account={globalAccount} quotes={globalQuotes ?? {}} now={now} />}
     {tab === "overview" && <div className="pnl-overview-grid"><section className="pnl-a-card pnl-performance-card"><header><div><h3>Cumulative realised P&amp;L</h3></div></header><PnlLineChart points={points} label="Cumulative realised P&L" baseline focus="largest" onSelect={onSelect} />
       {curve.undated > 0 && <p className="pnl-help">{curve.undated} undated legacy exits are in the totals, but excluded from dated charts.</p>}
       <div className="pnl-drawdown-heading"><div><ArrowDownRight size={18} /><b>Drawdown from prior peak</b></div><strong className="negative">Max {rupees(curve.maxDrawdown)}</strong></div><PnlLineChart points={drawdown} label="Closed-trade drawdown" negativeOnly onSelect={onSelect} />

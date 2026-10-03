@@ -23,7 +23,8 @@
     "android:sync": "cap sync android",
     "android:open": "cap open android",
     "android:apk": "cd android && gradlew.bat assembleDebug",
-    "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease"
+    "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease",
+    "test:research": "node --experimental-strip-types --test tests/research.test.mjs tests/portfolio-research-bot.test.mjs tests/paper-bot.test.mjs tests/global-order-engine.test.mjs tests/global-option-orders.test.mjs tests/nimble-scanner.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

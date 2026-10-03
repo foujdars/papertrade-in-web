@@ -1,0 +1,22 @@
+[
+  { "symbol": "RELIANCE", "name": "Reliance Industries" },
+  { "symbol": "TCS", "name": "Tata Consultancy Services" },
+  { "symbol": "HDFCBANK", "name": "HDFC Bank" },
+  { "symbol": "ICICIBANK", "name": "ICICI Bank" },
+  { "symbol": "INFY", "name": "Infosys" },
+  { "symbol": "BHARTIARTL", "name": "Bharti Airtel" },
+  { "symbol": "ITC", "name": "ITC" },
+  { "symbol": "LT", "name": "Larsen & Toubro" },
+  { "symbol": "SBIN", "name": "State Bank of India" },
+  { "symbol": "HINDUNILVR", "name": "Hindustan Unilever" },
+  { "symbol": "BAJFINANCE", "name": "Bajaj Finance" },
+  { "symbol": "MARUTI", "name": "Maruti Suzuki India" },
+  { "symbol": "M&M", "name": "Mahindra & Mahindra" },
+  { "symbol": "SUNPHARMA", "name": "Sun Pharmaceutical" },
+  { "symbol": "TITAN", "name": "Titan Company" },
+  { "symbol": "NTPC", "name": "NTPC" },
+  { "symbol": "POWERGRID", "name": "Power Grid Corporation" },
+  { "symbol": "TATASTEEL", "name": "Tata Steel" },
+  { "symbol": "ULTRACEMCO", "name": "UltraTech Cement" },
+  { "symbol": "AXISBANK", "name": "Axis Bank" }
+]
