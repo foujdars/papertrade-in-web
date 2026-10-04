@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BookOpenCheck, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, LineChart, Minus, PanelRight, Search, ShieldCheck, Upload, X } from "lucide-react";
+import { BookOpenCheck, Check, ChevronDown, ClipboardCheck, Download, Minus, Search, ShieldCheck, Upload, X } from "lucide-react";
 import type { Instrument } from "@/lib/market";
 import { recommendedColumns, screenerCompanyUrl, type Decision, type ScreeningResult, type ScreeningRunPayload } from "@/lib/fundamental-screener";
 import { companyJsonTemplate, evaluateCompanyJson, metricMedian, peerFields, rateFundamentalCompany, resolveFundamentalInstrument } from "@/lib/fundamental-analysis";
@@ -23,6 +23,7 @@ const METRIC_GROUPS = [
   { title: "Profit & growth", keys: ["quarterProfit", "quarterProfitGrowth", "ttmProfit", "priorYearProfit", "profit3"] },
 ].map(group => ({ title: group.title, fields: group.keys.map(key => peerFields.find(field => field.key === key)!) }));
 const PAGE_SIZE = 50;
+const STOCK_LIST_LABELS: Record<string, string> = { all: "All companies", review: "Passed gates", rejected: "Failed gates", approved: "Approved reviews", pending: "Pending reviews" };
 const number = (value: number | null, suffix = "") => value == null ? "Missing" : `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}${suffix}`;
 
 type RemoteFundamentalManifest = {
@@ -60,6 +61,7 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
   const [search, setSearch] = useState("");
   const term = useDeferredValue(search.trim().toLowerCase());
   const [status, setStatus] = useState("all");
+  const [listSort, setListSort] = useState<"name" | "rating">("name");
   const [industry, setIndustry] = useState("all");
   const [page, setPage] = useState(0);
   const [dataAsOf, setDataAsOf] = useState("");
@@ -113,14 +115,26 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
   const filtered = useMemo(() => scored.filter(({ result }) =>
     (!term || `${result.name} ${result.nseCode} ${result.bseCode} ${result.industry}`.toLowerCase().includes(term)) &&
     (industry === "all" || result.industry === industry) &&
-    (status === "all" || (status === "review" || status === "rejected" ? result.gateStatus === status : result.decision === status)) &&
-    (view !== "rank" || result.gateStatus === "review")
-  ).sort((a, b) => view === "rank" ? b.rating.overall - a.rating.overall : a.result.name.localeCompare(b.result.name)), [scored, term, industry, status, view]);
+    (status === "all" || (status === "review" || status === "rejected" ? result.gateStatus === status : result.decision === status))
+  ).sort((a, b) => listSort === "rating" ? b.rating.overall - a.rating.overall : a.result.name.localeCompare(b.result.name)), [scored, term, industry, status, listSort]);
   const lastPage = Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1);
   const safePage = Math.min(page, lastPage);
   const shown = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const selected = run?.results.find(result => result.id === selectedId) ?? null;
   const passing = run?.results.filter(result => result.gateStatus === "review").length ?? 0;
+  const summaries = [
+    { status: "all", label: "companies", count: run?.results.length ?? 0 },
+    { status: "review", label: "passed gates", count: passing },
+    { status: "rejected", label: "failed", count: (run?.results.length ?? 0) - passing },
+    { status: "approved", label: "approved", count: run?.results.filter(result => result.decision === "approved").length ?? 0 },
+  ];
+
+  const openStockList = (nextStatus: string, trigger: HTMLButtonElement) => {
+    stockTrigger.current = trigger;
+    setStatus(nextStatus); setSearch(""); setIndustry("all"); setPage(0);
+    setListSort(view === "rank" && nextStatus === "review" ? "rating" : "name");
+    setDrawerOpen(true);
+  };
 
   async function importCsv(file: File, options: ImportOptions = {}) {
     if (importing.current) return;
@@ -179,22 +193,25 @@ export function FundamentalWorkspace({ ownerId, instruments, onClose, onOpenChar
       {error && <p className="fa-message fa-error" role="alert">{error}</p>}
       {notice && <p className="fa-message" role="status">{notice}</p>}
       {loading ? <p role="status">Loading saved research…</p> : <>
-        {run && <div className="fa-run-summary"><b>{run.results.length} companies</b><span>{passing} passed gates</span><span>{run.results.length - passing} failed</span><span>{run.results.filter(result => result.decision === "approved").length} approved</span></div>}
+        {run && <nav className="fa-run-summary" aria-label="Company lists">{summaries.map(summary => <button type="button" key={summary.status}
+          aria-label={`${summary.count} ${summary.label}`} aria-haspopup="dialog" aria-expanded={drawerOpen && status === summary.status} aria-controls={drawerId}
+          title={`View ${STOCK_LIST_LABELS[summary.status].toLowerCase()}`} onClick={event => openStockList(summary.status, event.currentTarget)}>
+          <b>{summary.count}</b>{" "}<span>{summary.label}</span>
+        </button>)}</nav>}
         {view === "rate" ? <CompanyRating instruments={instruments} onOpenChart={onOpenChart} /> : !run ? <div className="fa-empty"><BookOpenCheck size={32} /><h3>Loading the latest company fundamentals</h3><p>After sign-in, the latest monthly Screener CSV is loaded from the server automatically. Manual CSV import remains available as a fallback.</p><button onClick={() => downloadFile(`${recommendedColumns.join(",")}\n`, "fundamental-columns.csv", "text/csv")}>Download column template</button><button onClick={() => setView("rate")}>Rate one company with JSON</button></div> : <>
           {run.missingColumns.length > 0 && <details className="fa-missing"><summary>{run.missingColumns.length} screening columns missing · missing values fail their gates</summary><p>{run.missingColumns.join(" · ")}</p></details>}
           {view === "peers" ? <PeerComparison key={run.importedAt} run={run} instruments={instruments} onOpenChart={openChart} /> : <>
-            <div className="fa-stock-toolbar"><button ref={stockTrigger} className="fa-stock-trigger" aria-label="Open stock list" aria-haspopup="dialog" aria-expanded={drawerOpen} aria-controls={drawerId} onClick={() => setDrawerOpen(true)}><PanelRight size={18} />Stocks<span className="fa-stock-count">{filtered.length}</span><ChevronRight size={16} /></button></div>
             {view === "rank" && <p className="fa-hint">Ranked by stock-scout’s 0–10 rating: gates 50%, quality 15%, growth 15%, valuation 10%, balance 10%. Only companies passing every gate appear here. Financial-company ratings remain preliminary.</p>}
             <div className="fa-company-stage">{selected && <CompanyReview key={`${run.id ?? run.importedAt}:${selected.id}`} result={selected} instruments={instruments} onOpenChart={openChart} onSave={saveReview} />}</div>
-            {drawerOpen && <AppDialog id={drawerId} className="fa-stock-drawer" labelledBy={`${drawerId}-title`} returnFocus={stockTrigger} initialFocus='input[aria-label="Search fundamental companies"]' avoidTouchKeyboard onClose={() => setDrawerOpen(false)}><div className="fa-drawer-content">
-              <header className="fa-drawer-head"><div><h3 id={`${drawerId}-title`}>Stocks</h3><small>{view === "rank" ? "Rankings" : "Screener"}</small></div><button className="icon-button" aria-label="Close stock list" onClick={() => setDrawerOpen(false)}><X size={20} /></button></header>
+          </>}
+        </>}
+        {run && drawerOpen && <AppDialog id={drawerId} className="fa-stock-drawer" labelledBy={`${drawerId}-title`} returnFocus={stockTrigger} initialFocus='input[aria-label="Search fundamental companies"]' avoidTouchKeyboard onClose={() => setDrawerOpen(false)}><div className="fa-drawer-content">
+              <header className="fa-drawer-head"><div><h3 id={`${drawerId}-title`}>Stocks</h3><small>{STOCK_LIST_LABELS[status]}{listSort === "rating" ? " · Rankings" : ""}</small></div><button className="icon-button" aria-label="Close stock list" onClick={() => setDrawerOpen(false)}><X size={20} /></button></header>
               <div className="fa-filters"><label><Search size={16} /><input aria-label="Search fundamental companies" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Company, symbol or industry" /></label><ModernSelect label="Industry" ariaLabel="Fundamental industry filter" hideLabel value={industry} choices={[{ value: "all", label: "All industries" }, ...industries.map(item => ({ value: item, label: item }))]} onChange={value => { setIndustry(value); setPage(0); }} /><ModernSelect label="Status" ariaLabel="Fundamental status filter" hideLabel value={status} choices={[{ value: "all", label: "All statuses" }, { value: "review", label: "Passed gates" }, { value: "rejected", label: "Failed gates" }, { value: "approved", label: "Approved reviews" }, { value: "pending", label: "Pending reviews" }]} onChange={value => { setStatus(value); setPage(0); }} /></div>
               <div className="fa-results"><div className="fa-table-scroll"><table><thead><tr><th>Company</th><th className="fa-number">Rating</th><th className="fa-number">ROE</th><th className="fa-number">P/E</th><th>Gates</th></tr></thead><tbody>{shown.map(({ result, rating }) => <tr key={result.id} className={selectedId === result.id ? "fa-selected" : ""}><td><div className="fa-stock-identity"><StockChartLink result={result} instruments={instruments} onOpenChart={openChart} /><button className="fa-company-link" title="View fundamental analysis" aria-label={`Analyse ${result.name}`} aria-pressed={selectedId === result.id} onClick={() => { setSelectedId(result.id); setDrawerOpen(false); }}><small>{result.name}</small></button></div></td><td className="fa-number"><b>{rating.overall.toFixed(1)}</b>{result.isFinancial && <small>preliminary</small>}</td><td className="fa-number" data-label="ROE">{number(result.metrics.roe, "%")}</td><td className="fa-number" data-label="P/E">{number(result.metrics.pe)}</td><td className="fa-stock-gates"><span className={`fa-badge ${result.gateStatus}`}>{result.gateStatus === "review" ? "Passed" : "Failed"}</span><small>{result.decision}</small></td></tr>)}</tbody></table>{!shown.length && <p className="fa-no-results">No companies match these filters.</p>}</div><div className="fa-pagination"><span>{filtered.length} results · Page {safePage + 1} of {lastPage + 1}</span><button disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</button><button disabled={safePage === lastPage} onClick={() => setPage(safePage + 1)}>Next</button></div></div>
             </div></AppDialog>}
-          </>}
-        </>}
       </>}
-      <details className="fa-help"><summary>Data, rules and chart connections</summary><p>Fundamental values come from the latest server CSV after sign-in, or from a manual CSV/JSON fallback. Import time is separate from the financial data date. Missing values stay visible; prices from an export are not live quotes.</p><p>Passing gates makes a company ready for your review. Financial businesses also need checks of asset quality, capital adequacy and their specific business model. Rankings describe supplied data and do not predict returns.</p><p>Open chart resolves the NSE/BSE code or ISIN into the existing Charts workspace, with its current market data, drawings, indicators, alerts and paper order controls. An unavailable instrument needs a valid code and ISIN. Screening and saved reviews stay in this browser for the current account.</p><a href="https://github.com/foujdars/stock-scout" target="_blank" rel="noreferrer">Source: your stock-scout repository</a></details>
+      <details className="fa-help"><summary>Data, rules and chart connections</summary><p>Fundamental values come from the latest server CSV after sign-in, or from a manual CSV/JSON fallback. Import time is separate from the financial data date. Missing values stay visible; prices from an export are not live quotes.</p><p>Passing gates makes a company ready for your review. Financial businesses also need checks of asset quality, capital adequacy and their specific business model. Rankings describe supplied data and do not predict returns.</p><p>Company logos and symbols open the NSE/BSE code or ISIN in the existing Charts workspace, with its current market data, drawings, indicators, alerts and paper order controls. An unavailable instrument needs a valid code and ISIN. Screening and saved reviews stay in this browser for the current account.</p><a href="https://github.com/foujdars/stock-scout" target="_blank" rel="noreferrer">Source: your stock-scout repository</a></details>
     </section>
   </div>;
 }
@@ -207,14 +224,9 @@ function FundamentalLogo({ result, instruments, size }: { result: ScreeningResul
   return <StockLogo symbol={(result.nseCode || result.bseCode || result.name).trim().toUpperCase()} instrumentKey={key} size={size} />;
 }
 
-function StockChartLink({ result, instruments, onOpenChart }: { result: ScreeningResult; instruments: Instrument[]; onOpenChart: (result: ScreeningResult) => void }) {
+function StockChartLink({ result, instruments, onOpenChart, size = 32 }: { result: ScreeningResult; instruments: Instrument[]; onOpenChart: (result: ScreeningResult) => void; size?: number }) {
   const available = Boolean(resolveFundamentalInstrument(result, instruments));
-  return <button className="fa-stock-chart" disabled={!available} title={available ? "Open chart" : "A matching listed symbol or valid ISIN is needed"} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}><FundamentalLogo result={result} instruments={instruments} size={32} /><b>{result.nseCode || result.bseCode || result.name}</b></button>;
-}
-
-function ChartButton({ result, instruments, onOpenChart }: { result: ScreeningResult; instruments: Instrument[]; onOpenChart: (result: ScreeningResult) => void }) {
-  const available = Boolean(resolveFundamentalInstrument(result, instruments));
-  return <button className="fa-chart-button" disabled={!available} title={available ? `Open ${result.nseCode || result.bseCode} in Charts` : "A matching listed symbol or valid ISIN is needed"} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}><LineChart size={16} />{available ? "Open chart" : "Unavailable"}</button>;
+  return <button type="button" className="fa-stock-chart" disabled={!available} title={available ? "Open chart" : "A matching listed symbol or valid ISIN is needed"} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}><FundamentalLogo result={result} instruments={instruments} size={size} /><b>{result.nseCode || result.bseCode || result.name}</b></button>;
 }
 
 function GateResults({ result }: { result: ScreeningResult }) {
@@ -222,7 +234,7 @@ function GateResults({ result }: { result: ScreeningResult }) {
   const missing = result.checks.filter(check => !check.pass && check.value == null).length;
   const failed = result.checks.length - passed - missing;
   const allPassed = passed === result.checks.length && result.checks.length > 0;
-  return <details className={`fa-gates ${allPassed ? "all-passed" : "needs-review"}`} open>
+  return <details className={`fa-gates ${allPassed ? "all-passed" : "needs-review"}`}>
     <summary>
       <span className="fa-gate-emblem"><ShieldCheck size={25} aria-hidden="true" /></span>
       <span className="fa-gate-summary-content">
@@ -235,10 +247,10 @@ function GateResults({ result }: { result: ScreeningResult }) {
       </span>
       <ChevronDown size={17} aria-hidden="true" />
     </summary>
-    <div className="fa-gate-grid">{result.checks.map(check => {
+    <div className="fa-gate-grid" role="list" aria-label="Screening gates">{result.checks.map(check => {
       const status = check.pass ? "passed" : check.value == null ? "missing" : "failed";
       const Icon = check.pass ? Check : check.value == null ? Minus : X;
-      return <div className="fa-gate-row" key={check.id} data-status={status}>
+      return <div className="fa-gate-row" role="listitem" key={check.id} data-status={status}>
         <span className="fa-gate-status"><Icon size={13} aria-hidden="true" /></span>
         <span className="fa-gate-copy"><b>{check.label}</b><small>{check.rule}</small></span>
         <span className="fa-gate-reading"><b>{check.value == null ? "Missing" : String(check.value)}</b>{check.value != null && <small>{check.pass ? "Passed" : "Failed"}</small>}</span>
@@ -254,10 +266,12 @@ function CompanyReview({ result, instruments, onOpenChart, onSave }: { result: S
   const [error, setError] = useState("");
   const rating = rateFundamentalCompany(result);
   const url = screenerCompanyUrl(result);
+  const chartAvailable = Boolean(resolveFundamentalInstrument(result, instruments));
+  const chartTitle = chartAvailable ? "Open chart" : "A matching listed symbol or valid ISIN is needed";
   return <aside className="fa-company-review">
     <header className="fa-review-heading">
-      <div className="fa-company-identity"><FundamentalLogo result={result} instruments={instruments} size={42} /><div><small>{result.industry}</small><h3>{result.name}</h3><span>{result.nseCode || result.bseCode} · {result.isFinancial ? "Financial · preliminary" : "Non-financial"}</span></div></div>
-      <div className="fa-review-actions"><ChartButton result={result} instruments={instruments} onOpenChart={onOpenChart} />{url && <a href={url} target="_blank" rel="noreferrer">Company source</a>}</div>
+      <div className="fa-company-identity"><button type="button" className="fa-chart-link fa-logo-link" disabled={!chartAvailable} title={chartTitle} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}><FundamentalLogo result={result} instruments={instruments} size={42} /></button><div><small>{result.industry}</small><h3><button type="button" className="fa-chart-link fa-name-link" disabled={!chartAvailable} title={chartTitle} onClick={() => onOpenChart(result)}>{result.name}</button></h3><span><button type="button" className="fa-chart-link fa-symbol-link" disabled={!chartAvailable} title={chartTitle} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}>{result.nseCode || result.bseCode}</button> · {result.isFinancial ? "Financial · preliminary" : "Non-financial"}</span></div></div>
+      <div className="fa-review-actions">{url && <a href={url} target="_blank" rel="noreferrer">Original source of data</a>}</div>
       <b className="fa-overall-rating">{rating.overall.toFixed(1)}</b>
     </header>
     <div className="fa-rating-breakdown">{(["gateScore", "quality", "growth", "valuation", "balance"] as const).map(key => <div key={key}><span>{key === "gateScore" ? "Gates" : key}</span><b>{rating[key].toFixed(1)}</b><meter min={0} max={10} value={rating[key]} aria-label={`${key} score`} /></div>)}</div>
@@ -280,7 +294,7 @@ function PeerComparison({ run, instruments, onOpenChart }: { run: ScreeningRunPa
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
   const peers = useMemo(() => run.results.filter(result => result.industry === industry), [run, industry]);
   const displayed = selectedIds == null ? peers.slice(0, 4) : peers.filter(result => selectedIds.includes(result.id));
-  return <section className="fa-peers"><div className="fa-peer-toolbar"><ModernSelect label="Compare industry" value={industry} choices={industries.map(item => ({ value: item, label: item }))} onChange={value => { setIndustry(value); setSelectedIds(null); }} /><span>Select up to four companies · medians use all {peers.length} industry peers</span></div><div className="fa-peer-picker">{peers.map(result => <label key={result.id}><input type="checkbox" checked={displayed.some(item => item.id === result.id)} disabled={!displayed.some(item => item.id === result.id) && displayed.length >= 4} onChange={event => { const ids = displayed.map(item => item.id); setSelectedIds(event.target.checked ? [...ids, result.id] : ids.filter(id => id !== result.id)); }} /><FundamentalLogo result={result} instruments={instruments} size={22} />{result.nseCode || result.bseCode || result.name}</label>)}</div><div className="fa-table-scroll"><table className="fa-peer-table" style={{ "--fa-peer-count": displayed.length } as CSSProperties}><colgroup><col /><col />{displayed.map(result => <col key={result.id} />)}</colgroup><thead><tr><th scope="col">Metric</th><th scope="col">Industry median</th>{displayed.map(result => <th scope="col" key={result.id}><div className="fa-peer-identity"><FundamentalLogo result={result} instruments={instruments} size={28} /><div><b>{result.nseCode || result.bseCode}</b><small>{result.name}</small></div></div><ChartButton result={result} instruments={instruments} onOpenChart={onOpenChart} /></th>)}</tr></thead><tbody><tr><th scope="row">Rating</th><td>{number(metricMedian(peers.map(result => rateFundamentalCompany(result).overall)))}</td>{displayed.map(result => <td key={result.id}>{rateFundamentalCompany(result).overall.toFixed(1)}{result.isFinancial && <small>Preliminary</small>}</td>)}</tr></tbody>{METRIC_GROUPS.map(group => <tbody key={group.title}><tr className="fa-peer-group"><th colSpan={displayed.length + 2} scope="rowgroup">{group.title}</th></tr>{group.fields.map(field => <tr key={field.key}><th scope="row">{field.label}</th><td>{number(metricMedian(peers.map(result => result.metrics[field.key])), field.suffix)}</td>{displayed.map(result => <td key={result.id}>{number(result.metrics[field.key], field.suffix)}</td>)}</tr>)}</tbody>)}</table></div></section>;
+  return <section className="fa-peers"><div className="fa-peer-toolbar"><ModernSelect label="Compare industry" value={industry} choices={industries.map(item => ({ value: item, label: item }))} onChange={value => { setIndustry(value); setSelectedIds(null); }} /><span>Select up to four companies · medians use all {peers.length} industry peers</span></div><div className="fa-peer-picker">{peers.map(result => <label key={result.id}><input type="checkbox" checked={displayed.some(item => item.id === result.id)} disabled={!displayed.some(item => item.id === result.id) && displayed.length >= 4} onChange={event => { const ids = displayed.map(item => item.id); setSelectedIds(event.target.checked ? [...ids, result.id] : ids.filter(id => id !== result.id)); }} /><FundamentalLogo result={result} instruments={instruments} size={22} />{result.nseCode || result.bseCode || result.name}</label>)}</div><div className="fa-table-scroll"><table className="fa-peer-table" style={{ "--fa-peer-count": displayed.length } as CSSProperties}><colgroup><col /><col />{displayed.map(result => <col key={result.id} />)}</colgroup><thead><tr><th scope="col">Metric</th><th scope="col">Industry median</th>{displayed.map(result => <th scope="col" key={result.id}><div className="fa-peer-identity"><StockChartLink result={result} instruments={instruments} onOpenChart={onOpenChart} size={28} /><small>{result.name}</small></div></th>)}</tr></thead><tbody><tr><th scope="row">Rating</th><td>{number(metricMedian(peers.map(result => rateFundamentalCompany(result).overall)))}</td>{displayed.map(result => <td key={result.id}>{rateFundamentalCompany(result).overall.toFixed(1)}{result.isFinancial && <small>Preliminary</small>}</td>)}</tr></tbody>{METRIC_GROUPS.map(group => <tbody key={group.title}><tr className="fa-peer-group"><th colSpan={displayed.length + 2} scope="rowgroup">{group.title}</th></tr>{group.fields.map(field => <tr key={field.key}><th scope="row">{field.label}</th><td>{number(metricMedian(peers.map(result => result.metrics[field.key])), field.suffix)}</td>{displayed.map(result => <td key={result.id}>{number(result.metrics[field.key], field.suffix)}</td>)}</tr>)}</tbody>)}</table></div></section>;
 }
 
 function CompanyRating({ instruments, onOpenChart }: { instruments: Instrument[]; onOpenChart: (instrument: Instrument) => void }) {
