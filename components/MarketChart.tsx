@@ -1,6 +1,6 @@
 "use client";
 import { CandleLoader } from "./CandleLoader";
-import { Check, Trash2, Settings2, Eye, EyeOff, X, Layers } from "lucide-react";
+import { Check, Trash2, Settings2, Eye, EyeOff, X } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
@@ -195,6 +195,7 @@ export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
 };
 
 export type ChartAction =
+  | "drawing-list"
   | "fit"
   | "reset"
   | "live"
@@ -208,7 +209,7 @@ export type ChartAction =
   | "scale-percent"
   | "scale-indexed";
 
-export type ChartActionRequest = { type: ChartAction; token: number };
+export type ChartActionRequest = { type: ChartAction; token: number; instrumentKey?: string; timeframe?: string };
 
 export type ChartOrderTool = {
   enabled: boolean;
@@ -464,6 +465,7 @@ export function MarketChart({
   indicators: suppliedIndicators,
   indicatorHost,
   chartAction,
+  onDrawingListClose,
   chartTheme = "light",
   orderTool: suppliedOrderTool,
   tradeMarkers = [],
@@ -509,6 +511,7 @@ export function MarketChart({
   indicators: ChartIndicators;
   indicatorHost?: HTMLElement | null;
   chartAction?: ChartActionRequest;
+  onDrawingListClose?: () => void;
   chartTheme?: "light" | "neon";
   orderTool?: ChartOrderTool;
   tradeMarkers?: ChartTradeMarker[];
@@ -712,10 +715,11 @@ export function MarketChart({
   const rememberStudyDrawingsRef = useRef<(next: StudyDrawing[]) => void>(() => {});
   const cancelInProgressRef = useRef<() => void>(() => {});
   const studyPaneRefreshRef = useRef<(() => void) | null>(null);
-  const [objectsOpen, setObjectsOpen] = useState(false);
+  const objectsOpen = chartAction?.type === "drawing-list" && (!chartAction.instrumentKey || chartAction.instrumentKey === instrument.instrumentKey) && (!chartAction.timeframe || chartAction.timeframe === timeframe);
+  const closeObjects = () => onDrawingListClose?.();
   const [, setObjectsRevision] = useState(0);
   const drawingTapRef = useRef<{id:string;time:number}|null>(null);
-  useEffect(() => { setObjectsOpen(false); setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
+  useEffect(() => { setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
   const [drawingActions, setDrawingActions] = useState<{ x: number; y: number } | null>(null);
   const [priceScaleWidth, setPriceScaleWidth] = useState(72);
   const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
@@ -1536,7 +1540,7 @@ export function MarketChart({
 
   useEffect(() => {
     const chart = chartApi.current;
-    if (!chartAction || !chart) return;
+    if (!chartAction || chartAction.type === "drawing-list" || !chart) return;
     if (chartAction.type === "fit") {
       viewportInteractedRef.current = false;
       chart.priceScale("right").setAutoScale(true);
@@ -3341,12 +3345,11 @@ export function MarketChart({
           else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points){item.updateOptions({anchorTimeOffset:usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0} as Partial<DrawingOptions>);item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));}persistDrawings(true);}}
           scheduleOverlayRefresh();
         }} />}
-        {objectsOpen && <DrawingObjects disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={()=>setObjectsOpen(false)} onAction={(item:DrawingObject,action)=>{
-          if(action==='select'){if(item.hidden)drawingAction(item.id,item.study,'hide');if(item.study){drawingManager.current?.deselectAll();selectedStudyLineRef.current=item.id;setSelectedStudyLine(item.id);}else{selectedStudyLineRef.current=null;setSelectedStudyLine(null);drawingManager.current?.selectDrawing(item.id);}setObjectsOpen(false);scheduleOverlayRefresh();}
-          else if(action==='settings'){setObjectsOpen(false);openDrawingSettings(item.id,item.study);}
+        {objectsOpen && <DrawingObjects disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={closeObjects} onAction={(item:DrawingObject,action)=>{
+          if(action==='select'){if(item.hidden)drawingAction(item.id,item.study,'hide');if(item.study){drawingManager.current?.deselectAll();selectedStudyLineRef.current=item.id;setSelectedStudyLine(item.id);}else{selectedStudyLineRef.current=null;setSelectedStudyLine(null);drawingManager.current?.selectDrawing(item.id);}closeObjects();scheduleOverlayRefresh();}
+          else if(action==='settings'){closeObjects();openDrawingSettings(item.id,item.study);}
           else drawingAction(item.id,item.study,action);
         }} />}
-        <button type="button" className="chart-object-trigger" aria-label="Open drawing list" title="Drawings" style={{right:priceScaleWidth+8}} onClick={()=>{setObjectsRevision(value=>value+1);setObjectsOpen(true);}}><Layers size={19}/></button>
         {editingLine && <ChartLineColorSettings key={editingLine} name={editingLine === "primary" ? instrument.symbol : overlayCompared.find((item) => item.instrumentKey === editingLine)?.symbol ?? "Compared symbol"} color={editingLine === "primary" ? primaryLineColor : overlayCompared.find((item) => item.instrumentKey === editingLine)?.color ?? compareColor(Math.max(0, overlayCompared.findIndex((item) => item.instrumentKey === editingLine)))} onChange={(color) => {
           if (editingLine === "primary") setPrimaryLineColor(color);
           else setComparedSymbols((current) => current.map((item) => item.instrumentKey === editingLine ? { ...item, color } : item));
