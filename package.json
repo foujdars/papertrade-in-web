@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "test:research": "node --experimental-strip-types --test tests/fundamental-analysis.test.mjs tests/stock-discovery.test.mjs",
     "test:bot": "node --experimental-strip-types --test tests/paper-bot.test.mjs tests/paper-bot-ema.test.mjs tests/global-order-engine.test.mjs",
     "test:psbb": "node --experimental-strip-types --test tests/psbb.test.mjs tests/psbb-watchlist.test.mjs tests/psbb-scan-route.test.mjs",
     "test:price-actions": "node --experimental-strip-types --test tests/price-actions.test.mjs",
