@@ -20,13 +20,14 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
-  let launch = { headless: true };
-  if (process.env.CHROMIUM_PACKAGE) {
-    const mod = require(process.env.CHROMIUM_PACKAGE), packaged = mod.default || mod;
-    launch = { ...launch, executablePath: await packaged.executablePath(), args: packaged.args };
-  }
-  const browser = await chromium.launch(launch);
+  let browser;
   try {
+    let launch = { headless: true };
+    if (process.env.CHROMIUM_PACKAGE) {
+      const mod = require(process.env.CHROMIUM_PACKAGE), packaged = mod.default || mod;
+      launch = { ...launch, executablePath: await packaged.executablePath(), args: packaged.args };
+    }
+    browser = await chromium.launch(launch);
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     page.setDefaultTimeout(20000);
     const errors = [], candleRequests = [];
@@ -75,14 +76,22 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     assert.doesNotMatch(await page.locator(".fa-run-summary").innerText(), /Imported|fundamentals\.csv|Data as of/);
     await chooseStock("Reliance Industries");
     const review = page.locator(".fa-company-review");
-    assert.equal(await review.locator(".fa-metrics").evaluate(el => el.open), true);
-    assert.equal(await review.locator(".fa-metrics dt").count(), 22);
-    assert.deepEqual(await review.locator(".fa-metrics").evaluate(el => Object.fromEntries([...el.querySelectorAll("dt")].map(dt => [dt.textContent, dt.nextElementSibling.textContent]))), {
-      ROE: "15%", ROCE: "18%", "Operating margin": "12%", "P/E": "20", PEG: "1.1",
-      "Debt / equity": "0.3", "Current ratio": "2", "Quick ratio": "1.5", "Promoter holding": "50%", "Promoter pledge": "0%", "FII holding": "10%", "DII holding": "10%",
-      "Quarterly sales (₹ Cr)": "Missing", "Quarterly sales growth": "Missing", "Sales TTM (₹ Cr)": "Missing", "Prior-year sales (₹ Cr)": "Missing", "Sales growth · 3Y": "14%",
-      "Quarterly profit (₹ Cr)": "Missing", "Quarterly profit growth": "Missing", "Profit TTM (₹ Cr)": "200", "Prior-year profit (₹ Cr)": "Missing", "Profit growth · 3Y": "12%",
+    assert.equal(await review.locator(".fa-metrics").count(), 0);
+    assert.equal(await review.locator(".fa-gates").evaluate(el => el.open), true);
+    assert.equal(await review.locator('.fa-gate-row[data-status="passed"]').count(), 16);
+    assert.equal(await review.locator(".fa-gate-track .passed").count(), 16);
+    assert.equal(await review.getByRole("img", { name: "16 passed, 0 failed, 0 missing", exact: true }).count(), 1);
+    assert.deepEqual(await review.locator(".fa-gate-row").evaluateAll(rows => Object.fromEntries(rows.map(row => [row.querySelector(".fa-gate-copy b").textContent, row.querySelector(".fa-gate-reading b").textContent]))), {
+      "Dual exchange listing": "RELIANCE / 500325", "Promoter pledge": "0", ROE: "15", "Average ROE · 3Y": "16", "Average ROE · 5Y": "17",
+      ROCE: "18", "Average ROCE · 3Y": "19", "Average ROCE · 5Y": "20", "Debt to equity": "0.3", "Net profit": "200", "Relative P/E": "1",
+      "Profit growth · 3Y": "12", "Profit growth · 5Y": "13", "Sales growth · 3Y": "14", "Sales growth · 5Y": "15", "Operating profit margin": "12",
     });
+    await chooseStock("Missing Data");
+    assert.equal(await review.locator('.fa-gate-row[data-status="passed"]').count(), 2);
+    assert.equal(await review.locator('.fa-gate-row[data-status="missing"]').count(), 14);
+    assert.equal(await review.locator('.fa-gate-row[data-status="failed"]').count(), 0);
+    assert.equal(await review.getByRole("img", { name: "2 passed, 0 failed, 14 missing", exact: true }).count(), 1);
+    await chooseStock("Reliance Industries");
     assert.equal(await review.locator("form").evaluate(el => getComputedStyle(el).display), "grid", "Legacy modal form styles must not override the compact review layout");
     assert.ok(await review.locator(".stock-logo").count());
     assert.match(await review.locator(".stock-logo img").getAttribute("src"), /NSE_EQ%7CINE002A01018/);
@@ -149,6 +158,12 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.getByRole("button", { name: "Calculate rating", exact: true }).click();
     await review.getByRole("heading", { name: "Reliance BSE", exact: true }).waitFor();
     assert.match(await review.locator(".stock-logo img").getAttribute("src"), /NSE_EQ%7CINE002A01018/, "BSE-only companies share the same ISIN artwork");
+    await page.getByLabel("Company fundamentals JSON").fill('{"Name":"Failed check","NSE Code":"FAIL","BSE Code":"500003","Pledged percentage":1}');
+    await page.getByRole("button", { name: "Calculate rating", exact: true }).click();
+    await review.getByRole("heading", { name: "Failed check", exact: true }).waitFor();
+    assert.equal(await review.locator('.fa-gate-row[data-status="failed"]').count(), 1);
+    assert.equal(await review.getByRole("img", { name: "1 passed, 1 failed, 14 missing", exact: true }).count(), 1);
+    assert.match(await review.locator('.fa-gate-row[data-status="failed"]').innerText(), /Promoter pledge.*1.*Failed/s);
     await page.getByLabel("Company fundamentals JSON").fill('{"Name":"Unknown"}');
     await page.getByRole("button", { name: "Calculate rating", exact: true }).click();
     await review.getByRole("heading", { name: "Unknown", exact: true }).waitFor();
@@ -188,6 +203,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
       await open();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `Body overflows at ${width}px`);
       assert.equal(await page.locator(".fundamental-workspace").evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, `Workspace overflows at ${width}px`);
+      assert.equal(await review.locator(".fa-gate-grid").evaluate(el => el.scrollWidth <= el.clientWidth + 1 && [...el.children].every(card => card.scrollWidth <= card.clientWidth + 1)), true, `Gate cards overflow at ${width}px`);
       assert.equal(await page.locator(".fa-company-stage .fa-company-review").evaluate(el => el.getBoundingClientRect().width >= el.parentElement.clientWidth - 2), true);
       if (process.env.FUNDAMENTAL_SCREENSHOT && width === 390) await page.screenshot({ path: process.env.FUNDAMENTAL_SCREENSHOT.replace(/\.png$/, "-phone.png"), fullPage: true });
       await openStocks();
@@ -204,7 +220,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
       }
       await stockList.getByRole("button", { name: "Close stock list", exact: true }).click();
       if (process.env.FUNDAMENTAL_SCREENSHOT && width === 390) {
-        await review.locator(".fa-gates summary").click();
+        if (!(await review.locator(".fa-gates").evaluate(el => el.open))) await review.locator(".fa-gates summary").click();
         await review.locator(".fa-warnings summary").click();
         assert.equal(await review.locator(".fa-gate-row").count(), 16);
         await review.getByRole("button", { name: "Review decision", exact: true }).scrollIntoViewIfNeeded();
@@ -226,6 +242,14 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.waitForFunction(() => new URL(location.href).searchParams.get("symbol") === "RELIANCE");
     await page.waitForFunction(() => new URL(location.href).searchParams.get("timeframe") === "1D");
     assert.ok(candleRequests.some(url => url.searchParams.get("instrumentKey") === "NSE_EQ|INE002A01018" && url.searchParams.get("timeframe") === "1D"));
+    assert.equal(await page.getByRole("button", { name: "Open drawing list", exact: true }).count(), 0);
+    assert.equal(await page.locator(".chart-object-trigger").count(), 0);
+    await page.getByRole("button", { name: "Functions", exact: true }).click();
+    await page.getByRole("dialog", { name: "Functions", exact: true }).getByRole("button", { name: "Chart controls", exact: true }).click();
+    await page.getByRole("button", { name: "Drawing list", exact: true }).click();
+    await page.getByRole("dialog", { name: "Chart drawings", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Close drawing list", exact: true }).click();
+    await page.getByRole("dialog", { name: "Chart drawings", exact: true }).waitFor({ state: "hidden" });
     await open(); await page.getByText("3 companies", { exact: true }).waitFor();
     await page.keyboard.press("Escape");
     await page.locator(".home-workspace").waitFor();
@@ -233,13 +257,10 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     const mobileNav = page.locator(".mobile-bottom-nav");
     assert.deepEqual(await mobileNav.locator("button").allTextContents(), ["Home", "Charts", "Watchlist", "IPO", "Analysis", "P&L"]);
     await mobileNav.getByRole("button", { name: "Watchlist", exact: true }).click();
+    assert.deepEqual(await page.locator(".market-section-tabs").filter({ visible: true }).locator("button").allTextContents(), ["Watchlist", "Trading", "Investment"]);
     await page.locator(".market-section-tabs").filter({ visible: true }).getByRole("button", { name: "Watchlist", exact: true }).click();
     const selectList = async name => {
-      await page.getByRole("button", { name: /^Current watchlist:/ }).click();
-      const popup = page.getByRole("dialog", { name: "Choose watchlist", exact: true });
-      await popup.waitFor();
-      await popup.getByRole("button").filter({ has: page.locator("b", { hasText: new RegExp(`^${name.replace("&", "\\&")}$`) }) }).click();
-      await popup.waitFor({ state: "hidden" });
+      await page.getByRole("tablist", { name: "Watchlists", exact: true }).getByRole("tab").filter({ has: page.locator("span", { hasText: new RegExp(`^${name}$`) }) }).click();
     };
     await selectList("Indices");
     const fnoList = page.locator(".watchlist-panel .fno-lists-panel");
@@ -256,7 +277,7 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     await page.waitForFunction(() => new URL(location.href).searchParams.get("symbol") === "RELIANCE DEC FUT");
     await page.goBack();
     await fnoList.waitFor();
-    assert.match(await page.getByRole("button", { name: /^Current watchlist:/ }).innerText(), /F&O stocks/);
+    assert.match(await page.getByRole("tablist", { name: "Watchlists", exact: true }).getByRole("tab", { selected: true }).innerText(), /F&O stocks/);
     await fnoList.getByRole("button", { name: "Open RELIANCE chart", exact: true }).click();
     await page.waitForFunction(() => new URL(location.href).searchParams.get("symbol") === "RELIANCE");
     await page.goBack();
@@ -268,12 +289,16 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
       if (process.env.FUNDAMENTAL_SCREENSHOT && [390, 1280].includes(width)) await page.screenshot({ path: process.env.FUNDAMENTAL_SCREENSHOT.replace(/\.png$/, `-watchlist-${width}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("button", { name: /^Current watchlist:/ }).click();
-    await page.waitForFunction(() => { const dialog = document.querySelector(".watchlist-selector-menu[open]"); return dialog && Math.abs(dialog.getBoundingClientRect().right - innerWidth) < 1; });
-    assert.equal(await page.getByRole("dialog", { name: "Choose watchlist", exact: true }).evaluate(el => Math.abs(el.getBoundingClientRect().right - innerWidth) < 1), true, `The phone watchlist sheet uses the full width: ${await page.getByRole("dialog", { name: "Choose watchlist", exact: true }).evaluate(el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return JSON.stringify({ width: r.width, left: r.left, right: r.right, innerWidth, cssWidth: s.width, maxWidth: s.maxWidth, transform: s.transform, animation: s.animationName }); })}`);
-    if (process.env.FUNDAMENTAL_SCREENSHOT) await page.screenshot({ path: process.env.FUNDAMENTAL_SCREENSHOT.replace(/\.png$/, "-watchlist-picker.png") });
-    await page.keyboard.press("Escape");
-    await page.getByRole("dialog", { name: "Choose watchlist", exact: true }).waitFor({ state: "hidden" });
+    assert.equal(await page.getByRole("button", { name: /^Current watchlist:/ }).count(), 0);
+    const watchlists = page.getByRole("tablist", { name: "Watchlists", exact: true });
+    assert.equal(await watchlists.isVisible(), true);
+    await watchlists.getByRole("tab", { selected: true }).focus();
+    await page.keyboard.press("Home");
+    assert.match(await watchlists.getByRole("tab", { selected: true }).innerText(), /NIFTY 50/);
+    await page.keyboard.press("ArrowRight");
+    assert.match(await watchlists.getByRole("tab", { selected: true }).innerText(), /Trading watchlist/);
+    await page.keyboard.press("End");
+    assert.match(await watchlists.getByRole("tab", { selected: true }).innerText(), /ALL NSE/);
     assert.equal(await page.locator(".terminal-shell").getAttribute("data-section"), "watchlist");
     await page.setViewportSize({ width: 390, height: 700 });
     const touchEmulation = await page.context().newCDPSession(page);
@@ -301,5 +326,5 @@ Missing Data,INE456A01017,MISSING,500002,Engineering,0,,,,,,,,,,,,,,,,,,,,
     assert.equal(await stockList.locator("tbody tr").count(), 50);
     assert.deepEqual(errors, []);
     console.log("Fundamentals verified: CSV worker, gates, reviews/reload, ranking, peers, rating, audit, NSE chart, stock logos, no /10 labels, right drawer, removed date/metadata, symbol-chart links, search, focus, Escape/Back, chart handoff, light/dark, nine viewport sizes, Bot in More and Indices/F&O/future charts under Watchlist.");
-  } finally { await browser.close(); server?.kill(); }
+  } finally { await browser?.close(); server?.kill(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

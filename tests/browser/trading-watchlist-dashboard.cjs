@@ -1,8 +1,22 @@
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const server = process.env.START_TEST_SERVER ? require('node:child_process').spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'start', '-p', '3228', '--hostname', '127.0.0.1'], { stdio: 'pipe' }) : null;
+  if (server) {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      try { const response = await fetch('http://127.0.0.1:3228'); if (response.ok) break; } catch {}
+      if (attempt === 59) { server.kill(); throw new Error('Production test server did not start.'); }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  let browser;
   try {
+    let launch = { headless: true };
+    if (process.env.CHROMIUM_PACKAGE) {
+      const mod = require(process.env.CHROMIUM_PACKAGE), packaged = mod.default || mod;
+      launch = { ...launch, executablePath: await packaged.executablePath(), args: packaged.args };
+    }
+    browser = await chromium.launch(launch);
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const errors = [], historyRequests = [];
     if(process.env.TRACE_BACK) {
@@ -14,11 +28,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     }
     page.on('pageerror', error => { errors.push(error.message); console.error(error.stack); });
     await page.route('**/*.supabase.co/**', route => route.abort());
+    await page.route('https://assets.upstox.com/**', route => route.abort());
     await page.route('**/api/**', route => {
       const url = new URL(route.request().url());
       if (url.pathname === '/api/market/psbb-scan') {
-        const stamp = Date.parse(`${url.searchParams.get('month')}-03T10:00:00+05:30`) / 1000;
-        return route.fulfill({ json: { ok: true, report: { instrumentKey: url.searchParams.get('instrumentKey'), timeframe: url.searchParams.get('timeframe'), month: url.searchParams.get('month'), rows: [{ id: '1', status: 'success', setup: { side: 'long', mssTime: stamp, confirmedTime: stamp, entry: 100, stop: 90, target1: 110 } }], counts: { pending: 0, active: 0, failed: 0, success: 1 }, coverage: 'available', scannedAt: Date.now() } } });
+        const date = new Date(Date.now() + 19800_000).toISOString().slice(0, 10);
+        const stamp = Date.parse(`${date}T10:00:00+05:30`) / 1000;
+        return route.fulfill({ json: { ok: true, report: { instrumentKey: url.searchParams.get('instrumentKey'), timeframe: url.searchParams.get('timeframe'), date, rows: [{ id: '1', side: 'long', firstTime: stamp - 3600, secondTime: stamp, confirmedTime: stamp + 300 }], lastCandleAt: stamp + 300, coverage: 'available', scannedAt: Date.now() } } });
       }
       if (url.pathname === '/api/upstox/candles') {
         historyRequests.push(Object.fromEntries(url.searchParams));
@@ -31,20 +47,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.mobile-bottom-nav').getByRole('button', { name: 'Watchlist', exact: true }).click();
     await page.locator('.market-section-tabs').filter({ visible: true }).getByRole('button', { name: 'Watchlist', exact: true }).click();
     await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='watchlist');
-    await page.getByRole('button', { name: /^Current watchlist:/ }).click();
-    await page.getByRole('dialog',{name:'Choose watchlist'}).waitFor();
-    await page.waitForFunction(()=>Boolean(history.state?.papertradeLayer));
-    await page.goBack();
-    await page.getByRole('dialog',{name:'Choose watchlist'}).waitFor({state:'hidden'});
-    assert.equal(await page.locator('.terminal-shell').getAttribute('data-section'),'watchlist','Back closes the list picker, not the tab');
+    assert.deepEqual(await page.locator('.market-section-tabs').filter({ visible: true }).locator('button').allTextContents(), ['Watchlist', 'Trading', 'Investment']);
+    const watchlists = page.getByRole('tablist', { name: 'Watchlists', exact: true });
+    assert.ok(await watchlists.isVisible());
+    assert.equal(await page.getByRole('button', { name: /^Current watchlist:/ }).count(), 0);
+    assert.deepEqual(await watchlists.getByRole('tab').locator('span').allTextContents(), ['NIFTY 50', 'Trading watchlist', 'Indices', 'F&O stocks', 'BANK NIFTY', 'NIFTY 500', 'ALL NSE']);
     await page.getByPlaceholder('Search all NSE stocks').fill('SENSEX');
     await page.goBack();
     await page.waitForFunction(()=>document.querySelector('.search-box input')?.value==='');
     assert.equal(await page.locator('.terminal-shell').getAttribute('data-section'),'watchlist','Back clears search first');
-    await page.getByRole('button', { name: /^Current watchlist:/ }).click();
-    const options = page.locator('.watchlist-selector-options button');
-    assert.equal(await options.nth(1).locator('b').textContent(), 'Trading watchlist');
-    await options.nth(1).click();
+    await watchlists.getByRole('tab').filter({ has: page.locator('span', { hasText: /^Trading watchlist$/ }) }).click();
     await page.getByRole('button',{name:'Refresh 5m',exact:true}).first().click();
     await page.locator('.tw-row').first().waitFor();
     await page.getByLabel('Trading stock universe').selectOption('Indices');
@@ -53,7 +65,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByRole('tab', { name: '4H', exact: true }).click();
     await page.getByRole('button',{name:'Refresh 4H',exact:true}).first().click();
     await page.getByRole('status').filter({ hasText: '3/3 stocks scanned' }).waitFor();
-    const last = page.getByRole('button', { name: 'Open SENSEX 4H success chart' });
+    const last = page.getByRole('button', { name: 'Open SENSEX 4H divergence chart' });
     await last.scrollIntoViewIfNeeded();
     assert.ok(await last.isVisible());
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Full dashboard fits mobile');
@@ -88,6 +100,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.goBack();
     await page.waitForFunction(()=>document.querySelector('.terminal-shell')?.dataset.section==='trade');
     assert.deepEqual(errors, []);
-    console.log('Dashboard: picker/search Back stays in Watchlist, stock-chart Back restores category/timeframe/search, then returns to scanners.');
-  } finally { await browser.close(); }
+    console.log('Dashboard: Watchlist comes first with visible list tabs, search Back stays in Watchlist, stock-chart Back restores category/timeframe/search, then returns to scanners.');
+  } finally { await browser?.close(); server?.kill(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

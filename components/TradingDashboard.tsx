@@ -39,6 +39,7 @@ import { TradingWatchlist } from "@/components/TradingWatchlist";
 import { TRADING_WATCHLIST_ID } from "@/lib/psbb-watchlist";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
+import { WatchlistTabs } from "@/components/WatchlistTabs";
 import { IpoWorkspace } from "@/components/IpoWorkspace";
 import { PushNotificationBridge } from "./PushNotificationBridge";
 import { SessionOpenAlerts } from "./SessionOpenAlerts";
@@ -2884,13 +2885,10 @@ export function TradingDashboard() {
               setMarketsInitialGroup(section);
             }} />
           </div>}
+          <WatchlistTabs activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); }} onNewList={() => openWatchlistPicker(null)} />
           {!derivativeList && <div className="search-box"><Search size={16} /><input aria-label="Search watchlist" value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" />{search && <button type="button" className="icon-button" aria-label="Clear watchlist search" onClick={() => { setSearch(''); setWatchlistLimit(60); }}><X size={16} /></button>}</div>}
-          <div className="desktop-watchlist-tabs" role="tablist" aria-label="Watchlists">
-            {watchlistChoices.map((choice) => <button type="button" role="tab" aria-selected={watchlist === choice.id} className={watchlist === choice.id ? "active" : ""} key={choice.id} onClick={() => { setWatchlist(choice.id); setWatchlistLimit(60); if (choice.id === "Indices" || choice.id === "F&O") setSearch(""); }}><span>{choice.name}</span><small>{choice.count}</small></button>)}
-            <button type="button" className="new-list-tab" onClick={() => openWatchlistPicker(null)}><Plus size={14} /> New list</button>
-          </div>
-          <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>
-          {showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
+          {!sidebarOpen && <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>}
+          {!sidebarOpen && showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
           {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : watchlist === TRADING_WATCHLIST_ID ? <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={search} active={activeNavigationSection === "watchlist" || sidebarOpen} onCount={setTradingWatchlistCount} onOpen={(instrument, frame, time) => {
             const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
@@ -3033,7 +3031,7 @@ export function TradingDashboard() {
               onClear={() => setClearSignal((value) => value + 1)}
             />
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
-            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setShowChartFunctions(false)} />}
+            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1, ...(type === "drawing-list" ? { instrumentKey: selected.instrumentKey, timeframe } : {}) }))} onClose={() => setShowChartFunctions(false)} />}
             {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { chooseTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {showChartStyleMenu && <ChartStyleMenu onClose={() => setShowChartStyleMenu(false)} />}
             {showComparePicker && <CompareSymbolPicker instruments={tradingUniverse} currentKey={selected.instrumentKey} onClose={() => setShowComparePicker(false)} />}
@@ -3057,6 +3055,7 @@ export function TradingDashboard() {
                 indicators={indicators}
                 indicatorHost={chartIndicatorHost}
                 chartAction={chartAction}
+                onDrawingListClose={() => setChartAction(undefined)}
                 chartTheme={theme}
                 externalCandles={selectedDeltaChartSymbol ? (globalCandleScopeRef.current === `${selectedDeltaChartSymbol}:${timeframe}` ? globalCandles : []) : undefined}
                 priceIncrement={selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.spec.tick : selectedDeltaOption ? globalTrading.optionSnapshots[selectedDeltaOption]?.spec.tick : undefined}
