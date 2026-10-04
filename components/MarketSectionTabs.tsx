@@ -5,9 +5,9 @@ import { Layers3, TrendingUp, Zap } from "lucide-react";
 export type MarketSection = "TRADING" | "INVESTMENT" | "WATCHLIST";
 
 const sections = [
+  { id: "WATCHLIST", label: "Watchlist", icon: Layers3 },
   { id: "TRADING", label: "Trading", icon: Zap },
   { id: "INVESTMENT", label: "Investment", icon: TrendingUp },
-  { id: "WATCHLIST", label: "Watchlist", icon: Layers3 },
 ] as const;
 
 /** Shared navigation keeps saved stocks inside the Markets workspace. */
