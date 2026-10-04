@@ -457,15 +457,15 @@ test("Markets has Trading, Investment and Watchlist actions with a single active
   const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const exports = {};
   new Function("require", "exports", compiled.outputText)(createRequire(import.meta.url), exports);
-  for (const active of ["TRADING", "INVESTMENT", "WATCHLIST"]) {
+  for (const active of ["WATCHLIST", "TRADING", "INVESTMENT"]) {
     const actions = [];
     const view = exports.MarketSectionTabs({ active, onChange: (section) => actions.push(section) });
     assert.equal(view.props["aria-label"], "Market sections");
     const buttons = view.props.children;
-    assert.deepEqual(buttons.map((button) => button.key), ["TRADING", "INVESTMENT", "WATCHLIST"]);
+    assert.deepEqual(buttons.map((button) => button.key), ["WATCHLIST", "TRADING", "INVESTMENT"]);
     assert.deepEqual(buttons.filter((button) => button.props["aria-current"] === "page").map((button) => button.key), [active]);
     for (const button of buttons) button.props.onClick();
-    assert.deepEqual(actions, ["TRADING", "INVESTMENT", "WATCHLIST"]);
+    assert.deepEqual(actions, ["WATCHLIST", "TRADING", "INVESTMENT"]);
   }
 });
 
@@ -476,7 +476,7 @@ test("Watchlist stays in Markets navigation and retains saved-list controls", as
   assert.match(dashboard, /const marketNavigationActive = activeNavigationSection === "markets" \|\| activeNavigationSection === "watchlist"/);
   assert.match(dashboard, /<MarketSectionTabs active="WATCHLIST"/);
   assert.match(dashboard, /onOpenWatchlist={\(\) => openNavigationSection\("watchlist"\)}/);
-  assert.match(dashboard, /marketNavigationActive \? 3/);
+  assert.match(dashboard, /marketNavigationActive \? 2/);
   assert.match(dashboard, /setSidebarOpen\(section === "watchlist"\)/);
   assert.match(dashboard, /removeStockFromCustomWatchlist/);
   assert.match(dashboard, /<WatchlistSelector/);
