@@ -1,4 +1,5 @@
 "use client";
+import { NewsWorkspace } from "./NewsWorkspace";
 import { BotWorkspace } from "./BotWorkspace";
 import dynamic from "next/dynamic";
 const FundamentalWorkspace = dynamic(() => import("./FundamentalWorkspace").then(module => module.FundamentalWorkspace));
@@ -18,7 +19,7 @@ import { ChartHistoryControls } from "./ChartHistoryControls";
 import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
 
 import {
-  Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, BookOpenCheck, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
+  Newspaper, Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, BookOpenCheck, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Rocket, ShieldCheck, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, Pencil,
@@ -193,7 +194,7 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "bot";
+type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "bot" | "news";
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
 type UiDensity = "comfortable" | "compact";
@@ -409,6 +410,7 @@ export function TradingDashboard() {
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [botOpen, setBotOpen] = useState(false);
+  const [newsOpen, setNewsOpen] = useState(false);
   const [fundamentalsOpen, setFundamentalsOpen] = useState(false);
   const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey), deltaOptionSymbolFromInstrumentKey(selected.instrumentKey), botOpen);
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
@@ -563,7 +565,7 @@ export function TradingDashboard() {
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const [globalCandles, setGlobalCandles] = useState<Candle[] | undefined>();
   const globalCandleScopeRef = useRef("");
-  const activeNavigationSection: NavigationSection = fundamentalsOpen
+  const activeNavigationSection: NavigationSection = newsOpen ? "news" : fundamentalsOpen
     ? "fundamentals"
     : botOpen
     ? "bot"
@@ -660,6 +662,7 @@ export function TradingDashboard() {
     setMarketsOpen(false);
     setPnlOpen(false);
     setBotOpen(false);
+    setNewsOpen(false);
     setFundamentalsOpen(false);
     setFnoListOpen(false);
     setOptionChainOpen(false);
@@ -1962,6 +1965,7 @@ export function TradingDashboard() {
   const visiblePnlTrades = useMemo(() => pnlDrilledTrades.filter(trade => pnlHistoryFilter === "all" || pnlOutcome(trade.netPnl) === pnlHistoryFilter), [pnlDrilledTrades, pnlHistoryFilter]);
   const tradeSelectionScope = `${pnlOpen}:${selectedPnlDateKey}:${pnlHistoryFilter}:${JSON.stringify(pnlScope)}:${pnlDrill?.label ?? ""}:${pnlTab}`;
   const selectingTrades = tradeSelection?.scope === tradeSelectionScope;
+  useTransientBack(newsOpen, () => returnToTradeFromBackRef.current());
   useTransientBack(fundamentalsOpen, () => returnToTradeFromBackRef.current());
   useTransientBack(botOpen, () => returnToTradeFromBackRef.current());
   useTransientBack(pnlOpen, () => returnToTradeFromBackRef.current());
@@ -2686,6 +2690,7 @@ export function TradingDashboard() {
   }
 
   function openNavigationSection(section: NavigationSection, remember = true) {
+    setNewsOpen(section === "news");
     setBotOpen(section === "bot");
     setFundamentalsOpen(section === "fundamentals");
     if (remember && section !== activeNavigationSection) {
@@ -2841,6 +2846,7 @@ export function TradingDashboard() {
           <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button>
           <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button>
           <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Watchlist</button>
+          <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}>News</button>
           <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button>
           <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} onClick={() => openNavigationSection("fundamentals")}>Fundamentals</button>
           <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
@@ -3279,15 +3285,17 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "ipo" ? 3 : activeNavigationSection === "fundamentals" ? 4 : 5 } as CSSProperties}>
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={["trade", "fno"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
         <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><Bookmark size={19} /><span>Watchlist</span></button>
+        <button className={activeNavigationSection === "news" ? "active" : ""} onClick={() => openNavigationSection("news")}><Newspaper size={19} /><span>News</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
         <button className={activeNavigationSection === "fundamentals" ? "active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><BookOpenCheck size={19} /><span>Analysis</span></button>
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><ChartNoAxesCombined size={19} /><span>P&amp;L</span></button>
       </nav>
 
+      {newsOpen && <NewsWorkspace instruments={stockUniverse} onOpenChart={instrument => { const chartState = { ...window.history.state }; delete chartState.papertradeLayer; window.history.replaceState(chartState, "", window.location.href); openNavigationSection("trade"); chooseTradeInstrument(instrument); }} />}
       {fundamentalsOpen && <FundamentalWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={stockUniverse} onClose={() => openNavigationSection("home")} onOpenChart={instrument => {
         // Promote this transient research entry to a chart entry. Otherwise its
         // Back cleanup can restore the previous chart and undo the daily frame.
