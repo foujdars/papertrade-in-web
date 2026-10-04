@@ -42,13 +42,13 @@
 .fno-focus-workspace.trade-dock-visible { grid-template-rows: minmax(0, 1fr) auto auto; }
 .home-portfolio-value > .home-today-pnl { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .home-today-pnl:focus-visible { outline: 2px solid var(--accent, #8054d9); outline-offset: 5px; border-radius: 4px; }
-@media (min-width: 761px) {
+@media (min-width: 941px) {
   .terminal-shell .permanent-trade-footer { display: flex; height: 26px; min-height: 26px; flex: 0 0 26px; padding: 0 12px; }
   .terminal-shell .permanent-trade-footer .chart-trade-buttons { display: none; }
   .terminal-shell .permanent-trade-footer .chart-trade-meta { width: 100%; }
   .terminal-shell .permanent-trade-footer .chart-positions-trigger { height: 22px; border: 0; background: transparent; }
 }
-@media (max-width: 768px) {
+@media (max-width: 940px) {
   .terminal-shell .permanent-trade-footer .chart-trade-meta { order: -1; width: 100%; height: 14px; min-height: 14px; justify-content: center; gap: 14px; }
   .terminal-shell .permanent-trade-footer .chart-positions-trigger { width: auto; height: 14px; min-height: 14px; flex: 0 1 auto; padding: 0; }
   .terminal-shell .chart-price-actions-slot .price-tasks-button { min-height: 14px; line-height: 14px; }
@@ -72,8 +72,8 @@
 .terminal-shell .chart-footer-pnl { justify-self: start; font-size: 10px; font-weight: 650; padding: 0; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: 30px; border: 0; background: transparent; }
 .terminal-shell :is(.chart-price-actions-slot,.fno-price-actions-row) .price-tasks-button { position: relative; inset: auto; display: grid; place-items: center; width: 34px; height: 30px; min-height: 30px; padding: 0; color: var(--purple,#8054d9); }
 .price-tasks-count { position: absolute; right: 0; top: 0; min-width: 12px; height: 12px; padding-inline: 2px; border-radius: 8px; background: #8054d9; color: white; font-size: 8px; line-height: 12px; text-align: center; }
-@media (max-width: 760px) { .terminal-shell .permanent-trade-footer { height: 74px; min-height: 74px; }.terminal-shell .chart-area:has(.permanent-trade-footer) { padding-bottom: 74px; } }
-@media (min-width: 761px) { .terminal-shell .permanent-trade-footer { height: 32px; min-height: 32px; flex-basis: 32px; } }
+
+@media (min-width: 941px) { .terminal-shell .permanent-trade-footer { height: 32px; min-height: 32px; flex-basis: 32px; } }
 
 /* Study names use the existing clock row, leaving candle space unobstructed. */
 .terminal-shell .chart-statusbar { display: flex; flex-wrap: wrap; align-items: center; padding-inline: 8px; gap: 8px; }
