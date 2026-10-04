@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BarChart3, BookOpenCheck, ChevronDown, ChevronRight, ClipboardCheck, Download, LineChart, PanelRight, Search, ShieldCheck, Upload, X } from "lucide-react";
+import { BookOpenCheck, Check, ChevronDown, ChevronRight, ClipboardCheck, Download, LineChart, Minus, PanelRight, Search, ShieldCheck, Upload, X } from "lucide-react";
 import type { Instrument } from "@/lib/market";
 import { recommendedColumns, screenerCompanyUrl, type Decision, type ScreeningResult, type ScreeningRunPayload } from "@/lib/fundamental-screener";
 import { companyJsonTemplate, evaluateCompanyJson, metricMedian, peerFields, rateFundamentalCompany, resolveFundamentalInstrument } from "@/lib/fundamental-analysis";
@@ -217,6 +217,36 @@ function ChartButton({ result, instruments, onOpenChart }: { result: ScreeningRe
   return <button className="fa-chart-button" disabled={!available} title={available ? `Open ${result.nseCode || result.bseCode} in Charts` : "A matching listed symbol or valid ISIN is needed"} aria-label={`Open ${result.name} chart`} onClick={() => onOpenChart(result)}><LineChart size={16} />{available ? "Open chart" : "Unavailable"}</button>;
 }
 
+function GateResults({ result }: { result: ScreeningResult }) {
+  const passed = result.checks.filter(check => check.pass).length;
+  const missing = result.checks.filter(check => !check.pass && check.value == null).length;
+  const failed = result.checks.length - passed - missing;
+  const allPassed = passed === result.checks.length && result.checks.length > 0;
+  return <details className={`fa-gates ${allPassed ? "all-passed" : "needs-review"}`} open>
+    <summary>
+      <span className="fa-gate-emblem"><ShieldCheck size={25} aria-hidden="true" /></span>
+      <span className="fa-gate-summary-content">
+        <span className="fa-gate-summary-line"><span className="fa-gate-count"><b>{passed}</b> / {result.checks.length} gates passed</span>
+          <span className="fa-gate-outcomes">{allPassed ? <span className="passed">All passed</span> : <>{failed > 0 && <span className="failed">{failed} failed</span>}{missing > 0 && <span className="missing">{missing} missing</span>}</>}</span>
+        </span>
+        <span className="fa-gate-track" role="img" aria-label={`${passed} passed, ${failed} failed, ${missing} missing`}>
+          {result.checks.map(check => <span key={check.id} className={check.pass ? "passed" : check.value == null ? "missing" : "failed"} title={`${check.label}: ${check.pass ? "Passed" : check.value == null ? "Missing" : "Failed"}`} />)}
+        </span>
+      </span>
+      <ChevronDown size={17} aria-hidden="true" />
+    </summary>
+    <div className="fa-gate-grid">{result.checks.map(check => {
+      const status = check.pass ? "passed" : check.value == null ? "missing" : "failed";
+      const Icon = check.pass ? Check : check.value == null ? Minus : X;
+      return <div className="fa-gate-row" key={check.id} data-status={status}>
+        <span className="fa-gate-status"><Icon size={13} aria-hidden="true" /></span>
+        <span className="fa-gate-copy"><b>{check.label}</b><small>{check.rule}</small></span>
+        <span className="fa-gate-reading"><b>{check.value == null ? "Missing" : String(check.value)}</b>{check.value != null && <small>{check.pass ? "Passed" : "Failed"}</small>}</span>
+      </div>;
+    })}</div>
+  </details>;
+}
+
 function CompanyReview({ result, instruments, onOpenChart, onSave }: { result: ScreeningResult; instruments: Instrument[]; onOpenChart: (result: ScreeningResult) => void; onSave: (result: ScreeningResult, decision: Decision, notes: string) => Promise<void> }) {
   const [decision, setDecision] = useState(result.decision);
   const [notes, setNotes] = useState(result.notes);
@@ -231,14 +261,8 @@ function CompanyReview({ result, instruments, onOpenChart, onSave }: { result: S
       <b className="fa-overall-rating">{rating.overall.toFixed(1)}</b>
     </header>
     <div className="fa-rating-breakdown">{(["gateScore", "quality", "growth", "valuation", "balance"] as const).map(key => <div key={key}><span>{key === "gateScore" ? "Gates" : key}</span><b>{rating[key].toFixed(1)}</b><meter min={0} max={10} value={rating[key]} aria-label={`${key} score`} /></div>)}</div>
-    <details className="fa-metrics" open>
-      <summary><span className="fa-section-label"><BarChart3 size={17} aria-hidden="true" />Financial metrics</span><ChevronDown size={16} aria-hidden="true" /></summary>
-      <div className="fa-metric-groups">{METRIC_GROUPS.map(group => <section className="fa-metric-group" key={group.title} aria-label={group.title}>
-        <h4>{group.title}</h4><dl>{group.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{number(result.metrics[field.key], field.suffix)}</dd></div>)}</dl>
-      </section>)}</div>
-    </details>
     <div className="fa-audit-grid">
-      <details className="fa-gates"><summary><span className="fa-section-label"><ShieldCheck size={17} aria-hidden="true" /><span>{result.checks.filter(check => check.pass).length} / {result.checks.length} gates passed</span></span><ChevronDown size={16} aria-hidden="true" /></summary><div className="fa-gate-grid">{result.checks.map(check => <div className="fa-gate-row" key={check.id}><span className={`fa-gate-status ${check.pass ? "positive" : "negative"}`}>{check.pass ? "✓" : "×"}</span><span><b>{check.label}</b><small>{check.rule}</small></span><b>{check.value == null ? "Missing" : String(check.value)}</b></div>)}</div></details>
+      <GateResults result={result} />
       <details className="fa-warnings"><summary><span className="fa-section-label"><ClipboardCheck size={17} aria-hidden="true" />Review checks</span><ChevronDown size={16} aria-hidden="true" /></summary><ul>{result.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>
     </div>
     <form className="fa-review-form" onSubmit={async event => { event.preventDefault(); setSaving(true); setError(""); try { await onSave(result, decision, notes); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save review."); } finally { setSaving(false); } }}>
