@@ -2,7 +2,7 @@ export type NewsItem = { title: string; url: string; source: string; publishedAt
 export function headlineSignals(title: string) {
  const up = /\b(beats?|surges?|rally|record profit|profit rises|wins?|approval|upgrade|dividend|growth)\b/i.test(title);
  const down = /\b(misses|plunges?|slump|loss(?:es)?|profit falls|fraud|probe|downgrade|penalty|default|recall)\b/i.test(title);
- return { sentiment: up && down ? 'Mixed' as const : up ? 'Positive' as const : down ? 'Negative' as const : 'Neutral' as const, importance: /\b(results|earnings|merger|acquisition|RBI|rate cut|rate hike|fraud|default|buyback)\b/i.test(title) ? 3 : up || down ? 2 : 1 };
+ return { sentiment: up && down ? 'Mixed' as const : up ? 'Positive' as const : down ? 'Negative' as const : 'Neutral' as const, importance: /\b(results|earnings|merger|acquisition|RBI|SEBI|Federal Reserve|Fed|rate cut|rate hike|repo rate|inflation|GDP|fraud|default|insolvency|bankruptcy|buyback|dividend|demerger|stock split|bonus issue|order win|contract win|wins? (?:an? |new )?(?:order|contract)|tariffs?|sanctions?)\b/i.test(title) ? 3 : up || down ? 2 : 1 };
 }
 const decode = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").trim();
 export function parseNewsFeed(xml: string, source: string, now = Date.now()): NewsItem[] {
@@ -13,9 +13,24 @@ export function parseNewsFeed(xml: string, source: string, now = Date.now()): Ne
  return [{title,url,source,publishedAt:new Date(date).toISOString(),...headlineSignals(title)}];
  });
 }
-export function rankNews(items: NewsItem[], now=Date.now()) {
- const seen=new Set<string>();
- return items.filter(i=>{const key=i.title.toLowerCase().replace(/\W/g,'');if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>(b.importance*12-(now-Date.parse(b.publishedAt))/3600000)-(a.importance*12-(now-Date.parse(a.publishedAt))/3600000)).slice(0,60);
+/** Newest first: an impact keyword must never bury a fresh market update. */
+export function rankNews(items: NewsItem[], now = Date.now()) {
+ const titles = new Set<string>(), urls = new Set<string>();
+ return items.filter(item => {
+   const date = Date.parse(item.publishedAt);
+   return Number.isFinite(date) && date <= now + 300000 && now - date <= 7 * 86400000;
+ }).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || b.importance - a.importance).filter(item => {
+   const title = item.title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+   let url = item.url;
+   try {
+     const canonical = new URL(item.url);
+     canonical.hash = '';
+     for (const key of [...canonical.searchParams.keys()]) if (/^utm_|^(?:fbclid|gclid)$/i.test(key)) canonical.searchParams.delete(key);
+     url = canonical.href;
+   } catch { return false; }
+   if (titles.has(title) || urls.has(url)) return false;
+   titles.add(title); urls.add(url); return true;
+ }).slice(0, 120);
 }
 export function matchNewsStocks<T extends {symbol:string;name:string;assetType?:string}>(title:string, stocks:readonly T[]):T[] {
  const norm=(s:string)=>s.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();const text=` ${norm(title)} `;
