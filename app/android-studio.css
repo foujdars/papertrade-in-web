@@ -160,7 +160,8 @@
 }
 /* Keep the bottom bar consistent wherever mobile navigation is visible. */
 @media (max-width: 940px) {
-  .terminal-shell .mobile-bottom-nav { display: flex !important; align-items: stretch; gap: 0; height: calc(56px + env(safe-area-inset-bottom, 0px)); padding: 0 0 calc(7px + env(safe-area-inset-bottom, 0px)); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: none; box-shadow: 0 -4px 20px #19263b06; }
+  .terminal-shell { --mobile-nav-height: calc(56px + env(safe-area-inset-bottom, 0px)); --mobile-trade-footer-height: 84px; }
+  .terminal-shell .mobile-bottom-nav { display: flex !important; align-items: stretch; gap: 0; height: var(--mobile-nav-height); padding: 0 0 calc(7px + env(safe-area-inset-bottom, 0px)); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; background: var(--surface); border-top: 1px solid var(--line); backdrop-filter: none; box-shadow: 0 -4px 20px #19263b06; }
   .terminal-shell .mobile-bottom-nav::before { display: none; }
   .terminal-shell .mobile-bottom-nav > button { position: relative; isolation: isolate; flex: 1 1 0; width: 0; min-width: 0; max-width: none; height: 48px; min-height: 48px; margin: 0; padding: 0; color: var(--muted); gap: 4px; font-size: clamp(10px, 2.8vw, 11px); font-weight: 550; text-shadow: none; text-align: center; }
   .terminal-shell .mobile-bottom-nav > button svg { display: block; width: 22px; height: 22px; flex: 0 0 22px; stroke-width: 1.8px; }
