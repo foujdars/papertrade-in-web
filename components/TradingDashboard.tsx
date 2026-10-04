@@ -1,4 +1,5 @@
 "use client";
+import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
 import { NewsWorkspace } from "./NewsWorkspace";
 import { BotWorkspace } from "./BotWorkspace";
 import dynamic from "next/dynamic";
@@ -482,6 +483,7 @@ export function TradingDashboard() {
   const [maxRiskInput, setMaxRiskInput] = useState("2000");
   const [tradeStrategy, setTradeStrategy] = useState("Breakout");
   const [tradeThesis, setTradeThesis] = useState("");
+  const [researchDraft, setResearchDraft] = useState<ResearchOrderDraft | null>(null);
   const [tradeConfidence, setTradeConfidence] = useState(3);
   const [orderType, setOrderType] = useState("Market");
   const [priceRequest, setPriceRequest] = useState<PriceRequest | null>(null);
@@ -1806,7 +1808,10 @@ export function TradingDashboard() {
 
   useEffect(() => {
     const restoreProtection = window.setTimeout(() => {
-      if (selectedProtection) {
+      if (researchDraft?.instrument.instrumentKey === selected.instrumentKey) {
+        setTargetPrice(researchDraft.target.toFixed(2));
+        setStopLossPrice(researchDraft.stop.toFixed(2));
+      } else if (selectedProtection) {
         setTargetPrice(selectedProtection.targetPrice?.toFixed(2) ?? "");
         setStopLossPrice(selectedProtection.stopLossPrice?.toFixed(2) ?? "");
       } else {
@@ -1815,7 +1820,7 @@ export function TradingDashboard() {
       }
     }, 0);
     return () => window.clearTimeout(restoreProtection);
-  }, [selected.instrumentKey, selectedProtection]);
+  }, [selected.instrumentKey, selectedProtection, researchDraft]);
   const openPositions = useMemo(() => positionSymbols.flatMap((symbol) => {
     const instrument = tradingUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
@@ -2216,12 +2221,15 @@ export function TradingDashboard() {
 
   function placeOrder() {
     if (isGlobalInstrumentKey(selected.instrumentKey)) { setOrderSheetOpen(true); setGlobalTicketTab("Order"); return; }
+    if (researchDraft && researchDraft.instrument.instrumentKey !== selected.instrumentKey) { setResearchDraft(null); setToast("Select the research instrument again to load its trade plan."); return; }
+    if (researchDraft && (orderType !== "Market" || side !== "BUY" || product !== "DELIVERY")) { setToast("This research draft uses a delivery market buy. Clear the research draft to start a different order."); return; }
     if (orderType !== "Market") {
       setOrderSheetOpen(false);
       setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit", quantity, product });
       return;
     }
     const currentSession = getNseMarketStatus(new Date(), exchangeSession);
+    if (researchDraft && !currentSession.isOpen) { setToast("Research draft saved in the ticket. An open market and fresh quote are required for its protected paper entry."); return; }
     if (!selectedDeltaChartSymbol && !currentSession.isOpen && afterHoursDeliveryCanQueue) {
       if (!Number.isSafeInteger(quantity) || quantity < 1) { setToast("Enter a valid delivery quantity."); return; }
       setOrderSheetOpen(false);
@@ -2246,6 +2254,10 @@ export function TradingDashboard() {
     if (!executionPrice || !Number.isFinite(executionPrice) || executionPrice <= 0) {
       setToast(selectedDeltaSymbol ? "Live Delta price unavailable. Paper order was not placed." : "Live Upstox price unavailable. Paper order was not placed.");
       return;
+    }
+    if (researchDraft) {
+      const researchError = researchExecutionError(researchDraft, quantity, executionPrice, Number(stopLossPrice), Number(targetPrice));
+      if (researchError) { setToast(researchError); return; }
     }
     if (selectedIsWatchOnly) {
       setToast("Brent is available as a watch-only global reference.");
@@ -2331,6 +2343,7 @@ export function TradingDashboard() {
     setTargetPrice("");
     setStopLossPrice("");
     setTradeThesis("");
+    setResearchDraft(null);
     setOrderSheetOpen(false);
     setToast(`${side === "BUY" ? "Bought" : "Sold"} ${quantity} ${selected.symbol} · charges ${formatInr(executionCharges.total)}`);
   }
@@ -2409,6 +2422,7 @@ export function TradingDashboard() {
   }
 
   function chooseTradeInstrument(item: Instrument) {
+    setResearchDraft(null);
     const fromWatchlist = marketNavigationActive;
     if (fromWatchlist) rememberWatchlistLocation();
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
@@ -2553,7 +2567,8 @@ export function TradingDashboard() {
     if (selected.assetType === "INDEX") { setToast("Indices cannot be traded directly. Choose a stock or F&O contract."); return; }
     if (!selectedDeltaChartSymbol && !getNseMarketStatus(new Date(), exchangeSession).isOpen) setProduct("DELIVERY");
     if (selectedDeltaSymbol || selectedDeltaOption) { setSide(nextSide); setGlobalTicketTab("Order"); setDesktopOrderPanelOpen(true); }
-    else activateRiskTool(nextSide);
+    else if (researchDraft && nextSide === "BUY") { setSide("BUY"); setTargetPrice(researchDraft.target.toFixed(2)); setStopLossPrice(researchDraft.stop.toFixed(2)); }
+    else { setResearchDraft(null); activateRiskTool(nextSide); }
     setOrderSheetOpen(true);
   }
 
@@ -2848,7 +2863,7 @@ export function TradingDashboard() {
           <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Watchlist</button>
           <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}>News</button>
           <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button>
-          <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} onClick={() => openNavigationSection("fundamentals")}>Fundamentals</button>
+          <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}>Analysis</button>
           <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
         </nav>
         <div className="top-actions">
@@ -3131,6 +3146,7 @@ export function TradingDashboard() {
             <label>Stop loss (₹)<input type="number" min="0.01" step="0.05" value={stopLossPrice} onChange={(event) => { setStopLossPrice(event.target.value); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Below ${verifiedLivePrice.toFixed(2)}` : `Above ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
             {selectedPosition.quantity > 0 && <button type="button" onClick={applyProtectionToOpenPosition}>Apply to open position</button>}
           </div>
+          {researchDraft && <div className="research-ticket-note"><b>Top Stocks research draft</b><small>Reference {formatInr(researchDraft.reference)} · {researchDraft.asOf}. Live budget {formatInr(researchDraft.budget)} · planned loss budget {formatInr(researchDraft.riskBudget)} including estimated charges. Fresh quotes and an open session are required.</small><button type="button" onClick={() => { setResearchDraft(null); setTradeThesis(""); }}>Clear research draft</button></div>}
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
           {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "FUTURE" ? "Paper cash settlement · no share delivery" : selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
@@ -3157,7 +3173,7 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={(!verifiedLivePrice && !afterHoursDeliveryCanQueue) || (!selectedMarketOrdersAllowed && !afterHoursDeliveryCanQueue) || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : afterHoursDeliveryCanQueue ? `QUEUE ${side} ${quantity} ${selected.symbol}` : !verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <button disabled={(researchDraft !== null && (!marketStatus.isOpen || !verifiedLivePrice)) || (!verifiedLivePrice && !afterHoursDeliveryCanQueue) || (!selectedMarketOrdersAllowed && !afterHoursDeliveryCanQueue) || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{researchDraft && !marketStatus.isOpen ? "RESEARCH DRAFT · MARKET CLOSED" : tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : afterHoursDeliveryCanQueue ? `QUEUE ${side} ${quantity} ${selected.symbol}` : !verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
           <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
@@ -3296,7 +3312,18 @@ export function TradingDashboard() {
       </nav>
 
       {newsOpen && <NewsWorkspace instruments={stockUniverse} onOpenChart={instrument => { const chartState = { ...window.history.state }; delete chartState.papertradeLayer; window.history.replaceState(chartState, "", window.location.href); openNavigationSection("trade"); chooseTradeInstrument(instrument); }} />}
-      {fundamentalsOpen && <FundamentalWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={stockUniverse} onClose={() => openNavigationSection("home")} onOpenChart={instrument => {
+      {fundamentalsOpen && <FundamentalWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={stockUniverse} balance={balance} onSimulate={draft => {
+        const chartState = { ...window.history.state }; delete chartState.papertradeLayer;
+        window.history.replaceState(chartState, "", window.location.href);
+        openNavigationSection("trade");
+        setStockUniverse(current => current.some(item => item.instrumentKey === draft.instrument.instrumentKey) ? current : mergeInstrumentUniverse([...current, draft.instrument]));
+        chooseTradeInstrument(draft.instrument);
+        setTimeframe("1D"); setProduct("DELIVERY"); setSide("BUY"); setOrderType("Market");
+        setQuantityInput(String(draft.quantity)); setResearchDraft(draft);
+        setTradeStrategy("Trend"); setTradeThesis(draft.thesis); setMaxRiskInput(String(draft.riskBudget));
+        setRiskSizingOpen(true); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true);
+        setToast("Research plan loaded. Review the live price, size and protection before placing your paper trade.");
+      }} onClose={() => openNavigationSection("home")} onOpenChart={instrument => {
         // Promote this transient research entry to a chart entry. Otherwise its
         // Back cleanup can restore the previous chart and undo the daily frame.
         const chartState = { ...window.history.state };
