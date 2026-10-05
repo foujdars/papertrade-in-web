@@ -1,6 +1,6 @@
 "use client";
 import type { HomeAttention } from '@/lib/home-attention';
-import { Bot, Newspaper, Bell, AlertCircle, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
+import { Bell, AlertCircle, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
 import { isGlobalInstrumentKey } from '@/lib/global-markets';
 import { compareMarketInstruments } from '@/lib/market-directory';
 import { MarketDirectory } from './MarketDirectory';
@@ -88,7 +88,6 @@ export function HomeWorkspace({
   cards,
   riskSummary: _riskSummary,
 
-  onOpenBot, onOpenNews,
   onOpenWatchlist,
   onOpenHoldings,
   onOpenPositions,
@@ -120,8 +119,6 @@ export function HomeWorkspace({
   stockOptions: HomeStockOption[];
   cards: HomeCardPreferences;
   riskSummary: HomeRiskSummary;
-  onOpenBot?: () => void;
-  onOpenNews?: () => void;
   onOpenWatchlist: () => void;
   onOpenHoldings: () => void;
   onOpenPositions: () => void;
@@ -307,7 +304,7 @@ export function HomeWorkspace({
   return (
     <section className="home-workspace home-hub home-studio" data-market={activeMarket} aria-label="PaperTrade home">
       <div className="home-dashboard-scroll">
-        <header className="home-overview-header"><div><span className="eyebrow">Your trading desk</span><h1 className="home-overview-title">{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1></div><span className="home-practice-label">Paper account</span></header>
+        <h1 className="home-overview-title">{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
         <section className="home-hero">
           <div className="home-hero-copy">
             <div className="home-global-search" onBlur={event => { const next = event.relatedTarget as Node | null; if (next && (event.currentTarget.contains(next) || sheetRef.current?.contains(next))) return; if (sheetRef.current) return; setSearchFocused(false); setSearch(""); }} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
@@ -354,11 +351,6 @@ export function HomeWorkspace({
           <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
         </section>
 
-        <nav className="home-shortcuts" aria-label="Trading shortcuts">
-          <button onClick={onOpenWatchlist}><Layers3 size={18}/><span>Watchlists</span><ChevronRight size={14}/></button>
-          {onOpenNews && <button onClick={onOpenNews}><Newspaper size={18}/><span>News</span><ChevronRight size={14}/></button>}
-          {onOpenBot && <button onClick={onOpenBot}><Bot size={18}/><span>Bot</span><ChevronRight size={14}/></button>}
-        </nav>
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
           <div className="home-indices-heading"><h2>Indian indices</h2><span>{indices.some(index => index.price !== null) ? feedLive && indices.every(index => index.live) ? 'Live quotes' : 'Latest quotes' : 'Awaiting quotes'}</span></div>
           <div className="home-index-grid" aria-label="Indian market indices">
@@ -384,6 +376,11 @@ export function HomeWorkspace({
 
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
+        {activeMarket === "india" && <div className="home-market-pair">
+          <MarketMovers onOpen={onOpenStock} />
+          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
+        </div>}
+
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
@@ -405,11 +402,6 @@ export function HomeWorkspace({
           </section>}
 
         </div>
-        {activeMarket === "india" && <div className="home-market-pair">
-          <MarketMovers onOpen={onOpenStock} />
-          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
-        </div>}
-
         {activeMarket === "india" ? <IndiaPulse /> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}

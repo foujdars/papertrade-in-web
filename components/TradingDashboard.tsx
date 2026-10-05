@@ -3233,8 +3233,6 @@ export function TradingDashboard() {
       }} />}
 
       {homeOpen && <HomeWorkspace
-        onOpenBot={() => openNavigationSection("bot")}
-        onOpenNews={() => openNavigationSection("news")}
         key={user?.id ?? 'guest'}
         preferenceOwner={user?.id ?? 'guest'}
         favouriteSymbols={[...new Set(customWatchlists.flatMap(list => list.symbols))]}
