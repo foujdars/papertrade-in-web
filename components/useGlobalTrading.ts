@@ -13,6 +13,10 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
   const [snapshots, setSnapshots] = useState<Partial<Record<PerpSymbol, GlobalSnapshot>>>({});
   const [optionSnapshots, setOptionSnapshots] = useState<Record<string, OptionSnapshot>>({});
   const [error, setError] = useState("");
+  const [marketError, setMarketError] = useState("");
+  const [lastChecked, setLastChecked] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const observationsRef = useRef<Record<string, BotObservation>>({});
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(0);
   const activeKey = useRef("");
@@ -31,7 +35,9 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     const load = async () => {
       await Promise.resolve();
       if (activeKey.current !== key) return;
-      setAccount(null); setError(""); setBusy(false); setClock(Date.now());
+      setAccount(null); setError(""); setMarketError(""); setLastChecked(0); setBusy(false); setClock(Date.now());
+      snapshotsRef.current = {}; optionSnapshotsRef.current = {};
+      setSnapshots({}); setOptionSnapshots({});
       try {
         if (!navigator.locks) throw new Error("This WebView cannot safely save orders. Update Android System WebView.");
         await navigator.locks.request(key, () => {
@@ -79,11 +85,41 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     ...(account?.optionOrders?.map(order => order.symbol) ?? []),
   ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, botVisible, account?.bots, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
   const botScopes = (account?.bots ?? []).filter(b => b.enabled).flatMap(b => [...botFrames(b), ...(b.trendTimeframe && b.trendTimeframe !== "off" ? [b.trendTimeframe] : [])].map(frame => `${b.symbol}:${frame}:${b.startedAt}`)).join(",");
+  // Candle history must never hold up live quotes or protective exits.
+  useEffect(() => {
+    observationsRef.current = {};
+    if (!botScopes) return;
+    const controller = new AbortController();
+    let running = false;
+    const pollHistory = async () => {
+      if (running || document.hidden || controller.signal.aborted) return;
+      running = true;
+      try {
+        const observations: Record<string, BotObservation> = {};
+        await Promise.allSettled(botScopes.split(",").map(async scope => {
+          const [symbol, frame] = scope.split(":") as [string, BotFrame];
+          const key = botScope(symbol, frame);
+          try {
+            const response = await fetch(`/api/global-markets?mode=candles&symbol=${symbol}&timeframe=${frame}`, {
+              cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]),
+            });
+            const history = await response.json();
+            if (!response.ok || !history.ok || !Array.isArray(history.candles)) throw new Error("History unavailable");
+            if (!controller.signal.aborted && !document.hidden) observations[key] = { candles: history.candles, fetchedAt: history.fetchedAt };
+          } catch { /* A failed timeframe never borrows another history. */ }
+        }));
+        if (!controller.signal.aborted && !document.hidden) observationsRef.current = observations;
+      } finally { running = false; }
+    };
+    void pollHistory();
+    const timer = window.setInterval(() => void pollHistory(), 10000);
+    document.addEventListener("visibilitychange", pollHistory);
+    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", pollHistory); };
+  }, [botScopes, key, refreshTick]);
   useEffect(() => {
     if (!monitorSymbols) return;
     const controller = new AbortController();
     let running = false;
-    const candleCache: Record<string, BotObservation> = {};
     const poll = async () => {
       if (running || document.hidden || controller.signal.aborted) return;
       running = true;
@@ -91,9 +127,8 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
         const next: Partial<Record<PerpSymbol, GlobalSnapshot>> = {};
         const nextOptions: Record<string, OptionSnapshot> = {};
         const observedOptions: Record<string, OptionObservation> = {};
-        const botObservations: Record<string, BotObservation> = {};
         const results = await Promise.allSettled(monitorSymbols.split(",").map(async symbol => {
-          const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
+          const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
           const data = await r.json();
           if (!r.ok || !data.ok) throw new Error(data.error ?? "Delta market data unavailable.");
           if (data.kind === "option") {
@@ -104,25 +139,13 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           } else {
             if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta perpetual quote unavailable.");
             next[symbol] = { spec: data.spec, quote: data.quote };
-            const scopes = botScopes.split(",").filter(scope => scope.startsWith(`${symbol}:`));
-            await Promise.allSettled(scopes.map(async scope => {
-              const [, timeframe] = scope.split(":") as [string, BotFrame, string];
-              try {
-                let observation = candleCache[scope];
-                if (!observation || Date.now() - observation.fetchedAt >= 15000) {
-                  const response = await fetch(`/api/global-markets?mode=candles&symbol=${symbol}&timeframe=${timeframe}`, { cache: "no-store", signal: controller.signal });
-                  const history = await response.json();
-                  if (!response.ok || !history.ok || !Array.isArray(history.candles)) throw new Error("Candle history unavailable");
-                  observation = { candles: history.candles, fetchedAt: history.fetchedAt };
-                  candleCache[scope] = observation;
-                }
-                botObservations[botScope(symbol, timeframe)] = observation;
-              } catch { delete candleCache[scope]; } // Failure on one frame never supplies another frame's history.
-            }));
+
           }
         }));
         if (controller.signal.aborted || document.hidden) return;
-        if (results.every(r => r.status === "rejected")) return; // Existing timestamps expire and disable orders.
+        setMarketError(results.some(r => r.status === "rejected") ? "Some live prices are unavailable. Retrying automatically." : "");
+        if (results.every(r => r.status === "rejected")) return; // Stale quotes cannot fill orders.
+        setLastChecked(Date.now());
         snapshotsRef.current = { ...snapshotsRef.current, ...next };
         setSnapshots(snapshotsRef.current);
         optionSnapshotsRef.current = { ...optionSnapshotsRef.current, ...nextOptions };
@@ -136,7 +159,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           if (document.hidden || controller.signal.aborted) return a;
           const now = Date.now();
           const advanced = advanceOptions(advanceGlobalAccount(a, quotes, specs, now, extremesRef.current), observedOptions, now);
-          return advancePaperBots(advanced, next, botObservations, now);
+          return advancePaperBots(advanced, next, observationsRef.current, now);
         }, true);
       } finally { running = false; }
     };
@@ -144,7 +167,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
     const interval = window.setInterval(() => void poll(), 5000);
     document.addEventListener("visibilitychange", poll);
     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
-  }, [monitorSymbols, botScopes, transact]);
-  return { account, snapshots, optionSnapshots, clock, busy, error, transact, noteCandle };
+  }, [monitorSymbols, transact, refreshTick]);
+  return { account, snapshots, optionSnapshots, clock, busy, error, marketError, lastChecked, refresh: () => setRefreshTick(tick => tick + 1), transact, noteCandle };
 }
 export type GlobalTrading = ReturnType<typeof useGlobalTrading>;

@@ -1,0 +1,30 @@
+/* Home: clear hierarchy, compact shortcuts and consistent themed surfaces. */
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll { max-width: 1440px; margin-inline: auto; padding: 20px 24px 100px; }
+.home-overview-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.home-overview-header .eyebrow { font-size:10px; letter-spacing:.1em; color:var(--muted); }
+.terminal-shell .home-overview-header .home-overview-title { display:block; position:static; width:auto; height:auto; overflow:visible; clip-path:none; white-space:normal; font-size:26px; letter-spacing:-.8px; margin:5px 0 0; line-height:1.2; }
+.home-practice-label { flex:none; padding:6px 9px; border:1px solid var(--line); border-radius:20px; color:var(--muted); font-size:10px; }
+.terminal-shell .home-studio .home-global-search { border-radius:14px; background:var(--surface); border:1px solid var(--line); min-height:48px; box-shadow:0 3px 12px #17274305; }
+.terminal-shell .home-studio .home-market-chooser { gap:6px; padding:5px; border:1px solid var(--line); border-radius:15px; background:var(--soft); margin:14px 0 12px; }
+.terminal-shell .home-studio .home-market-chooser > button { border:1px solid transparent; border-radius:11px; background:transparent; box-shadow:none; padding:10px; min-height:56px; }
+.terminal-shell .home-studio .home-market-chooser > button.active { background:var(--surface); border-color:var(--line); color:var(--purple); box-shadow:0 2px 5px #17274308; }
+.home-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:0 0 18px; }
+.home-shortcuts button { display:flex; align-items:center; gap:9px; min-width:0; min-height:46px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; cursor:pointer; }
+.home-shortcuts button > svg:first-child { color:var(--purple); flex:none; }
+.home-shortcuts button > svg:last-child { margin-left:auto; color:var(--muted); flex:none; }
+.home-shortcuts button:hover { background:var(--purple-soft); }
+.home-shortcuts button:focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
+.terminal-shell .home-studio .home-portfolio-card { background:linear-gradient(110deg,var(--surface),var(--purple-soft)); border:1px solid var(--line); border-radius:16px; padding:18px; }
+.terminal-shell .home-studio .home-portfolio-row { margin-top:16px; gap:10px; }
+.terminal-shell .home-studio .home-today-pnl strong { font-size:28px; letter-spacing:-.7px; }
+.terminal-shell .home-studio .home-main-grid-clean { margin:16px 0; }
+@media(max-width:600px) {
+ .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding:16px 12px 100px; }
+ .terminal-shell .home-overview-header .home-overview-title { font-size:23px; }
+ .home-shortcuts { gap:6px; }
+ .home-shortcuts button { gap:6px; font-size:11px; padding:9px 8px; }
+ .home-shortcuts button > svg:last-child { display:none; }
+ .terminal-shell .home-studio .home-market-chooser > button { padding:8px; }
+ .terminal-shell .home-studio .home-portfolio-card { padding:14px; }
+ .terminal-shell .home-studio .home-today-pnl strong { font-size:23px; }
+}

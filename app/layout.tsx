@@ -36,6 +36,7 @@ import "./android-studio.css";
 import "./home-market-design.css";
 import "./bot-workspace.css";
 import "./modern-popup.css";
+import "./home-refresh.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
