@@ -63,3 +63,51 @@
 .bot-decisions small { font-size:10px; color:var(--muted); }
 .bot-workspace .bot-preview-button { margin-top:10px; }
 .bot-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Action-first bot workspace. Strategy explanations stay available on demand. */
+.bot-workspace.navigation-page { max-width:1200px; margin-inline:auto; padding:20px 24px 96px; }
+.bot-workspace .bot-runtime { margin:0 0 16px; padding:14px 16px; justify-content:space-between; background:var(--soft); }
+.bot-runtime > div > b { display:flex; gap:8px; align-items:center; }
+.bot-runtime small,.bot-checked { display:block; margin-top:5px; color:var(--muted); font-size:11px; }
+.bot-running-dot { width:7px; height:7px; border-radius:50%; background:var(--green); }
+.bot-runtime-actions { display:flex; gap:7px; }
+.bot-workspace .bot-assets { gap:8px; margin-bottom:18px; }
+.bot-workspace .bot-assets button { padding:12px; border-radius:12px; text-align:left; }
+.bot-workspace .bot-assets button.active { background:var(--purple-soft); border-color:var(--purple); }
+.bot-workspace .bot-assets b { font-size:20px; }
+.bot-workspace .bot-assets small { font-size:10px; }
+.bot-workspace .bot-card { border-radius:14px; box-shadow:none; }
+.bot-workspace .bot-layout { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); align-items:start; gap:16px; }
+.bot-workspace .bot-monitor { display:flex; flex-direction:column; gap:12px; }
+.bot-workspace .bot-monitor .bot-card { margin:0; }
+.bot-workspace .bot-monitor .bot-card:nth-child(2) { order:-1; border-color:color-mix(in srgb,var(--purple) 35%,var(--line)); background:var(--purple-soft); }
+.bot-workspace .bot-monitor h3 { font-size:18px; }
+.bot-workspace .bot-monitor p { font-size:12px; line-height:1.5; }
+.bot-workspace summary { cursor:pointer; font-size:12px; font-weight:650; padding:7px 0; }
+.bot-strategy-help,.bot-advanced { border-bottom:1px solid var(--line); margin:0 0 16px; padding-bottom:8px; }
+.bot-workspace .bot-help p { font-size:11px; }
+.bot-workspace .bot-fields label { font-size:11px; gap:6px; }
+.bot-workspace .bot-fields :is(input,select) { min-height:42px; border-radius:8px; }
+.bot-workspace .bot-start { width:100%; min-height:46px; font-weight:700; margin:14px 0 8px; background:var(--purple); color:white; }
+.bot-workspace .bot-start + small { display:block; font-size:11px; text-align:center; color:var(--muted); }
+.bot-workspace .bot-activity li { padding:12px 0; }
+@media(max-width:700px) {
+ .bot-workspace.navigation-page { padding:12px 12px 90px; }
+ .bot-workspace .bot-layout { display:flex; flex-direction:column; }
+ .bot-workspace .bot-layout > * { width:100%; min-width:0; }
+ .bot-workspace .bot-monitor { order:-1; }
+ .bot-workspace .bot-assets { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .bot-workspace .bot-runtime { gap:12px; }
+ .bot-runtime-actions { width:100%; }
+ .bot-runtime-actions button { flex:1; }
+}
+.bot-workspace.navigation-page .modal-head { margin:0 0 16px; padding:8px 0 12px; width:auto; top:0; }
+@media(max-width:700px) {
+ .bot-workspace .bot-monitor { display:contents; }
+ .bot-workspace .bot-monitor .bot-card:nth-child(2) { order:0; }
+ .bot-workspace .bot-monitor .bot-card:first-child { order:1; }
+ .bot-workspace .bot-settings { order:2; }
+ .bot-workspace .bot-frame-monitor { order:3; }
+ .bot-workspace .bot-help { order:4; }
+ .bot-workspace .bot-decisions { order:5; }
+}
