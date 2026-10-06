@@ -1,0 +1,294 @@
+/* ==========================================================================
+   PaperTrade IN — Modern Theme Layer (style-only)
+   --------------------------------------------------------------------------
+   * Pure CSS overrides: no markup, class names, handlers or logic changed.
+   * Load LAST in app/layout.tsx:   import "./modern-theme.css";
+   * Never changes display/position/size of controls, so every feature,
+     button, menu and chart works exactly as before.
+   * Light theme gets the full refresh; the existing "neon" dark theme keeps
+     its colours and only receives shared polish (radius, focus, motion).
+   * Remove the import line to revert instantly.
+   ========================================================================== */
+
+/* ---------- 1. Design tokens ---------- */
+:root {
+  /* Core palette — refined indigo/violet + calm neutrals */
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e6e8f0;
+  --surface: #ffffff;
+  --soft: #f6f7fb;
+  --purple: #5b4cf0;
+  --purple-soft: #eeecff;
+  --panel: var(--surface);
+
+  --green: #10b981;
+  --red: #ef4444;
+  --allotment-accent: #059669;
+
+  /* Studio tokens already used across the app */
+  --studio-canvas: #f6f7fb;
+  --studio-panel: #ffffff;
+  --studio-raised: #fafbff;
+  --studio-border: #e6e8f0;
+  --studio-highlight: #eeecff;
+  --studio-accent: linear-gradient(120deg, #6d5cff 0%, #4f46e5 55%, #3b82f6 100%);
+  --studio-card: #ffffff;
+  --studio-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
+
+  /* New tokens for this layer */
+  --mt-radius-sm: 8px;
+  --mt-radius: 12px;
+  --mt-radius-lg: 18px;
+  --mt-ring: 0 0 0 3px rgba(91, 76, 240, .28);
+  --mt-shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
+  --mt-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .07);
+  --mt-shadow-lg: 0 24px 64px -12px rgba(15, 23, 42, .28);
+  --mt-glass: rgba(255, 255, 255, .78);
+  --mt-font: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mt-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --motion-fast: 150ms;
+  --motion-enter: 240ms;
+  --motion-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ---------- 2. Base typography & rendering ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--mt-font);
+  font-feature-settings: "cv11", "ss01", "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.005em;
+}
+/* Tabular figures for every price / P&L style number */
+:is(.price, .ltp, .pnl, .quantity, .ohlc-strip, .holding-row, .instrument-row,
+    .trend-stock-row, .positions-summary, .home-portfolio-value, .chart-statusbar,
+    .advanced-statusbar, .trade-day-range, .option-sheet-columns, td, .stepper input) {
+  font-variant-numeric: tabular-nums;
+}
+::selection { background: rgba(91, 76, 240, .18); }
+
+/* Slim modern scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(100, 116, 139, .35) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, .3); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(100, 116, 139, .5); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Accessible focus ring everywhere (keyboard only) */
+:is(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: none !important;
+  box-shadow: var(--mt-ring) !important;
+  border-radius: var(--mt-radius-sm);
+}
+
+/* Smooth, consistent motion on interactive elements */
+:is(button, a, input, select, textarea, .instrument-row, .trend-stock-row, .holding-row) {
+  transition: background-color var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease),
+              color var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease),
+              transform var(--motion-fast) var(--motion-ease);
+}
+button:not(:disabled):active { transform: translateY(.5px) scale(.985); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation-duration: .001ms !important; }
+}
+
+/* ==========================================================================
+   LIGHT THEME REFRESH  (everything below skips the neon theme)
+   ========================================================================== */
+
+/* ---------- 3. App shell & top bar ---------- */
+.terminal-shell:not([data-theme="neon"]) { background: var(--soft); color: var(--ink); }
+
+.terminal-shell:not([data-theme="neon"]) .topbar {
+  background: var(--mt-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid rgba(15, 23, 42, .06);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 4px 18px -10px rgba(15, 23, 42, .18);
+}
+.terminal-shell:not([data-theme="neon"]) .brand b { letter-spacing: -0.02em; }
+
+/* Primary navigation — pill style active state */
+.terminal-shell:not([data-theme="neon"]) .main-nav button {
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: 10px;
+}
+.terminal-shell:not([data-theme="neon"]) .main-nav button:hover { color: var(--ink); background: rgba(15, 23, 42, .04); }
+.terminal-shell:not([data-theme="neon"]) .main-nav button:is(.active, [aria-current="page"], [aria-selected="true"], [data-active="true"]) {
+  color: var(--purple);
+  background: var(--purple-soft);
+}
+
+/* Icon / utility buttons in header */
+.terminal-shell:not([data-theme="neon"]) :is(.icon-button, .theme-toggle, .more-menu-trigger,
+  .notification-center-trigger, .profile-button, .top-watchlist-button) {
+  border-radius: 10px;
+}
+.terminal-shell:not([data-theme="neon"]) :is(.icon-button, .theme-toggle, .more-menu-trigger,
+  .notification-center-trigger, .top-watchlist-button):hover {
+  background: rgba(15, 23, 42, .05);
+}
+
+/* Mobile bottom navigation — floating glass bar look */
+.terminal-shell:not([data-theme="neon"]) .mobile-bottom-nav {
+  background: var(--mt-glass);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  border-top: 1px solid rgba(15, 23, 42, .06);
+  box-shadow: 0 -8px 28px -14px rgba(15, 23, 42, .25);
+}
+.terminal-shell:not([data-theme="neon"]) .mobile-bottom-nav button { font-weight: 600; letter-spacing: -0.01em; }
+.terminal-shell:not([data-theme="neon"]) .mobile-bottom-nav button:is(.active, [aria-current="page"], [aria-selected="true"]) { color: var(--purple); }
+
+/* ---------- 4. Panels & surfaces ---------- */
+.terminal-shell:not([data-theme="neon"]) :is(.watchlist-panel, .order-ticket, .chart-area) {
+  background: var(--surface);
+}
+.terminal-shell:not([data-theme="neon"]) .watchlist-panel { border-right-color: var(--line); }
+.terminal-shell:not([data-theme="neon"]) .instrument-header { border-bottom-color: var(--line); }
+.terminal-shell:not([data-theme="neon"]) :is(.chart-statusbar, .advanced-statusbar, .advanced-commandbar) {
+  border-color: var(--line);
+  background: var(--studio-raised);
+}
+
+/* List rows — soft hover, no harsh lines */
+.terminal-shell:not([data-theme="neon"]) :is(.instrument-row, .trend-stock-row, .holding-row, .scanner-run-row) {
+  border-radius: 10px;
+}
+.terminal-shell:not([data-theme="neon"]) :is(.instrument-row, .trend-stock-row, .holding-row, .scanner-run-row):hover {
+  background: #f4f5fb;
+}
+.terminal-shell:not([data-theme="neon"]) :is(.instrument-row, .trend-stock-row).selected,
+.terminal-shell:not([data-theme="neon"]) :is(.instrument-row, .trend-stock-row)[aria-selected="true"] {
+  background: var(--purple-soft);
+  box-shadow: inset 3px 0 0 var(--purple);
+}
+
+/* Eyebrow / small labels */
+.terminal-shell:not([data-theme="neon"]) .eyebrow {
+  color: var(--purple);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+
+/* ---------- 5. Buttons ---------- */
+.terminal-shell:not([data-theme="neon"]) .primary-button,
+.modal .primary-button {
+  border-radius: var(--mt-radius);
+  background: var(--studio-accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 16px -6px rgba(79, 70, 229, .55);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.terminal-shell:not([data-theme="neon"]) .primary-button:hover,
+.modal .primary-button:hover { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 10px 22px -8px rgba(79, 70, 229, .6); }
+
+/* Buy / sell switches keep their semantic colours, just modernised */
+.terminal-shell:not([data-theme="neon"]) .side-switch :is(.buy-active, .sell-active) {
+  border-radius: 10px;
+  box-shadow: var(--mt-shadow-sm);
+}
+
+/* Secondary pill-tab groups across the app */
+.terminal-shell:not([data-theme="neon"]) :is(.trend-tabs, .ipo-filter-tabs, .scanner-family-tabs,
+  .chart-menu-tabs, .fno-chart-menu-tabs, .density-picker) button {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+/* ---------- 6. Inputs & selects ---------- */
+.terminal-shell:not([data-theme="neon"]) :is(.text-input, .stepper input, .protection-grid input,
+  .connection-settings input, .connection-settings select),
+.modal :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  border-radius: 10px;
+  border-color: var(--line);
+  background: #fff;
+}
+.terminal-shell:not([data-theme="neon"]) :is(.text-input, .stepper input):hover,
+.modal :is(input, select, textarea):hover { border-color: #cfd3e3; }
+.terminal-shell:not([data-theme="neon"]) :is(.text-input, .stepper input):focus,
+.modal :is(input, select, textarea):focus {
+  border-color: var(--purple);
+  box-shadow: var(--mt-ring);
+  outline: none;
+}
+.terminal-shell:not([data-theme="neon"]) .stepper button { border-radius: 10px; }
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--purple); }
+
+/* ---------- 7. Modals, sheets, menus & popovers ---------- */
+.modal-backdrop {
+  background: rgba(15, 23, 42, .42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.terminal-shell:not([data-theme="neon"]) .modal,
+body > .modal-backdrop .modal {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, .06);
+  box-shadow: var(--mt-shadow-lg);
+}
+.terminal-shell:not([data-theme="neon"]) :is(.more-menu-panel, .notification-center-panel,
+  .watchlist-selector-menu, .chart-function-menu, .drawing-library, .dashboard-indicator-popover,
+  .advanced-symbol-menu, .home-search-results) {
+  border-radius: 16px;
+  border-color: rgba(15, 23, 42, .07);
+  box-shadow: var(--mt-shadow-lg);
+}
+
+/* ---------- 8. Home dashboard ---------- */
+.terminal-shell:not([data-theme="neon"]) .home-workspace {
+  background:
+    radial-gradient(1200px 380px at 10% -10%, rgba(109, 92, 255, .10), transparent 60%),
+    radial-gradient(900px 320px at 100% 0%, rgba(59, 130, 246, .08), transparent 60%),
+    var(--soft);
+}
+.terminal-shell:not([data-theme="neon"]) .home-hero {
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(139, 124, 255, .55) 0, transparent 34%),
+    radial-gradient(circle at 0% 110%, rgba(16, 185, 129, .30) 0, transparent 40%),
+    linear-gradient(135deg, #0b1020 0%, #151a3a 55%, #1e1b4b 100%);
+  box-shadow: 0 30px 60px -30px rgba(30, 27, 75, .65);
+}
+.terminal-shell:not([data-theme="neon"]) .home-global-search {
+  border-radius: 14px;
+  border-color: rgba(255, 255, 255, .5);
+  box-shadow: 0 12px 32px -12px rgba(15, 23, 42, .35);
+}
+.terminal-shell:not([data-theme="neon"]) .home-global-search > svg { color: var(--purple); }
+
+/* Generic card treatments used on home / IPO / P&L / market screens */
+.terminal-shell:not([data-theme="neon"]) :is(.home-stock-preview, .home-recent-list, .pnl-win-card,
+  .market-command-stats, .risk-reward-summary, .live-position-head, .trade-journey) {
+  border-radius: var(--mt-radius-lg);
+  border-color: var(--line);
+  box-shadow: var(--mt-shadow);
+}
+
+/* ---------- 9. Market colours (semantic, slightly calmer) ---------- */
+.terminal-shell:not([data-theme="neon"]) :is(.positive, .up, .gain) { color: #059669; }
+.terminal-shell:not([data-theme="neon"]) :is(.negative, .down, .loss) { color: #dc2626; }
+
+/* ---------- 10. Toasts / connection state ---------- */
+.terminal-shell:not([data-theme="neon"]) .connection-state { border-radius: 999px; font-weight: 600; }
+
+/* ==========================================================================
+   NEON THEME — shared polish only (colours untouched)
+   ========================================================================== */
+.terminal-shell[data-theme="neon"] .modal { border-radius: 20px; }
+.terminal-shell[data-theme="neon"] .primary-button { border-radius: var(--mt-radius); }
+.terminal-shell[data-theme="neon"] :is(.more-menu-panel, .notification-center-panel,
+  .watchlist-selector-menu, .chart-function-menu, .drawing-library) { border-radius: 16px; }
