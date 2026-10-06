@@ -394,11 +394,11 @@
 @keyframes home-side-slide { from { transform:translateX(105%); } to { transform:none; } }
 @media (max-width:760px) { .home-side-sheet { width:100%; box-shadow:none; } }
 @media (prefers-reduced-motion:reduce) { .home-side-sheet { animation:none; } }
-.home-heat { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:2px 14px 14px; }
-.home-heat button { min-height:62px; display:flex; flex-direction:column; justify-content:center; gap:2px; padding:8px 7px; border:0; border-radius:12px; text-align:left; cursor:default; }
+.home-heat { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; padding:0 12px 10px; }
+.home-heat button { min-height:44px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:1px; padding:5px 3px; border:0; border-radius:8px; text-align:left; cursor:default; }
 .home-heat button.is-link { cursor:pointer; }
-.home-heat b { font-size:11px; line-height:1.2; }
-.home-heat strong { font-size:13px; font-variant-numeric:tabular-nums; }
+.home-heat b { font-size:11px; font-weight:600; letter-spacing:-.2px; line-height:1.2; white-space:nowrap; }
+.home-heat strong { font-size:13px; line-height:1.2; font-variant-numeric:tabular-nums; }
 .heat-3 { background:#087f60; color:#fff; }
 .heat-2 { background:#1aa87a; color:#fff; }
 .heat-1 { background:#d8f5ea; color:#0b3b2e; }
@@ -407,5 +407,6 @@
 .heat--2 { background:#e85a74; color:#fff; }
 .heat--3 { background:#c92e51; color:#fff; }
 @media (max-width:360px) { .home-heat { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (min-width:361px) and (max-width:380px) { .home-heat b { font-size:10px; } }
 @media(min-width:761px){.terminal-shell .home-hub .home-dashboard-scroll{max-width:920px;margin:0 auto;padding-inline:28px}.terminal-shell .home-hub .home-hero{display:grid;grid-template-columns:1fr}.terminal-shell .home-hub .home-index-card strong{font-size:23px}.terminal-shell .home-hub .home-index-card>span b{font-size:12px}.terminal-shell .home-hub .home-index-card small{font-size:11px}}
 @media(max-width:360px){.terminal-shell .home-hub .home-portfolio-stats button svg{display:none}.terminal-shell .home-hub .home-index-card{padding-inline:7px}.terminal-shell .home-hub .home-index-card strong{font-size:15px}.terminal-shell .home-hub .home-portfolio-value b{font-size:15px}}
