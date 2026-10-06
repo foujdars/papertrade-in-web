@@ -24,12 +24,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   const lossButtons='.chart-trade-buttons .sell,.fno-trade-actions>button.sell,.place-order.sell,.chart-sell-button,.chart-order-buttons .compact-sell';
   for(const theme of ['light','neon']){
    if(theme==='neon')await page.getByRole('button',{name:'Theme',exact:true}).click();
+   const gain = theme === 'light' ? '#087d5b' : '#55d9ad', loss = theme === 'light' ? '#c52d43' : '#ff8d9c';
+   await page.waitForFunction(expected => getComputedStyle(document.querySelector('.buy-active')).color === expected, rgb(gain));
    for(const width of [320,390,1280]){
     await page.setViewportSize({width,height:844});
     await page.waitForFunction(({green,red})=>{const o=window.qaSeries?.options();return o?.upColor===green&&o?.downColor===red;},{green:MARKET_GREEN,red:MARKET_RED});
     const options=await page.evaluate(()=>{const o=window.qaSeries.options();return [o.upColor,o.borderUpColor,o.wickUpColor,o.downColor,o.borderDownColor,o.wickDownColor];});
     assert.deepEqual(options,[MARKET_GREEN,MARKET_GREEN,MARKET_GREEN,MARKET_RED,MARKET_RED,MARKET_RED]);
-    for(const [selector,property,expected] of [[gainText,'color',rgb(MARKET_GREEN)],[lossText,'color',rgb(MARKET_RED)],[gainButtons,'backgroundColor',rgb(MARKET_GREEN)],[lossButtons,'backgroundColor',rgb(MARKET_RED)],[gainButtons,'color','rgb(255, 255, 255)'],[lossButtons,'color','rgb(255, 255, 255)'],['.india-flow-chart .fii.up','fill',rgb(MARKET_GREEN)],['.india-flow-chart .down','fill',rgb(MARKET_RED)],['.india-breadth-line.up','stroke',rgb(MARKET_GREEN)],['.india-breadth-line.down','stroke',rgb(MARKET_RED)]]){
+    for(const [selector,property,expected] of [[gainText,'color',rgb(gain)],[lossText,'color',rgb(loss)],[gainButtons,'backgroundColor',rgb('#087d5b')],[lossButtons,'backgroundColor',rgb('#c52d43')],[gainButtons,'color','rgb(255, 255, 255)'],[lossButtons,'color','rgb(255, 255, 255)'],['.india-flow-chart .fii.up','fill',rgb(MARKET_GREEN)],['.india-flow-chart .down','fill',rgb(MARKET_RED)],['.india-breadth-line.up','stroke',rgb(MARKET_GREEN)],['.india-breadth-line.down','stroke',rgb(MARKET_RED)]]){
      const bad=await page.locator(selector).evaluateAll((els,{property,expected})=>els.filter(el=>getComputedStyle(el)[property]!==expected).map(el=>({class:el.getAttribute('class'),actual:getComputedStyle(el)[property]})),{property,expected});
      assert.deepEqual(bad,[],`${theme} ${width}px ${property} ${selector}`);
     }
