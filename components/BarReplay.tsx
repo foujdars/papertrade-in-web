@@ -1,4 +1,5 @@
 "use client";
+import { useTransientBack } from "./useTransientBack";
 import { CandleLoader } from "./CandleLoader";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -175,6 +176,7 @@ export function BarReplay({ instrument, initialTimeframe, theme, onClose }: { in
 }
 
 export function BarReplayDialog({ instrument, timeframe, theme, onClose }: { instrument: Instrument; timeframe: string; theme: "light" | "neon"; onClose: () => void }) {
+  useTransientBack(true, onClose);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; const overflow = document.body.style.overflow; document.body.style.overflow = "hidden"; ref.current?.querySelector<HTMLButtonElement>("button")?.focus(); return () => { document.body.style.overflow = overflow; previous?.focus(); }; }, []);
   return <div className="bar-replay-backdrop" role="presentation"><div ref={ref} className="bar-replay-dialog" role="dialog" aria-modal="true" aria-label="Bar replay" onKeyDown={(event) => {
