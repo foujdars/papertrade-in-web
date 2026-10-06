@@ -67,6 +67,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       assert.match(await peers.locator('.research-matrix thead').innerText(), /Valuation/);
       assert.equal(await peers.locator('.research-peer-select-row').evaluate(el => { const [companies, metrics] = el.children; return Math.abs(companies.getBoundingClientRect().top - metrics.getBoundingClientRect().top) < 1; }), true);
       await page.getByRole('button', { name: 'Screener', exact: true }).click();
+      await page.getByRole('button', { name: 'Top stocks', exact: true }).click();
+      const top = page.getByRole('region', { name: 'Top stocks discovery' });
+      assert.equal(await top.locator('.research-section-head, .research-scan-note, .research-method, .research-exclusions').count(), 0);
+      assert.equal(await top.locator('select').count(), 0);
+      assert.equal(await top.locator('.research-discovery-overview').evaluate(el => new Set([...el.children].map(child => child.getBoundingClientRect().top)).size), 1, 'Four summary cards share one row');
+      assert.equal(await top.locator('.research-scan-controls').evaluate(el => new Set([...el.querySelectorAll(':scope > .modern-select')].map(child => child.getBoundingClientRect().top)).size), 1, 'Scan selectors share one row');
+      for (const [name, option] of [['Candidate pool', '48 companies'], ['Minimum daily turnover', 'At least ₹5 Cr'], ['Per-industry limit', '5']]) {
+        await top.getByRole('button', { name, exact: true }).click();
+        await page.getByRole('option', { name: option, exact: true }).click();
+        assert.match(await top.getByRole('button', { name, exact: true }).innerText(), new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      }
+      assert.ok(await top.locator('.research-scan-controls').evaluate(el => el.getBoundingClientRect().right <= innerWidth + 1), 'Scan controls fit viewport');
+      await page.getByRole('button', { name: 'Screener', exact: true }).click();
     }
     assert.equal(await page.getByText('Import CSV', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('heading', { name: 'Fundamental Analysis', exact: true }).count(), 0);
