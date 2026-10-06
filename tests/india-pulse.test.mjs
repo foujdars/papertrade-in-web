@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { appendAdTape, fiiDii, flowsInRange, historyFlows, indexBreadth, indiaVix, istStamp, mergeFlows, niftyCloses, nseBreadth, putCallRatio, selectAdTape, vixBand, withNifty, FLOW_WINDOWS } from "../lib/india-pulse.ts";
+import { appendAdTape, fiiDii, flowChartRows, flowsInRange, historyFlows, indexBreadth, indiaVix, istStamp, mergeFlows, niftyCloses, nseBreadth, putCallRatio, selectAdTape, vixBand, withNifty, FLOW_WINDOWS } from "../lib/india-pulse.ts";
 
 test("NSE advance and decline come from the Moneycontrol bar", () => {
   const breadth = nseBreadth('<div class="advBar"><span style="width:43%;"></span></div><div class="bartxt"><span class="baradv">1,380</span><span class="bardecl">1870</span></div>');
@@ -78,4 +78,28 @@ test("the pulse route reads Moneycontrol breadth, VIX and FII/DII", async () => 
   assert.doesNotMatch(pulse, /Major indices/);
   assert.match(dispatch, /sampleNseAdTape/);
   assert.match(dispatch, /dispatchEma5ReversalAlerts/);
+});
+
+const chartRows = count => Array.from({ length: count }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10), label: `Day ${i + 1}`, fii: -100 - i, dii: 200 + i, nifty: null, niftyChange: null }));
+
+test("the last FII/DII bar is one reported day rather than the final two-day bucket", () => {
+  const rows = chartRows(22);
+  const plotted = flowChartRows(rows, 6);
+  assert.equal(plotted.length, 6);
+  assert.deepEqual(plotted.at(-1), rows.at(-1));
+  assert.equal(plotted.at(-1).label, "Day 22");
+  assert.equal(plotted.at(-2).date, rows.at(-2).date);
+  assert.equal(new Set(plotted.map(row => row.date)).size, plotted.length);
+});
+
+test("flow grouping preserves every cash total while reserving the latest day at each chart width", () => {
+  for (const limit of [6, 24]) for (const count of [7, 14, 22, 25, 64, 260]) {
+    const rows = chartRows(count), plotted = flowChartRows(rows, limit);
+    assert.ok(plotted.length <= limit);
+    assert.deepEqual(plotted.at(-1), rows.at(-1));
+    for (const key of ["fii", "dii"]) assert.equal(plotted.reduce((sum, row) => sum + row[key], 0), rows.reduce((sum, row) => sum + row[key], 0));
+  }
+  const daily = chartRows(6);
+  assert.deepEqual(flowChartRows(daily, 6), daily);
+  assert.deepEqual(flowChartRows([], 6), []);
 });
