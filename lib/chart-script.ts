@@ -1,9 +1,10 @@
+import { MARKET_GREEN, MARKET_RED } from "./market-colours.ts";
 import type { Candle } from "./market";
 import type { StudyPlot } from "./study-calculations";
 
 export type ChartScriptRun = { plots: StudyPlot[]; levels: number[]; overlay: boolean; error: string | null };
 
-const COLORS = ["#753bce", "#0b9f7a", "#e23b4a", "#2563eb"];
+const COLORS = ["#753bce", MARKET_GREEN, MARKET_RED, "#2563eb"];
 
 type Value = number | number[];
 type Env = Map<string, Value>;
