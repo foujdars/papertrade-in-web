@@ -1,3 +1,4 @@
+import { MARKET_GREEN, MARKET_RED, marketTint } from "./market-colours.ts";
 import type { IChartApi, ISeriesApi, ISeriesPrimitive, IPrimitivePaneView, SeriesAttachedParameter, Time } from "lightweight-charts";
 import type { Candle } from "./market";
 import { buildVolumeProfile, compactVolume, footprintLadder, volumeValueArea } from "./volume-profile";
@@ -89,7 +90,7 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
       const gap = 10;
       const cell = Math.min(56, Math.max(26, (spacing - gap * 2 - 6) / 2));
       const font = Math.max(8, Math.min(12, Math.floor(pixel / rows * 0.42)));
-      const ink = "#1b2433";
+      const ink = this.dark ? "#eef3fc" : "#1b2433";
       ctx.font = `700 ${font}px Inter, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -103,8 +104,8 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
         const h = Math.max(8, Math.abs(rowBottom - rowTop) - 2);
         const poc = rowIndex === area.poc;
         const inValue = area.low >= 0 && rowIndex >= area.low && rowIndex <= area.high;
-        const sellFill = poc ? "#1c1c1c" : inValue ? "#f3a3ad" : "#f8d0d6";
-        const buyFill = poc ? "#1c1c1c" : inValue ? "#8fd9c2" : "#d5f3e8";
+        const sellFill = poc ? "#1c1c1c" : marketTint('red', inValue ? .5 : .2);
+        const buyFill = poc ? "#1c1c1c" : marketTint('green', inValue ? .5 : .2);
         this.paintFootprintCell(ctx, x - gap - cell, y, cell, h, sellFill, compactVolume(row.sell), font, poc ? "#ffffff" : ink);
         this.paintFootprintCell(ctx, x + gap, y, cell, h, buyFill, compactVolume(row.buy), font, poc ? "#ffffff" : ink);
         sellTotal += row.sell;
@@ -128,10 +129,10 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
         ctx.font = "700 9px Inter, system-ui, sans-serif";
         ctx.textBaseline = "top";
         ctx.textAlign = "right";
-        ctx.fillStyle = "#d23b52";
+        ctx.fillStyle = MARKET_RED;
         ctx.fillText(compactVolume(sellTotal), x - gap, bottom + 4);
         ctx.textAlign = "left";
-        ctx.fillStyle = "#0c9a72";
+        ctx.fillStyle = MARKET_GREEN;
         ctx.fillText(compactVolume(buyTotal), x + gap, bottom + 4);
       }
     }
@@ -157,7 +158,7 @@ export class ChartProfileOverlay implements ISeriesPrimitive<Time> {
     const yOpen = this.series!.priceToCoordinate(open);
     const yClose = this.series!.priceToCoordinate(candle.close);
     if (yOpen === null || yClose === null) return;
-    const color = up ? "#00a67e" : "#f04458";
+    const color = up ? MARKET_GREEN : MARKET_RED;
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = 2;
