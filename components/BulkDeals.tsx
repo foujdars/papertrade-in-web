@@ -1,5 +1,5 @@
 "use client";
-import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
+import { Boxes, Handshake, ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { dealValue, groupDeals, type Deal } from "@/lib/bulk-deals";
@@ -23,6 +23,7 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
   const [openSymbol, setOpenSymbol] = useState<string | null>(null);
   useTransientBack(open, () => setOpen(false));
+  useTransientBack(open && openSymbol !== null, () => setOpenSymbol(null));
   useEffect(() => {
     const controller = new AbortController();
     const load = () => {
@@ -55,10 +56,13 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
   const block = listed.filter(row => row.kind === "Block").length;
   const logoKey = (isin: string) => isin ? `NSE_EQ|${isin}` : undefined;
   return <div className="home-deal-slot">
-    <button type="button" className="home-market-card" data-kind="deals" onClick={() => setOpen(true)} aria-label="Open bulk and block deals">
-      <span className="home-market-card-copy"><b>Bulk & block</b><ChevronRight size={16} aria-hidden="true" /></span>
-      <span className="home-deal-meta">{rows ? `${date ? sessionLabel(date) : "Latest session"} · ${bulk} bulk · ${block} block` : failed ? "Deals unavailable right now" : "Loading the latest NSE session"}</span>
-    </button>
+    <section className="home-section home-deals-summary" aria-label="Bulk and block deals">
+      <header><span><b>Bulk &amp; Block Deals</b></span><small>{date ? sessionLabel(date) : "NSE · Latest session"}</small></header>
+      <div className="home-deal-counts">{([['Bulk', bulk, Boxes], ['Block', block, Handshake]] as const).map(([kind, count, Icon]) => <button key={kind} type="button" className="home-market-card home-deal-count" onClick={() => { setTab(kind); setOpenSymbol(null); setOpen(true); }} aria-label={`Open ${kind.toLowerCase()} deals${rows ? `, ${count} deals` : ''}`}>
+        <span className="home-deal-icon"><Icon size={21} aria-hidden="true" /></span><span><small>{kind} deals</small><b>{rows ? count.toLocaleString('en-IN') : '—'}</b></span><ChevronRight size={17} aria-hidden="true" />
+      </button>)}</div>
+      {(!rows || failed) && <small className="home-deal-meta" role="status">{failed ? rows ? "Update unavailable · showing last received session" : "Deals unavailable right now" : "Loading the latest NSE session"}</small>}
+    </section>
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close bulk and block deals" onClick={() => setOpen(false)} />
       <div className="home-side-sheet" role="dialog" aria-modal="true" aria-label="Bulk and block deals">
@@ -79,7 +83,7 @@ export function BulkDeals({ onOpen }: { onOpen: (symbol: string) => void }) {
               <span><strong>{dealValue(row.value)}</strong><em className={row.side === "Buy" ? "up" : "down"}>{qty.format(row.qty)} @ {price.format(row.price)}</em></span>
             </button>) : null}
           </section>;
-        })}</div> : <div className="india-pulse-wait">{rows || failed ? "No deals on this list" : "Loading NSE deals"}</div>}
+        })}</div> : <div className="india-pulse-wait">{!rows && failed ? "Deals unavailable right now" : rows ? "No deals on this list" : "Loading NSE deals"}</div>}
       </div>
     </>, document.querySelector(".terminal-shell") ?? document.body)}
   </div>;
