@@ -1,0 +1,79 @@
+/* Match the candle bodies everywhere, including nested workspaces and portals.
+   Keep muted fills/intensity scales, but derive them from the same two hues. */
+:root { --market-green: #00a67e; --market-red: #f04458; --green: var(--market-green); --red: var(--market-red); }
+:root:root :is(.terminal-shell[data-theme], .bar-replay, .fno-focus-workspace, .option-chain-sheet, .coach-modal, .ticket-risk-sizing, .coach-launch-button) {
+  --green: var(--market-green); --red: var(--market-red);
+}
+:root:root .home-market-card-v2 { --market-up: var(--green); --market-down: var(--red); }
+:root:root .india-flows { --flow-buy: var(--green); --flow-sell: var(--red); --flow-dii-sell: var(--red); }
+
+/* Directional text and badges; white button/tile labels remain readable. */
+:root:root :is(.up, .positive, .buy-tag, .buy-active, .advanced-buy, .risk-target-line,
+  .chart-or-line.high, .chart-or-tag.high, .chart-pd-line.high, .chart-prior-mark.year,
+  .smc-direction-key b, .india-vix-status.calm, .india-pcr-labels span:first-child,
+  .fa-badge.review, .ipo-gmp-panel.high, .ipo-stage.open, .ipo-stage.allotted,
+  .ipo-status-badge.open, .ipo-alert-toggle.active, .ipo-source-line span, .ipo-subscription-block em,
+  .price-alert-status.pending, .price-alert-status.filled, .price-alert-status.triggered,
+  .technical-monitor-state, .technical-summary > svg, .home-risk-meter em.risk-low,
+  .pnl-calendar-day.profit, .pnl-trade-row > span:first-child.win, .home-session-board span.is-open,
+  .chart-session-chip.is-open, .study-pane-heading.is-oversold .study-pane-value) { color: var(--green); }
+:root:root :is(.down, .negative, .sell-tag, .sell-active, .advanced-sell, .risk-stop-line,
+  .chart-or-line.low, .chart-or-tag.low, .chart-pd-line.low, .smc-direction-key em,
+  .india-vix-status.high, .india-pcr-labels span:last-child, .fa-badge.rejected, .fa-error,
+  .ipo-gmp-panel.low, .price-alert-status.rejected, .price-action-sheet [role="alert"],
+  .home-risk-meter em.risk-high, .pnl-calendar-day.loss, .pnl-trade-row > span:first-child.loss, .auth-error, .notification-center-actions button,
+  .pnl-trade-actions button, .pnl-stat-icon.loss, .tw-errors, .indicator-error) { color: var(--red); }
+
+/* Primary buy/sell actions have one solid candle shade, without gradients. */
+:root:root :is(.chart-trade-buttons .buy, .fno-trade-actions > button.buy,
+  .place-order.buy, .chart-buy-button, .chart-order-buttons .compact-buy) {
+  color: #fff; background: var(--green) !important; border-color: var(--green) !important;
+  box-shadow: none;
+}
+:root:root :is(.chart-trade-buttons .sell, .fno-trade-actions > button.sell,
+  .place-order.sell, .chart-sell-button, .chart-order-buttons .compact-sell) {
+  color: #fff; background: var(--red) !important; border-color: var(--red) !important;
+  box-shadow: none;
+}
+:root:root :is(.compact-buy, .advanced-buy, .buy-tag, .buy-active) {
+  color: var(--green); border-color: color-mix(in srgb, var(--green) 32%, var(--line)) !important;
+  background: color-mix(in srgb, var(--green) 8%, var(--surface)) !important;
+}
+:root:root :is(.compact-sell, .advanced-sell, .sell-tag, .sell-active) {
+  color: var(--red); border-color: color-mix(in srgb, var(--red) 32%, var(--line)) !important;
+  background: color-mix(in srgb, var(--red) 8%, var(--surface)) !important;
+}
+/* Filled compact chart buttons override the outlined compact variants above. */
+:root:root .chart-order-buttons .compact-buy { color: #fff; background: var(--green) !important; border-color: var(--green) !important; }
+:root:root .chart-order-buttons .compact-sell { color: #fff; background: var(--red) !important; border-color: var(--red) !important; }
+
+/* SVG charts use tokens too; DII's blue still identifies its separate series. */
+:root:root .india-flow-chart .fii.up { fill: var(--green); }
+:root:root .india-flow-chart :is(.fii.down, .dii.down) { fill: var(--red); }
+:root:root :is(.india-flow-legend .fii.up, .india-flow-stats i.fii, .india-flow-key .fii-buy) { background: var(--green); }
+:root:root :is(.india-flow-legend .fii.down, .india-flow-legend .dii.down, .india-flow-key .fii-sell, .india-flow-key .dii-sell) { background: var(--red); }
+:root:root .india-market-gauge .call { stroke: var(--red); fill: var(--red); }
+:root:root .india-market-gauge .india-gauge-arc.call { fill: none; }
+:root:root .chart-psbb-level.target { stroke: var(--green); }
+:root:root .chart-psbb-level.stop { stroke: var(--red); }
+:root:root .chart-psbb text.target { fill: var(--green); }
+:root:root .chart-psbb text.stop { fill: var(--red); }
+:root:root .welcome-candle-loader i { color: var(--green); }
+:root:root .welcome-candle-loader i:nth-child(2) { color: var(--red); }
+
+/* Heat-map intensity remains meaningful, using only the candle hues as bases. */
+:root:root .heat-3 { background: var(--green); color: #fff; }
+:root:root .heat-2 { background: color-mix(in srgb, var(--green) 82%, var(--surface)); color: var(--ink); }
+:root:root .heat-1 { background: color-mix(in srgb, var(--green) 17%, var(--surface)); color: var(--green); }
+:root:root .heat--3 { background: var(--red); color: #fff; }
+:root:root .heat--2 { background: color-mix(in srgb, var(--red) 82%, var(--surface)); color: var(--ink); }
+:root:root .heat--1 { background: color-mix(in srgb, var(--red) 17%, var(--surface)); color: var(--red); }
+:root:root .pnl-calendar-legend .profit::before { background: var(--green); }
+:root:root .pnl-calendar-legend .loss::before { background: var(--red); }
+:root:root .trade-day-range > div { background: linear-gradient(90deg, var(--red), #f6b93b 48%, var(--green)); }
+:root:root .home-risk-meter > div i { background: linear-gradient(90deg, var(--green), var(--purple) 62%, var(--red)); }
+
+:root:root .study-pane-heading.is-overbought .study-pane-value { color: var(--red); }
+:root:root .chart-session-chip.is-open { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); }
+:root:root .india-vix-status.calm { background: color-mix(in srgb, var(--green) 15%, var(--surface)); }
+:root:root .india-vix-status.high { background: color-mix(in srgb, var(--red) 15%, var(--surface)); }
