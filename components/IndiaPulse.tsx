@@ -52,9 +52,9 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
   const total = last.advance + last.decline;
   const advanceShare = total ? Math.round(last.advance / total * 100) : 0;
   const advanceY = y(last.advance), declineY = y(last.decline);
-  const closeLabels = Math.abs(advanceY - declineY) < 22;
-  const upperLabelY = Math.max(top + 7, Math.min(height - bottom - 26, (advanceY + declineY) / 2 - 11));
-  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === "advance" ? 0 : 22) : y(last[key]);
+  const closeLabels = Math.abs(advanceY - declineY) < 34;
+  const upperLabelY = Math.max(top + 7, Math.min(height - bottom - 50, (advanceY + declineY) / 2 - 17));
+  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === "advance" ? 0 : 34) : Math.min(height - bottom - 16, y(last[key]));
   return <svg id={id} ref={chartRef} className="india-ad-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`NSE advances and declines through the session. Advances ${last.advance.toLocaleString("en-IN")}, ${advanceShare} percent; declines ${last.decline.toLocaleString("en-IN")}, ${total ? 100 - advanceShare : 0} percent.`}>
     {[0, max / 2, max].map(value => <text className="india-breadth-axis" key={value} x={left - 7} y={y(value) + 4} textAnchor="end">{Math.round(value).toLocaleString("en-IN")}</text>)}
     <line className="grid" x1={left} x2={left} y1={top} y2={height - bottom} />
@@ -62,7 +62,7 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
     <path className="india-breadth-line down" d={line("decline")} /><path className="india-breadth-line up" d={line("advance")} />
     {(["advance", "decline"] as const).map(key => <g key={key}>
       <circle className={key === "advance" ? "up" : "down"} cx={x(last.t)} cy={y(last[key])} r="3" />
-      <text className={`india-breadth-end ${key === "advance" ? "up" : "down"}`} x={x(last.t) + 7} y={endpointY(key) + 3}>{last[key].toLocaleString("en-IN")} | {key === "advance" ? advanceShare : total ? 100 - advanceShare : 0}%</text>
+      <text className={`india-breadth-end ${key === "advance" ? "up" : "down"}`} x={x(last.t) + 7} y={endpointY(key) + 3}><tspan x={x(last.t) + 7}>{last[key].toLocaleString("en-IN")}</tspan><tspan x={x(last.t) + 7} dy="13">({key === "advance" ? advanceShare : total ? 100 - advanceShare : 0}%)</tspan></text>
     </g>)}
     {ticks.map((tick, index) => <g key={tick}>
       <line className="grid" x1={x(tick)} x2={x(tick)} y1={height - bottom} y2={height - bottom + 4} />

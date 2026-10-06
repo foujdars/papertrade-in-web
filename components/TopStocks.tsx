@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Download, ScanLine, X } from "lucide-react";
+import { ArrowUpRight, ScanLine, X } from "lucide-react";
 import type { Candle, Instrument } from "@/lib/market";
 import { formatInr } from "@/lib/market";
 import type { ScreeningRunPayload } from "@/lib/fundamental-screener";
@@ -22,7 +22,6 @@ export function TopStocks({ run, instruments, balance, onInspect, onCompare, onO
   const [state, setState] = useState<"idle" | "loading" | "ready">("idle");
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
-  const [search, setSearch] = useState("");
   const [industry, setIndustry] = useState("all");
   const [simulation, setSimulation] = useState<RankedDiscovery | null>(null);
   const simulationTrigger = useRef<HTMLButtonElement>(null);
@@ -33,7 +32,7 @@ export function TopStocks({ run, instruments, balance, onInspect, onCompare, onO
   const rankings = useMemo(() => Object.fromEntries(HORIZON_KEYS.map(h => [h, rankDiscovery(currentStocks, h, { minTurnover: Math.max(0, minTurnover) * 1e7, industryCap, trendOnly }, benchmark)])) as Record<StockHorizon, ReturnType<typeof rankDiscovery>>, [currentStocks, minTurnover, industryCap, trendOnly, benchmark]);
   const ranking = rankings[horizon];
   const appearances = (key: string) => HORIZON_KEYS.filter(h => rankings[h].picks.some(s => s.instrument.instrumentKey === key));
-  const visible = ranking.picks.filter(s => (industry === "all" || s.result.industry === industry) && `${s.result.name} ${s.result.nseCode}`.toLowerCase().includes(search.toLowerCase()));
+  const visible = ranking.picks.filter(s => (industry === "all" || s.result.industry === industry));
   const loadCandles = async (key: string, signal: AbortSignal) => {
     const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(key)}&timeframe=1D&years=3&scope=historical&strict=1`, { cache: "no-store", signal: AbortSignal.any([signal, AbortSignal.timeout(25000)]) });
     const data = await response.json();
@@ -62,12 +61,6 @@ export function TopStocks({ run, instruments, balance, onInspect, onCompare, onO
     setMessage(`${results.length} of ${candidates.selected.length} candidates have usable price history. ${errors.length} unavailable. Rankings use the newest common price date among included stocks.`);
   }
   const cancel = () => { controller.current?.abort(); setState("idle"); setMessage("Scan cancelled. No orders were placed."); };
-  function exportRanking() {
-    const cell = (v: unknown) => { const s = String(v ?? ""); return `"${(/^[=+@-]/.test(s) ? "'" : "") + s.replace(/"/g, '""')}"`; };
-    const rows = [["Horizon", "Rank", "Symbol", "Company", "Industry", "Score /100", "Price date", "Close INR", "Stop INR", "Momentum %", "Nifty excess pp", "Fundamentals /100", "Momentum /100", "Trend /100", "Risk /100", "Data coverage %"], ...HORIZON_KEYS.flatMap(h => rankings[h].picks.map((s, i) => [h, i + 1, s.instrument.symbol, s.result.name, s.result.industry, s.score.toFixed(2), s.asOf, s.entry, s.stop, s.momentum.toFixed(2), s.excess?.toFixed(2), s.fundamentals.total.toFixed(2), s.momentumScore.toFixed(2), s.trend.toFixed(2), s.riskScore.toFixed(2), s.fundamentals.coverage.toFixed(1)]))];
-    const url = URL.createObjectURL(new Blob([rows.map(r => r.map(cell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `papertrade-top-stocks-${ranking.asOf ?? "scan"}.csv`; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
   return <section className="research-discovery" aria-label="Top stocks discovery">
     <div className="research-discovery-overview"><div><b>{candidates.eligible}</b><span>eligible companies</span></div><div><b>{candidates.selected.length}</b><span>in the scan pool</span></div><div><b>{ranking.picks.length || "—"}</b><span>shortlisted · {horizon}</span></div><div><b>{ranking.asOf ?? "Not scanned"}</b><span>completed price session</span></div></div>
     <div className="research-scan-controls">
@@ -78,18 +71,17 @@ export function TopStocks({ run, instruments, balance, onInspect, onCompare, onO
       <button className="research-primary" disabled={!candidates.selected.length || state === "loading"} onClick={scan}><ScanLine size={16} />{state === "loading" ? `Scanning ${progress}/${candidates.selected.length}` : stocks.length ? "Refresh prices & rank" : "Generate top stocks"}</button>{state === "loading" && <button onClick={cancel}>Cancel scan</button>}{stocks.length > 0 && <button onClick={() => { setStocks([]); setBenchmark(undefined); setBenchmarkMessage(""); setState("idle"); setMessage(""); }}>Change pool</button>}
     </div>
     {state === "loading" && <progress className="research-progress" aria-label="Stock scan progress" value={progress} max={candidates.selected.length} />}
-    {message && <p role="status" className="fa-message">{message}</p>}{benchmarkMessage && <p className="fa-hint">{benchmarkMessage}</p>}
+    {message && state === "idle" && <p role="status" className="fa-message">{message}</p>}{benchmarkMessage && <p className="fa-hint">{benchmarkMessage}</p>}
     <nav className="research-horizons" aria-label="Top stocks horizon">{HORIZON_KEYS.map(h => <button aria-pressed={horizon === h} key={h} onClick={() => { setHorizon(h); setIndustry("all"); }}><b>{h}</b><span>{STOCK_HORIZONS[h].label}</span><small>{rankings[h].picks.length} stocks</small></button>)}</nav>
     <div className="research-method-strip">{["Fundamentals", "Momentum", "Trend", "Risk"].map((label, i) => <div key={label}><span>{label}</span><b>{STOCK_HORIZONS[horizon].weights[i]}%</b></div>)}</div>
-    {state === "ready" && <><h3 className="research-results-title">Your {horizon} shortlist <small>{visible.length} shown · {ranking.picks.length} ranked</small></h3><div className="research-ranking-tools"><label><SearchLabel /><input aria-label="Search top stocks" placeholder="Find a shortlisted company" value={search} onChange={e => setSearch(e.target.value)} /></label><ModernSelect label="Shortlisted industry" ariaLabel="Filter top stocks industry" hideLabel value={industry} choices={[{ value: "all", label: "All shortlisted industries" }, ...[...new Set(ranking.picks.map(s => s.result.industry))].map(value => ({ value, label: value }))]} onChange={setIndustry} /><button disabled={!HORIZON_KEYS.some(h => rankings[h].picks.length)} onClick={exportRanking}><Download size={15} />Export all horizons</button></div>
+    {state === "ready" && <><div className="research-ranking-tools"><ModernSelect label="Shortlisted industry" ariaLabel="Filter top stocks industry" hideLabel value={industry} choices={[{ value: "all", label: "All shortlisted industries" }, ...[...new Set(ranking.picks.map(s => s.result.industry))].map(value => ({ value, label: value }))]} onChange={setIndustry} /></div>
       {visible.length ? <div className="research-top-scroll"><table className="research-top-table"><thead><tr><th>Rank / company</th><th>Score</th><th>Price / momentum</th><th>Risk & liquidity</th><th>Next step</th></tr></thead><tbody>{visible.map(s => { const shared = appearances(s.instrument.instrumentKey); return <tr key={s.instrument.instrumentKey}><td><div className="research-stock-title"><span className="research-rank">{String(ranking.picks.indexOf(s) + 1).padStart(2, "0")}</span><StockLogo symbol={s.instrument.symbol} instrumentKey={s.instrument.instrumentKey} size={32} /><div><b>{s.result.name}</b><small>{s.instrument.symbol} · {s.result.industry}</small></div></div><span className="research-overlap">{shared.join(" · ")} {shared.length > 1 ? "lists" : "list"}</span></td><td data-label="Score"><b className="research-score">{s.score.toFixed(1)}<small>/ 100</small></b><small>{s.fundamentals.coverage.toFixed(0)}% data coverage</small><details><summary>Why this rank?</summary><dl className="research-score-detail">{[["Fundamentals", s.fundamentals.total], ["Momentum", s.momentumScore], ["Trend", s.trend], ["Risk", s.riskScore]].map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{Number(v).toFixed(1)}</dd></div>)}</dl><p>{s.momentum > 0 ? "Positive" : "Non-positive"} {horizon} price momentum. {s.trend.toFixed(0)}% of trend checks passed.</p></details></td><td data-label="Price / momentum"><b>{formatInr(s.entry)}</b><small>Close · {s.asOf}</small><span className={s.momentum >= 0 ? "positive" : "negative"}>{pct(s.momentum)} · {horizon}</span><small>Nifty excess: {s.excess == null ? "Unavailable" : `${s.excess >= 0 ? "+" : ""}${s.excess.toFixed(1)} pp`}</small></td><td data-label="Risk & liquidity"><b>Stop {formatInr(s.stop)}</b><small>{s.stopPercent.toFixed(1)}% distance · ATR {s.atrPercent.toFixed(2)}%</small><small>Median turnover ₹{(s.turnover / 1e7).toFixed(2)} Cr</small></td><td><div className="research-row-actions"><button className="research-primary" onClick={e => { simulationTrigger.current = e.currentTarget; setSimulation(s); }}>Simulate trade <ArrowUpRight size={13} /></button><button onClick={() => onCompare(s.result.id)}>Compare peers</button><button onClick={() => onOpenChart(s.instrument)}>Chart</button><button onClick={() => onInspect(s.result.id)}>Inspect</button></div></td></tr>; })}</tbody></table></div> : <div className="fa-empty"><h3>No stocks match this view</h3><p>Try another horizon or adjust the turnover and trend filters. No missing price data is filled in.</p></div>}
-      <p className="research-caption">{ranking.eligible} price-qualified candidates · {ranking.diversificationOmissions} omitted by industry limits or the top-15 limit. Search filters the finished shortlist; it does not change ranks.</p>
+      <p className="research-caption">{ranking.eligible} price-qualified candidates · {ranking.diversificationOmissions} omitted by industry limits or the top-15 limit. </p>
     </>}
     {state === "idle" && <div className="fa-empty"><ScanLine size={28} /><h3>Start with your research universe</h3><p>Generate four horizon lists from the imported companies. No trade is placed during a scan.</p></div>}
     {simulation && <ResearchSimulation stock={simulation} balance={balance} returnFocus={simulationTrigger} onClose={() => setSimulation(null)} onSimulate={onSimulate} />}
   </section>;
 }
-function SearchLabel() { return <span aria-hidden="true">⌕</span>; }
 function ResearchSimulation({ stock, balance, returnFocus, onClose, onSimulate }: { stock: RankedDiscovery; balance: number; returnFocus: React.RefObject<HTMLButtonElement | null>; onClose: () => void; onSimulate: (draft: ResearchOrderDraft) => void }) {
   const id = useId();
   const [budget, setBudget] = useState(Math.max(0, Math.min(25000, balance)));

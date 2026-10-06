@@ -30,8 +30,9 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
     assert.equal(await page.locator('.india-gauge-oi-value.call').textContent(),'17Cr');
     assert.equal(await page.locator('.india-gauge-arc').count(),6);
     assert.equal(await page.locator('.india-gauge-needle').count(),2);
-    assert.equal(await page.locator('.india-breadth-end.up').textContent(),'2,241 | 69%');
-    assert.equal(await page.locator('.india-breadth-end.down').textContent(),'1,027 | 31%');
+    assert.deepEqual(await page.locator('.india-breadth-end.up tspan').allTextContents(), ['2,241', '(69%)']);
+    assert.deepEqual(await page.locator('.india-breadth-end.down tspan').allTextContents(), ['1,027', '(31%)']);
+    assert.ok(await page.locator('.india-breadth-end').evaluateAll(labels => labels.every(label => { const [count, percentage] = label.children; return percentage.getBBox().y > count.getBBox().y; })), 'Bracketed percentages sit below counts');
     assert.match(await page.locator('.india-breadth-head small').textContent(),/NSE · 6 Oct · 15:35 IST/);
     for(const theme of ['light','neon']) {
       if(theme==='neon') await page.getByRole('button',{name:'Theme',exact:true}).click();
