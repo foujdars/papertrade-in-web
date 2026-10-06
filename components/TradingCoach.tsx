@@ -1,4 +1,5 @@
 "use client";
+import { useTransientBack } from "./useTransientBack";
 
 import { BarChart3, BookOpenText, ChevronRight, Play, ShieldCheck, Target, X } from "lucide-react";
 import { BarReplay } from "@/components/BarReplay";
@@ -63,6 +64,7 @@ function PayoffChart({ legs, spot }: { legs: OptionPayoffLeg[]; spot: number }) 
 
 
 export function TradingCoach({ selected, orders, trades, limits, proposedOptionLeg, spotPrice, onLimitsChange, onReviewTrade, onOpenInsights, onClose, initialTab = "journal", timeframe = "5m", theme = "light" }: { selected: Instrument; orders: PaperOrder[]; trades: ClosedPaperTrade[]; limits: TradingLimits; proposedOptionLeg: OptionPayoffLeg | null; spotPrice: number; onLimitsChange: (limits: TradingLimits) => void; onReviewTrade: (tradeId: string) => void; onClose: () => void; onOpenInsights: () => void; initialTab?: CoachTab; timeframe?: string; theme?: "light" | "neon"; }) {
+  useTransientBack(true, onClose);
   const { user, syncStatus } = useAuth();
   const [tab, setTab] = useState<CoachTab>(initialTab);
   const [journal, setJournal] = useState<Record<string, TradeJournalEntry>>({});
