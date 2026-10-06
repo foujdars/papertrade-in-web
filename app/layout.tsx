@@ -34,6 +34,7 @@ import "./home-studio.css";
 import "./trading-watchlist.css";
 import "./android-studio.css";
 import "./home-market-design.css";
+import "./india-pulse-design.css";
 import "./bot-workspace.css";
 import "./modern-popup.css";
 

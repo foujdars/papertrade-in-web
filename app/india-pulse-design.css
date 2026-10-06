@@ -1,0 +1,60 @@
+/* Home indicators: a full-width breadth chart and one shared pair of live gauges. */
+.terminal-shell .india-pulse-layout { display: grid; gap: 14px; min-width: 0; }
+.terminal-shell .india-pulse-layout > .home-section { margin-top: 0; }
+.terminal-shell .india-pulse-layout .india-breadth-head { display: grid; grid-template-columns: auto minmax(0,1fr) 32px; align-items: center; gap: 8px; padding: 8px 12px 4px; min-height: 46px; }
+.terminal-shell .india-breadth-head > b { font-size: 15px; font-weight: 700; letter-spacing: -.35px; white-space: nowrap; }
+.terminal-shell .india-breadth-head > small { min-width: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.terminal-shell .india-breadth-expand { display: grid; place-items: center; width: 32px; min-height: 36px; padding: 0; border: 0; border-radius: 8px; color: var(--muted); background: none; cursor: pointer; }
+.terminal-shell .india-breadth-expand[aria-expanded="true"] svg { transform: rotate(90deg); }
+.terminal-shell .india-pulse-layout .india-ad { display: block; padding: 2px 10px 10px; border: 0; border-radius: 0; background: none; }
+.terminal-shell .india-pulse-layout .india-ad-chart { display: block; width: 100%; height: 180px; max-height: none; margin: 0; }
+.terminal-shell .india-pulse-layout .is-expanded .india-ad-chart { height: 300px; }
+.terminal-shell .india-pulse-layout .india-ad-chart text { font-family: inherit; font-size: 10px; font-weight: 500; fill: var(--muted); }
+.terminal-shell .india-pulse-layout .india-ad-chart .grid { stroke: var(--line); stroke-width: 1; }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line.up { stroke: var(--green); }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line.down { stroke: var(--red); }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end.up { fill: var(--green); }
+.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end.down { fill: var(--red); }
+.terminal-shell .india-breadth-pending { display: block; margin-top: 6px; }
+.terminal-shell .india-pulse-layout .india-gauge-panel { position: relative; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 12px 0; gap: 0; overflow: visible; background: var(--surface); }
+.terminal-shell .india-gauge-panel :is(.india-vix,.india-pcr) { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 0 8px; border: 0; border-radius: 0; background: none; }
+.terminal-shell .india-gauge-panel .india-pcr { border-left: 1px solid var(--line); }
+.terminal-shell .india-gauge-heading { min-height: 36px; width: 100%; text-align: center; }
+.terminal-shell .india-gauge-heading h3 { margin: 0 0 4px; color: var(--ink); font-size: clamp(11px,3.1vw,15px); font-weight: 700; line-height: 1.2; letter-spacing: -.25px; white-space: nowrap; }
+.terminal-shell .india-gauge-heading small { display: block; color: var(--muted); font-size: clamp(8px,2.4vw,10px); font-weight: 500; line-height: 1.3; }
+.terminal-shell .india-market-gauge { display: block; width: 100%; height: auto; max-width: 260px; margin: 4px auto 0; overflow: visible; }
+.terminal-shell .india-market-gauge .india-gauge-track { fill: none; stroke: var(--soft); stroke-width: 24; }
+.terminal-shell .india-market-gauge .india-gauge-arc { fill: none; stroke-width: 23; }
+.terminal-shell .india-market-gauge .calm { stroke: var(--green); }
+.terminal-shell .india-market-gauge .watch { stroke: #e5b02b; }
+.terminal-shell .india-market-gauge .elevated { stroke: #ec8b36; }
+.terminal-shell .india-market-gauge .high { stroke: var(--red); }
+.terminal-shell .india-market-gauge .put { stroke: #2f80e7; fill: #2f80e7; }
+.terminal-shell .india-market-gauge .call { stroke: #ed6682; fill: #ed6682; }
+.terminal-shell .india-market-gauge .india-gauge-arc.put, .terminal-shell .india-market-gauge .india-gauge-arc.call { fill: none; }
+.terminal-shell .india-market-gauge text { font-family: inherit; stroke: none; font-variant-numeric: tabular-nums; }
+.terminal-shell .india-market-gauge .india-gauge-band { fill: var(--ink); font-size: 14px; font-weight: 650; }
+.terminal-shell .india-market-gauge .india-gauge-threshold { fill: var(--muted); font-size: 12px; font-weight: 500; }
+.terminal-shell .india-market-gauge .india-gauge-oi { font-size: 15px; font-weight: 650; }
+.terminal-shell .india-market-gauge .india-gauge-oi-value { font-size: 17px; font-weight: 700; }
+.terminal-shell .india-market-gauge .india-gauge-needle { fill: var(--ink); }
+.terminal-shell .india-market-gauge .india-gauge-needle circle { stroke: var(--surface); stroke-width: 3; }
+.terminal-shell .india-gauge-panel :is(.india-vix-value,.india-pcr-main) { display: flex; flex-direction: column; align-items: center; justify-content: start; gap: 3px; margin: 0; width: 100%; color: var(--ink); text-align: center; font-variant-numeric: tabular-nums; }
+.terminal-shell .india-gauge-panel :is(.india-vix-value,.india-pcr-main) strong { font-size: clamp(25px,8vw,38px); font-weight: 750; line-height: 1.1; letter-spacing: -1px; }
+.terminal-shell .india-gauge-panel .india-vix-value b { font-size: clamp(10px,2.9vw,12px); font-weight: 650; line-height: 1.4; white-space: nowrap; }
+.terminal-shell .india-gauge-panel .india-vix-value small { font-size: 10px; color: var(--muted); }
+.terminal-shell .india-gauge-foot { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: auto; padding-top: 8px; min-height: 32px; }
+.terminal-shell .india-gauge-panel .india-vix-status { padding: 4px 10px; border-radius: 8px; font-size: 11px; line-height: 1.3; }
+.terminal-shell .india-gauge-foot details { position: static; }
+.terminal-shell .india-gauge-foot summary { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--surface); font-size: 12px; font-family: Georgia,serif; font-style: italic; list-style: none; cursor: pointer; }
+.terminal-shell .india-gauge-foot summary::-webkit-details-marker { display: none; }
+.terminal-shell .india-gauge-foot details p { position: absolute; z-index: 8; left: 10px; right: 10px; top: calc(100% + 6px); width: auto; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 10px 28px #0002; font-size: 12px; font-weight: 500; line-height: 1.5; }
+.terminal-shell .india-gauge-foot summary:focus-visible, .terminal-shell .india-breadth-expand:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+@media (max-width:360px) { .terminal-shell .india-breadth-head > b { font-size: 13px; } .terminal-shell .india-breadth-head > small { font-size: 9px; } .terminal-shell .india-gauge-panel :is(.india-vix,.india-pcr) { padding-inline: 6px; } }
+@media (min-width:761px) { .terminal-shell .india-pulse-layout .india-ad-chart { height: 210px; } .terminal-shell .india-breadth-head > b { font-size: 17px; } .terminal-shell .india-breadth-head > small { font-size: 12px; } }
+
+.terminal-shell .india-pulse-layout .india-ad-chart circle.up { fill: var(--green); }
+.terminal-shell .india-pulse-layout .india-ad-chart circle.down { fill: var(--red); }
+.terminal-shell .india-pulse-layout .india-breadth-head { border-bottom: 0; }
