@@ -1,4 +1,6 @@
 "use client";
+import { TRANSIENT_BACK_EVENT, useTransientBack, hasTransientBackLayer } from "./useTransientBack";
+import { afterBackSettles, pushNavigationState } from "@/lib/back-layers";
 import { StockLogo } from "@/components/StockLogo";
 import { BarReplayDialog } from "@/components/BarReplay";
 
@@ -102,6 +104,10 @@ export function AdvancedChartWorkspace({
   const [orders, setOrders] = useState<PaperOrder[]>([]);
   const [toast, setToast] = useState("");
   const [replayOpen, setReplayOpen] = useState(false);
+  useTransientBack(showSymbols, () => { setShowSymbols(false); setSymbolSearch(""); });
+  useTransientBack(orderSide !== null, () => setOrderSide(null));
+  const currentChart = useRef({ symbol: instrument.symbol, timeframe });
+  useEffect(() => { currentChart.current = { symbol: instrument.symbol, timeframe }; }, [instrument.symbol, timeframe]);
   const symbolPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,23 +120,37 @@ export function AdvancedChartWorkspace({
   }, []);
 
   useEffect(() => {
-    const returnToTrade = () => {
-      const params = new URLSearchParams(window.location.search);
-      const symbol = params.get("symbol") ?? initialSymbol;
-      const period = params.get("timeframe") ?? initialTimeframe;
+    let disposed = false;
+    const returnToTrade = (event: PopStateEvent) => {
+      if (event.defaultPrevented || hasTransientBackLayer()) return;
+      const { symbol, timeframe: period } = currentChart.current;
       window.location.replace(`/?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(period)}`);
     };
-    window.history.pushState({ ...window.history.state, papertradeFullChartGuard: true }, "", window.location.href);
+    queueMicrotask(() => {
+      if (!disposed && !window.history.state?.papertradeFullChartGuard) pushNavigationState({ ...window.history.state, papertradeFullChartGuard: true }, window.location.href);
+    });
     window.addEventListener("popstate", returnToTrade);
-    return () => window.removeEventListener("popstate", returnToTrade);
-  }, [initialSymbol, initialTimeframe]);
+    return () => { disposed = true; window.removeEventListener("popstate", returnToTrade); };
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    queueMicrotask(() => afterBackSettles(() => {
+      if (disposed) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set("symbol", instrument.symbol);
+      url.searchParams.set("timeframe", timeframe);
+      window.history.replaceState(window.history.state, "", url);
+    }));
+    return () => { disposed = true; };
+  }, [instrument.symbol, timeframe]);
 
   useEffect(() => {
     if (Capacitor.getPlatform() !== "android") return;
     let listener: { remove: () => Promise<void> } | undefined;
     let disposed = false;
     const returnToTrade = () => {
-      if (replayOpen) { setReplayOpen(false); return; }
+      if (!window.dispatchEvent(new Event(TRANSIENT_BACK_EVENT, { cancelable: true }))) return;
       const params = new URLSearchParams(window.location.search);
       const symbol = params.get("symbol") ?? instrument.symbol ?? initialSymbol;
       const period = params.get("timeframe") ?? timeframe ?? initialTimeframe;
@@ -228,16 +248,10 @@ export function AdvancedChartWorkspace({
     setLivePrice(next.price > 0 ? next.price : 100);
     setShowSymbols(false);
     setSymbolSearch("");
-    const url = new URL(window.location.href);
-    url.searchParams.set("symbol", next.symbol);
-    window.history.replaceState({}, "", url);
   }
 
   function chooseTimeframe(next: string) {
     setTimeframe(next);
-    const url = new URL(window.location.href);
-    url.searchParams.set("timeframe", next);
-    window.history.replaceState({}, "", url);
   }
 
   function chooseRange(label: string, bars: number) {
