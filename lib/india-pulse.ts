@@ -220,6 +220,21 @@ export const FLOW_WINDOWS = [
   { id: "1Y", label: "1Y", days: 372 },
 ] as const;
 
+/** Keep the latest reported day selectable on its own when older days need grouping. */
+export function flowChartRows(rows: FlowPoint[], maxBars: number): FlowPoint[] {
+  const limit = Math.max(2, Math.floor(maxBars));
+  if (rows.length <= limit) return rows;
+  const history = rows.slice(0, -1);
+  const size = Math.ceil(history.length / (limit - 1));
+  const result: FlowPoint[] = [];
+  for (let i = 0; i < history.length; i += size) {
+    const group = history.slice(i, i + size);
+    const last = group[group.length - 1];
+    result.push({ ...last, label: group.length === 1 ? last.label : `${group[0].label} – ${last.label}`, fii: group.reduce((sum, row) => sum + row.fii, 0), dii: group.reduce((sum, row) => sum + row.dii, 0) });
+  }
+  return [...result, rows[rows.length - 1]];
+}
+
 export function flowsInRange<T extends { date: string }>(rows: T[], days: number): T[] {
   const newest = rows.map(row => isoDay(row.date) ?? row.date).sort().at(-1);
   if (!newest) return [];
