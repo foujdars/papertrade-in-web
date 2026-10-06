@@ -78,28 +78,31 @@ test("Back dismisses trade selection before its parent screen, and Done doesn't 
     addEventListener(type, callback, options) { const entries = listeners.get(type) ?? []; entries.push({ callback, once: options?.once, capture: options === true || options?.capture }); listeners.set(type, entries); },
     removeEventListener(type, callback) { listeners.set(type, (listeners.get(type) ?? []).filter(entry => entry.callback !== callback)); },
     dispatchEvent(event) { let stopped = false; event.stopImmediatePropagation = () => { stopped = true; }; for (const entry of [...(listeners.get(event.type) ?? [])].sort((a, b) => Number(b.capture) - Number(a.capture))) { if (stopped) break; entry.callback(event); if (entry.once) win.removeEventListener(event.type, entry.callback); } return !event.defaultPrevented; },
-    history: { get state() { return history[index]; }, pushState(state) { history.splice(++index); history.push(state); }, back() { if (index > 0) index--; queueMicrotask(() => win.dispatchEvent(new Event("popstate"))); } },
+    history: { get state() { return history[index]; }, pushState(state) { history.splice(++index); history.push(state); }, back() { if (index > 0) index--; queueMicrotask(() => { const event = new Event("popstate"); event.state = history[index]; win.dispatchEvent(event); }); } },
   };
   const cleanups = [];
   const fakeReact = { useRef: current => ({ current }), useEffect: fn => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup); } };
+  const layerModule = {};
+  const layerCode = ts.transpileModule(await source("lib/back-layers.ts"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  new Function("exports", "window", layerCode)(layerModule, win);
   const exports = {};
-  new Function("require", "exports", "window", "document", compiled.outputText)(name => name === "react" ? fakeReact : name === "@capacitor/core" ? { Capacitor: { isNativePlatform: () => false } } : require(name), exports, win, { querySelector: () => null });
+  new Function("require", "exports", "window", "document", compiled.outputText)(name => name === "@/lib/back-layers" ? layerModule : name === "react" ? fakeReact : name === "@capacitor/core" ? { Capacitor: { isNativePlatform: () => false } } : require(name), exports, win, { querySelector: () => null });
   exports.useTransientBack(true, () => home++);
-  await Promise.resolve();
+  await new Promise(setImmediate);
   exports.useTransientBack(true, () => deselected++);
-  await Promise.resolve();
-  win.history.back(); await Promise.resolve();
+  await new Promise(setImmediate);
+  win.history.back(); await new Promise(setImmediate);
   assert.equal(deselected, 1); assert.equal(home, 0);
   cleanups.pop()();
-  win.history.back(); await Promise.resolve();
+  win.history.back(); await new Promise(setImmediate);
   assert.equal(home, 1);
   cleanups.pop()();
-  exports.useTransientBack(true, () => home++); await Promise.resolve();
-  exports.useTransientBack(true, () => deselected++); await Promise.resolve();
+  exports.useTransientBack(true, () => home++); await new Promise(setImmediate);
+  exports.useTransientBack(true, () => deselected++); await new Promise(setImmediate);
   cleanups.pop()(); // Done
-  await Promise.resolve();
+  await new Promise(setImmediate);
   assert.equal(home, 1, "Done must not close the parent screen");
-  win.history.back(); await Promise.resolve();
+  win.history.back(); await new Promise(setImmediate);
   assert.equal(home, 2, "No lingering cleanup listener may swallow the next Back");
   cleanups.pop()();
 });
@@ -603,7 +606,7 @@ test("portfolio controls ship styled confirmation, aligned identities and a quan
   assert.match(dialog, /cancelRef\.current\?\.focus\(\)/);
   assert.match(dialog, /disabled={Boolean\(error\) \|\| !count}/);
   assert.match(dashboard, /verifiedLivePrice \? formatInr\(estimatedFundsRequired\) : "—"/);
-  assert.match(dashboard, /pendingDeleteIds \? \(\) => setPendingDeleteIds\(null\)/);
+  assert.match(dashboard, /useTransientBack\(Boolean\(pendingDeleteIds && pnlOpen\), \(\) => setPendingDeleteIds\(null\)\)/);
 });
 
 test("cash charts discover F&O eligibility regardless of where a symbol was opened", async () => {
