@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FLOW_WINDOWS, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
+import { FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
 import { useTransientBack } from "./useTransientBack";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
@@ -8,6 +8,7 @@ type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
 const istDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const flowDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const checkedTime = (at: number) => `${istDate.format(at)}, ${clock.format(at)} IST`;
 
 function InfoTip({ label, children }: { label: string; children: ReactNode }) {
@@ -62,18 +63,8 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  // Long ranges retain the net cash total per bucket instead of drawing unreadable 1px daily bars.
-  const plotted = useMemo(() => {
-    const size = Math.ceil(rows.length / (chartWidth < 440 ? 6 : 24));
-    if (size <= 1) return rows;
-    const result: FlowPoint[] = [];
-    for (let i = 0; i < rows.length; i += size) {
-      const group = rows.slice(i, i + size);
-      const last = group[group.length - 1];
-      result.push({ ...last, label: `${group[0].label} – ${last.label}`, fii: group.reduce((sum, row) => sum + row.fii, 0), dii: group.reduce((sum, row) => sum + row.dii, 0) });
-    }
-    return result;
-  }, [rows, chartWidth]);
+  // Older buckets retain their totals; the newest bar always represents one reported day.
+  const plotted = useMemo(() => flowChartRows(rows, chartWidth < 440 ? 6 : 24), [rows, chartWidth]);
   const selected = plotted.find(row => row.date === selectedDate) ?? plotted.at(-1)!;
   const width = Math.max(300, chartWidth);
   const height = 172;
@@ -95,12 +86,12 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
       const x = left + index * slot + slot / 2;
       const fii = Math.abs(yFlow(row.fii) - mid);
       const dii = Math.abs(yFlow(row.dii) - mid);
-      return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
+      return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-pressed={selected.date === row.date} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
         <title>{row.label} · FII {crore(row.fii)} Cr · DII {crore(row.dii)} Cr</title>
         <rect className="flow-hit" x={x - slot / 2} y={top} width={slot} height={height - top - bottom} />
         <rect className={row.fii >= 0 ? "fii up" : "fii down"} x={x - barWidth - 1} y={row.fii >= 0 ? mid - fii : mid} width={barWidth} height={Math.max(fii, 1)} rx="1" />
         <rect className={row.dii >= 0 ? "dii up" : "dii down"} x={x + 1} y={row.dii >= 0 ? mid - dii : mid} width={barWidth} height={Math.max(dii, 1)} rx="1" />
-        {(index % labelEvery === 0 && index < plotted.length - 1 - labelEvery / 2) || index === plotted.length - 1 ? <text className="flow-date" x={x} y={height - 8} textAnchor="middle">{row.label.replace(/^[A-Za-z]{3}\s/, "").split(" – ").at(-1)}</text> : null}
+        {(index % labelEvery === 0 && index < plotted.length - 1 - labelEvery / 2) || index === plotted.length - 1 ? <text className="flow-date" x={index === 0 ? left : index === plotted.length - 1 ? width - right : x} y={height - 8} textAnchor={index === 0 ? "start" : index === plotted.length - 1 ? "end" : "middle"} pointerEvents="none">{flowDate.format(new Date(`${row.date}T00:00:00Z`))}</text> : null}
       </g>;
     })}
     </svg>
