@@ -204,6 +204,7 @@ export function HomeWorkspace({
   };
   const shelfRows = useMemo(() => searchShelfRows({ shelf, instruments: stockOptions, recent: recentSymbols, popular, query: search }), [popular, recentSymbols, search, shelf, stockOptions]);
   const closeSearch = () => { setSearchFocused(false); setSearch(""); };
+  useTransientBack(activeMarket === "global", () => { updatePreferences({ ...preferences, market: "india" }); setSearch(""); setSearchFocused(false); });
   useTransientBack(searchFocused, closeSearch);
   useTransientBack(preview !== null, () => setPreview(null));
   useEffect(() => {
@@ -409,9 +410,9 @@ export function HomeWorkspace({
           {!!hiddenAttention.length && <><button className="home-hidden-toggle" aria-expanded={showHidden} onClick={()=>setShowHidden(!showHidden)}>{showHidden?'Hide':'Show'} reviewed / later ({hiddenAttention.length})</button>{showHidden && hiddenAttention.map(item => <div className="home-hidden-reminder" key={item.id}><span><b>{item.title}</b><small>{preferences.reminders[item.id].reviewed?'Reviewed · returns if details change':`Remind at ${new Date(preferences.reminders[item.id].until).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`}</small></span><button onClick={()=>restoreReminder(item.id)}>Restore</button></div>)}</>}
         </div></section>}
         {preferenceMessage && <p className="home-preference-message" role="status">{preferenceMessage}<button aria-label="Dismiss preference message" onClick={()=>setPreferenceMessage('')}><X size={14}/></button></p>}
-        {activeMarket === 'india' && <BulkDeals onOpen={onOpenStock} />}
         {activeMarket === 'india' && <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); setSectorTick(tick => tick + 1); }} />}
         {activeMarket === 'india' && <IndiaFlows />}
+        {activeMarket === 'india' && <BulkDeals onOpen={onOpenStock} />}
       </div>
 
       {preview && <div className="home-stock-preview-backdrop" role="presentation" onClick={() => setPreview(null)}>

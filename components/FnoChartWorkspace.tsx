@@ -1,4 +1,5 @@
 "use client";
+import { useTransientBack } from "./useTransientBack";
 import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, GitCompareArrows, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
@@ -108,6 +109,7 @@ export function FnoChartWorkspace({
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+  useTransientBack(timeMenuOpen, () => setTimeMenuOpen(false));
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
   const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
   const [styleMenuOpen, setStyleMenuOpen] = useState(false);

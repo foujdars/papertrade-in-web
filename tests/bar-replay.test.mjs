@@ -24,6 +24,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
   const preferences = { magnet: true, hidden: false };
   const mocks = {
     react,
+    "./useTransientBack": { useTransientBack() {} },
     "./CandleLoader": { CandleLoader: () => null },
     "@/components/MarketChart": { MarketChart: chart, DEFAULT_CHART_INDICATORS: {} },
     "@/components/ChartFunctionMenu": {}, "@/components/CompactSelectors": {}, "@/components/StockLogo": {},

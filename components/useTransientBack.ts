@@ -1,47 +1,14 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
-
-export const TRANSIENT_BACK_EVENT = "papertrade:dismiss-layer";
-const layers: string[] = [];
-export function hasTransientBackLayer() { return layers.length > 0 || returningFromDismiss; }
-let returningFromDismiss = false;
-/** A transient screen consumes one Back action without leaving its parent. */
+import { useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { ensureBackHandling, registerBackLayer } from '@/lib/back-layers';
+export { TRANSIENT_BACK_EVENT, hasTransientBackLayer } from '@/lib/back-layers';
+/** Close exactly the topmost popup before any parent screen or chart. */
 export function useTransientBack(open: boolean, onDismiss: () => void) {
   const dismiss = useRef(onDismiss);
   useEffect(() => { dismiss.current = onDismiss; }, [onDismiss]);
   useEffect(() => {
-    if (!open) return;
-    const token = `layer-${Date.now()}-${Math.random()}`;
-    const native = Capacitor.isNativePlatform();
-    layers.push(token);
-    let disposed = false;
-    // Delay the entry so React's development setup/cleanup probe cannot leave a ghost entry.
-    queueMicrotask(() => { if (!native && !disposed) window.history.pushState({ ...window.history.state, papertradeLayer: token }, ""); });
-    const back = (event: Event) => {
-      if (layers.at(-1) !== token) return;
-      event.preventDefault(); event.stopImmediatePropagation(); dismiss.current();
-    };
-    const pop = (event: PopStateEvent) => {
-      if (returningFromDismiss) return;
-      back(event);
-    };
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector("dialog[open]")) back(event); };
-    window.addEventListener(TRANSIENT_BACK_EVENT, back);
-    window.addEventListener("popstate", pop, true);
-    window.addEventListener("keydown", key);
-    return () => {
-      disposed = true;
-      window.removeEventListener(TRANSIENT_BACK_EVENT, back);
-      window.removeEventListener("popstate", pop, true);
-      window.removeEventListener("keydown", key);
-      layers.splice(layers.indexOf(token), 1);
-      if (!native && window.history.state?.papertradeLayer === token) {
-        returningFromDismiss = true;
-        const swallow = (event: PopStateEvent) => { returningFromDismiss = false; event.stopImmediatePropagation(); };
-        window.addEventListener("popstate", swallow, { capture: true, once: true });
-        window.history.back();
-      }
-    };
+    ensureBackHandling();
+    if (open) return registerBackLayer(() => dismiss.current(), Capacitor.isNativePlatform());
   }, [open]);
 }

@@ -120,6 +120,7 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
 
 function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[number]["id"]; onChange: (value: (typeof FLOW_WINDOWS)[number]["id"]) => void }) {
   const [open, setOpen] = useState(false);
+  useTransientBack(open, () => { setOpen(false); triggerRef.current?.focus(); });
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {

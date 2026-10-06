@@ -37,3 +37,9 @@ It runs the actual MarketChart and chart library with a fake clock and controlle
 `node tests/browser/pnl.cjs` runs the real analytics components on localhost:3226 with deterministic completed exits. It checks exact totals, intersecting date/market/product filters, calendar day selection, breakeven and empty states, keyboard chart inspection, chart-to-trade drill-down, invalid date ranges, and light/dark layouts at 320, 390, 768 and 1280px. Set `PNL_SCREENSHOTS=1` to save full-page screenshots under `outputs/`. No account or trade records are modified.
 
 With `npx next dev -p 3220` running, `node --experimental-strip-types tests/browser/pnl-dashboard.cjs` checks the complete dashboard integration: totals from actual order accounting, trade review navigation, clearing chart/day selections, the Trading Coach link, responsive containment and unchanged order storage. Broker responses are mocked. `PNL_APP_URL` can override the local server URL.
+
+## Back navigation and Home deals
+
+`node tests/browser/back-navigation.cjs` uses real history and React StrictMode to test Back/Forward, nested dialogs and menus, Escape, manual close, chart/list/timeframe/scroll restoration, and opening charts from filtered Bulk/Block drawers. Android is covered by simulated native Back events without browser popup entries. It also checks the standalone chart's symbol/timeframe persistence and popup-first return behavior.
+
+With a production build, `START_TEST_SERVER=1 node tests/browser/back-dashboard.cjs` starts a local server at port 3229 and tests the actual dashboard: deals as the final Home section, exact counts and filters, responsive layout at 320–1280px, every primary tab, Bot, nested Coach/Replay menus and inline chart Replay. Broker/news/deal responses are mocked; no orders or cloud records are changed. Physical Android device validation remains separate.

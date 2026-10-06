@@ -13,7 +13,7 @@ import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
 import { TradeDeleteDialog } from "@/components/TradeDeleteDialog";
 import { LongPressTradeRow } from "@/components/LongPressTradeRow";
 import { TRANSIENT_BACK_EVENT, useTransientBack, hasTransientBackLayer } from "@/components/useTransientBack";
-import { useWatchlistHistory } from "@/components/useWatchlistHistory";
+import { useNavigationHistory } from "@/components/useNavigationHistory";
 import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 import { ChartHistoryControls } from "./ChartHistoryControls";
@@ -536,8 +536,6 @@ export function TradingDashboard() {
   const [coachOpen, setCoachOpen] = useState(false);
   const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
   const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
-  const toolkitBackRef = useRef<(() => void) | null>(null);
-  useEffect(() => { toolkitBackRef.current = pendingDeleteIds ? () => setPendingDeleteIds(null) : replayInstrument ? () => { setReplayInstrument(null); setReplayReviewTimeframe(null); } : coachOpen ? () => setCoachOpen(false) : null; }, [pendingDeleteIds, replayInstrument, coachOpen]);
   const [coachTab, setCoachTab] = useState<CoachTab>("journal");
   const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
@@ -585,9 +583,23 @@ export function TradingDashboard() {
             ? "pnl"
             : workspaceMode;
   const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
-  const watchlistHistory = useWatchlistHistory<{ section: NavigationSection; group: ScannerGroup; scroll: Record<string, number> }>((saved) => {
+  const navigationSnapshot = useCallback(() => {
+    const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.fundamental-workspace', '.pnl-trade-list'];
+    const scroll = Object.fromEntries(selectors.map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
+    return { section: activeNavigationSection, group: marketsInitialGroup, scroll, instrument: selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey };
+  }, [activeNavigationSection, marketsInitialGroup, selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey]);
+  const navigationHistory = useNavigationHistory<ReturnType<typeof navigationSnapshot>>((saved) => {
     openNavigationSection(saved.section, false);
     setMarketsInitialGroup(saved.group);
+    pendingTradingHistory.current = saved.chartHistory;
+    setChartHistory(saved.chartHistory);
+    setSelected(saved.instrument); setTimeframe(saved.timeframe);
+    setWorkspaceMode(saved.workspaceMode); setSpotInstrument(saved.spotInstrument);
+    setFnoUnderlying(saved.fnoUnderlying); setFnoFutureInstrument(saved.fnoFutureInstrument);
+    setFnoTopMode(saved.fnoTopMode); setFnoListOpen(saved.fnoListOpen);
+    setWatchlist(saved.watchlist); setSearch(saved.search);
+    setPnlTab(saved.pnlTab); setPnlScope(saved.pnlScope); setPnlDrill(saved.pnlDrill);
+    setPnlHistoryFilter(saved.pnlHistoryFilter); setPnlHistoryOnly(saved.pnlHistoryOnly); setSelectedPnlDateKey(saved.selectedPnlDateKey);
     requestAnimationFrame(() => requestAnimationFrame(() => {
       for (const [selector, top] of Object.entries(saved.scroll)) {
         const panel = document.querySelector(selector);
@@ -595,16 +607,19 @@ export function TradingDashboard() {
       }
     }));
   });
-  const watchlistHistoryRef = useRef(watchlistHistory); watchlistHistoryRef.current = watchlistHistory;
-  function rememberWatchlistLocation() {
-    const scroll = Object.fromEntries(['.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel'].map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
-    watchlistHistory.remember({ section: activeNavigationSection, group: marketsInitialGroup, scroll });
-  }
+  const navigationHistoryRef = useRef(navigationHistory); navigationHistoryRef.current = navigationHistory;
+  function rememberWatchlistLocation() { navigationHistory.remember(navigationSnapshot()); }
+  useEffect(() => {
+    if (!chartPreferencesReady) return;
+    const snapshot = navigationSnapshot();
+    navigationHistory.update(snapshot, activeNavigationSection !== 'home' ? { ...snapshot, section: 'home' } : undefined);
+  }, [chartPreferencesReady, activeNavigationSection, navigationSnapshot, navigationHistory]);
   useTransientBack(sidebarOpen && Boolean(search), () => { setSearch(''); setWatchlistLimit(60); });
   useTransientBack(watchlistPickerOpen, () => setWatchlistPickerOpen(false));
   const replayOnChart = Boolean(replayInstrument && activeNavigationSection === "trade" && selected.instrumentKey === replayInstrument.instrumentKey && selected.assetType !== "OPTION");
   const chartReplay = useReplayController(replayOnChart ? selected : null, replayReviewTimeframe ?? timeframe);
   const exitChartReplay = () => { setReplayInstrument(null); setReplayReviewTimeframe(null); };
+  useTransientBack(replayOnChart, exitChartReplay);
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
@@ -643,7 +658,7 @@ export function TradingDashboard() {
     const url = new URL(window.location.href);
     url.searchParams.set("symbol", fallback.symbol);
     url.searchParams.set("timeframe", restoredTimeframe);
-    window.history.replaceState({}, "", url);
+    window.history.replaceState(window.history.state, "", url);
   }, [timeframe]);
 
   const returnToTradeFromBack = useCallback(() => {
@@ -870,23 +885,13 @@ export function TradingDashboard() {
   }, [chartPreferencesReady, fnoUnderlying, selected, timeframe]);
 
   useEffect(() => {
-    if (workspaceMode !== "fno") return;
-    const handleHistoryBack = () => { if (!hasTransientBackLayer()) closeFnoWorkspace(); };
-    window.addEventListener("popstate", handleHistoryBack);
-    return () => {
-      window.removeEventListener("popstate", handleHistoryBack);
-    };
-  }, [closeFnoWorkspace, workspaceMode]);
-
-  useEffect(() => {
     if (!isAndroidApp) return;
     let nativeListener: { remove: () => Promise<void> } | undefined;
     let disposed = false;
 
     void CapacitorApp.addListener("backButton", () => {
-      if (toolkitBackRef.current) { toolkitBackRef.current(); return; }
       if (!window.dispatchEvent(new Event(TRANSIENT_BACK_EVENT, { cancelable: true }))) return;
-      if (watchlistHistoryRef.current.back()) {
+      if (navigationHistoryRef.current.back()) {
         exitBackDeadlineRef.current = 0;
         if (exitBackToastTimerRef.current !== null) window.clearTimeout(exitBackToastTimerRef.current);
         setToast(''); return;
@@ -926,7 +931,10 @@ export function TradingDashboard() {
       if (hasTransientBackLayer() || event.defaultPrevented) return;
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
+      setHomeOpen(false); setNewsOpen(false); setFundamentalsOpen(false); setBotOpen(false);
+      setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setSelected(snapshot.instrument);
+      setTimeframe(snapshot.timeframe);
       setWorkspaceMode("trade");
       setSpotInstrument(null);
       setFnoUnderlying(null);
@@ -1970,10 +1978,9 @@ export function TradingDashboard() {
   const visiblePnlTrades = useMemo(() => pnlDrilledTrades.filter(trade => pnlHistoryFilter === "all" || pnlOutcome(trade.netPnl) === pnlHistoryFilter), [pnlDrilledTrades, pnlHistoryFilter]);
   const tradeSelectionScope = `${pnlOpen}:${selectedPnlDateKey}:${pnlHistoryFilter}:${JSON.stringify(pnlScope)}:${pnlDrill?.label ?? ""}:${pnlTab}`;
   const selectingTrades = tradeSelection?.scope === tradeSelectionScope;
-  useTransientBack(newsOpen, () => returnToTradeFromBackRef.current());
-  useTransientBack(fundamentalsOpen, () => returnToTradeFromBackRef.current());
-  useTransientBack(botOpen, () => returnToTradeFromBackRef.current());
-  useTransientBack(pnlOpen, () => returnToTradeFromBackRef.current());
+  useTransientBack(Boolean(pnlDrill && pnlOpen), () => { setPnlDrill(null); setPnlTab("overview"); });
+  useTransientBack(Boolean(selectedPnlDateKey && pnlOpen), () => setSelectedPnlDateKey(null));
+  useTransientBack(Boolean(pnlTradeMenuId && pnlOpen), () => setPnlTradeMenuId(null));
   useTransientBack(Boolean(selectingTrades && pnlOpen), () => setTradeSelection(null));
   useTransientBack(Boolean(pendingDeleteIds && pnlOpen), () => setPendingDeleteIds(null));
   useTransientBack(moreMenuOpen, () => setMoreMenuOpen(false));
@@ -2423,8 +2430,7 @@ export function TradingDashboard() {
 
   function chooseTradeInstrument(item: Instrument) {
     setResearchDraft(null);
-    const fromWatchlist = marketNavigationActive;
-    if (fromWatchlist) rememberWatchlistLocation();
+    if (activeNavigationSection !== "trade" || selected.instrumentKey !== item.instrumentKey) rememberWatchlistLocation();
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
     const price = quote?.lastPrice ?? 0;
     const nextInstrument = { ...item, price: price > 0 ? price : 0 };
@@ -2449,19 +2455,8 @@ export function TradingDashboard() {
     const url = new URL(window.location.href);
     url.searchParams.set("symbol", item.symbol);
     url.searchParams.set("timeframe", timeframe);
-    if (item.assetType === "OPTION") {
-      if (window.history.state?.papertradeFno) window.history.replaceState({ ...window.history.state, papertradeFno: true }, "", url);
-      else window.history.pushState({ papertradeFno: true }, "", url);
-    } else {
-      const currentState = window.history.state ?? {};
-      const currentSnapshot = currentState.papertradeChart as ChartHistorySnapshot | undefined;
-      if (!currentSnapshot?.instrument?.instrumentKey && selected.assetType !== "OPTION" && selected.assetType !== "FUTURE") {
-        window.history.replaceState({ ...currentState, papertradeChart: { instrument: selected, timeframe } }, "", window.location.href);
-      }
-      const nextState = { ...window.history.state, papertradeChart: { instrument: nextInstrument, timeframe } };
-      if (fromWatchlist || selected.instrumentKey === nextInstrument.instrumentKey && workspaceMode === "trade") window.history.replaceState(nextState, "", url);
-      else window.history.pushState(nextState, "", url);
-    }
+    const nextState = { ...window.history.state, papertradeChart: { instrument: nextInstrument, timeframe }, papertradeFno: item.assetType === "OPTION" };
+    window.history.replaceState(nextState, "", url);
   }
 
   function chooseOptionTradeInstrument(option: Instrument, spot: Instrument) {
@@ -2640,6 +2635,7 @@ export function TradingDashboard() {
   }
 
   function openPositionChart(symbol: string) {
+    openNavigationSection("trade");
     setSidebarOpen(false);
     setPositionsOpen(false);
     setHoldingsOpen(false);
@@ -2704,13 +2700,16 @@ export function TradingDashboard() {
     setOrderSheetOpen(true);
   }
 
+  function closeNavigationPage() {
+    if (!navigationHistory.back()) openNavigationSection("home", false);
+  }
+
   function openNavigationSection(section: NavigationSection, remember = true) {
     setNewsOpen(section === "news");
     setBotOpen(section === "bot");
     setFundamentalsOpen(section === "fundamentals");
     if (remember && section !== activeNavigationSection) {
-      if (section === 'watchlist' || section === 'markets') rememberWatchlistLocation();
-      else watchlistHistory.clear();
+      rememberWatchlistLocation();
     }
     setOptionChainOpen(false);
     if (section === "home") {
@@ -3273,7 +3272,7 @@ export function TradingDashboard() {
         riskSummary={homeRiskSummary}
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
-        onOpenPositions={() => { setHomeOpen(false); setPositionsOpen(true); }}
+        onOpenPositions={() => setPositionsOpen(true)}
         onOpenTradeHistory={() => {
           setSelectedPnlDateKey(null);
           setPnlHistoryFilter("all");
@@ -3311,10 +3310,8 @@ export function TradingDashboard() {
         <button className={["holdings", "orders", "pnl"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("pnl")}><ChartNoAxesCombined size={19} /><span>P&amp;L</span></button>
       </nav>
 
-      {newsOpen && <NewsWorkspace instruments={stockUniverse} onOpenChart={instrument => { const chartState = { ...window.history.state }; delete chartState.papertradeLayer; window.history.replaceState(chartState, "", window.location.href); openNavigationSection("trade"); chooseTradeInstrument(instrument); }} />}
+      {newsOpen && <NewsWorkspace instruments={stockUniverse} onOpenChart={instrument => { openNavigationSection("trade"); chooseTradeInstrument(instrument); }} />}
       {fundamentalsOpen && <FundamentalWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={stockUniverse} balance={balance} onSimulate={draft => {
-        const chartState = { ...window.history.state }; delete chartState.papertradeLayer;
-        window.history.replaceState(chartState, "", window.location.href);
         openNavigationSection("trade");
         setStockUniverse(current => current.some(item => item.instrumentKey === draft.instrument.instrumentKey) ? current : mergeInstrumentUniverse([...current, draft.instrument]));
         chooseTradeInstrument(draft.instrument);
@@ -3323,26 +3320,21 @@ export function TradingDashboard() {
         setTradeStrategy("Trend"); setTradeThesis(draft.thesis); setMaxRiskInput(String(draft.riskBudget));
         setRiskSizingOpen(true); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true);
         setToast("Research plan loaded. Review the live price, size and protection before placing your paper trade.");
-      }} onClose={() => openNavigationSection("home")} onOpenChart={instrument => {
-        // Promote this transient research entry to a chart entry. Otherwise its
-        // Back cleanup can restore the previous chart and undo the daily frame.
-        const chartState = { ...window.history.state };
-        delete chartState.papertradeLayer;
-        window.history.replaceState(chartState, "", window.location.href);
+      }} onClose={closeNavigationPage} onOpenChart={instrument => {
         openNavigationSection("trade");
         setStockUniverse(current => current.some(item => item.instrumentKey === instrument.instrumentKey) ? current : mergeInstrumentUniverse([...current, instrument]));
         chooseTradeInstrument(instrument);
         setTimeframe("1D");
         setProduct("DELIVERY");
       }} />}
-      {botOpen && <BotWorkspace trading={globalTrading} onClose={() => openNavigationSection("home")} onPnl={() => { openNavigationSection("pnl"); setPnlScope({ ...DEFAULT_PNL_SCOPE, asset: "global" }); }} />}
+      {botOpen && <BotWorkspace trading={globalTrading} onClose={closeNavigationPage} onPnl={() => { openNavigationSection("pnl"); setPnlScope({ ...DEFAULT_PNL_SCOPE, asset: "global" }); }} />}
       {replayInstrument && !replayOnChart && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={exitChartReplay} />}
       {coachOpen && <TradingCoach initialTab={coachTab} timeframe={timeframe} theme={theme} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onOpenInsights={() => { setCoachOpen(false); openNavigationSection("pnl"); setPnlTab("insights"); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
-        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setHoldingsOpen(false); }}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) closeNavigationPage(); }}>
           <section className="modal holdings-modal navigation-page" role="dialog" aria-modal="true" aria-label="Delivery holdings" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Holdings</h2></div><button className="icon-button" onClick={() => setHoldingsOpen(false)} aria-label="Close holdings"><X size={20} /></button></div>
+            <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Holdings</h2></div><button className="icon-button" onClick={closeNavigationPage} aria-label="Close holdings"><X size={20} /></button></div>
             <div className="holdings-layout">
               <section className="holdings-overview-card">
                 <span className="holdings-asset-tab">Stocks</span>
@@ -3376,9 +3368,9 @@ export function TradingDashboard() {
         </div>
       )}
       {ordersOpen && (
-        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setOrdersOpen(false); }}>
+        <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) closeNavigationPage(); }}>
           <section className="modal orders-modal navigation-page" role="dialog" aria-modal="true" aria-label="Paper orders" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={() => setOrdersOpen(false)}><X size={20} /></button></div>
+            <div className="modal-head"><div><span className="eyebrow">Local account</span><h2>Paper order book</h2></div><button className="icon-button" onClick={closeNavigationPage} aria-label="Close order book"><X size={20} /></button></div>
             <div className="order-table">
               <div className="order-row table-head"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Price</span><span>Charges</span><span>Status</span></div>
               {todayOrders.map((order) => <div className="order-row" key={order.id}><span>{order.time}</span><button className="order-symbol-link" onClick={() => openPositionChart(order.symbol)}><StockLogo {...order} size={22} />{order.symbol}</button><span className={order.side === "BUY" ? "positive" : "negative"}>{order.side}</span><span>{order.quantity}</span><span>{formatInr(order.price)}</span><span>{formatInr(getOrderCharges(order).total)}</span><span className="complete-tag">{paperOrderStatusLabel(order)}</span></div>)}
