@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
 import { useTransientBack } from "./useTransientBack";
+import { ChevronRight } from "lucide-react";
+import { MarketGauge } from "./MarketGauge";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
@@ -29,26 +31,43 @@ function axisMax(value: number) {
   return steps.find(step => step >= value) ?? Math.ceil(value / 1000) * 1000;
 }
 
-function SessionChart({ points }: { points: AdPoint[] }) {
-  const width = 360;
-  const height = 210;
-  const left = 36;
-  const right = 12;
-  const top = 12;
-  const bottom = 22;
+function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string; expanded: boolean }) {
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(360);
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(260, Math.round(entry.contentRect.width))));
+    observer.observe(chartRef.current);
+    return () => observer.disconnect();
+  }, []);
+  const height = expanded ? 300 : width >= 600 ? 210 : 180, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 28;
+  const last = points[points.length - 1];
   const max = axisMax(Math.max(...points.flatMap(point => [point.advance, point.decline])));
   const bounds = sessionBounds(points);
-  const start = bounds.start;
-  const end = Math.max(bounds.end, points[points.length - 1].t);
+  const start = bounds.start, end = Math.max(bounds.end, last.t);
   const x = (t: number) => left + ((Math.min(end, Math.max(start, t)) - start) / (end - start)) * (width - left - right);
   const y = (value: number) => top + (1 - value / max) * (height - top - bottom);
   const line = (key: "advance" | "decline") => points.map((point, index) => `${index ? "L" : "M"}${x(point.t).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
-  const ticks = [start, start + (end - start) * 0.25, start + (end - start) * 0.5, start + (end - start) * 0.75, end];
-  return <svg className="india-ad-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="NSE advances and declines through the session">
-    {[0, max / 2, max].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={y(value)} y2={y(value)} /><text x={left - 4} y={y(value) + 3} textAnchor="end">{Math.round(value)}</text></g>)}
-    <path d={line("decline")} /><path d={line("advance")} />
-    {points.length < 2 ? <><circle className="down" cx={x(points[0].t)} cy={y(points[0].decline)} r="3" /><circle className="up" cx={x(points[0].t)} cy={y(points[0].advance)} r="3" /></> : null}
-    {ticks.map((tick, index) => <text key={tick} x={x(tick)} y={height - 4} textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{clock.format(tick)}</text>)}
+  const ticks = [start, start + (end - start) * .25, start + (end - start) * .5, start + (end - start) * .75, end];
+  const total = last.advance + last.decline;
+  const advanceShare = total ? Math.round(last.advance / total * 100) : 0;
+  const advanceY = y(last.advance), declineY = y(last.decline);
+  const closeLabels = Math.abs(advanceY - declineY) < 22;
+  const upperLabelY = Math.max(top + 7, Math.min(height - bottom - 26, (advanceY + declineY) / 2 - 11));
+  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === "advance" ? 0 : 22) : y(last[key]);
+  return <svg id={id} ref={chartRef} className="india-ad-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`NSE advances and declines through the session. Advances ${last.advance.toLocaleString("en-IN")}, ${advanceShare} percent; declines ${last.decline.toLocaleString("en-IN")}, ${total ? 100 - advanceShare : 0} percent.`}>
+    {[0, max / 2, max].map(value => <text className="india-breadth-axis" key={value} x={left - 7} y={y(value) + 4} textAnchor="end">{Math.round(value).toLocaleString("en-IN")}</text>)}
+    <line className="grid" x1={left} x2={left} y1={top} y2={height - bottom} />
+    <line className="grid" x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} />
+    <path className="india-breadth-line down" d={line("decline")} /><path className="india-breadth-line up" d={line("advance")} />
+    {(["advance", "decline"] as const).map(key => <g key={key}>
+      <circle className={key === "advance" ? "up" : "down"} cx={x(last.t)} cy={y(last[key])} r="3" />
+      <text className={`india-breadth-end ${key === "advance" ? "up" : "down"}`} x={x(last.t) + 7} y={endpointY(key) + 3}>{last[key].toLocaleString("en-IN")} | {key === "advance" ? advanceShare : total ? 100 - advanceShare : 0}%</text>
+    </g>)}
+    {ticks.map((tick, index) => <g key={tick}>
+      <line className="grid" x1={x(tick)} x2={x(tick)} y1={height - bottom} y2={height - bottom + 4} />
+      <text className="india-breadth-time" x={x(tick)} y={height - 6} textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{clock.format(tick)}</text>
+    </g>)}
   </svg>;
 }
 
@@ -130,71 +149,64 @@ function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[numbe
 
 function usePulse() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
+  const [observedAt, setObservedAt] = useState(0);
   const [range, setRange] = useState<(typeof FLOW_WINDOWS)[number]["id"]>("1M");
   useEffect(() => {
     const controller = new AbortController();
     const load = () => {
       fetch("/api/market/india-pulse", { signal: controller.signal, cache: "no-store" })
         .then(response => response.json())
-        .then(body => { if (body?.ok) setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }); })
+        .then(body => { if (body?.ok) { setObservedAt(Date.now()); setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }); } })
         .catch(() => undefined);
     };
     load();
     const timer = window.setInterval(load, 30_000);
     return () => { controller.abort(); window.clearInterval(timer); };
   }, []);
-  return { pulse, range, setRange };
+  return { pulse, range, setRange, observedAt };
 }
 
 export function IndiaPulse() {
-  const { pulse } = usePulse();
-  const breadth = pulse?.breadth;
+  const { pulse, observedAt } = usePulse();
+  const chartId = useId();
+  const [expanded, setExpanded] = useState(false);
+  useTransientBack(expanded, () => setExpanded(false));
   const latestPoint = pulse?.tape[pulse.tape.length - 1];
-  const advance = pulse?.sessionLive ? breadth?.advance ?? latestPoint?.advance : latestPoint?.advance;
-  const decline = pulse?.sessionLive ? breadth?.decline ?? latestPoint?.decline : latestPoint?.decline;
-  const advanceShare = advance !== undefined && decline !== undefined ? advance / Math.max(1, advance + decline) : 0;
-  const marketOpen = Boolean(pulse?.sessionLive && clock.format(Date.now()) < "15:30");
-  const sessionDate = latestPoint ? istDate.format(latestPoint.t) : "";
+  const marketOpen = Boolean(pulse?.sessionLive && clock.format(observedAt) < "15:30");
   const sampleTime = latestPoint ? clock.format(latestPoint.t) : "";
   const adStatus = marketOpen
-    ? latestPoint ? Date.now() - latestPoint.t < 3 * 60_000 ? `Live · ${sampleTime} IST` : `Last update ${sampleTime} IST` : "Waiting for live data"
-    : latestPoint ? `${sessionDate} · ${sampleTime >= "15:25" ? "final" : "last sample"} ${sampleTime} IST` : "";
+    ? latestPoint ? observedAt - latestPoint.t < 3 * 60_000 ? "Live" : "Last sample" : "Waiting for live data"
+    : latestPoint ? sampleTime >= "15:25" ? "Final sample" : "Last sample" : "Chart unavailable";
+  const vix = pulse?.vix;
+  const band = vix ? vixBand(vix.price) : null;
   const vixStatus = pulse?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} · checked ${checkedTime(pulse.vixCheckedAt)}` : "";
   const pcr = pulse?.pcr;
   const pcrCheckedAt = pcr ? Date.parse(pcr.asOf) : NaN;
   const pcrStatus = Number.isFinite(pcrCheckedAt) ? `${marketOpen ? "Market open" : "Market closed"} · OI checked ${checkedTime(pcrCheckedAt)}` : "";
-  const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : 50;
-  return <section className="home-section india-pulse" aria-label="Indian market pulse">
-    <header><span><b>Market pulse</b></span><small>Moneycontrol</small></header>
-    <div className="india-pulse-board">
+  const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : null;
+  const oi = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
+  return <div className="india-pulse-layout">
+    <section className={`home-section india-pulse india-breadth-card${expanded ? " is-expanded" : ""}`} aria-label="Indian market pulse">
+      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
       <div className="india-ad">
-        <div>
-          <span>Advance/Decline (NSE){adStatus ? ` · ${adStatus}` : ""}</span>
-          <div className="india-ad-bar" aria-hidden="true"><i style={{ width: `${Math.round(advanceShare * 100)}%` }} /></div>
-          <div className="india-ad-counts"><b className="up">{advance !== undefined ? advance.toLocaleString("en-IN") : "—"}</b><b className="down">{decline !== undefined ? decline.toLocaleString("en-IN") : "—"}</b></div>
-        </div>
-        <div className="india-ad-legend"><b className="up"><i />Advance</b><b className="down"><i />Decline</b></div>
-        {pulse && pulse.tape.length ? <SessionChart points={pulse.tape} /> : <div className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Chart unavailable"}</div>}
+        {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : <div id={chartId} className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Chart unavailable"}{pulse?.sessionLive && pulse.breadth ? <span className="india-breadth-pending">Advance {pulse.breadth.advance.toLocaleString("en-IN")} · Decline {pulse.breadth.decline.toLocaleString("en-IN")}</span> : null}</div>}
       </div>
+    </section>
+    <section className="home-section india-gauge-panel" aria-label="India VIX and Nifty put/call ratio">
       <div className="india-vix">
-        <div className="india-vix-head"><span>India VIX <small>Expected 30-day volatility</small></span>{pulse?.vix ? <b className={`india-vix-status ${vixBand(pulse.vix.price).tone}`}>{vixBand(pulse.vix.price).label}</b> : null}</div>
-        <div className="india-vix-value">{pulse?.vix ? <><strong>{pulse.vix.price.toFixed(2)}</strong><b className={pulse.vix.change < 0 ? "down" : "up"}>{pulse.vix.change > 0 ? "+" : ""}{pulse.vix.change.toFixed(2)} · {pulse.vix.changePercent > 0 ? "+" : ""}{pulse.vix.changePercent.toFixed(2)}%</b></> : <strong>—</strong>}</div>
-        {vixStatus && <small className="india-pulse-freshness">{vixStatus}</small>}
-        <div className="india-vix-range" role="img" aria-label={pulse?.vix ? `India VIX ${pulse.vix.price.toFixed(2)}, ${vixBand(pulse.vix.price).label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "Indicative VIX volatility bands"}>
-          <div className="india-vix-track" aria-hidden="true"><i className="calm" /><i className="watch" /><i className="elevated" /><i className="high" />{pulse?.vix && <span style={{ left: `${vixBand(pulse.vix.price).position}%` }} />}</div>
-          <div className="india-vix-labels"><span>Calm<br /><b>&lt;15</b></span><span>Watch<br /><b>15–20</b></span><span>Elevated<br /><b>20–30</b></span><span>High<br /><b>30+</b></span></div>
-        </div>
-        <small className="india-vix-note">Indicative bands · Higher VIX means more expected volatility, not market direction.</small>
+        <div className="india-gauge-heading"><h3>India VIX</h3><small>Expected 30-day volatility</small></div>
+        <MarketGauge variant="vix" position={band?.position ?? null} label={vix ? `India VIX ${vix.price.toFixed(2)}, ${band!.label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "India VIX unavailable; indicative volatility bands"} />
+        <div className="india-vix-value"><strong>{vix ? vix.price.toFixed(2) : "—"}</strong>{vix ? <b className={vix.change < 0 ? "down" : "up"}>{vix.change > 0 ? "+" : ""}{vix.change.toFixed(2)} · {vix.changePercent > 0 ? "+" : ""}{vix.changePercent.toFixed(2)}%</b> : <small>Data unavailable</small>}</div>
+        <div className="india-gauge-foot">{band ? <b className={`india-vix-status ${band.tone}`}>{band.label}</b> : null}<InfoTip label="India VIX data details"><p>{vixStatus && <>{vixStatus}<br /></>}Source: Moneycontrol. Indicative bands · Higher VIX means more expected volatility, not market direction.</p></InfoTip></div>
       </div>
       <div className="india-pcr">
-        <div className="india-pcr-head"><span>Nifty put/call ratio</span><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.</p></InfoTip></div>
-        <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong><span>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</span></div>
-        {pcrStatus && <small className="india-pulse-freshness">{pcrStatus}</small>}
-        <div className="india-pcr-track" role="img" aria-label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"}><i style={{ width: `${pcrShare}%` }} /></div>
-        <div className="india-pcr-labels"><span>Put OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.putOi) : "—"}</span><span>Call OI {pcr ? new Intl.NumberFormat("en-IN", { notation: "compact" }).format(pcr.callOi) : "—"}</span></div>
+        <div className="india-gauge-heading"><h3>Nifty put/call ratio</h3><small>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</small></div>
+        <MarketGauge variant="pcr" position={pcrShare} putOi={pcr ? oi.format(pcr.putOi) : "—"} callOi={pcr ? oi.format(pcr.callOi) : "—"} label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"} />
+        <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong></div>
+        <div className="india-gauge-foot"><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.{pcrStatus && <><br />{pcrStatus}</>} The needle shows the put share of total open interest.</p></InfoTip></div>
       </div>
-    </div>
-  </section>;
+    </section>
+  </div>;
 }
 
 export function IndiaFlows() {
