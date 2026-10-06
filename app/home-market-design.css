@@ -184,3 +184,15 @@
 }
 .terminal-shell .home-hub.home-studio .home-pulse-section .home-session-board { padding: 0 6px; }
 .terminal-shell .home-hub.home-studio .home-pulse-first { overflow: visible; }
+
+/* The last Home section: two compact, actionable deal totals. */
+.terminal-shell .home-deals-summary { overflow: hidden; }
+.terminal-shell .home-deal-counts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 10px 12px; }
+.terminal-shell .home-deal-count.home-market-card { display: grid; grid-template-columns: 32px minmax(0,1fr) 17px; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.terminal-shell .home-deal-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: var(--purple); background: var(--purple-soft); }
+.terminal-shell .home-deal-count > span:nth-child(2) { display: grid; gap: 2px; }
+.terminal-shell .home-deal-count small { color: var(--muted); font-size: 11px; }
+.terminal-shell .home-deal-count b { color: var(--ink); font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.terminal-shell .home-deal-count > svg { color: var(--muted); }
+.terminal-shell .home-deals-summary > .home-deal-meta { display: block; padding: 0 12px 10px; color: var(--muted); }
+.terminal-shell .home-deal-count:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
