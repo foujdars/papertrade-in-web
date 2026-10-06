@@ -1,4 +1,5 @@
 "use client";
+import { useTransientBack } from "./useTransientBack";
 
 import { Check, ChevronDown, Clock3, List, Plus, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -39,6 +40,7 @@ function useEscape(onClose: () => void) {
 }
 
 export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: string; onSelect: (timeframe: string) => void; onClose: () => void }) {
+  useTransientBack(true, onClose);
   useEscape(onClose);
   const [favorites, setFavorites] = useState<string[]>([]);
   useEffect(() => { setFavorites(readFavoriteTimeframes()); }, []);
