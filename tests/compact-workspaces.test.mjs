@@ -569,12 +569,12 @@ test("light and dark studio text meet normal-text contrast on their surfaces", a
   }
 });
 
-test("chart creation and theme changes both use the charcoal canvas and preserve candle colours", async () => {
+test("chart creation and theme changes both use the navy canvas and preserve candle colours", async () => {
   const chart = await source("components/MarketChart.tsx");
-  assert.equal(chart.match(/color: neon \? "#1b222d" : "#ffffff"/g)?.length, 2);
-  assert.equal(chart.match(/textColor: neon \? "#a6b0bf"/g)?.length, 2);
-  assert.match(chart, /upColor: [^\n]*MARKET_GREEN/);
-  assert.match(chart, /downColor: MARKET_RED/);
+  assert.equal(chart.match(/color: neon \? "#0c142b" : "#ffffff"/g)?.length, 2);
+  assert.equal(chart.match(/textColor: neon \? "#a4adc7"/g)?.length, 2);
+  assert.match(chart, /upColor: "#00a67e"/);
+  assert.match(chart, /downColor: "#f04458"/);
 });
 
 test("portfolio exposes complete history filters and a separate open-position exit action", async () => {

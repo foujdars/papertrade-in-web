@@ -2882,7 +2882,7 @@ export function TradingDashboard() {
               <section className="more-menu-panel" aria-label="More options">
                 <div className="mobile-utility-grid" aria-label="Quick access">
                   <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={20} aria-hidden="true"/><span>Wallet</span></button>
-                  <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use dark theme"}>{theme === "neon" ? <Sun size={20} aria-hidden="true"/> : <Moon size={20} aria-hidden="true"/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
+                  <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={20} aria-hidden="true"/> : <Moon size={20} aria-hidden="true"/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
                   <button onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={20} aria-hidden="true"/><span>Coach</span></button>
                   <button className={botOpen ? "active" : ""} onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><Bot size={20} aria-hidden="true" /><span>Bot</span></button>
                 </div>
@@ -2890,7 +2890,7 @@ export function TradingDashboard() {
             </>}
           </div>
           <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>
-          <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use dark theme"} title={theme === "neon" ? "Light theme" : "Dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
+          <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
       </header>

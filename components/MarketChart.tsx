@@ -1460,20 +1460,20 @@ export function MarketChart({
     const neon = chartTheme === "neon";
     chart.applyOptions({
       layout: {
-        background: { type: ColorType.Solid, color: neon ? "#1b222d" : "#ffffff" },
-        textColor: neon ? "#a6b0bf" : "#596779",
+        background: { type: ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+        textColor: neon ? "#a4adc7" : "#65708a",
         attributionLogo: false,
-        panes: { separatorColor: neon ? "#323a47" : "#dce2e9", separatorHoverColor: neon ? "#9ab3ff" : "#eaf0ff", enableResize: true },
+        panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
       },
       grid: {
-        vertLines: { color: neon ? "#252e3c" : "#f1f4f8" },
-        horzLines: { color: neon ? "#252e3c" : "#f1f4f8" },
+        vertLines: { color: neon ? "#19233c" : "#edf0f6" },
+        horzLines: { color: neon ? "#19233c" : "#edf0f6" },
       },
-      rightPriceScale: { borderColor: neon ? "#323a47" : "#dce2e9" },
-      timeScale: { borderColor: neon ? "#323a47" : "#dce2e9" },
+      rightPriceScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
+      timeScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
       crosshair: {
-        vertLine: { color: neon ? "#9ab3ff" : "#8c96aa", labelBackgroundColor: neon ? "#263451" : "#252b3d" },
-        horzLine: { color: neon ? "#9ab3ff" : "#8c96aa", labelBackgroundColor: neon ? "#263451" : "#252b3d" },
+        vertLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+        horzLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
       },
     });
   }, [chartTheme]);
@@ -1572,7 +1572,7 @@ export function MarketChart({
     }
     if (chartAction.type === "toggle-grid") {
       gridVisibleRef.current = !gridVisibleRef.current;
-      const color = gridVisibleRef.current ? "#f1f4f8" : "rgba(0,0,0,0)";
+      const color = gridVisibleRef.current ? "#edf0f6" : "rgba(0,0,0,0)";
       chart.applyOptions({ grid: { vertLines: { color }, horzLines: { color } } });
     }
     if (chartAction.type === "toggle-crosshair") {
@@ -1617,19 +1617,19 @@ export function MarketChart({
         width: Math.max(1, Math.floor(host.clientWidth)),
         height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
-          background: { type: lwc.ColorType.Solid, color: neon ? "#1b222d" : "#ffffff" },
-          textColor: neon ? "#a6b0bf" : "#596779",
+          background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+          textColor: neon ? "#a4adc7" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
           attributionLogo: false,
-          panes: { separatorColor: neon ? "#323a47" : "#dce2e9", separatorHoverColor: neon ? "#9ab3ff" : "#eaf0ff", enableResize: true },
+          panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
         grid: {
-          vertLines: { color: neon ? "#252e3c" : "#f1f4f8", style: lwc.LineStyle.Dashed },
-          horzLines: { color: neon ? "#252e3c" : "#f1f4f8", style: lwc.LineStyle.Dashed },
+          vertLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          horzLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
         },
         rightPriceScale: {
           visible: true,
-          borderColor: neon ? "#323a47" : "#dce2e9",
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
@@ -1638,7 +1638,7 @@ export function MarketChart({
         },
         leftPriceScale: { visible: false },
         timeScale: {
-          borderColor: neon ? "#323a47" : "#dce2e9",
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           timeVisible: !CALENDAR_TIMEFRAMES.has(timeframe),
           secondsVisible: timeframe === "1m",
           tickMarkFormatter: (time: Time, tickType: number) => chartTickTime(time, timeframe, tickType),
@@ -1655,8 +1655,8 @@ export function MarketChart({
         },
         crosshair: {
           mode: magnetArmed() ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
-          vertLine: { color: neon ? "#9ab3ff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#263451" : "#252b3d" },
-          horzLine: { color: neon ? "#9ab3ff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#263451" : "#252b3d" },
+          vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
         },
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
@@ -1850,13 +1850,13 @@ export function MarketChart({
         const purple = studyId === "rsi";
         if (purple === rsiScalePurple) return;
         rsiScalePurple = purple;
-        const label = purple ? (rsiCursorColor("rsi") ?? "#8054da") : (neon ? "#263451" : "#252b3d");
+        const label = purple ? (rsiCursorColor("rsi") ?? "#8054da") : (neon ? "#342353" : "#252b3d");
         chart.applyOptions({
           crosshair: {
             horzLine: {
               visible: !normalizeTool(activeToolRef.current),
               labelVisible: true,
-              color: neon ? "#9ab3ff" : "#8c96aa",
+              color: neon ? "#bf9aff" : "#8c96aa",
               labelBackgroundColor: label,
             },
           },
