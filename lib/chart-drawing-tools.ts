@@ -1,3 +1,4 @@
+import { MARKET_GREEN, MARKET_RED, marketTint } from "./market-colours.ts";
 import type { Anchor, ControlPoint, DrawingOptions, DrawingStyle, Geometry, Point, Viewport } from "lightweight-charts-drawing";
 import type { IPrimitivePaneView, Logical } from "lightweight-charts";
 import { buildVolumeProfile, volumeValueArea, type VolumeCandle } from "./volume-profile.ts";
@@ -266,10 +267,10 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       const box=this.positionBox(viewport); if(!box) return [];
       const {entry,stop,target,left,end}=box, [e,s,t]=this.anchors.map(a=>a.price), labelX=end-4;
       const sign=this.type==="long-position"?1:-1, reward=(t-e)*sign, risk=(e-s)*sign;
-      const riskColor=plotSize?.().dark?"#ff819b":"#ce355b", rewardColor=plotSize?.().dark?"#40dfb4":"#00876b", entryColor=plotSize?.().dark?"#f0b429":"#e39b12";
+      const riskColor=MARKET_RED, rewardColor=MARKET_GREEN, entryColor=plotSize?.().dark?"#f0b429":"#e39b12";
       const zone=(y:number,fill:string):Geometry & {fill:string}=>({type:"polygon",closed:true,points:[{x:left,y:entry.y},{x:end,y:entry.y},{x:end,y},{x:left,y}],fill});
       const delta=(n:number)=>`${n>=0?"+":""}${n.toFixed(2)} (${n>=0?"+":""}${(e?n/e*100:0).toFixed(2)}%)`;
-      return [zone(target.y,"rgba(0,174,132,.19)"),zone(stop.y,"rgba(242,62,103,.18)"),
+      return [zone(target.y,marketTint('green', .19)),zone(stop.y,marketTint('red', .18)),
         {type:"line",start:{x:left,y:target.y},end:{x:end,y:target.y}},
         {type:"line",start:{x:left,y:entry.y},end:{x:end,y:entry.y}},
         {type:"line",start:{x:left,y:stop.y},end:{x:end,y:stop.y}},
@@ -288,7 +289,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const reward=g.start.y===this.positionBox(viewport)?.target.y;
           const entryLine=g.start.y===this.positionBox(viewport)?.entry.y;
           ctx.beginPath();ctx.setLineDash([3,3]);ctx.lineWidth=1;ctx.moveTo(g.start.x,g.start.y);ctx.lineTo(g.end.x,g.end.y);
-          ctx.strokeStyle=entryLine?(plotSize?.().dark?"#f0b429":"#e39b12"):reward?(plotSize?.().dark?"#40dfb4":"#00876b"):(plotSize?.().dark?"#ff819b":"#ce355b");
+          ctx.strokeStyle=entryLine?(plotSize?.().dark?"#f0b429":"#e39b12"):reward?MARKET_GREEN:MARKET_RED;
           ctx.stroke();ctx.setLineDash([]);
         }
         else if(g.type==="text")labels.push({text:g.text,x:g.position.x,y:g.position.y,align:g.align,color:g.color});
@@ -415,7 +416,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         const y=Math.max(0,Math.min(top,bottom)), floor=Math.min(size.height,Math.max(top,bottom)-.5);
         if(floor<=y||bin.volume<=0)continue;
         const valueArea=index>=left&&index<=high,up=width*bin.upVolume/max,down=width*bin.downVolume/max;
-        const sections=this.mode==="fixed"?[[start,start+up,valueArea?"#08bed0":"#95dbe0"],[start+up,start+up+down,valueArea?"#f45b9b":"#efb3d0"]] as const:[[right-up-down,right-up,valueArea?"#f45b9b":"#efb3d0"],[right-up,right,valueArea?"#5d8ff0":"#a1dbe1"]] as const;
+        const sections=this.mode==="fixed"?[[start,start+up,marketTint('green',valueArea ? .85 : .35)],[start+up,start+up+down,marketTint('red',valueArea ? .85 : .35)]] as const:[[right-up-down,right-up,marketTint('red',valueArea ? .85 : .35)],[right-up,right,marketTint('green',valueArea ? .85 : .35)]] as const;
         for(const [begin,end,fill] of sections) {
           const clippedStart=Math.max(0,begin),clippedEnd=Math.min(size.width-2,end);
           if(clippedEnd>clippedStart)geometry.push({type:"polygon",closed:true,fill,points:[{x:clippedStart,y},{x:clippedEnd,y},{x:clippedEnd,y:floor},{x:clippedStart,y:floor}]});

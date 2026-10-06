@@ -1,4 +1,6 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
+
 import { CandleLoader } from "./CandleLoader";
 import { Check, Trash2, Settings2, Eye, EyeOff, X } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
@@ -284,8 +286,8 @@ const DEFAULT_DRAWING_STYLE: Partial<DrawingStyle> = {
 
 function toolStyle(tool: DrawingToolId): Partial<DrawingStyle> {
   if (tool === "volume-profile") return { ...DEFAULT_DRAWING_STYLE, fillColor: "rgba(102,87,238,.28)" };
-  if (tool === "long-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#00a67e", fillColor: "rgba(0, 166, 126, .12)" };
-  if (tool === "short-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#f04458", fillColor: "rgba(240, 68, 88, .12)" };
+  if (tool === "long-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: MARKET_GREEN, fillColor: marketTint('green', .12) };
+  if (tool === "short-position") return { ...DEFAULT_DRAWING_STYLE, lineColor: MARKET_RED, fillColor: marketTint('red', .12) };
   if (tool === "highlighter") return { ...DEFAULT_DRAWING_STYLE, lineColor: "#f5b800", fillColor: "rgba(245, 184, 0, .22)" };
   return DEFAULT_DRAWING_STYLE;
 }
@@ -1696,31 +1698,31 @@ export function MarketChart({
         },
       };
       const series = kind === "bar"
-        ? chart.addSeries(lwc.BarSeries, { ...shared, upColor: "#00a67e", downColor: "#f04458", thinBars: style === "high-low" })
+        ? chart.addSeries(lwc.BarSeries, { ...shared, upColor: MARKET_GREEN, downColor: MARKET_RED, thinBars: style === "high-low" })
         : kind === "line"
           ? chart.addSeries(lwc.LineSeries, { ...shared, color: primaryLineColor, lineWidth: 2, lineType: style === "step-line" ? lwc.LineType.WithSteps : lwc.LineType.Simple, pointMarkersVisible: style === "line-markers", pointMarkersRadius: 3 })
           : kind === "area"
             ? chart.addSeries(lwc.AreaSeries, { ...shared, lineColor: primaryLineColor, topColor: `${primaryLineColor}47`, bottomColor: `${primaryLineColor}0a`, lineWidth: 2 })
             : kind === "baseline"
-              ? chart.addSeries(lwc.BaselineSeries, { ...shared, baseValue: { type: "price", price: styleBaselinePrice(dataRef.current) }, topLineColor: "#00a67e", topFillColor1: "rgba(0,166,126,0.28)", topFillColor2: "rgba(0,166,126,0.04)", bottomLineColor: "#f04458", bottomFillColor1: "rgba(240,68,88,0.28)", bottomFillColor2: "rgba(240,68,88,0.04)" })
+              ? chart.addSeries(lwc.BaselineSeries, { ...shared, baseValue: { type: "price", price: styleBaselinePrice(dataRef.current) }, topLineColor: MARKET_GREEN, topFillColor1: marketTint('green', .28), topFillColor2: marketTint('green', .04), bottomLineColor: MARKET_RED, bottomFillColor1: marketTint('red', .28), bottomFillColor2: marketTint('red', .04) })
               : kind === "histogram"
                 ? chart.addSeries(lwc.HistogramSeries, { ...shared, color: "#2962FF" })
                 : chart.addSeries(lwc.CandlestickSeries, {
                   ...shared,
-                  upColor: style === "hollow-candles" ? "rgba(0,166,126,0)" : "#00a67e",
-                  downColor: "#f04458",
+                  upColor: style === "hollow-candles" ? marketTint('green', 0) : MARKET_GREEN,
+                  downColor: MARKET_RED,
                   borderVisible: style === "hollow-candles",
-                  borderUpColor: "#00a67e",
-                  borderDownColor: "#f04458",
-                  wickUpColor: "#00a67e",
-                  wickDownColor: "#f04458",
+                  borderUpColor: MARKET_GREEN,
+                  borderDownColor: MARKET_RED,
+                  wickUpColor: MARKET_GREEN,
+                  wickDownColor: MARKET_RED,
                 });
       chartApi.current = chart;
       candleSeries.current = series;
       if (style === "hlc-area") {
         hlcSeries.current = {
-          high: chart.addSeries(lwc.LineSeries, { color: "rgba(0,166,126,.72)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
-          low: chart.addSeries(lwc.LineSeries, { color: "rgba(240,68,88,.72)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+          high: chart.addSeries(lwc.LineSeries, { color: marketTint('green', .72), lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+          low: chart.addSeries(lwc.LineSeries, { color: marketTint('red', .72), lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
         };
       } else hlcSeries.current = null;
       if (isProfileStyle(style)) {

@@ -1,4 +1,6 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
+
 
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
@@ -79,10 +81,10 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
       {rangeVisible && analysis.range && (() => {
         const high = y(analysis.range.high), low = y(analysis.range.low), mid = y(analysis.range.midpoint);
         if (high === null || low === null || mid === null) return null;
-        return <g><rect x={0} y={high} width={pane.width} height={Math.max(0, mid - high)} fill="#f04458" opacity=".035"/><rect x={0} y={mid} width={pane.width} height={Math.max(0, low - mid)} fill="#00a67e" opacity=".035"/><path d={`M0 ${mid}H${pane.width}`} stroke="#a78bfa" strokeDasharray="3 4"/><text x={8} y={mid - 6} fill={dark ? "#c4b5fd" : "#6d28d9"}>50% equilibrium · premium above / discount below</text></g>;
+        return <g><rect x={0} y={high} width={pane.width} height={Math.max(0, mid - high)} fill={MARKET_RED} opacity=".035"/><rect x={0} y={mid} width={pane.width} height={Math.max(0, low - mid)} fill={MARKET_GREEN} opacity=".035"/><path d={`M0 ${mid}H${pane.width}`} stroke="#a78bfa" strokeDasharray="3 4"/><text x={8} y={mid - 6} fill={dark ? "#c4b5fd" : "#6d28d9"}>50% equilibrium · premium above / discount below</text></g>;
       })()}
       {shapes.map(({ mark: m, left, right, top, bottom }) => {
-        const colour = m.direction === "bullish" ? (dark ? "#44dfc0" : "#00856b") : (dark ? "#ff91aa" : "#c12d54");
+        const colour = m.direction === "bullish" ? MARKET_GREEN : MARKET_RED;
         const zone = isSmcZone(m);
         if (zone) {
           const fill = SMC_ZONE_COLOURS[m.kind as keyof typeof SMC_ZONE_COLOURS];
@@ -91,7 +93,7 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
           const bull = m.direction === "bullish";
           return <g key={m.id} data-smc-zone={m.kind} data-smc-direction={m.direction}>
             <rect x={left} y={top} width={Math.max(2, right - left)} height={Math.max(2, bottom - top)} fill={fill} fillOpacity={dark ? ".28" : ".24"} stroke="none" />
-            <path d={bull ? `M${arrowX} ${arrowY - 5}l-5 9h10z` : `M${arrowX} ${arrowY + 5}l-5 -9h10z`} fill={bull ? (dark ? "#44dfc0" : "#009b7c") : (dark ? "#ff83ad" : "#e53572")} stroke="none" />
+            <path d={bull ? `M${arrowX} ${arrowY - 5}l-5 9h10z` : `M${arrowX} ${arrowY + 5}l-5 -9h10z`} fill={bull ? MARKET_GREEN : MARKET_RED} stroke="none" />
           </g>;
         }
         let labelY = Math.max(86, Math.min(pane.height - 12, top - 5));

@@ -1,11 +1,13 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
+
 import { useEffect, useRef, useState } from 'react';
 import type { DrawingPresentation } from '@/lib/study-pane-drawings';
 import { useTransientBack } from './useTransientBack';
 import { ChartDialogPortal } from './ChartDialogPortal';
 export type DrawingCoordinate = { time: number; value: number };
 type Props = { coordinates?: DrawingCoordinate[]; coordinateOffset?: number; tool?: string; study?: boolean; value: DrawingPresentation; onApply: (value: DrawingPresentation, coordinates?: DrawingCoordinate[]) => void; onClose: () => void };
-const DRAWING_COLORS = ['#000000', '#6657ee', '#2563eb', '#ef4444', '#16a34a', '#f59e0b', '#ffffff'];
+const DRAWING_COLORS = ['#000000', '#6657ee', '#2563eb', MARKET_RED, MARKET_GREEN, '#f59e0b', '#ffffff'];
 export function DrawingSettings(props: Props) {
   return <ChartDialogPortal><DrawingSettingsDialog {...props}/></ChartDialogPortal>;
 }

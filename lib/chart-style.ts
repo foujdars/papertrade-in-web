@@ -1,3 +1,4 @@
+import { MARKET_GREEN, MARKET_RED } from "./market-colours.ts";
 import type { Candle } from "./market";
 
 export const CHART_STYLE_GROUPS = [
@@ -107,7 +108,7 @@ export function volumeCandleColor(candle: Candle, candles: Candle[]) {
   const up = candle.close >= candle.open;
   const average = meanVolume(candles);
   const strength = average > 0 ? candle.volume / (average * 1.8) : 1;
-  return mixHex(up ? "#00a67e" : "#f04458", strength);
+  return mixHex(up ? MARKET_GREEN : MARKET_RED, strength);
 }
 
 export type StyleSeriesPoint = {
@@ -148,7 +149,7 @@ export function toStyleSeriesPoint(
       point.borderColor = color;
       point.wickColor = color;
     } else if (highLow) {
-      point.color = candle.close >= candle.open ? "#00a67e" : "#f04458";
+      point.color = candle.close >= candle.open ? MARKET_GREEN : MARKET_RED;
     }
     return point;
   }
@@ -157,7 +158,7 @@ export function toStyleSeriesPoint(
     return {
       time,
       value: candle.close,
-      color: candle.close >= previous.close ? "#00a67e" : "#f04458",
+      color: candle.close >= previous.close ? MARKET_GREEN : MARKET_RED,
     };
   }
   return { time, value: candle.close };

@@ -1,6 +1,7 @@
+import { MARKET_GREEN } from "./market-colours.ts";
 import type { Candle } from "./market";
 
-export const COMPARE_COLORS = ["#2962FF", "#FF6D00", "#089981", "#E91E63", "#9C27B0", "#00BCD4"] as const;
+export const COMPARE_COLORS = ["#2962FF", "#FF6D00", MARKET_GREEN, "#E91E63", "#9C27B0", "#00BCD4"] as const;
 export const MAX_COMPARED_SYMBOLS = 6;
 export const COMPARE_MODES = ["percent", "price", "pane"] as const;
 export type CompareMode = (typeof COMPARE_MODES)[number];

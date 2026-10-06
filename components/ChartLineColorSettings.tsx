@@ -1,11 +1,13 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
+
 
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { ChartDialogPortal } from "./ChartDialogPortal";
 import { useTransientBack } from "./useTransientBack";
 
-const COLORS = ["#2962FF", "#E91E63", "#FF6D00", "#089981", "#9C27B0", "#00BCD4", "#F04458", "#1E293B"];
+const COLORS = ["#2962FF", "#E91E63", "#FF6D00", MARKET_GREEN, "#9C27B0", "#00BCD4", MARKET_RED, "#1E293B"];
 
 export function ChartLineColorSettings({ name, color, onChange, onClose }: {
   name: string;

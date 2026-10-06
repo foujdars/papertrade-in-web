@@ -1,4 +1,5 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
 
 import { useLayoutEffect, useId, useMemo, useState, type MutableRefObject, type RefObject } from "react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
@@ -76,7 +77,7 @@ export function PsbbMarks({ candles, chart, series, timeframe, config, refreshRe
     return y == null ? null : y + rsiBase;
   };
   if (divergenceOnly) {
-    const palette = ["#e0a100", "#e24b4b", "#3b6fd8", "#7c3aed", "#0f9f6e", "#f97316", "#db2777", "#0e7490"];
+    const palette = ["#e0a100", MARKET_RED, "#3b6fd8", "#7c3aed", MARKET_GREEN, "#f97316", "#db2777", "#0e7490"];
     const colorOf = new Map([...new Set(lines.map((line) => line.firstTime))].sort((a, b) => a - b).map((time, index) => [time, palette[index % palette.length]]));
     return <svg className="chart-psbb" width={plotWidth} height={height} aria-label={`${timeframe} RSI divergences`}>
       {lines.map((line) => {

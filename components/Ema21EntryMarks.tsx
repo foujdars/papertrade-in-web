@@ -1,4 +1,6 @@
 "use client";
+import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
+
 
 import { useLayoutEffect, useMemo, useState } from "react";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
@@ -54,7 +56,7 @@ export function Ema21EntryMarks({ candles, chart, series, timeframe }: {
       const y = series.priceToCoordinate(signal.price);
       if (x === null || y === null || x < 0 || x > width || y < 0 || y > height) return null;
       return <g key={signal.time}><title>{`${signal.side === "bullish" ? "Bullish" : "Bearish"} EMA 21 entry`}</title>
-        <text x={x} y={y + (signal.side === "bullish" ? 19 : -7)} textAnchor="middle" fontSize={20} fontWeight={800} fill={signal.side === "bullish" ? "#009e73" : "#dc3355"}>{signal.side === "bullish" ? "↑" : "↓"}</text>
+        <text x={x} y={y + (signal.side === "bullish" ? 19 : -7)} textAnchor="middle" fontSize={20} fontWeight={800} fill={signal.side === "bullish" ? MARKET_GREEN : MARKET_RED}>{signal.side === "bullish" ? "↑" : "↓"}</text>
       </g>;
     })}
   </svg>;
