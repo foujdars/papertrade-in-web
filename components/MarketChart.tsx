@@ -19,7 +19,7 @@ import { duplicateDrawingPoints, drawingTitle } from '@/lib/drawing-editing';
 import type { DrawingPresentation } from '@/lib/study-pane-drawings';
 import { AnchoredVwapOverlay } from "@/lib/anchored-vwap-overlay";
 import { stampChartOverlay } from "@/lib/chart-overlay-export";
-import { TRANSIENT_BACK_EVENT, useTransientBack } from "./useTransientBack";
+import { useTransientBack } from "./useTransientBack";
 import { stackTradeMarkers, positionPnl, compactPnl } from "@/lib/trade-marker-layout";
 import { createChartDrawingRegistry, positionLineIndex } from "@/lib/chart-drawing-tools";
 import { createProfileDataClient } from "@/lib/profile-data-client";
@@ -1385,16 +1385,7 @@ export function MarketChart({
     onDrawingCompleteRef.current?.();
   };
 
-  useEffect(() => {
-    if (!drafting) return;
-    const onBack = (event: Event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      cancelInProgressRef.current();
-    };
-    window.addEventListener(TRANSIENT_BACK_EVENT, onBack);
-    return () => window.removeEventListener(TRANSIENT_BACK_EVENT, onBack);
-  }, [drafting]);
+  useTransientBack(drafting, () => cancelInProgressRef.current());
 
   useEffect(() => {
     indicatorsRef.current = indicators;
