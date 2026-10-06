@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "r
 import { BookOpenCheck, Check, ChevronDown, ClipboardCheck, Minus, Search, ShieldCheck, X } from "lucide-react";
 import type { Instrument } from "@/lib/market";
 import { screenerCompanyUrl, type Decision, type ScreeningResult, type ScreeningRunPayload } from "@/lib/fundamental-screener";
-import { companyJsonTemplate, evaluateCompanyJson, rateFundamentalCompany, resolveFundamentalInstrument } from "@/lib/fundamental-analysis";
+import { rateFundamentalCompany, resolveFundamentalInstrument } from "@/lib/fundamental-analysis";
 import { loadLatestLocalRun, saveLocalRun, updateLocalDecision } from "@/lib/fundamental-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { StockLogo } from "./StockLogo";
@@ -17,8 +17,8 @@ import "./fundamental-workspace.css";
 import "./research-workspace.css";
 
 type Props = { balance: number; onSimulate: (draft: ResearchOrderDraft) => void; ownerId: string; instruments: Instrument[]; onClose: () => void; onOpenChart: (instrument: Instrument) => void };
-type View = "screen" | "rank" | "peers" | "rate";
-const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "rank", label: "Top stocks" }, { id: "peers", label: "Peer comparison" }, { id: "rate", label: "Company rating" }];
+type View = "screen" | "peers" | "rank";
+const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "peers", label: "Peer comparison" }, { id: "rank", label: "Top stocks" }];
 const PAGE_SIZE = 50;
 const STOCK_LIST_LABELS: Record<string, string> = { all: "All companies", review: "Passed gates", rejected: "Failed gates", approved: "Approved reviews", pending: "Pending reviews" };
 const number = (value: number | null, suffix = "") => value == null ? "Missing" : `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}${suffix}`;
@@ -78,6 +78,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
     { status: "review", label: "passed gates", count: passing },
     { status: "rejected", label: "failed", count: (run?.results.length ?? 0) - passing },
     { status: "approved", label: "approved", count: run?.results.filter(result => result.decision === "approved").length ?? 0 },
+    { status: "pending", label: "pending", count: run?.results.filter(result => result.decision === "pending").length ?? 0 },
   ];
 
   const openStockList = (nextStatus: string, trigger: HTMLButtonElement) => {
@@ -192,7 +193,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
           title={`View ${STOCK_LIST_LABELS[summary.status].toLowerCase()}`} onClick={event => openStockList(summary.status, event.currentTarget)}>
           <b>{summary.count}</b>{" "}<span>{summary.label}</span>
         </button>)}</nav>}
-        {view === "rate" ? <CompanyRating instruments={instruments} onOpenChart={onOpenChart} /> : !run ? <div className="fa-empty"><BookOpenCheck size={32} /><h3>Loading the latest company fundamentals</h3><p>After sign-in, the latest monthly Screener CSV is loaded from the server automatically.</p><button onClick={() => setView("rate")}>Rate one company with JSON</button></div> : <>
+        {!run ? <div className="fa-empty"><BookOpenCheck size={32} /><h3>Loading the latest company fundamentals</h3><p>After sign-in, the latest monthly Screener CSV is loaded from the server automatically.</p></div> : <>
           {run.missingColumns.length > 0 && <details className="fa-missing"><summary>{run.missingColumns.length} screening columns missing · missing values fail their gates</summary><p>{run.missingColumns.join(" · ")}</p></details>}
           <div hidden={view !== "peers"}><FundamentalPeers key={`${run.importedAt}:${peerAnchor}`} run={run} instruments={instruments} anchorId={peerAnchor || selectedId} onInspect={inspect} onOpenChart={openChart} /></div>
           <div hidden={view !== "rank"}><TopStocks key={run.importedAt} run={run} instruments={instruments} balance={balance} onInspect={inspect} onCompare={compare} onOpenChart={onOpenChart} onSimulate={onSimulate} /></div>
@@ -200,8 +201,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
 
         </>}
         {run && view === "screen" && <section id={drawerId} className="fa-stock-drawer fa-inline-list" aria-label="Company list"><div className="fa-drawer-content">
-              <header className="fa-drawer-head"><div><h3 id={`${drawerId}-title`}>{STOCK_LIST_LABELS[status]}</h3><small role="status">{filtered.length} {status === "review" ? "passed companies" : status === "rejected" ? "failed companies" : "companies"} in this list</small></div></header>
-              <div className="fa-filters"><label><Search size={16} /><input aria-label="Search fundamental companies" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Company, symbol or industry" /></label><ModernSelect label="Industry" ariaLabel="Fundamental industry filter" hideLabel value={industry} choices={[{ value: "all", label: "All industries" }, ...industries.map(item => ({ value: item, label: item }))]} onChange={value => { setIndustry(value); setPage(0); }} /><ModernSelect label="Status" ariaLabel="Fundamental status filter" hideLabel value={status} choices={[{ value: "all", label: "All statuses" }, { value: "review", label: "Passed gates" }, { value: "rejected", label: "Failed gates" }, { value: "approved", label: "Approved reviews" }, { value: "pending", label: "Pending reviews" }]} onChange={value => { setStatus(value); setPage(0); }} /></div>
+              <div className="fa-filters"><label><Search size={16} /><input aria-label="Search fundamental companies" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Company or symbol" /></label><ModernSelect label="Industry" ariaLabel="Fundamental industry filter" hideLabel value={industry} choices={[{ value: "all", label: "All industries" }, ...industries.map(item => ({ value: item, label: item }))]} onChange={value => { setIndustry(value); setPage(0); }} /></div>
               <div className="fa-results"><div className="fa-table-scroll"><table><thead><tr><th>Company</th><th className="fa-number">Rating</th><th className="fa-number">ROE</th><th className="fa-number">P/E</th><th>Gates</th></tr></thead><tbody>{shown.map(({ result, rating }) => <tr key={result.id} className={selectedId === result.id ? "fa-selected" : ""}><td><div className="fa-stock-identity"><button type="button" className="fa-stock-chart" aria-label={`View ${result.nseCode || result.bseCode || result.name} analysis`} onClick={event => { stockTrigger.current = event.currentTarget; inspect(result.id); }}><FundamentalLogo result={result} instruments={instruments} size={32} /><b>{result.nseCode || result.bseCode || result.name}</b></button><button className="fa-company-link" title="View fundamental analysis" aria-label={`Analyse ${result.name}`} aria-pressed={selectedId === result.id} onClick={event => { stockTrigger.current = event.currentTarget; inspect(result.id); }}><small>{result.name}</small></button></div></td><td className="fa-number"><b>{rating.overall.toFixed(1)}</b>{result.isFinancial && <small>preliminary</small>}</td><td className="fa-number" data-label="ROE">{number(result.metrics.roe, "%")}</td><td className="fa-number" data-label="P/E">{number(result.metrics.pe)}</td><td className="fa-stock-gates"><span className={`fa-badge ${result.gateStatus}`}>{result.gateStatus === "review" ? "Passed" : "Failed"}</span><small>{result.decision}</small></td></tr>)}</tbody></table>{!shown.length && <p className="fa-no-results">No companies match these filters.</p>}</div><div className="fa-pagination"><span>{filtered.length} results · Page {safePage + 1} of {lastPage + 1}</span><button disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</button><button disabled={safePage === lastPage} onClick={() => setPage(safePage + 1)}>Next</button></div></div>
             </div></section>}
       </>}
@@ -279,12 +279,4 @@ function CompanyReview({ result, instruments, onOpenChart, onSave }: { result: S
       {(notes !== result.notes || decision !== result.decision) && <small className="fa-form-message">Unsaved changes</small>}{error && <p role="alert" className="negative fa-form-message">{error}</p>}
     </form>
   </aside>;
-}
-
-function CompanyRating({ instruments, onOpenChart }: { instruments: Instrument[]; onOpenChart: (instrument: Instrument) => void }) {
-  const [input, setInput] = useState("");
-  const [rated, setRated] = useState<ReturnType<typeof evaluateCompanyJson> | null>(null);
-  const [ratingVersion, setRatingVersion] = useState(0);
-  const [error, setError] = useState("");
-  return <div className="fa-analysis-grid fa-rater"><form className="fa-json-form" onSubmit={event => { event.preventDefault(); try { setRated(evaluateCompanyJson(input)); setRatingVersion(current => current + 1); setError(""); } catch (caught) { setRated(null); setError(caught instanceof Error ? caught.message : "Check the JSON format."); } }}><h3>Rate one company</h3><p>Paste factual company data with the same field names as your Screener export. Use null when a value is unavailable.</p><button type="button" onClick={() => setInput(JSON.stringify(companyJsonTemplate, null, 2))}>Load blank template</button><label>Company JSON<textarea aria-label="Company fundamentals JSON" value={input} onChange={event => setInput(event.target.value)} rows={14} spellCheck={false} placeholder={'{ "Name": "Company name", "NSE Code": "SYMBOL", … }'} /></label>{error && <p role="alert" className="negative">{error}</p>}<button type="submit">Calculate rating</button><details><summary>Data extraction instructions</summary><p>Read the consolidated company financials. Return one JSON object using the template fields, plain numbers without units, codes as strings, and null for missing values. Sales and Net Profit mean TTM values. Supply the financial data date under Data as of. Verify extracted values against the company filings or Screener page.</p></details></form>{rated ? <div><p className="fa-hint">Data as of: {rated.dataAsOf || "not supplied"} · Single-company rating is for this session.</p><CompanyReview key={ratingVersion} result={rated.result} instruments={instruments} onOpenChart={result => { const instrument = resolveFundamentalInstrument(result, instruments); if (instrument) onOpenChart(instrument); }} onSave={async (_result, decision, notes) => setRated(current => current ? { ...current, result: { ...current.result, decision, notes } } : current)} /></div> : <div className="fa-empty"><h3>Your rating and gate audit will appear here</h3><p>Missing metrics contribute zero to their rating component and cannot pass a screening gate.</p></div>}</div>;
 }

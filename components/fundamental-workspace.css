@@ -1,4 +1,4 @@
-.fundamental-workspace { color: var(--ink); font-size: 14px; }
+.fundamental-workspace { min-width: 0; color: var(--ink); font-size: 14px; }
 .fundamental-workspace.navigation-page { width: 100%; max-width: none; padding: 10px 12px; }
 .fundamental-workspace .modal-head { top: -10px; margin: -10px -12px 8px; padding: 10px 12px; }
 .fundamental-workspace .modal-head h2 { display: flex; align-items: center; gap: 8px; font-size: 20px; }
@@ -306,8 +306,15 @@
 .fundamental-workspace .fa-inline-list .fa-drawer-content { height: auto; padding: 12px; }
 .fundamental-workspace .fa-inline-list .fa-drawer-head { position: static; }
 .fundamental-workspace .fa-inline-list .fa-results .fa-table-scroll { max-height: none; overflow: visible; }
-.fa-review-dialog { width: min(720px, calc(100vw - 24px)); max-height: calc(100dvh - 40px); overflow: auto; padding: 14px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--surface); }
+.fa-review-dialog { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; overflow: auto; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0; color: var(--ink); background: var(--surface); }
 .fa-review-dialog::backdrop { background: rgb(0 0 0 / 45%); }
 .fa-review-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .fa-review-dialog-head h2 { margin: 0; font-size: 20px; }
 .fa-review-dialog-head button { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; }
+.fundamental-workspace .fa-run-summary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.fundamental-workspace .fa-inline-list .fa-filters { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 6px; margin: 0 0 8px; }
+.fundamental-workspace .fa-inline-list .fa-filters > label { grid-column: auto; flex-basis: auto; min-width: 0; gap: 4px; }
+.fundamental-workspace .fa-inline-list .fa-filters input { min-width: 0; padding-inline: 6px; font-size: 13px; }
+.fundamental-workspace .fa-inline-list .fa-filters > label > svg { display: none; }
+.fundamental-workspace .fa-inline-list .fa-filters .modern-select-trigger { width: 100%; }
+.fundamental-workspace .fa-run-summary span { font-size: 11px; }
