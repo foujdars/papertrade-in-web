@@ -22,7 +22,7 @@ const esbuild = require('esbuild');
     build.onResolve({ filter: /supabase-client$/ }, () => ({ path: 'test-session', namespace: 'fixture' }));
     build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `export const getSupabaseBrowserClient = () => ({auth:{getSession:async()=>({data:{session:{access_token:'test-session',user:{id:'${owner}'}}}})}});`, loader: 'js' }));
   } }] });
-  const css = fs.readFileSync('app/globals.css', 'utf8') + fs.readFileSync('app/bot-workspace.css', 'utf8');
+  const css = [...fs.readFileSync('app/layout.tsx', 'utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([, file]) => fs.readFileSync('app/' + file, 'utf8')).join('\n').replace(/@import[^;]+;/g, '');
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
@@ -57,7 +57,8 @@ const esbuild = require('esbuild');
     const url = `http://127.0.0.1:${server.address().port}`;
     await page.goto(url);
     await page.getByRole('button', { name: 'Enable background', exact: true }).waitFor();
-    await page.getByLabel('Strategy', { exact: true }).selectOption('breakout');
+    await page.getByRole('button', { name: 'Strategy', exact: true }).click();
+    await page.getByRole('option', { name: 'Range breakout', exact: true }).click();
     await page.getByLabel('Entry timeframe 1m', { exact: true }).check();
     await page.getByLabel('Entry timeframe 5m', { exact: true }).uncheck();
     await page.getByLabel('Breakout lookback').fill('10');
@@ -98,9 +99,16 @@ const esbuild = require('esbuild');
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => window.botState.background.mode === 'cloud');
     assert.equal(record.account.bots[0].enabled, false, 'Reconnect does not restart a paused bot');
-    for (const width of [390, 768, 1280]) {
+    for (const width of [320, 390, 768, 1280]) {
       await page.setViewportSize({ width, height: 844 });
       assert.ok(await page.locator('.bot-workspace').evaluate(el => el.scrollWidth <= el.clientWidth + 1), `Bot fits ${width}px`);
+      assert.equal(await page.locator('.bot-workspace select').count(), 0, 'Bot uses modern lists');
+      assert.equal(await page.locator('.bot-assets').evaluate(el => new Set([...el.children].map(child => child.getBoundingClientRect().top)).size), 1, 'Four assets share one row');
+      assert.equal(await page.locator('.bot-monitor').evaluate(el => new Set([...el.children].map(child => child.getBoundingClientRect().top)).size), 1, 'Status and trade share one row');
+      assert.equal(await page.locator('.bot-form-actions').evaluate(el => new Set([...el.children].map(child => child.getBoundingClientRect().top)).size), 1, 'Preview and start share one row');
+      await page.getByRole('button', { name: 'Trade direction', exact: true }).click();
+      await page.getByRole('option', { name: 'Long only', exact: true }).click();
+      assert.match(await page.getByRole('button', { name: 'Trade direction', exact: true }).innerText(), /Long only/);
     }
     if (process.env.BOT_BACKGROUND_SCREENSHOT) { await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: process.env.BOT_BACKGROUND_SCREENSHOT }); }
     assert.deepEqual(errors, []);

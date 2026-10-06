@@ -111,3 +111,58 @@
  .bot-workspace .bot-help { order:4; }
  .bot-workspace .bot-decisions { order:5; }
 }
+
+/* Compact bot controls share the same density on phone and desktop. */
+.bot-workspace.navigation-page { padding: 10px 12px 24px; }
+.bot-workspace.navigation-page .modal-head { margin: 0 0 8px; padding: 0 0 8px; }
+.bot-workspace .bot-runtime { padding: 8px 10px; margin-bottom: 8px; gap: 6px; }
+.bot-runtime > div:first-child { min-width: 0; flex: 1; }
+.bot-runtime b { white-space: normal; font-size: 12px; }
+.bot-runtime small { margin-top: 3px; font-size: 10px; line-height: 1.3; }
+.bot-runtime-actions { width: auto; flex: none; gap: 4px; }
+.bot-workspace button { padding: 7px 8px; min-height: 34px; font-size: 11px; }
+.bot-workspace .bot-assets { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 8px 0; }
+.bot-workspace .bot-assets button { min-width: 0; padding: 8px 5px; gap: 4px; border-radius: 9px; }
+.bot-workspace .bot-assets button > span { font-size: 10px; }
+.bot-workspace .bot-assets b { font-size: clamp(12px, 2.8vw, 20px); letter-spacing: -.3px; overflow-wrap: anywhere; }
+.bot-workspace .bot-assets small { font-size: 9px; line-height: 1.3; }
+.bot-workspace .bot-layout { gap: 8px; }
+.bot-workspace .bot-monitor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.bot-workspace .bot-monitor .bot-card { order: initial; min-width: 0; }
+.bot-workspace .bot-card { padding: 10px; border-radius: 10px; }
+.bot-workspace .bot-card h3 { font-size: 14px; margin: 4px 0 8px; }
+.bot-workspace .bot-card > p { font-size: 10px; line-height: 1.35; margin: 6px 0; }
+.bot-workspace .bot-card dl { gap: 6px; margin: 8px 0; }
+.bot-workspace .bot-card dl > div { gap: 5px; font-size: 10px; flex-wrap: wrap; }
+.bot-card dd { overflow-wrap: anywhere; }
+.bot-monitor .eyebrow { font-size: 10px; }
+.bot-workspace .bot-monitor button + button { margin: 4px 0 0; }
+.bot-workspace .bot-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bot-workspace .bot-strategy-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bot-workspace .bot-fields > :is(label, .modern-select) { min-width: 0; }
+.bot-workspace .bot-fields label, .bot-workspace .modern-select-label { font-size: 10px; line-height: 1.35; gap: 4px; }
+.bot-workspace .bot-fields :is(input, .modern-select-trigger) { height: 36px; min-height: 36px; padding: 6px; font-size: 11px; }
+.bot-workspace .modern-select-trigger { width: 100%; justify-content: space-between; gap: 4px; }
+.bot-workspace .bot-presets { gap: 4px; margin-bottom: 8px; }
+.bot-workspace .bot-presets button { min-height: 28px; padding: 4px 8px; }
+.bot-workspace .bot-timeframes { display: flex; flex-wrap: nowrap; gap: 4px; padding: 4px 0 8px; overflow-x: auto; }
+.bot-timeframes legend { font-size: 11px; margin: 0 0 5px; }
+.bot-workspace .bot-timeframes label { position: relative; flex: 1 0 32px; justify-content: center; padding: 8px 4px; font-size: 10px; }
+.bot-timeframes input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.bot-timeframes label:has(input:focus-visible) { outline: 2px solid var(--purple); outline-offset: -2px; }
+.bot-timeframes label:has(input:disabled):not(:has(input:checked)) { opacity: .5; }
+.bot-workspace .bot-strategy-help, .bot-workspace .bot-advanced { margin: 4px 0 8px; padding-bottom: 4px; }
+.bot-workspace .bot-form-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.bot-workspace .bot-form-actions button { width: 100%; margin: 0; min-height: 38px; }
+.bot-workspace .bot-settings > small { margin-top: 6px; font-size: 10px; }
+.bot-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; grid-column: 1 / -1; min-width: 0; }
+.bot-workspace .bot-tools .bot-card { padding: 6px 8px; min-width: 0; }
+.bot-tools summary { font-size: 10px; }
+.bot-workspace .bot-tools .bot-card[open] { grid-column: 1 / -1; }
+.bot-workspace .bot-activity { margin-top: 8px; }
+@media (max-width: 700px) {
+ .bot-workspace .bot-monitor { order: -1; }
+ .bot-workspace .bot-tools { order: 3; }
+ .bot-workspace .bot-runtime-actions button { font-size: 10px; padding: 6px; }
+ .bot-workspace .bot-runtime-actions svg { width: 12px; }
+}
