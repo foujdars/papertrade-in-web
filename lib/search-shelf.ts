@@ -1,4 +1,5 @@
 import { marketDisplayName, marketGroup, marketTicker, type DirectoryInstrument } from "./market-directory.ts";
+import { compareCommodityPriority } from "./commodity-discovery.ts";
 
 export type SearchShelfId = "all" | "in" | "mcx" | "us" | "crypto";
 export type PopularLists = {
@@ -168,9 +169,9 @@ export function searchShelfRows<T extends DirectoryInstrument>(input: {
     const root = item.symbol.replace(/-\d{8}$/, "");
     if (roots.has(root)) return false;
     roots.add(root);
-    return !seen.has(item.symbol);
+    return input.shelf === "mcx" || !seen.has(item.symbol);
   });
-  return { recent, popular: input.shelf === "mcx" ? commodityRows.slice(0, 40) : popular, matches: [] as T[] };
+  return { recent, popular: input.shelf === "mcx" ? commodityRows.sort(compareCommodityPriority).slice(0, 40) : popular, matches: [] as T[] };
 }
 
 export function popularHeading(shelf: SearchShelfId, popular: PopularLists) {

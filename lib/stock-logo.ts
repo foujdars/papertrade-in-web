@@ -1,4 +1,5 @@
 import { marketGroup, marketTicker, type DirectoryInstrument } from "./market-directory.ts";
+import { commodityLogo } from "./commodity-discovery.ts";
 
 export type LogoInstrument = {
   symbol: string;
@@ -92,7 +93,7 @@ export function stockLogoDirectory(instruments: readonly LogoInstrument[]): Map<
 }
 
 export function resolveStockLogo(item: LogoInstrument, directory: ReadonlyMap<string, string>): string | null {
-  return stockLogoUrl(item.instrumentKey)
+  return commodityLogo(item) ?? stockLogoUrl(item.instrumentKey)
     ?? stockLogoUrl(item.underlyingKey)
     ?? stockLogoUrl(directory.get(item.symbol))
     ?? stockLogoUrl(directory.get(item.underlyingSymbol ?? ""))
