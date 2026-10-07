@@ -15,8 +15,8 @@
 .terminal-shell .chart-body > .chart-floating-favourite.saved svg { stroke:#b7791f; }
 .terminal-shell :is(.chart-symbol-search button,.chart-floating-favourite):focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
 .terminal-shell:has(.trade-symbol-menu) .chart-floating-favourite { visibility:hidden; pointer-events:none; }
-.chart-price-plus { position:absolute; right:0; z-index:24; display:grid; grid-template-columns:24px minmax(0,1fr); height:24px; transform:translateY(-50%); color:#fff; background:#252b3d; border-radius:3px; font-size:11px; font-variant-numeric:tabular-nums; pointer-events:auto; }
-.chart-price-plus button { display:grid; place-items:center; border:0; border-right:1px solid #ffffff44; padding:0; color:#fff; background:transparent; font:600 18px/1 system-ui; cursor:pointer; }
+.chart-price-plus { position:absolute; right:0; z-index:24; display:grid; grid-template-columns:18px minmax(0,1fr); height:18px; transform:translateY(-50%); color:#fff; background:#252b3d; border-radius:2px; font-size:11px; font-variant-numeric:tabular-nums; pointer-events:auto; }
+.chart-price-plus button { display:grid; place-items:center; border:0; border-right:1px solid #ffffff44; padding:0; color:#fff; background:transparent; font:600 14px/1 system-ui; cursor:pointer; }
 .chart-price-plus button:focus-visible { outline:2px solid #fff; outline-offset:-2px; }
 .chart-price-plus span { display:flex; align-items:center; justify-content:center; white-space:nowrap; padding:0 3px; }
 .terminal-shell[data-theme="neon"] .chart-price-plus { background:#342353; }
