@@ -1,4 +1,4 @@
-import { isSupportedNseInstrumentKey } from "@/lib/upstox";
+import { isSupportedChartInstrumentKey } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch, upstoxFreshFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
     const readCandles = url.searchParams.get("strict") === "1" ? upstoxFreshFetch : upstoxFetch;
     const config = timeframeMap[timeframe as keyof typeof timeframeMap];
 
-    if (!isSupportedNseInstrumentKey(instrumentKey)) {
+    if (!isSupportedChartInstrumentKey(instrumentKey)) {
       return Response.json(
         { ok: false, error: { code: "INVALID_INSTRUMENT", message: "Unsupported instrument key." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },

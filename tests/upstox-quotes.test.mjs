@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { derivePreviousClose } from "../lib/upstox.ts";
+import { derivePreviousClose, isSupportedChartInstrumentKey, isSupportedNseInstrumentKey } from "../lib/upstox.ts";
+
+test('GIFT charts accept only the documented global key without widening Indian trading validation', () => {
+  assert.equal(isSupportedChartInstrumentKey('GLOBAL_INDEX|SGX NIFTY'), true);
+  assert.equal(isSupportedChartInstrumentKey('GLOBAL_INDEX|OTHER'), false);
+  assert.equal(isSupportedNseInstrumentKey('GLOBAL_INDEX|SGX NIFTY'), false);
+  assert.equal(isSupportedChartInstrumentKey('NSE_FO|123'), true);
+});
 
 test("derives the previous close from Upstox LTP and net change", () => {
   const lastPrice = 1_105.05;

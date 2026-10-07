@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { ModernSelect } from './ModernSelect';
 import { oiSummary, type GiftSnapshot } from '@/lib/home-derivatives';
-import type { FnoUnderlying, OptionChainRow } from '@/lib/fno';
+import { futureToInstrument, type FnoUnderlying, type OptionChainRow } from '@/lib/fno';
+import type { Instrument } from '@/lib/market';
 import { vixBand, type IndiaVix } from '@/lib/india-pulse';
 const defaults: FnoUnderlying[] = [
   { symbol: 'NIFTY', name: 'Nifty 50', instrumentKey: 'NSE_INDEX|Nifty 50', underlyingType: 'INDEX', optionContracts: 1, futureContracts: 0 },
@@ -29,7 +30,7 @@ function OpenInterestChart({ rows, change }: { rows: ReturnType<typeof oiSummary
   </svg></div>;
 }
 
-export function HomeDerivatives({ onOpenStock }: { onOpenStock: (symbol: string) => void }) {
+export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock: (symbol: string) => void; onOpenInstrument?: (instrument: Instrument) => void }) {
   const [catalogue, setCatalogue] = useState<FnoUnderlying[]>(defaults);
   const [selected, setSelected] = useState(defaults[0].instrumentKey);
   const [expiry, setExpiry] = useState('');
@@ -112,9 +113,9 @@ export function HomeDerivatives({ onOpenStock }: { onOpenStock: (symbol: string)
   const direction = difference === null || difference === 0 ? '' : difference > 0 ? 'positive' : 'negative';
   return <div className="home-derivatives">
     <section className="home-section home-gift-card" aria-label="GIFT NIFTY and Nifty futures close">
-      <div><b>GIFT NIFTY</b><strong>{number(gift?.gift?.price)}</strong><small>{gift?.gift ? `${time(gift.gift.asOf)} IST · 2 min delayed` : 'Quote unavailable'}</small></div>
-      <div><b>{future?.tradingSymbol ?? 'NIFTY futures'}</b><strong>{number(futureClose?.price)}</strong><small>{futureClose ? `Session close · ${futureClose.date}` : 'Completed close unavailable'}</small></div>
-      <div className={`home-gift-difference ${direction}`}><strong>{difference === null ? '—' : `${number(Math.abs(difference))} pts ${difference > 0 ? 'above' : difference < 0 ? 'below' : 'at'}`}</strong><small>NIFTY futures close</small></div>
+      <button type="button" className="home-gift-quote" aria-label="Open GIFT NIFTY chart" disabled={!onOpenInstrument} title={gift?.gift ? `${time(gift.gift.asOf)} IST · 2 min delayed` : 'Quote unavailable'} onClick={() => onOpenInstrument?.({ symbol: 'GIFT NIFTY', name: 'GIFT NIFTY', instrumentKey: 'GLOBAL_INDEX|SGX NIFTY', exchange: 'GLOBAL', assetType: 'INDEX', categories: [], price: gift?.gift?.price ?? 0, change: 0 })}><b>GIFT NIFTY</b><strong>{number(gift?.gift?.price)}</strong></button>
+      <button type="button" className="home-gift-quote" aria-label="Open NIFTY futures chart" disabled={!future || !onOpenInstrument} title={futureClose ? `Session close · ${futureClose.date}` : 'Completed close unavailable'} onClick={() => { const nifty = catalogue.find(item => item.symbol === 'NIFTY'); if (future && nifty) onOpenInstrument?.(futureToInstrument(future, nifty)); }}><b>{future?.tradingSymbol ?? 'NIFTY futures'}</b><strong>{number(futureClose?.price)}</strong></button>
+      <div className={`home-gift-difference ${direction}`} role="status"><strong>{difference === null ? '—' : `${number(Math.abs(difference))} pts ${difference > 0 ? 'above' : difference < 0 ? 'below' : 'at'}`}</strong></div>
     </section>
     <section className="home-section home-option-pulse" aria-label="Options open interest analysis">
       <header><ModernSelect label="Instrument" hideLabel ariaLabel="OI instrument" value={selected} choices={catalogue.map(r => ({ value: r.instrumentKey, label: r.symbol, description: r.name }))} onChange={key => { setSelected(key); setExpiry(''); setExpiries([]); setRows([]); setAsOf(''); setState('loading'); }}/><ModernSelect label="Expiry" hideLabel ariaLabel="OI expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(d => ({ value: d, label: d }))} onChange={value => { setExpiry(value); setRows([]); setAsOf(''); setState('loading'); }}/><button className="home-oi-open" onClick={() => onOpenStock(underlying.symbol)} aria-label={`Open ${underlying.symbol} chart`}><ChevronRight size={18}/></button></header>
@@ -122,7 +123,7 @@ export function HomeDerivatives({ onOpenStock }: { onOpenStock: (symbol: string)
       <div className="home-oi-tabs" role="tablist" aria-label="Open interest display"><button role="tab" aria-selected={!change} onClick={() => setChange(false)}>OI</button><button role="tab" aria-selected={change} onClick={() => setChange(true)}>Change in OI</button><small>{spot === null ? '' : `${underlying.symbol} ${number(spot)}`}</small></div>
       {state === 'ready' && chartAvailable ? <OpenInterestChart rows={visible} change={change}/> : <div className="home-oi-empty" role="status">{state === 'loading' ? 'Loading option chain…' : state === 'ready' ? `${change ? 'Change in OI' : 'OI'} unavailable for this chain.` : 'Option-chain data unavailable. Retrying automatically.'}</div>}
       <div className="home-oi-legend"><span><i className="call"/>Call {change ? `Δ ${number(summary.callChange,true)}` : 'OI'}</span><span><i className="put"/>Put {change ? `Δ ${number(summary.putChange,true)}` : 'OI'}</span></div>
-      <footer>{asOf ? `OI checked ${time(asOf)} IST` : 'Upstox option chain'}{vixTime ? ` · VIX checked ${time(vixTime)} IST` : ''}<details><summary>Data details</summary><p>PCR = total put OI ÷ total call OI for the selected expiry. Change in OI compares with the provider’s previous OI; missing values remain unavailable. Chart shows nearby strikes; totals cover the full chain. India VIX describes expected 30-day volatility for the broader market, not the selected stock. {vix ? `VIX ${vixBand(vix.price).label}; change ${number(vix.change)} (${number(vix.changePercent)}%). ` : ''}VIX source: Moneycontrol. GIFT NIFTY has a 120-second Upstox delay and is an indication, not a prediction of the next open.</p></details></footer>
+      <footer><details><summary>Data details</summary><p>{asOf ? `OI checked ${time(asOf)} IST. ` : ''}{vixTime ? `VIX checked ${time(vixTime)} IST. ` : ''}{gift?.gift ? `GIFT checked ${time(gift.gift.asOf)} IST · 2 min delayed. ` : 'GIFT quote unavailable. '}{futureClose ? `Futures session close: ${futureClose.date}. ` : 'Completed futures close unavailable. '}PCR = total put OI ÷ total call OI for the selected expiry. Change in OI compares with the provider’s previous OI; missing values remain unavailable. Chart shows nearby strikes; totals cover the full chain. India VIX describes expected 30-day volatility for the broader market, not the selected stock. {vix ? `VIX ${vixBand(vix.price).label}; change ${number(vix.change)} (${number(vix.changePercent)}%). ` : ''}VIX source: Moneycontrol. GIFT NIFTY has a 120-second Upstox delay and is an indication, not a prediction of the next open.</p></details></footer>
     </section>
   </div>;
 }
