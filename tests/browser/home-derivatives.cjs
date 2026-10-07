@@ -23,10 +23,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.clock.setFixedTime(new Date('2026-10-07T13:00:00Z'));await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByRole('img',{name:'Call and put open interest by strike',exact:true}).waitFor();
   assert.ok(await page.getByText('97.9 pts below',{exact:true}).isVisible());assert.equal(await page.locator('.home-derivative-metrics > div').first().locator('b').textContent(),'1.5');
+  await page.getByRole('button',{name:'Open GIFT NIFTY chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaInstrument.instrumentKey),'GLOBAL_INDEX|SGX NIFTY');
+  await page.getByRole('button',{name:'Open NIFTY futures chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaInstrument.instrumentKey),'NSE_FO|123');
   for(const theme of ['light','neon'])for(const width of [320,390,768,1280]){
    await page.setViewportSize({width,height:844});await page.locator('.terminal-shell').evaluate((el,theme)=>el.dataset.theme=theme,theme);
    assert.ok(await page.locator('.home-derivatives').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} fits ${width}`);
    assert.ok(await page.locator('.home-option-pulse').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'chart scroll stays inside card');
+   assert.ok(await page.locator('.home-gift-card').evaluate(el=>el.getBoundingClientRect().height<=80),'gift card is one compact row');
+   if(width===390){fs.mkdirSync('outputs',{recursive:true});await page.screenshot({path:`outputs/home-derivatives-${theme}.png`});}
   }
   await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'Change in OI',exact:true}).click();await page.getByRole('img',{name:'Call and put change in open interest by strike',exact:true}).waitFor();assert.ok(await page.getByText('Call Δ -70',{exact:true}).isVisible());
   await page.getByRole('button',{name:'OI instrument',exact:true}).click();await page.getByRole('option',{name:/BANKNIFTY/}).click();await page.getByRole('button',{name:'Open BANKNIFTY chart',exact:true}).waitFor();await page.getByRole('button',{name:'OI expiry',exact:true}).click();await page.getByRole('option',{name:'2026-10-27',exact:true}).click();

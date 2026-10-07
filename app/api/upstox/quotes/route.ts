@@ -1,4 +1,4 @@
-import { derivePreviousClose, isSupportedNseInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
+import { derivePreviousClose, isSupportedChartInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       .filter(Boolean);
     const keys = [...new Set(requestedKeys)];
 
-    if (!keys.length || keys.length > 500 || keys.some((key) => !isSupportedNseInstrumentKey(key))) {
+    if (!keys.length || keys.length > 500 || keys.some((key) => !isSupportedChartInstrumentKey(key))) {
       return Response.json(
         { ok: false, error: { code: "INVALID_INSTRUMENTS", message: "Provide between 1 and 500 supported instrument keys." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },

@@ -95,11 +95,12 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock, preferenceOwner='guest', recentSymbols=[], onClearRecent, commoditySessionLabel,
+  onOpenStock, onOpenInstrument, preferenceOwner='guest', recentSymbols=[], onClearRecent, commoditySessionLabel,
   realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   commoditySessionLabel?: string;
+  onOpenInstrument?: (instrument: import('@/lib/market').Instrument) => void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
   onOpenRealised?:()=>void;
@@ -384,7 +385,6 @@ export function HomeWorkspace({
           <SessionBoard />
         </section>}
 
-        {activeMarket === 'india' && cards.market && <HomeDerivatives onOpenStock={onOpenStock}/>}
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
         {activeMarket === "india" && <div className="home-market-pair">
@@ -414,6 +414,7 @@ export function HomeWorkspace({
 
         </div>
         {activeMarket === "india" ? <IndiaPulse showGauges={!cards.market}/> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
+        {activeMarket === 'india' && cards.market && <HomeDerivatives onOpenStock={onOpenStock} onOpenInstrument={onOpenInstrument}/>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}

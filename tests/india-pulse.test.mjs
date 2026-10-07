@@ -74,7 +74,7 @@ test("the pulse route reads Moneycontrol breadth, VIX and FII/DII", async () => 
   assert.match(route, /recordNseAdTape/);
   assert.doesNotMatch(route, /heat-map-advance-decline-ratio-nse-bse/);
   assert.match(home, /activeMarket === "india" \? <IndiaPulse showGauges={!cards.market}\/>/);
-  assert.match(home, /<HomeDerivatives onOpenStock={onOpenStock}\/>/);
+  assert.match(home, /<HomeDerivatives onOpenStock={onOpenStock} onOpenInstrument={onOpenInstrument}\/>/);
   assert.match(pulse, /NSE advances and declines through the session/);
   assert.doesNotMatch(pulse, /Major indices/);
   assert.match(dispatch, /sampleNseAdTape/);

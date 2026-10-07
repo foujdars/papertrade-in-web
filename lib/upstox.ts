@@ -29,6 +29,11 @@ export const UPSTOX_KEY_TO_SYMBOL = Object.fromEntries(
 
 export const ALLOWED_UPSTOX_KEYS = new Set<string>(Object.values(UPSTOX_INSTRUMENT_KEYS));
 
+// GIFT is available through Upstox market-data APIs, outside the Indian trading universe.
+export function isSupportedChartInstrumentKey(key: string) {
+  return key === 'GLOBAL_INDEX|SGX NIFTY' || isSupportedNseInstrumentKey(key);
+}
+
 export function isSupportedNseInstrumentKey(key: string) {
   return ALLOWED_UPSTOX_KEYS.has(key) ||
     /^(?:NSE_EQ|BSE_EQ)\|INE[A-Z0-9]+$/.test(key) ||

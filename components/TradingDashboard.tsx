@@ -3303,6 +3303,7 @@ export function TradingDashboard() {
           setTradeSelection(null);
         }}
         onOpenPnl={() => openNavigationSection("pnl")}
+        onOpenInstrument={instrument => { openNavigationSection("trade"); chooseTradeInstrument(instrument); }}
         onOpenStock={(symbol) => {
           const globalInstrument = globalInstruments.find((item) => item.symbol === symbol);
           if (globalInstrument) {
