@@ -1,4 +1,5 @@
 "use client";
+import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls';
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
 import { NewsWorkspace } from "./NewsWorkspace";
 import { BotWorkspace } from "./BotWorkspace";
@@ -2864,6 +2865,16 @@ export function TradingDashboard() {
     }
   }
 
+  const chartSymbolControlProps = {
+    instrument: selected, venue: selectedVenueLabel, expanded: showTradeSymbols,
+    onToggle: () => setShowTradeSymbols(value => !value), compared: !!comparedSymbols.length,
+    onCompare: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); },
+    onOptions: selectedFnoUnderlying ? () => void openFnoUnderlying(selectedFnoUnderlying) : undefined,
+    optionsDisabled: openingUnderlyingKey === selectedFnoUnderlying?.instrumentKey, styled: chartStyle !== 'candles',
+    onStyle: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); },
+    query: tradeSymbolSearch, onQuery: setTradeSymbolSearch, matches: tradeSymbolMatches,
+    onChoose: chooseTradeInstrument, venueLabel: instrumentVenueLabel,
+  };
   return (
     <StockLogoProvider instruments={tradingUniverse}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-section={activeNavigationSection}>
@@ -2976,42 +2987,7 @@ export function TradingDashboard() {
                 <span>{selectedVenueLabel === "NSE" || selectedVenueLabel === "MCX" ? "Paper practice" : "Global practice"}</span>
               </div>
               <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
-                <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
-                  <div className="title-line"><StockLogo {...selected} size={28} /><h1>{selected.symbol}</h1><span>{selectedVenueLabel}</span><ChevronDown size={16} /></div>
-                  <p>{selected.name}</p>
-                </button>
-                {selected.assetType !== "OPTION" && <button
-                  className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`}
-                  onClick={() => openWatchlistPicker(selected)}
-                  aria-label={`Add ${selected.symbol} to a custom watchlist`}
-                  title="Add to custom watchlist"
-                >
-                  <Star size={17} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} />
-                </button>}
-                <button type="button" className={`chart-compare-link ${comparedSymbols.length ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); }} aria-label="Compare symbols" title="Compare symbols"><Plus size={18} /></button>
-                {selectedFnoUnderlying && <button
-                  className="chart-derivatives-link"
-                  disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey}
-                  onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}
-                  aria-label={`Open ${selected.symbol} option charts`}
-                  title="Open option charts"
-                >
-                  <Link2 size={19} />
-                </button>}
-                <button type="button" className={`chart-style-link ${chartStyle !== "candles" ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); }} aria-label="Chart type" title="Chart type"><CandlestickChart size={18} /></button>
-                {showTradeSymbols && (
-                  <div className="trade-symbol-menu">
-                    <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search stocks, BTC, gold or Brent" /></label>
-                    <div>
-                      {tradeSymbolMatches.map((item) => (
-                        <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}>
-                          <span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>{instrumentVenueLabel(item)}</em>
-                        </button>
-                      ))}
-                      {!tradeSymbolMatches.length && <p>No matching symbol.</p>}
-                    </div>
-                  </div>
-                )}
+                <ChartSymbolControls {...chartSymbolControlProps}/>
               </div>
             </div>
             <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedQuoteIsFresh ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>
@@ -3030,17 +3006,7 @@ export function TradingDashboard() {
 
           <div className="chart-controls">
             <div ref={desktopTradeSymbolPickerRef} className="desktop-chart-symbol trade-symbol-picker">
-              <button className="desktop-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
-                <StockLogo {...selected} size={24} /><span>{selected.symbol}</span><small>{selectedVenueLabel}</small><ChevronDown size={15} />
-              </button>
-              {selected.assetType !== "OPTION" && <button className={`chart-watchlist-star ${customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "saved" : ""}`} onClick={() => openWatchlistPicker(selected)} aria-label={`Add ${selected.symbol} to a custom watchlist`}><Star size={15} fill={customWatchlists.some((list) => list.symbols.includes(selected.symbol)) ? "currentColor" : "none"} /></button>}
-              <button type="button" className={`chart-compare-link ${comparedSymbols.length ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); }} aria-label="Compare symbols" title="Compare symbols"><Plus size={17} /></button>
-              {selectedFnoUnderlying && <button className="chart-derivatives-link" disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)} aria-label={`Open ${selected.symbol} option charts`}><Link2 size={16} /></button>}
-              <button type="button" className={`chart-style-link ${chartStyle !== "candles" ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); }} aria-label="Chart type" title="Candles"><CandlestickChart size={17} /></button>
-              {showTradeSymbols && <div className="trade-symbol-menu desktop-symbol-menu">
-                <label><Search size={16} /><input value={tradeSymbolSearch} onChange={(event) => setTradeSymbolSearch(event.target.value)} placeholder="Search stocks, BTC, gold or Brent" /></label>
-                <div>{tradeSymbolMatches.map((item) => <button key={item.symbol} onClick={() => chooseTradeInstrument(item)}><span className="stock-identity"><StockLogo {...item} size={32} /><span><b>{item.symbol}</b><small>{item.name}</small></span></span><em>{instrumentVenueLabel(item)}</em></button>)}{!tradeSymbolMatches.length && <p>No matching symbol.</p>}</div>
-              </div>}
+              <ChartSymbolControls desktop {...chartSymbolControlProps}/>
             </div>
             <button className="chart-tools-trigger" aria-label="Open drawing tools" title="Drawing tools" onClick={() => setShowDrawingLibrary(true)}><Pencil size={18} /></button>
             <button type="button" className={`compact-selector-trigger chart-functions-trigger ${showChartFunctions ? "active" : ""}`} onClick={() => { setShowTimeframeMenu(false); setShowChartFunctions(true); }} aria-label="Functions" title="Indicators" aria-haspopup="dialog"><svg className="chart-fx-mark" viewBox="0 0 13.88 17.97" aria-hidden="true"><path fill="currentColor" d="M1.231 17.825q-.15 0-.316-.031-.167-.03-.321-.075-.154-.044-.273-.092-.118-.048-.171-.092v-.07q.035-.106.07-.264l.07-.321.067-.312q.03-.15.048-.255H.58q.246.246.531.426t.585.18q.22 0 .413-.166.193-.167.343-.484t.237-.773.088-1.037q0-.51-.009-1.218-.009-.707-.017-1.503-.01-.795-.018-1.621-.009-.826-.009-1.565 0-.676.013-1.375.014-.699.031-1.336t.04-1.169.04-.875q.034-.553.193-1.041.158-.488.395-.892t.536-.725q.3-.321.62-.54t.633-.335Q5.538.15 5.8.15q.15 0 .326.03.175.032.342.071.167.04.295.092.127.053.171.088v.08Q6.9.615 6.856.77q-.044.153-.083.32t-.08.317-.057.255h-.184q-.246-.246-.532-.43-.286-.186-.584-.186-.211 0-.41.167-.197.167-.346.488-.15.321-.238.778t-.088 1.037q0 .528.005 1.2.004.672.013 1.345t.013 1.256q.005.585.005.928 0 .369-.01.91-.008.54-.021 1.146l-.026 1.226q-.014.62-.031 1.16l-.031.945q-.013.405-.022.572-.044.843-.356 1.516-.312.672-.747 1.138t-.927.716-.888.25m8.085-6.439q-.218.212-.358.37-.14.157-.223.276t-.112.216-.031.177q0 .11.078.171.079.062.209.096L8.824 13H7.56q-.041-.035-.076-.113-.034-.079-.034-.181 0-.096.051-.209.052-.113.161-.256t.287-.328.438-.424l1.866-1.736-1.176-2.7-.731-.172.054-.307h1.696l.99 2.447.849-.807q.437-.417.615-.656t.178-.41q0-.055-.038-.096-.038-.04-.1-.071-.06-.031-.132-.055l-.134-.045.055-.307h1.21q.061.048.102.12.041.071.041.174 0 .403-.943 1.299L11.326 9.54l1.313 3.007.793.144-.055.308h-1.75l-1.142-2.735Z"/></svg></button>
@@ -3053,6 +3019,7 @@ export function TradingDashboard() {
           </section>
 
           <div className="chart-body">
+            <ChartFavouriteButton instrument={selected} saved={customWatchlists.some(list => list.symbols.includes(selected.symbol))} onClick={() => openWatchlistPicker(selected)}/>
             <ChartDrawingToolbar
               libraryInHeader
               activeTool={activeTool}
