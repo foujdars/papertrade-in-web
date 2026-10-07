@@ -33,6 +33,7 @@ export function compareMarketInstruments(a: DirectoryInstrument, b: DirectoryIns
   return rank(a) - rank(b) || marketDisplayName(a).localeCompare(marketDisplayName(b)) || a.symbol.localeCompare(b.symbol);
 }
 export function marketProductLabel(item: DirectoryInstrument): string {
+  if (item.instrumentKey?.startsWith("MCX_FO|")) return "MCX future · INR";
   if (item.instrumentKey?.startsWith("TVC|")) return "Reference · watch only";
   if (item.assetType === "OPTION") return "Option · USD";
   if (marketGroup(item) === "india") return item.assetType === "INDEX" ? "Index · INR" : "Stock · INR";

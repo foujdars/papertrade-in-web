@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { NseSession } from "@/lib/market-hours";
 
-export function useNseSession() {
+export function useNseSession(exchange: "NSE" | "MCX" = "NSE") {
   const [session, setSession] = useState<NseSession | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -11,7 +11,7 @@ export function useNseSession() {
       if (pending || controller.signal.aborted) return;
       pending = true;
       try {
-        const response = await fetch("/api/market/session", { cache: "no-store", signal: controller.signal });
+        const response = await fetch(exchange === "NSE" ? "/api/market/session" : "/api/market/session?exchange=MCX", { cache: "no-store", signal: controller.signal });
         const payload = await response.json();
         if (!response.ok || !payload.session || !Array.isArray(payload.session.sessions)) throw new Error("No exchange session");
         if (!controller.signal.aborted) setSession(payload.session);
@@ -24,6 +24,6 @@ export function useNseSession() {
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
     return () => { controller.abort(); window.clearInterval(interval); document.removeEventListener("visibilitychange", resume); window.removeEventListener("online", resume); };
-  }, []);
+  }, [exchange]);
   return session;
 }

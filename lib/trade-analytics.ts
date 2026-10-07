@@ -44,7 +44,7 @@ export function getOrderCharges(order: PaperOrder) {
     product: order.product ?? "INTRADAY",
     quantity: order.quantity,
     price: order.price,
-  });
+  }, order.instrumentKey, order.underlyingSymbol);
   return order.assetType === "OPTION" || order.assetType === "FUTURE"
     ? calculatedCharges
     : order.charges ?? calculatedCharges;

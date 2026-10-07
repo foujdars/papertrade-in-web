@@ -32,7 +32,7 @@ export const ALLOWED_UPSTOX_KEYS = new Set<string>(Object.values(UPSTOX_INSTRUME
 export function isSupportedNseInstrumentKey(key: string) {
   return ALLOWED_UPSTOX_KEYS.has(key) ||
     /^(?:NSE_EQ|BSE_EQ)\|INE[A-Z0-9]+$/.test(key) ||
-    /^NSE_FO\|[A-Z0-9]+$/.test(key) ||
+    /^(?:NSE_FO|MCX_FO)\|[A-Z0-9]+$/.test(key) ||
     /^(?:NSE_INDEX|BSE_INDEX)\|[A-Za-z0-9 .&_-]+$/.test(key);
 }
 

@@ -32,7 +32,7 @@ test("server-renders only the full-screen disclaimer before the home dashboard",
   assert.match(dashboard, /Indian market indices/);
   assert.match(dashboard, /Needs attention/);
   assert.doesNotMatch(dashboard, /Continue your chart/);
-  assert.match(dashboard, /Search Indian stocks and indices/);
+  assert.match(dashboard, /Search stocks, indices or MCX/);
   assert.match(dashboard, /Search global markets/);
   assert.match(dashboard, /Your paper portfolio/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);

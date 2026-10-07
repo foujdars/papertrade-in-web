@@ -97,7 +97,7 @@ function orderCashEffect(order: PaperOrder) {
     product: order.product ?? "INTRADAY",
     quantity: order.quantity,
     price: order.price,
-  });
+  }, order.instrumentKey, order.underlyingSymbol);
   const charges = order.assetType === "OPTION" || order.assetType === "FUTURE"
     ? calculatedCharges
     : order.charges ?? calculatedCharges;
@@ -108,9 +108,9 @@ export const FUTURE_PAPER_MARGIN_RATE = 0.2;
 
 /** Reserve estimated margin on entry; release it and realise full price P&L on exit. */
 export function futureFillCashDelta(orders: PaperOrder[], fill: PaperOrder) {
-  if (fill.assetType !== "FUTURE" || !fill.instrumentKey?.startsWith("NSE_FO|") ||
+  if (fill.assetType !== "FUTURE" || !/^(NSE_FO|MCX_FO)\|/.test(fill.instrumentKey ?? "") ||
     !Number.isFinite(fill.quantity) || fill.quantity <= 0 || !Number.isFinite(fill.price) || fill.price <= 0)
-    throw new Error("A valid NSE futures fill is required.");
+    throw new Error("A valid Indian futures fill is required.");
   const product = fill.product ?? "DELIVERY";
   const before = calculatePosition(orders, fill.symbol, fill.price, product);
   const after = calculatePosition([fill, ...orders], fill.symbol, fill.price, product);
@@ -119,7 +119,7 @@ export function futureFillCashDelta(orders: PaperOrder[], fill: PaperOrder) {
   const realisedPnl = after.realizedPnl - before.realizedPnl;
   const charges = fill.charges?.total ?? calculateUpstoxTradingCharges("FUTURE", {
     side: fill.side, product, quantity: fill.quantity, price: fill.price,
-  }).total;
+  }, fill.instrumentKey, fill.underlyingSymbol).total;
   return { cashDelta: marginBefore - marginAfter + realisedPnl - charges, marginBefore, marginAfter, realisedPnl, charges };
 }
 
