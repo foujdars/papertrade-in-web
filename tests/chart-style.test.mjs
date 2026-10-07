@@ -115,7 +115,8 @@ test("chart workspaces expose type and compare menus without restyling the shell
   assert.match(layout, /chart-style.css/);
   assert.match(dashboard, /<ChartStyleMenu/);
   assert.match(dashboard, /<CompareSymbolPicker/);
-  assert.match(dashboard, /Compare symbols/);
+  assert.match(dashboard, /<ChartSymbolControls/);
+  assert.match(await source("components/ChartSymbolControls.tsx"), /Compare symbols/);
   assert.match(chart, /overlayCompared/);
   assert.match(chart, /PriceScaleMode.Percentage/);
   assert.match(chart, /priceScaleId = mode === "price" \? `compare-\$\{index\}`/);

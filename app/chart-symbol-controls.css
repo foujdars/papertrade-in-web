@@ -1,0 +1,14 @@
+/* Share the symbol selector's surface with compare, leaving more room for the name. */
+.terminal-shell .trade-cockpit .chart-symbol-search { display:flex; align-items:center; flex:1 1 auto; min-width:0; gap:4px; padding:0 5px 0 8px; border:1px solid var(--line); border-radius:12px; background:var(--purple-soft); }
+.terminal-shell .trade-cockpit .chart-symbol-search :is(.desktop-symbol-trigger,.trade-symbol-trigger) { flex:1 1 auto; min-width:0; background:transparent; }
+.terminal-shell .trade-cockpit .chart-symbol-search .desktop-symbol-trigger > span { max-width:none; flex:1 1 auto; text-align:left; }
+.terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { display:grid; place-items:center; width:32px; min-width:32px; height:32px; min-height:32px; flex:0 0 32px; padding:0; border:1px solid var(--line); border-radius:50%; color:var(--purple); background:var(--surface); }
+.terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link.active { color:var(--purple); border-color:var(--purple); background:var(--surface); }
+.terminal-shell .chart-body > .chart-floating-favourite { position:absolute; z-index:19; top:10px; right:80px; display:grid; place-items:center; width:40px; height:40px; min-width:40px; padding:0; border:1px solid var(--line); border-radius:50%; color:var(--muted); background:var(--surface); box-shadow:0 2px 8px #0000000d; }
+.terminal-shell .chart-body > .chart-floating-favourite.saved,.terminal-shell .chart-body > .chart-floating-favourite:hover { color:var(--purple); background:var(--purple-soft); border-color:var(--purple); }
+.terminal-shell :is(.chart-symbol-search button,.chart-floating-favourite):focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
+.terminal-shell:has(.trade-symbol-menu) .chart-floating-favourite { visibility:hidden; pointer-events:none; }
+@media (max-width:360px) {
+  .terminal-shell .trade-cockpit .chart-symbol-search { gap:2px; padding-left:5px; padding-right:3px; }
+  .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { width:28px; min-width:28px; height:28px; min-height:28px; flex-basis:28px; }
+}
