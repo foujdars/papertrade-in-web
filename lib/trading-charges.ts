@@ -97,8 +97,25 @@ export function calculateUpstoxFutureCharges({ side, quantity, price }: Omit<Equ
 export function calculateUpstoxTradingCharges(
   assetType: ChargeableAssetType | undefined,
   input: EquityChargeInput,
+  instrumentKey?: string,
+  underlyingSymbol?: string,
 ): EquityChargeBreakdown {
+  if (assetType === "FUTURE" && instrumentKey?.startsWith("MCX_FO|")) return calculateMcxFutureCharges(input, underlyingSymbol);
   if (assetType === "OPTION") return calculateUpstoxOptionCharges(input);
   if (assetType === "FUTURE") return calculateUpstoxFutureCharges(input);
   return calculateUpstoxEquityCharges(input);
+}
+
+/** Paper estimates for commodity futures; NSE rates remain unchanged. */
+export function calculateMcxFutureCharges({ side, quantity, price }: EquityChargeInput, root = ""): EquityChargeBreakdown {
+  const turnover = Math.max(0, quantity * price);
+  const agri = /^(COTTON|COTTONCNDY|COTTONOIL|KAPAS|MENTHAOIL|CARDAMOM|CPO|CASTORSEED|RUBBER)$/.test(root);
+  const brokerage = Math.min(20, turnover * .0005);
+  const stt = side === "SELL" && !agri ? turnover * .0001 : 0;
+  const transactionCharges = turnover * (agri ? .00006 : .000021);
+  const sebiCharges = turnover * .000001;
+  const stampDuty = side === "BUY" ? turnover * .00002 : 0;
+  const gst = (brokerage + transactionCharges) * .18;
+  const values = { brokerage, stt, transactionCharges, ipftCharges: 0, sebiCharges, gst, stampDuty, dpCharges: 0 };
+  return { ...Object.fromEntries(Object.entries(values).map(([k, v]) => [k, roundPaise(v)])) as Omit<EquityChargeBreakdown, "total">, total: roundPaise(Object.values(values).reduce((a, b) => a + b, 0)) };
 }

@@ -1,6 +1,6 @@
 import { marketDisplayName, marketGroup, marketTicker, type DirectoryInstrument } from "./market-directory.ts";
 
-export type SearchShelfId = "all" | "in" | "us" | "crypto";
+export type SearchShelfId = "all" | "in" | "mcx" | "us" | "crypto";
 export type PopularLists = {
   in: string[];
   us: string[];
@@ -107,7 +107,7 @@ function shelfOf(item: DirectoryInstrument): SearchShelfId | "other" {
 }
 
 export function matchShelfInstrument<T extends DirectoryInstrument>(instruments: T[], shelf: SearchShelfId, token: string): T | null {
-  const pool = instruments.filter(item => item.assetType !== "OPTION" && (shelf === "all" || shelfOf(item) === shelf));
+  const pool = instruments.filter(item => item.assetType !== "OPTION" && (shelf === "all" || (shelf === "mcx" ? item.instrumentKey?.startsWith("MCX_FO|") : shelfOf(item) === shelf)));
   const key = token.trim().toUpperCase();
   if (!key) return null;
   const bySymbol = new Map(pool.map(item => [item.symbol.toUpperCase(), item]));
@@ -128,7 +128,7 @@ export function searchShelfRows<T extends DirectoryInstrument>(input: {
   query: string;
 }) {
   const tradable = input.instruments.filter(item => item.assetType !== "OPTION");
-  const pool = tradable.filter(item => input.shelf === "all" || shelfOf(item) === input.shelf);
+  const pool = tradable.filter(item => input.shelf === "all" || (input.shelf === "mcx" ? item.instrumentKey?.startsWith("MCX_FO|") : shelfOf(item) === input.shelf));
   const bySymbol = new Map(pool.map(item => [item.symbol.toUpperCase(), item]));
   const byTicker = new Map<string, T>();
   for (const item of pool) {
@@ -163,7 +163,14 @@ export function searchShelfRows<T extends DirectoryInstrument>(input: {
     popular.push(item);
     if (popular.length >= 12) break;
   }
-  return { recent, popular, matches: [] as T[] };
+  const roots = new Set<string>();
+  const commodityRows = pool.filter(item => {
+    const root = item.symbol.replace(/-\d{8}$/, "");
+    if (roots.has(root)) return false;
+    roots.add(root);
+    return !seen.has(item.symbol);
+  });
+  return { recent, popular: input.shelf === "mcx" ? commodityRows.slice(0, 40) : popular, matches: [] as T[] };
 }
 
 export function popularHeading(shelf: SearchShelfId, popular: PopularLists) {

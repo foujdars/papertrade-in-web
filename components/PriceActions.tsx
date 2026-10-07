@@ -16,11 +16,13 @@ import { fillTitle, priceHitTitle } from "@/lib/notification-policy";
 import type { Instrument } from "@/lib/market";
 const KEY = "papertrade-price-tasks-v1";
 const money = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", globalSymbol, onOpenTechnical, onHomeAlertsChange, homeAlertRequest }: {
+export function PriceActions({ request, onClose, onFill, onValidate, marketOpen, intradayOpen, instrumentOpen, instrumentIntradayOpen, onNotice, visible, triggerHost, onCreateAlert, onTasksChange, ownerId = "local", timeframe = "5m", globalSymbol, onOpenTechnical, onHomeAlertsChange, homeAlertRequest }: {
   onHomeAlertsChange?:(snapshot:HomeAlertSnapshot)=>void;homeAlertRequest?:HomeAlertRequest|null;
   request: PriceRequest | null; onClose: () => void; onFill: (task: PriceTask, price: number) => string | null;
   onValidate?: (task: PriceTask) => string | null;
   marketOpen: boolean; intradayOpen: boolean; onNotice: (message: string) => void; visible: boolean; ownerId?: string;
+  instrumentOpen?: (instrument: Instrument) => boolean;
+  instrumentIntradayOpen?: (instrument: Instrument) => boolean;
   triggerHost?: HTMLElement | null;
   onCreateAlert?: () => void;
   onTasksChange?: (tasks: PriceTask[]) => void;
@@ -43,8 +45,8 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
   const storageKey = `${KEY}:${ownerId}`;
   const [tasks, setTasks] = useState<PriceTask[]>([]);
   const tasksRef = useRef(tasks);
-  const callbacks = useRef({ onFill, marketOpen, intradayOpen, onNotice });
-  callbacks.current = { onFill, marketOpen, intradayOpen, onNotice };
+  const callbacks = useRef({ onFill, marketOpen, intradayOpen, instrumentOpen, instrumentIntradayOpen, onNotice });
+  callbacks.current = { onFill, marketOpen, intradayOpen, instrumentOpen, instrumentIntradayOpen, onNotice };
   const [manage, setManage] = useState(false);
   const [tab, setTab] = useState<"list" | "log">("list");
   const [search, setSearch] = useState("");
@@ -93,8 +95,8 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
       const now = Date.now();
       let current = tasksRef.current;
       if (current.some(t => t.status === "pending" && t.expiresAt <= now)) { current = current.map(t => t.status === "pending" && t.expiresAt <= now ? { ...t, status: "expired" as const, completedAt: now } : t); save(current); }
-      const pending = current.filter(t => t.status === "pending");
-      if (pending.length && callbacks.current.marketOpen) {
+      const pending = current.filter(t => t.status === "pending" && (callbacks.current.instrumentOpen?.(t.instrument) ?? true));
+      if (pending.length && (callbacks.current.instrumentOpen || callbacks.current.marketOpen)) {
         controller = new AbortController();
         const timeout = setTimeout(() => controller?.abort(), 9000);
         try {
@@ -109,8 +111,8 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
           if (Array.isArray(stored)) { tasksRef.current = stored; setTasks(stored); }
           for (const t of tasksRef.current.filter(t => t.status === "pending" && t.expiresAt > Date.now())) {
             const q = payload.quotes?.[t.instrument.instrumentKey];
-            if (!callbacks.current.marketOpen || !freshTaskQuote(q, Date.now()) || !priceTaskMatches(t, q.lastPrice)) continue;
-            if (t.product === "INTRADAY" && t.kind === "order" && !callbacks.current.intradayOpen) continue;
+            if (!(callbacks.current.instrumentOpen?.(t.instrument) ?? callbacks.current.marketOpen) || !freshTaskQuote(q, Date.now()) || !priceTaskMatches(t, q.lastPrice)) continue;
+            if (t.product === "INTRADAY" && t.kind === "order" && !(callbacks.current.instrumentIntradayOpen?.(t.instrument) ?? callbacks.current.intradayOpen)) continue;
             const failure = t.kind === "order" ? callbacks.current.onFill(t, q.lastPrice) : null;
             const status = failure ? "rejected" : t.kind === "alert" ? "triggered" : "filled";
             const message = failure ?? (t.kind === "alert" ? priceHitTitle(t.instrument.symbol, q.lastPrice) : fillTitle(t.instrument.symbol, q.lastPrice));
@@ -156,7 +158,7 @@ export function PriceActions({ request, onClose, onFill, onValidate, marketOpen,
       onClose();
       return;
     }
-    if (mode === "order" && product === "INTRADAY" && (!intradayOpen || !marketOpen)) { setError("Intraday orders can only be queued during the trading session."); return; }
+    if (mode === "order" && product === "INTRADAY" && !(instrumentIntradayOpen?.(request.instrument) ?? (intradayOpen && marketOpen))) { setError("Intraday orders can only be queued during the trading session."); return; }
     if (tasksRef.current.filter(t => t.status === "pending").length >= 30) { setError("Cancel an active item before adding more (maximum 30)."); return; }
     try { save([task, ...tasksRef.current].slice(0, 100)); } catch { setError("Device storage is unavailable. Nothing was queued."); return; }
     onNotice(mode === "alert" ? "Price alert saved" : orderType === "Market" ? "Paper market order queued · fills at a fresh open-market quote while the app is running" : "Paper price order queued"); onClose();

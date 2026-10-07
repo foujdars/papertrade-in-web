@@ -79,7 +79,8 @@ import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { deriveNetChange, formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
-import { getNseMarketStatus, nseSquareOffMinute, type NseSession } from "@/lib/market-hours";
+import { getNseMarketStatus, type NseSession } from "@/lib/market-hours";
+import { isMcx, mcxContractSession, indianInstrumentStatus, indianSquareOffMinute } from "@/lib/mcx";
 import {
   calculatePosition,
   getDeliveryHoldingQuantity,
@@ -221,7 +222,7 @@ function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
   return {
     symbol: order.symbol,
     name: order.instrumentName || order.symbol,
-    exchange: "NSE",
+    exchange: order.instrumentKey?.startsWith("MCX_FO|") ? "MCX" : "NSE",
     price: order.price,
     change: 0,
     instrumentKey: order.instrumentKey,
@@ -240,7 +241,7 @@ function instrumentFromPaperOrder(order: PaperOrder, universe: Instrument[]): In
   return universe.find((item) => item.instrumentKey === order.instrumentKey || item.symbol === order.symbol) ?? {
     symbol: order.symbol,
     name: order.instrumentName || order.symbol,
-    exchange: "NSE",
+    exchange: order.instrumentKey?.startsWith("MCX_FO|") ? "MCX" : "NSE",
     price: order.price,
     change: 0,
     instrumentKey: order.instrumentKey || order.symbol,
@@ -255,8 +256,8 @@ function instrumentFromPaperOrder(order: PaperOrder, universe: Instrument[]): In
   };
 }
 
-function calculateInstrumentCharges(instrument: Pick<Instrument, "assetType">, input: { side: "BUY" | "SELL"; product: "INTRADAY" | "DELIVERY"; quantity: number; price: number }) {
-  return calculateUpstoxTradingCharges(instrument.assetType, input);
+function calculateInstrumentCharges(instrument: Pick<Instrument, "assetType"> & Partial<Pick<Instrument, "instrumentKey" | "underlyingSymbol">>, input: { side: "BUY" | "SELL"; product: "INTRADAY" | "DELIVERY"; quantity: number; price: number }) {
+  return calculateUpstoxTradingCharges(instrument.assetType, input, instrument.instrumentKey, instrument.underlyingSymbol);
 }
 
 function getPaperOrderTimestamp(order: PaperOrder) {
@@ -407,6 +408,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 
 export function TradingDashboard() {
   const exchangeSession = useNseSession();
+  const mcxSession = useNseSession("MCX");
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
@@ -416,6 +418,9 @@ export function TradingDashboard() {
   const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey), deltaOptionSymbolFromInstrumentKey(selected.instrumentKey), botOpen);
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
+  const [commodityInstruments, setCommodityInstruments] = useState<Instrument[]>([]);
+  function instrumentSession(instrument: Instrument, at = new Date()) { return indianInstrumentStatus(instrument, at, exchangeSession, mcxSession); }
+  function instrumentCutoff(instrument: Instrument, at = new Date()) { return indianSquareOffMinute(instrument, at, exchangeSession, mcxSession); }
   const [globalInstruments, setGlobalInstruments] = useState<Instrument[]>(GLOBAL_CHART_INSTRUMENTS);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
@@ -980,6 +985,20 @@ export function TradingDashboard() {
     };
   }, [showTradeSymbols]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch("/api/upstox/commodities", { cache: "no-store", signal: controller.signal });
+        const body = await response.json();
+        if (response.ok && body.ok && Array.isArray(body.instruments)) setCommodityInstruments(body.instruments);
+      } catch { /* Existing charts remain usable during a catalogue outage. */ }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 30 * 60_000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, []);
+
   const loadInstrumentUniverse = useCallback(async ({ force = false, signal }: { force?: boolean; signal?: AbortSignal } = {}) => {
     try {
       const endpoint = force ? "/api/upstox/instruments?refresh=1" : "/api/upstox/instruments";
@@ -1065,9 +1084,9 @@ export function TradingDashboard() {
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
     const standardList = watchlistTabs.find((tab) => tab === watchlist);
     const universe = customList
-      ? [...new Map([...stockUniverse, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
+      ? [...new Map([...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
       : term
-        ? [...stockUniverse, ...stockFutureInstruments, ...globalInstruments]
+        ? [...stockUniverse, ...commodityInstruments, ...stockFutureInstruments, ...globalInstruments]
         : stockUniverse;
     return universe.filter((item) => {
       const matchesList = Boolean(term)
@@ -1076,7 +1095,7 @@ export function TradingDashboard() {
         || (standardList !== undefined && item.categories.includes(standardList));
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
-  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockFutureInstruments, stockUniverse, watchlist]);
+  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockFutureInstruments, commodityInstruments, stockUniverse, watchlist]);
   useEffect(() => {
     const term = search.trim();
     if (term.length < 2 || filtered.length || watchlistLoading) return;
@@ -1093,11 +1112,11 @@ export function TradingDashboard() {
   }, [filtered.length, loadInstrumentUniverse, search, watchlistLoading]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
-    return [...stockUniverse, ...stockFutureInstruments, ...globalInstruments]
+    return [...stockUniverse, ...commodityInstruments, ...stockFutureInstruments, ...globalInstruments]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
       .sort((a, b) => (term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0) || compareMarketInstruments(a, b))
       .slice(0, 120);
-  }, [globalInstruments, stockFutureInstruments, stockUniverse, tradeSymbolSearch]);
+  }, [globalInstruments, stockFutureInstruments, commodityInstruments, stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
     const lastFill = orders.find((order) => order.symbol === symbol);
     return calculatePosition(orders, symbol, lastFill?.price ?? 0, "INTRADAY").quantity > 0 || calculatePosition(orders, symbol, lastFill?.price ?? 0, "DELIVERY").quantity > 0;
@@ -1105,9 +1124,9 @@ export function TradingDashboard() {
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const tradingUniverse = useMemo(() => {
     const byKey = new Map<string, Instrument>();
-    for (const item of [...stockUniverse, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
+    for (const item of [...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
-  }, [derivativeInstruments, globalInstruments, stockFutureInstruments, stockUniverse]);
+  }, [derivativeInstruments, globalInstruments, stockFutureInstruments, commodityInstruments, stockUniverse]);
   const volumeShockerWatch = useMemo(() => selectVolumeShockerWatch({ watchlist, customWatchlists, instruments: stockUniverse }), [customWatchlists, stockUniverse, watchlist]);
 
   useEffect(() => {
@@ -1420,9 +1439,6 @@ export function TradingDashboard() {
 
   useEffect(() => {
     if (!clock || !orders.length || autoSquareOffInFlightRef.current || Date.now() < autoSquareOffRetryAtRef.current) return;
-    const marketClock = getNseMarketStatus(clock, exchangeSession);
-    const cutoffMinute = nseSquareOffMinute(clock, exchangeSession);
-    const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= cutoffMinute;
     const currentIndiaDate = indiaDateKey(clock);
     const symbols = [...new Set(orders.map((order) => order.symbol))];
     const pending = symbols.flatMap((symbol) => {
@@ -1433,9 +1449,12 @@ export function TradingDashboard() {
       if (!position.quantity || position.side === "FLAT") return [];
       const orderIndiaDate = indiaDateKey(getPaperOrderTimestamp(latestOrder));
       const carriedOver = orderIndiaDate < currentIndiaDate;
-      if (!carriedOver && !afterSquareOff) return [];
       const instrument = tradingUniverse.find((item) => item.symbol === symbol);
       if (!instrument) return [];
+      const marketClock = instrumentSession(instrument, clock);
+      const cutoffMinute = instrumentCutoff(instrument, clock);
+      const afterSquareOff = marketClock.isTradingDay && marketClock.minutesFromMidnight >= cutoffMinute;
+      if (!carriedOver && !afterSquareOff) return [];
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
       return [{ symbol, position, instrument, quote, sessionDate: carriedOver ? orderIndiaDate : currentIndiaDate, cutoffMinute: carriedOver ? UPSTOX_AUTO_SQUARE_OFF_MINUTES : cutoffMinute }];
     });
@@ -1444,10 +1463,10 @@ export function TradingDashboard() {
     void Promise.all(pending.map(async (item) => {
       let cutoffMinute = item.cutoffMinute;
       if (item.sessionDate !== currentIndiaDate) {
-        const historical = await fetch(`/api/market/session?date=${item.sessionDate}`, { cache: "no-store" })
+        const historical = await fetch(`/api/market/session?date=${item.sessionDate}&exchange=${isMcx(item.instrument) ? "MCX" : "NSE"}`, { cache: "no-store" })
           .then(response => response.json()).catch(() => null) as { session?: NseSession } | null;
         if (!historical?.session?.sessions.length) return { ...item, resolvedPrice: undefined };
-        cutoffMinute = nseSquareOffMinute(new Date(`${item.sessionDate}T00:00:00+05:30`), historical.session);
+        cutoffMinute = indianSquareOffMinute(item.instrument, new Date(`${item.sessionDate}T00:00:00+05:30`), historical.session, historical.session);
       }
       return { ...item, cutoffMinute, resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate, cutoffMinute).catch(() => undefined) };
     })).then((resolved) => {
@@ -1471,7 +1490,7 @@ export function TradingDashboard() {
           createdAt: exitTimestamp,
           charges,
           autoSquareOff: true,
-          squareOffPolicy: "NSE_SESSION_30_MIN_V1",
+          squareOffPolicy: isMcx(item.instrument) ? "MCX_SESSION_30_MIN_V1" : "NSE_SESSION_30_MIN_V1",
           exitReason: "AUTO_SQUARE_OFF",
           priceSource: item.resolvedPrice ? "UPSTOX_CANDLE" : "UPSTOX_QUOTE",
           instrumentKey: item.instrument.instrumentKey,
@@ -1510,7 +1529,7 @@ export function TradingDashboard() {
     }).finally(() => {
       autoSquareOffInFlightRef.current = false;
     });
-  }, [balance, clock, exchangeSession, marketQuotes, orders, tradingUniverse]);
+  }, [balance, clock, exchangeSession, mcxSession, marketQuotes, orders, tradingUniverse]);
 
   useEffect(() => {
     if (!clock || !orders.length || futureExpiryInFlightRef.current || autoSquareOffInFlightRef.current || Date.now() < futureExpiryRetryAtRef.current) return;
@@ -1519,7 +1538,10 @@ export function TradingDashboard() {
     const candidates = [...new Set(orders.filter((order) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey).map((order) => order.symbol))]
       .flatMap((symbol) => {
         const contract = orders.find((order) => order.symbol === symbol && order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey);
-        if (!contract?.expiry || !contract.underlyingKey || !(contract.expiry < today || (contract.expiry === today && afterClose))) return [];
+        if (!contract?.expiry || !contract.underlyingKey) return [];
+        const mcxClose = isMcx(contract) ? mcxContractSession({ categories: [], underlyingSymbol: contract.underlyingSymbol }, mcxSession)?.sessions.at(-1)?.end : undefined;
+        const sessionEnded = isMcx(contract) ? mcxClose !== undefined && clock.getTime() >= mcxClose : afterClose;
+        if (!(contract.expiry < today || (contract.expiry === today && sessionEnded))) return [];
         const position = calculatePosition(orders, symbol, contract.price, "DELIVERY");
         return position.quantity > 0 ? [{ contract, position }] : [];
       });
@@ -1527,7 +1549,7 @@ export function TradingDashboard() {
     futureExpiryInFlightRef.current = true;
     void Promise.all(candidates.map(async ({ contract }) => {
       try {
-        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
+        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(isMcx(contract) ? contract.instrumentKey! : contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
         const candle = response.ok && payload.ok ? payload.candles?.find((item) => indiaDateKey(item.time * 1000) === contract.expiry) : undefined;
         return { contract, price: candle?.close };
@@ -1562,9 +1584,9 @@ export function TradingDashboard() {
         writePaperProtections(remaining);
         return remaining;
       });
-      setToast(`${settled.length} stock future${settled.length === 1 ? "" : "s"} paper-settled at the expiry-day stock close. No shares were delivered.`);
+      setToast(`${settled.length} future${settled.length === 1 ? "" : "s"} paper-settled at the expiry-day close. No physical delivery.`);
     }).finally(() => { futureExpiryInFlightRef.current = false; });
-  }, [balance, clock, orders]);
+  }, [balance, clock, mcxSession, orders]);
 
   useEffect(() => {
     if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
@@ -1621,8 +1643,6 @@ export function TradingDashboard() {
   useEffect(() => {
     if (!clock || !orders.length || !protections.length) return;
     const nativeTriggersById = new Map(nativeProtectionTriggers.map((item) => [item.id, item]));
-    if (!getNseMarketStatus(clock, exchangeSession).isOpen && !nativeTriggersById.size) return;
-    const afterIntradaySquareOff = getNseMarketStatus(clock, exchangeSession).minutesFromMidnight >= nseSquareOffMinute(clock, exchangeSession);
     const triggeredOrders: PaperOrder[] = [];
     const clearedProtectionIds = new Set<string>();
     const nativeTriggeredOrderIds = new Set<string>();
@@ -1632,8 +1652,9 @@ export function TradingDashboard() {
     protections.forEach((protection, index) => {
       const nativeTrigger = nativeTriggersById.get(protection.id);
       if (nativeTrigger) consumedNativeTriggerIds.add(protection.id);
-      if (protection.product === "INTRADAY" && afterIntradaySquareOff && !nativeTrigger) return;
       const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
+      if (!instrument && !nativeTrigger) return;
+      if (instrument && !nativeTrigger && (!instrumentSession(instrument, clock).isOpen || (protection.product === "INTRADAY" && getNseMarketStatus(clock).minutesFromMidnight >= instrumentCutoff(instrument, clock)))) return;
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[protection.symbol] : marketQuotes[protection.symbol];
       const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : protection.symbol;
       const quoteIsFresh = Boolean(nativeTrigger || (quote && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000));
@@ -1708,7 +1729,7 @@ export function TradingDashboard() {
       ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
-  }, [balance, clock, exchangeSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
+  }, [balance, clock, exchangeSession, mcxSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedDeltaSymbol = deltaSymbolFromInstrumentKey(selected.instrumentKey);
   const selectedDeltaOption = deltaOptionSymbolFromInstrumentKey(selected.instrumentKey);
@@ -1873,10 +1894,9 @@ export function TradingDashboard() {
     () => clock ? getNseMarketStatus(clock, exchangeSession) : { isOpen: false, message: "Checking NSE session…" },
     [clock, exchangeSession],
   );
-  const intradayOrdersAllowed = Boolean(
-    clock && marketStatus.isOpen && getNseMarketStatus(clock, exchangeSession).minutesFromMidnight < nseSquareOffMinute(clock, exchangeSession),
-  );
-  const marketOrdersAllowed = Boolean(clock && marketStatus.isOpen);
+  const selectedSessionStatus = clock ? instrumentSession(selected, clock) : { isOpen: false, message: "Checking exchange session…" };
+  const intradayOrdersAllowed = Boolean(clock && selectedSessionStatus.isOpen && getNseMarketStatus(clock).minutesFromMidnight < instrumentCutoff(selected, clock));
+  const marketOrdersAllowed = Boolean(clock && selectedSessionStatus.isOpen);
   const selectedMarketOrdersAllowed = selectedIsWatchOnly ? false : selectedDeltaChartSymbol ? selectedQuoteIsFresh : marketOrdersAllowed;
   const selectedOrderTicketAvailable = !selectedIsWatchOnly && selected.assetType !== "INDEX" && (selectedDeltaChartSymbol ? selectedQuoteIsFresh : true);
   const afterHoursDeliveryEstimate = orderEstimatePrice;
@@ -1895,9 +1915,9 @@ export function TradingDashboard() {
     if (selectedDeltaSymbol || selectedDeltaOption) { setGlobalTicketTab("Positions"); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true); }
     else setPositionsOpen(true);
   }
-  const intradayStatusMessage = marketStatus.isOpen && !intradayOrdersAllowed
+  const intradayStatusMessage = selectedSessionStatus.isOpen && !intradayOrdersAllowed
     ? "Intraday entry is closed for this session’s auto square-off window"
-    : marketStatus.message;
+    : selectedSessionStatus.message;
   const todayOrders = useMemo(() => {
     if (!clock) return [];
     const start = new Date(clock);
@@ -1935,7 +1955,7 @@ export function TradingDashboard() {
       instrumentKey: instrument.instrumentKey,
       assetType: "EQUITY" as const,
     };
-  }), ...globalInstruments.map((instrument) => {
+  }), ...commodityInstruments.map(instrument => ({ symbol: instrument.symbol, name: instrument.name, price: marketQuotes[instrument.instrumentKey]?.lastPrice ?? 0, changePercent: marketQuotes[instrument.instrumentKey]?.changePercent ?? 0, categories: instrument.categories, instrumentKey: instrument.instrumentKey, assetType: instrument.assetType })), ...globalInstruments.map((instrument) => {
     const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
     return {
       symbol: instrument.symbol,
@@ -1946,7 +1966,7 @@ export function TradingDashboard() {
       instrumentKey: instrument.instrumentKey,
       assetType: instrument.assetType,
     };
-  })], [globalInstruments, marketQuotes, stockUniverse]);
+  })], [commodityInstruments, globalInstruments, marketQuotes, stockUniverse]);
   const homeRiskSummary = useMemo(() => {
     const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
     const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
@@ -2235,7 +2255,7 @@ export function TradingDashboard() {
       setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "order", side, orderType: orderType === "SL" ? "SL" : "Limit", quantity, product });
       return;
     }
-    const currentSession = getNseMarketStatus(new Date(), exchangeSession);
+    const currentSession = instrumentSession(selected);
     if (researchDraft && !currentSession.isOpen) { setToast("Research draft saved in the ticket. An open market and fresh quote are required for its protected paper entry."); return; }
     if (!selectedDeltaChartSymbol && !currentSession.isOpen && afterHoursDeliveryCanQueue) {
       if (!Number.isSafeInteger(quantity) || quantity < 1) { setToast("Enter a valid delivery quantity."); return; }
@@ -2272,7 +2292,7 @@ export function TradingDashboard() {
     }
     if (!selectedDeltaSymbol) {
       if (!marketOrdersAllowed) {
-        setToast(marketStatus.message);
+        setToast(selectedSessionStatus.message);
         return;
       }
       if (product === "INTRADAY" && !intradayOrdersAllowed) {
@@ -2375,11 +2395,11 @@ export function TradingDashboard() {
       return;
     }
     const exitIsDelta = Boolean(deltaSymbolFromInstrumentKey(exitInstrument.instrumentKey));
-    if (!exitIsDelta && !marketOrdersAllowed) {
-      setToast(marketStatus.message);
+    if (!exitIsDelta && !instrumentSession(exitInstrument).isOpen) {
+      setToast(selectedSessionStatus.message);
       return;
     }
-    if (!exitIsDelta && exitProduct === "INTRADAY" && !intradayOrdersAllowed) {
+    if (!exitIsDelta && exitProduct === "INTRADAY" && getNseMarketStatus().minutesFromMidnight >= instrumentCutoff(exitInstrument)) {
       setToast(intradayStatusMessage);
       return;
     }
@@ -2560,7 +2580,7 @@ export function TradingDashboard() {
   function openOrderSheet(nextSide: "BUY" | "SELL") {
     if (selectedIsWatchOnly) { setToast("This global reference has no live paper order contract."); return; }
     if (selected.assetType === "INDEX") { setToast("Indices cannot be traded directly. Choose a stock or F&O contract."); return; }
-    if (!selectedDeltaChartSymbol && !getNseMarketStatus(new Date(), exchangeSession).isOpen) setProduct("DELIVERY");
+    if (!selectedDeltaChartSymbol && !instrumentSession(selected).isOpen) setProduct("DELIVERY");
     if (selectedDeltaSymbol || selectedDeltaOption) { setSide(nextSide); setGlobalTicketTab("Order"); setDesktopOrderPanelOpen(true); }
     else if (researchDraft && nextSide === "BUY") { setSide("BUY"); setTargetPrice(researchDraft.target.toFixed(2)); setStopLossPrice(researchDraft.stop.toFixed(2)); }
     else { setResearchDraft(null); activateRiskTool(nextSide); }
@@ -2771,8 +2791,8 @@ export function TradingDashboard() {
     if (!paperDataReady) return "Paper account is not ready. Please queue the order again.";
     const invalid = priceTaskError(task);
     if (invalid) return invalid;
-    if (!getNseMarketStatus(new Date(), exchangeSession).isOpen) return "Market is closed.";
-    if (task.product === "INTRADAY" && !intradayOrdersAllowed) return "Intraday trading is closed.";
+    if (!instrumentSession(task.instrument).isOpen) return "Market is closed.";
+    if (task.product === "INTRADAY" && getNseMarketStatus().minutesFromMidnight >= instrumentCutoff(task.instrument)) return "Intraday trading is closed.";
     const instrument = task.instrument;
     const currentOrders = readPaperOrders();
     if (currentOrders.some(o => o.id === task.id)) return null;
@@ -2851,7 +2871,7 @@ export function TradingDashboard() {
       <SessionOpenAlerts />
       <PaperTradeToneListener />
       <VolumeShockerAlerts instruments={volumeShockerWatch} />
-      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} globalSymbol={selectedDeltaSymbol} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
+      <PriceActions key={user?.id ?? "local"} ownerId={user?.id ?? "local"} globalSymbol={selectedDeltaSymbol} request={priceRequest} onClose={() => setPriceRequest(null)} onFill={fillPriceOrder} onValidate={validateQueuedPriceOrder} marketOpen={paperDataReady && marketStatus.isOpen} instrumentOpen={i => paperDataReady && instrumentSession(i).isOpen} instrumentIntradayOpen={i => instrumentSession(i).isOpen && getNseMarketStatus().minutesFromMidnight < instrumentCutoff(i)} intradayOpen={intradayOrdersAllowed} onNotice={setToast} onTasksChange={setPriceTasks} onHomeAlertsChange={setHomeAlerts} homeAlertRequest={homeAlertRequest} timeframe={timeframe} onOpenTechnical={(instrument, frame) => { setHomeOpen(false); setFnoListOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false); setWorkspaceMode("trade"); chooseTradeInstrument(instrument); setTimeframe(frame); }} onCreateAlert={() => setPriceRequest({ instrument: selected, price: verifiedLivePrice ?? selected.price, mode: "alert" })} triggerHost={activeNavigationSection === "fno" ? fnoPriceActionsHost : priceActionsHost} visible={activeNavigationSection === "trade" || activeNavigationSection === "fno"} />
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
@@ -2952,8 +2972,8 @@ export function TradingDashboard() {
           <div className="instrument-header">
             <div className="trade-identity-cluster">
               <div className="trade-context-line">
-                <span className={`trade-feed-chip ${selectedQuoteIsFresh && selectedMarketOrdersAllowed ? "live" : "waiting"}`} title={selectedDeltaChartSymbol ? "Delta Exchange India market data" : marketStatus.message}><i />{selectedIsWatchOnly ? "WATCH" : !selectedMarketOrdersAllowed && !selectedDeltaChartSymbol ? "CLOSED" : selectedQuoteIsFresh ? "LIVE" : "SYNCING"}</span>
-                <span>{selectedVenueLabel === "NSE" ? "Paper practice" : "Global practice"}</span>
+                <span className={`trade-feed-chip ${selectedQuoteIsFresh && selectedMarketOrdersAllowed ? "live" : "waiting"}`} title={selectedDeltaChartSymbol ? "Delta Exchange India market data" : selectedSessionStatus.message}><i />{selectedIsWatchOnly ? "WATCH" : !selectedMarketOrdersAllowed && !selectedDeltaChartSymbol ? "CLOSED" : selectedQuoteIsFresh ? "LIVE" : "SYNCING"}</span>
+                <span>{selectedVenueLabel === "NSE" || selectedVenueLabel === "MCX" ? "Paper practice" : "Global practice"}</span>
               </div>
               <div ref={tradeSymbolPickerRef} className="instrument-title trade-symbol-picker">
                 <button className="trade-symbol-trigger" onClick={() => setShowTradeSymbols((value) => !value)} aria-expanded={showTradeSymbols}>
@@ -3259,6 +3279,7 @@ export function TradingDashboard() {
         todayPnl={todayClosedPnl+(homeOpenDayChange??0)}
         realisedToday={todayClosedPnl}
         openChangeToday={homeOpenDayChange}
+        commoditySessionLabel={mcxSession?.sessions.length ? "MCX · " + mcxSession.sessions.map(s => [s.start, s.end].map(t => new Date(t).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })).join("–")).join(", ") + " IST" : "MCX · Session closed or unconfirmed"}
         sessionLabel={marketStatus.isOpen?'Market open':/holiday/i.test(marketStatus.message)?'Market holiday':/checking|unavailable/i.test(marketStatus.message)?'Session unconfirmed':'Market closed'}
         sessionMessage={marketStatus.message}
         attention={[...positionAttention(openPositions,protections,orders),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
@@ -3289,7 +3310,7 @@ export function TradingDashboard() {
             chooseTradeInstrument(globalInstrument);
             return;
           }
-          const stock = stockUniverse.find((item) => item.symbol === symbol);
+          const stock = tradingUniverse.find((item) => item.symbol === symbol);
           const index = SEARCHABLE_INDEX_TICKERS.find((item) => item.symbol === symbol);
           openNavigationSection("trade");
           if (stock) chooseTradeInstrument(stock);
