@@ -65,16 +65,22 @@ function marksFor(prefix: string, tone: PriorTone, bars: Bar[], options: PriorOp
 }
 
 /** Levels from daily candles. Each mark keeps the time of the candle that printed it. */
-export function priorMarks(candles: Bar[], options: PriorOptions = DEFAULTS): PriorMark[] {
+export function priorMarks(candles: Bar[], options: PriorOptions = DEFAULTS, referenceTime?: number): PriorMark[] {
   const rows = candles.filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)).slice().sort((a, b) => a.time - b.time);
-  if (rows.length < 2) return [];
+  if (!rows.length) return [];
   const today = istDate(rows.at(-1)!.time);
   const past = rows.filter((candle) => istDate(candle.time) < today);
-  if (!past.length) return [];
   const marks: PriorMark[] = [];
   if (options.day) {
-    const date = istDate(past.at(-1)!.time);
-    marks.push(...marksFor("PD", "day", past.filter((candle) => istDate(candle.time) === date), options));
+    // Historical daily requests can end yesterday, while the displayed chart
+    // already has today's candle. Do not discard yesterday a second time.
+    const referenceDay = Number.isFinite(referenceTime) ? istDate(referenceTime!) : today;
+    const completed = rows.filter((candle) => istDate(candle.time) < referenceDay);
+    const previous = completed.at(-1);
+    if (previous) {
+      const date = istDate(previous.time);
+      marks.push(...marksFor("PD", "day", completed.filter((candle) => istDate(candle.time) === date), options));
+    }
   }
   if (options.week) {
     const start = addDays(weekStart(today), -7);
