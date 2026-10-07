@@ -27,6 +27,8 @@ export function PriorLevels({ candles, chart, series, timeframe, instrumentKey, 
   const [daily, setDaily] = useState<Candle[]>([]);
   const [dailyState, setDailyState] = useState<"loading" | "ready" | "error">("loading");
   const stamp = candles.length ? `${candles.length}:${candles[0]?.time}:${candles.at(-1)?.time}` : "";
+  const referenceTime = candles.at(-1)?.time;
+  const referenceDay = referenceTime === undefined ? "" : new Date((referenceTime + 19_800) * 1000).toISOString().slice(0, 10);
   const optionKey = JSON.stringify(config?.inputs ?? null);
   const options = useMemo(() => priorOptionsFromInputs(config?.inputs ?? studyDefaults("prior-levels").inputs), [optionKey]);
   useEffect(() => {
@@ -38,9 +40,11 @@ export function PriorLevels({ candles, chart, series, timeframe, instrumentKey, 
       .then((payload: { candles?: Candle[] }) => { if (controller.signal.aborted) return; if (Array.isArray(payload.candles) && payload.candles.length) { setDaily(payload.candles); setDailyState("ready"); } else setDailyState("error"); })
       .catch(() => { if (!controller.signal.aborted) setDailyState("error"); });
     return () => controller.abort();
-  }, [instrumentKey]);
+  }, [instrumentKey, referenceDay]);
   const source = daily.length ? daily : timeframe === "1Y" ? [] : candles;
-  const marks = useMemo(() => priorMarks(source, options), [source, options, stamp]);
+  // Weekly/monthly chart timestamps can precede the latest daily history.
+  const dayReferenceTime = referenceTime === undefined ? undefined : Math.max(referenceTime, source.at(-1)?.time ?? referenceTime);
+  const marks = useMemo(() => priorMarks(source, options, dayReferenceTime), [source, options, stamp, dayReferenceTime]);
   const markKey = marks.map((mark) => `${mark.id}:${mark.price}:${mark.time}`).join("|");
   useEffect(() => {
     if (!chart || !marks.length) return;

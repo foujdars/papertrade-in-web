@@ -36,6 +36,34 @@ test("a day-only high does not draw the week, month or low", () => {
   assert.deepEqual(marks.map((mark) => mark.id), ["PDH"]);
 });
 
+test("daily history ending yesterday uses yesterday, not the day before it", () => {
+  const history = candles.slice(0, -1);
+  const reference = candles.at(-1).time;
+  const marks = Object.fromEntries(priorMarks(history, undefined, reference).map(mark => [mark.id, mark]));
+  assert.equal(marks.PDH.price, 130);
+  assert.equal(marks.PDL.price, 88);
+  assert.equal(marks.PDH.time, history.at(-1).time);
+  const withoutReference = priorMarks(history);
+  assert.deepEqual(Object.values(marks).filter(mark => mark.tone !== 'day'), withoutReference.filter(mark => mark.tone !== 'day'));
+});
+
+test("the reference session excludes its candle and skips weekends and holidays", () => {
+  const history = [bar('2026-10-01T09:15:00Z', 110, 90), bar('2026-10-05T09:15:00Z', 130, 100)];
+  const monday = Object.fromEntries(priorMarks(history, undefined, at('2026-10-05T12:00:00Z')).map(mark => [mark.id, mark]));
+  assert.equal(monday.PDH.price, 110);
+  assert.equal(monday.PDL.price, 90);
+  const tuesday = Object.fromEntries(priorMarks(history, undefined, at('2026-10-06T09:15:00Z')).map(mark => [mark.id, mark]));
+  assert.equal(tuesday.PDH.price, 130);
+  assert.equal(tuesday.PDL.price, 100);
+  const replay = Object.fromEntries(priorMarks(history, undefined, at('2026-10-02T09:15:00Z')).map(mark => [mark.id, mark]));
+  assert.equal(replay.PDH.price, 110);
+});
+
+test("one available completed daily candle is sufficient for the day levels", () => {
+  const marks = priorMarks([bar('2026-10-06T09:15:00Z', 150, 120)], undefined, at('2026-10-07T09:15:00Z'));
+  assert.deepEqual(marks.map(mark => [mark.id, mark.price]), [['PDH', 150], ['PDL', 120]]);
+});
+
 test("financial year and a chosen daily candle can be added", () => {
   const marks = priorMarks(candles, { day: false, week: false, month: false, year: true, custom: 3, high: true, low: true, open: true, close: true });
   const byId = Object.fromEntries(marks.map((mark) => [mark.id, mark]));
