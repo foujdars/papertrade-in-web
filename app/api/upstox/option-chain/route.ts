@@ -18,6 +18,7 @@ type MarketData = {
   ltp?: number;
   volume?: number;
   oi?: number;
+  prev_oi?: number;
   close_price?: number;
   bid_price?: number;
   bid_qty?: number;
@@ -66,6 +67,8 @@ function normalizeSide(side: ChainSide | undefined, contract: UpstoxOptionContra
       ltp: finite(side?.market_data?.ltp),
       volume: finite(side?.market_data?.volume),
       oi: finite(side?.market_data?.oi),
+      oiAvailable: typeof side?.market_data?.oi === "number" && Number.isFinite(side.market_data.oi) && side.market_data.oi >= 0,
+      prevOi: typeof side?.market_data?.prev_oi === "number" && Number.isFinite(side.market_data.prev_oi) && side.market_data.prev_oi >= 0 ? side.market_data.prev_oi : null,
       closePrice: finite(side?.market_data?.close_price),
       bidPrice: finite(side?.market_data?.bid_price),
       bidQty: finite(side?.market_data?.bid_qty),

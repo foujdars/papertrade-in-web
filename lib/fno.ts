@@ -22,6 +22,8 @@ export type OptionMarketData = {
   ltp: number;
   volume: number;
   oi: number;
+  oiAvailable?: boolean;
+  prevOi?: number | null;
   closePrice: number;
   bidPrice: number;
   bidQty: number;

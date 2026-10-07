@@ -5,6 +5,7 @@ import { isGlobalInstrumentKey } from '@/lib/global-markets';
 import { compareMarketInstruments } from '@/lib/market-directory';
 import { MarketDirectory } from './MarketDirectory';
 import { IndiaPulse, IndiaFlows } from "./IndiaPulse";
+import { HomeDerivatives } from "./HomeDerivatives";
 import { MarketMovers } from "./MarketMovers";
 import { EquityWatch } from "./EquityWatch";
 import { BulkDeals } from "./BulkDeals";
@@ -383,6 +384,7 @@ export function HomeWorkspace({
           <SessionBoard />
         </section>}
 
+        {activeMarket === 'india' && cards.market && <HomeDerivatives onOpenStock={onOpenStock}/>}
         {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
         {activeMarket === "india" && <div className="home-market-pair">
@@ -411,7 +413,7 @@ export function HomeWorkspace({
           </section>}
 
         </div>
-        {activeMarket === "india" ? <IndiaPulse /> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
+        {activeMarket === "india" ? <IndiaPulse showGauges={!cards.market}/> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}

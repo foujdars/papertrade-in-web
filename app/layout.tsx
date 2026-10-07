@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { NativeViewportGuard } from "@/components/NativeViewportGuard";
 import "./globals.css";
+import "./home-derivatives.css";
 import "./motion.css";
 import "./allotments.css";
 import "./ipo-directory.css";
