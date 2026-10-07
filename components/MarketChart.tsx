@@ -1587,6 +1587,7 @@ export function MarketChart({
     }
     if (chartAction.type === "toggle-crosshair") {
       crosshairVisibleRef.current = !crosshairVisibleRef.current;
+      setPriceCursor(null);
       chart.applyOptions({ crosshair: { vertLine: { visible: crosshairVisibleRef.current }, horzLine: { visible: crosshairVisibleRef.current } } });
     }
     if (chartAction.type.startsWith("scale-")) {
@@ -1666,7 +1667,7 @@ export function MarketChart({
         crosshair: {
           mode: magnetArmed() ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
           vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
-          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelVisible: false, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
         },
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
@@ -1676,6 +1677,9 @@ export function MarketChart({
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
+      // Programmatic clears do not emit a crosshair event in Lightweight Charts.
+      const clearCrosshairPosition = chart.clearCrosshairPosition.bind(chart);
+      chart.clearCrosshairPosition = () => { setPriceCursor(null); clearCrosshairPosition(); };
       const style = chartStyleRef.current;
       const kind = styleSeriesKind(style);
       const shared = {
@@ -1838,6 +1842,7 @@ export function MarketChart({
       let touchPointerStart: { id: number; x: number; y: number } | null = null;
       let cursorGesture: { id: number; x: number; y: number; origin: { x: number; y: number; pane: number }; moved: boolean; existing: boolean } | null = null;
       let keepCursorAfterTouch = false;
+      let retainedTouchCursor: { x: number; y: number; pane: number } | null = null;
       let retainedCursorFrame: number | null = null;
       // Native tracking belongs to one pane. End that tracking on release,
       // then retain our cross-pane cursor through the public chart API.
@@ -1864,8 +1869,8 @@ export function MarketChart({
         chart.applyOptions({
           crosshair: {
             horzLine: {
-              visible: !normalizeTool(activeToolRef.current),
-              labelVisible: true,
+              visible: crosshairVisibleRef.current && !normalizeTool(activeToolRef.current),
+              labelVisible: purple,
               color: neon ? "#bf9aff" : "#8c96aa",
               labelBackgroundColor: label,
             },
@@ -1895,7 +1900,7 @@ export function MarketChart({
         const rsiValue = datum && 'value' in datum && typeof datum.value === 'number' ? datum.value : null;
         const value = bundle?.id === 'rsi' && rsiValue !== null ? rsiValue : raw;
         chart.setCrosshairPosition(value, time, line);
-        if (!normalizeTool(activeToolRef.current)) setPriceCursor(point.pane === 0 ? { scope: `${instrument.instrumentKey}:${timeframe}`, anchor: { time, price: value }, y: line.priceToCoordinate(value) ?? point.y, width: chart.priceScale('right').width(), precision: externalFeed ? globalPriceFormatRef.current.precision : 2 } : null);
+        if (!normalizeTool(activeToolRef.current)) setPriceCursor(crosshairVisibleRef.current && point.pane === 0 ? { scope: `${instrument.instrumentKey}:${timeframe}`, anchor: { time, price: value }, y: line.priceToCoordinate(value) ?? point.y, width: chart.priceScale('right').width(), precision: externalFeed ? globalPriceFormatRef.current.precision : 2 } : null);
         cursorPoint = point;
         studyAimRef.current = bundle ? { studyId: bundle.id, time: Number(time), value, x: point.x, y: top + (line.priceToCoordinate(value) ?? point.y - top) } : null;
         if (point.pane === 0) lastCrosshairAnchorRef.current = { time, price: value };
@@ -1913,10 +1918,10 @@ export function MarketChart({
         if (replayRef.current.selecting && stamp !== null) replayRef.current.onPreview?.(stamp);
       };
       crosshairMove = (event) => {
-        if (event.point && event.paneIndex === 0 && event.time !== undefined && !normalizeTool(activeToolRef.current)) {
+        if (crosshairVisibleRef.current && event.point && event.paneIndex === 0 && event.time !== undefined && !normalizeTool(activeToolRef.current)) {
           const price = series.coordinateToPrice(event.point.y);
           if (price !== null && Number.isFinite(price) && event.point.y >= 0 && event.point.y < chart.panes()[0].getHeight()) setPriceCursor({ scope: `${instrument.instrumentKey}:${timeframe}`, anchor: { time: event.time, price }, y: event.point.y, width: chart.priceScale('right').width(), precision: externalFeed ? globalPriceFormatRef.current.precision : 2 });
-        } else if (event.point || normalizeTool(activeToolRef.current)) setPriceCursor(null);
+        } else setPriceCursor(null);
         if (followPane >= 0 && event.paneIndex !== followPane) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         if (!normalizeTool(activeToolRef.current)) {
@@ -2398,8 +2403,9 @@ export function MarketChart({
         scheduleOverlayRefresh();
         if (cursorGesture?.id === event.pointerId) {
           keepCursorAfterTouch = (cursorGesture.moved || !cursorGesture.existing) && event.type !== "pointercancel";
+          retainedTouchCursor = keepCursorAfterTouch && cursorPoint ? { ...cursorPoint } : null;
           if (!keepCursorAfterTouch) {
-            chart.clearCrosshairPosition(); cursorPoint = null; studyAimRef.current = null;
+            chart.clearCrosshairPosition(); setPriceCursor(null); cursorPoint = null; studyAimRef.current = null;
             paintRsiCrosshair(undefined); setStudyCursor(null); setRsiLastVisible(true);
           }
           cursorGesture = null;
@@ -2535,7 +2541,8 @@ export function MarketChart({
         if (event.touches.length === 1 && tool && !CONTINUOUS_TOOLS.has(tool) && !pinching) event.stopPropagation();
       };
       const finishCursorTouch = (event: TouchEvent) => {
-        const retained = keepCursorAfterTouch && event.type === "touchend" ? cursorPoint : null;
+        const retained = keepCursorAfterTouch && event.type === "touchend" ? retainedTouchCursor : null;
+        retainedTouchCursor = null;
         keepCursorAfterTouch = false;
         if (retained) retainedCursorFrame = requestAnimationFrame(() => {
           retainedCursorFrame = null;
@@ -3332,7 +3339,7 @@ export function MarketChart({
     <div className="chart-stack lightweight-stack">
       <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={event => { if (event.pointerType !== 'touch') setPriceCursor(null); }}>
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
-        {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 24 }}>
+        {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 18 }}>
           <button type="button" aria-label={`Add horizontal line at ${priceCursor.anchor.price.toFixed(priceCursor.precision)}`} title="Add horizontal line at this price" onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.stopPropagation(); addCrosshairPriceLine(); }}>+</button>
           <span>{priceCursor.anchor.price.toLocaleString('en-IN', { maximumFractionDigits: priceCursor.precision })}</span>
         </div>}
