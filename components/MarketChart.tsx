@@ -610,6 +610,7 @@ export function MarketChart({
   const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
   const chartHost = useRef<HTMLDivElement>(null);
+  const [priceCursor, setPriceCursor] = useState<{ scope: string; anchor: Anchor; y: number; width: number; precision: number } | null>(null);
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
   const candleSeries = useRef<ISeriesApi<SeriesType> | null>(null);
@@ -1196,6 +1197,15 @@ export function MarketChart({
       if (isReplay) replayDrawingsRef.current = { scope: storageKeyRef.current, snapshot };
       if (!isReplay) window.localStorage.setItem(storageKeyRef.current, JSON.stringify(snapshot));
     }
+  }
+
+  function addCrosshairPriceLine() {
+    const manager = drawingManager.current, registry = drawingRegistry.current;
+    if (!priceCursor || priceCursor.scope !== `${instrument.instrumentKey}:${timeframe}` || !manager || !registry || lockedRef.current || hiddenRef.current || normalizeTool(activeToolRef.current)) return;
+    const line = registry.createDrawing('horizontal-line', crypto.randomUUID(), [{ ...priceCursor.anchor }], toolStyle('horizontal-line'), { visible: true, locked: false, anchorTimeOffset: usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0 } as DrawingOptions);
+    if (!line) return;
+    manager.addDrawing(line);
+    persistDrawings(true);
   }
 
   function openDrawingSettings(id:string, study:boolean) {
@@ -1885,6 +1895,7 @@ export function MarketChart({
         const rsiValue = datum && 'value' in datum && typeof datum.value === 'number' ? datum.value : null;
         const value = bundle?.id === 'rsi' && rsiValue !== null ? rsiValue : raw;
         chart.setCrosshairPosition(value, time, line);
+        if (!normalizeTool(activeToolRef.current)) setPriceCursor(point.pane === 0 ? { scope: `${instrument.instrumentKey}:${timeframe}`, anchor: { time, price: value }, y: line.priceToCoordinate(value) ?? point.y, width: chart.priceScale('right').width(), precision: externalFeed ? globalPriceFormatRef.current.precision : 2 } : null);
         cursorPoint = point;
         studyAimRef.current = bundle ? { studyId: bundle.id, time: Number(time), value, x: point.x, y: top + (line.priceToCoordinate(value) ?? point.y - top) } : null;
         if (point.pane === 0) lastCrosshairAnchorRef.current = { time, price: value };
@@ -1902,6 +1913,10 @@ export function MarketChart({
         if (replayRef.current.selecting && stamp !== null) replayRef.current.onPreview?.(stamp);
       };
       crosshairMove = (event) => {
+        if (event.point && event.paneIndex === 0 && event.time !== undefined && !normalizeTool(activeToolRef.current)) {
+          const price = series.coordinateToPrice(event.point.y);
+          if (price !== null && Number.isFinite(price) && event.point.y >= 0 && event.point.y < chart.panes()[0].getHeight()) setPriceCursor({ scope: `${instrument.instrumentKey}:${timeframe}`, anchor: { time: event.time, price }, y: event.point.y, width: chart.priceScale('right').width(), precision: externalFeed ? globalPriceFormatRef.current.precision : 2 });
+        } else if (event.point || normalizeTool(activeToolRef.current)) setPriceCursor(null);
         if (followPane >= 0 && event.paneIndex !== followPane) return;
         if(studyGestureRef.current || (normalizeTool(activeToolRef.current)&&studyAimRef.current))return;
         if (!normalizeTool(activeToolRef.current)) {
@@ -3315,8 +3330,12 @@ export function MarketChart({
   </div> : null;
   return (
     <div className="chart-stack lightweight-stack">
-      <div className="price-chart-wrap lightweight-chart-wrap">
+      <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={event => { if (event.pointerType !== 'touch') setPriceCursor(null); }}>
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
+        {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 24 }}>
+          <button type="button" aria-label={`Add horizontal line at ${priceCursor.anchor.price.toFixed(priceCursor.precision)}`} title="Add horizontal line at this price" onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.stopPropagation(); addCrosshairPriceLine(); }}>+</button>
+          <span>{priceCursor.anchor.price.toLocaleString('en-IN', { maximumFractionDigits: priceCursor.precision })}</span>
+        </div>}
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
         {sessionShades.flatMap((shade) => shade.edges.map((edge) => <span key={`${shade.key}-${edge.label}-${edge.x}`} className="chart-session-edge" style={{ left: edge.x }}>{edge.label}</span>))}
         {dateArrow && <div className="chart-date-arrow" style={{ left: dateArrow.x, top: Math.max(20, dateArrow.y - dateArrow.size - 3), fontSize: dateArrow.size }} aria-label="Selected date candle">↓</div>}
