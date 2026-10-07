@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { ModernSelect } from './ModernSelect';
+import { OpenInterestChart } from './OpenInterestChart';
+import { nearbyOiStrikes, oiLevels } from '@/lib/oi-chart';
 import { oiSummary, type GiftSnapshot } from '@/lib/home-derivatives';
 import { futureToInstrument, type FnoUnderlying, type OptionChainRow } from '@/lib/fno';
 import type { Instrument } from '@/lib/market';
@@ -13,22 +15,6 @@ const defaults: FnoUnderlying[] = [
 ];
 const number = (n: number | null | undefined, compact = false) => typeof n === 'number' && Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: 2, ...(compact ? { notation: 'compact' as const } : {}) }) : '—';
 const time = (iso: string) => new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-function OpenInterestChart({ rows, change }: { rows: ReturnType<typeof oiSummary>['strikes']; change: boolean }) {
-  const width = Math.max(440, rows.length * 42 + 52), height = 180;
-  const values = rows.flatMap(row => [row.call[change ? 'change' : 'oi'], row.put[change ? 'change' : 'oi']]);
-  const max = Math.max(1, ...values.map(value => Math.abs(value ?? 0)));
-  const negative = change && values.some(value => value !== null && value < 0);
-  const base = negative ? 76 : 134, scale = (negative ? 62 : 110) / max;
-  return <div className="home-oi-chart-scroll"><svg viewBox={`0 0 ${width} ${height}`} style={{ minWidth: width }} role="img" aria-label={change ? 'Call and put change in open interest by strike' : 'Call and put open interest by strike'}>
-    {[0, .5, 1].map(f => <g key={f}><line x1="36" x2={width-8} y1={base-max*scale*f} y2={base-max*scale*f} className="home-oi-grid"/><text x="32" y={base-max*scale*f+3} textAnchor="end">{number(max*f,true)}</text></g>)}
-    {negative && <text x="32" y={base+max*scale+3} textAnchor="end">−{number(max,true)}</text>}
-    {rows.map((row,i) => <g key={row.strike}>{(['call','put'] as const).map((side,j) => {
-      const value = row[side][change ? 'change' : 'oi'], x = 44 + i*((width-52)/Math.max(1,rows.length)) + j*12;
-      return value === null ? null : <rect key={side} x={x} y={value >= 0 ? base-value*scale : base} width="10" height={Math.max(0,Math.abs(value)*scale)} rx="2" className={`home-oi-bar ${side}`}><title>{row.strike} · {side === 'call' ? 'Call' : 'Put'} {change ? 'OI change' : 'OI'}: {number(value)}</title></rect>;
-    })}<text transform={`translate(${52+i*((width-52)/Math.max(1,rows.length))},${height-7}) rotate(-45)`} textAnchor="start">{number(row.strike)}</text></g>)}
-  </svg></div>;
-}
 
 export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock: (symbol: string) => void; onOpenInstrument?: (instrument: Instrument) => void }) {
   const [catalogue, setCatalogue] = useState<FnoUnderlying[]>(defaults);
@@ -101,13 +87,9 @@ export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [selected, expiry]);
   const summary = useMemo(() => oiSummary(rows), [rows]);
-  const spot = rows.find(row => row.underlyingSpotPrice > 0)?.underlyingSpotPrice ?? null;
-  const visible = useMemo(() => {
-    if (summary.strikes.length <= 13) return summary.strikes;
-    const atm = summary.strikes.reduce((best,row,i,all) => Math.abs(row.strike-(spot ?? 0)) < Math.abs(all[best].strike-(spot ?? 0)) ? i : best,0);
-    const start = Math.max(0,Math.min(summary.strikes.length-13,atm-6));
-    return summary.strikes.slice(start,start+13);
-  }, [summary,spot]);
+  const spot = rows.find(row => Number.isFinite(row.underlyingSpotPrice) && row.underlyingSpotPrice > 0)?.underlyingSpotPrice ?? null;
+  const visible = useMemo(() => nearbyOiStrikes(summary.strikes, spot), [summary, spot]);
+  const levels = useMemo(() => oiLevels(summary.strikes, spot), [summary, spot]);
   const chartAvailable = visible.some(row => row.call[change ? 'change' : 'oi'] !== null || row.put[change ? 'change' : 'oi'] !== null);
   const difference = gift?.gift && futureClose ? gift.gift.price-futureClose.price : null;
   const direction = difference === null || difference === 0 ? '' : difference > 0 ? 'positive' : 'negative';
@@ -121,7 +103,7 @@ export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock
       <header><ModernSelect label="Instrument" hideLabel ariaLabel="OI instrument" value={selected} choices={catalogue.map(r => ({ value: r.instrumentKey, label: r.symbol, description: r.name }))} onChange={key => { setSelected(key); setExpiry(''); setExpiries([]); setRows([]); setAsOf(''); setState('loading'); }}/><ModernSelect label="Expiry" hideLabel ariaLabel="OI expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(d => ({ value: d, label: d }))} onChange={value => { setExpiry(value); setRows([]); setAsOf(''); setState('loading'); }}/><button className="home-oi-open" onClick={() => onOpenStock(underlying.symbol)} aria-label={`Open ${underlying.symbol} chart`}><ChevronRight size={18}/></button></header>
       <div className="home-derivative-metrics"><div><small>PCR</small><b>{number(summary.pcr)}</b></div><div><small>India VIX</small><b>{number(vix?.price)}</b>{vix && <small className={vix.changePercent >= 0 ? 'positive' : 'negative'}>{vix.changePercent > 0 ? '+' : ''}{number(vix.changePercent)}%</small>}</div><div><small>Call OI</small><b>{number(summary.callOi,true)}</b></div><div><small>Put OI</small><b>{number(summary.putOi,true)}</b></div></div>
       <div className="home-oi-tabs" role="tablist" aria-label="Open interest display"><button role="tab" aria-selected={!change} onClick={() => setChange(false)}>OI</button><button role="tab" aria-selected={change} onClick={() => setChange(true)}>Change in OI</button><small>{spot === null ? '' : `${underlying.symbol} ${number(spot)}`}</small></div>
-      {state === 'ready' && chartAvailable ? <OpenInterestChart rows={visible} change={change}/> : <div className="home-oi-empty" role="status">{state === 'loading' ? 'Loading option chain…' : state === 'ready' ? `${change ? 'Change in OI' : 'OI'} unavailable for this chain.` : 'Option-chain data unavailable. Retrying automatically.'}</div>}
+      {state === 'ready' && chartAvailable ? <OpenInterestChart rows={visible} change={change} spot={spot} symbol={underlying.symbol} levels={levels}/> : <div className="home-oi-empty" role="status">{state === 'loading' ? 'Loading option chain…' : state === 'ready' ? `${change ? 'Change in OI' : 'OI'} unavailable for this chain.` : 'Option-chain data unavailable. Retrying automatically.'}</div>}
       <div className="home-oi-legend"><span><i className="call"/>Call {change ? `Δ ${number(summary.callChange,true)}` : 'OI'}</span><span><i className="put"/>Put {change ? `Δ ${number(summary.putChange,true)}` : 'OI'}</span></div>
       <footer><details><summary>Data details</summary><p>{asOf ? `OI checked ${time(asOf)} IST. ` : ''}{vixTime ? `VIX checked ${time(vixTime)} IST. ` : ''}{gift?.gift ? `GIFT checked ${time(gift.gift.asOf)} IST · 2 min delayed. ` : 'GIFT quote unavailable. '}{futureClose ? `Futures session close: ${futureClose.date}. ` : 'Completed futures close unavailable. '}PCR = total put OI ÷ total call OI for the selected expiry. Change in OI compares with the provider’s previous OI; missing values remain unavailable. Chart shows nearby strikes; totals cover the full chain. India VIX describes expected 30-day volatility for the broader market, not the selected stock. {vix ? `VIX ${vixBand(vix.price).label}; change ${number(vix.change)} (${number(vix.changePercent)}%). ` : ''}VIX source: Moneycontrol. GIFT NIFTY has a 120-second Upstox delay and is an indication, not a prediction of the next open.</p></details></footer>
     </section>

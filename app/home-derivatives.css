@@ -24,10 +24,23 @@
 .home-oi-tabs button{border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--ink);padding:8px 11px;min-height:38px;font-size:12px}
 .home-oi-tabs button[aria-selected=true]{background:var(--purple-soft);color:var(--purple);border-color:var(--purple)}
 .home-oi-tabs small{margin-left:auto;font-size:11px;color:var(--muted)}
-.home-oi-chart-scroll{max-width:100%;overflow:auto;overscroll-behavior-x:contain}
-.home-oi-chart-scroll svg{display:block;width:100%;height:150px}
+.home-oi-chart-scroll{width:100%;max-width:100%;min-width:0;overflow:hidden}
+.home-oi-chart-scroll svg{display:block;width:100%;height:auto}
 .home-oi-chart-scroll text{font-size:10px;fill:var(--muted)}
 .home-oi-grid{stroke:var(--line);stroke-dasharray:3 3}
+.home-oi-zero{stroke:var(--muted);stroke-width:.7}
+.home-oi-spot line{stroke:var(--muted);stroke-dasharray:4 3;stroke-width:1}
+.home-oi-spot rect{fill:var(--purple-soft)}
+.home-oi-spot text{fill:var(--ink);font-size:10px}
+.home-oi-marker line{stroke:var(--muted);stroke-dasharray:2 4;opacity:.3}
+.home-oi-marker.support rect{fill:#d8f5ee;stroke:#8dcebc}
+.home-oi-marker.support text{fill:#096653}
+.home-oi-marker.resistance rect{fill:#fde5eb;stroke:#e9a9ba}
+.home-oi-marker.resistance text{fill:#a0284b}
+.home-oi-marker.pain rect{fill:#fff0dc;stroke:#e5bf87}
+.home-oi-marker.pain text{fill:#805219}
+.home-oi-levels{display:flex;flex-wrap:wrap;gap:3px 10px;color:var(--muted);font-size:10px;line-height:1.5}
+.home-oi-levels b{color:var(--ink);font-weight:500}
 .home-oi-bar.call,.home-oi-legend .call{fill:#ef476f;background:#ef476f}
 .home-oi-bar.put,.home-oi-legend .put{fill:#00a898;background:#00a898}
 .home-oi-legend{display:flex;gap:16px;font-size:11px;color:var(--muted);margin:7px 0}
