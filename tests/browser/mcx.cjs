@@ -14,6 +14,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const now = Date.parse('2026-10-07T14:30:00Z'), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     const gold = { symbol: 'GOLD-20261204', name: 'GOLD FUT 04 DEC 26', instrumentKey: 'MCX_FO|123', exchange: 'MCX', price: 0, change: 0, assetType: 'FUTURE', expiry: '2026-12-04', lotSize: 100, underlyingSymbol: 'GOLD', underlyingKey: 'MCX_COM|1', categories: ['MCX', 'COMMODITY', 'NON_AGRI'] };
+    const crude = { ...gold, symbol: 'CRUDEOILM-20261204', name: 'CRUDEOILM FUT 04 DEC 26', instrumentKey: 'MCX_FO|456', underlyingSymbol: 'CRUDEOILM' };
     await page.route('**/*.supabase.co/**', r => r.abort());
     await page.route('**/api/**', r => {
       const url = new URL(r.request().url());
@@ -21,10 +22,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       if (url.pathname === '/api/market/session') {
         const mcx = url.searchParams.get('exchange') === 'MCX';
         json = { ok: true, session: { date: '2026-10-07', checkedAt: now, status: mcx ? 'NORMAL_OPEN' : 'NORMAL_CLOSE', source: mcx ? 'MCX' : 'NSE', sessions: [{ start: Date.parse('2026-10-07T03:30:00Z'), end: Date.parse(mcx ? '2026-10-07T18:00:00Z' : '2026-10-07T10:00:00Z') }] } };
-      } else if (url.pathname === '/api/upstox/commodities') json = { ok: true, instruments: [gold] };
+      } else if (url.pathname === '/api/upstox/commodities') json = { ok: true, instruments: [gold, crude] };
       else if (url.pathname === '/api/upstox/quotes') {
         const keys = r.request().method() === 'POST' ? r.request().postDataJSON().keys : (url.searchParams.get('keys') || '').split(',');
-        json = { ok: true, quotes: Object.fromEntries(keys.map(key => [key, { instrumentKey: key, symbol: key === gold.instrumentKey ? gold.symbol : 'RELIANCE', lastPrice: 10000, netChange: 100, changePercent: 1.01, open: 9900, high: 10100, low: 9800, previousClose: 9900, lastTradeAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() }])) };
+        json = { ok: true, quotes: Object.fromEntries(keys.map(key => [key, { instrumentKey: key, symbol: key === gold.instrumentKey ? gold.symbol : 'RELIANCE', lastPrice: 10000, volume: key === crude.instrumentKey ? 71000 : 4600, netChange: 100, changePercent: 1.01, open: 9900, high: 10100, low: 9800, previousClose: 9900, lastTradeAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() }])) };
       } else if (url.pathname === '/api/upstox/candles') json = { ok: true, candles: Array.from({ length: 120 }, (_, i) => ({ time: now / 1000 - (119 - i) * 300, open: 9900, close: 10000, high: 10100, low: 9800, volume: 1000 })) };
       return r.fulfill({ json });
     });
@@ -35,6 +36,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       await page.getByRole('textbox', { name: 'Search Indian markets', exact: true }).focus();
       await page.getByRole('tab', { name: 'MCX', exact: true }).click();
       await page.getByRole('button', { name: 'Open GOLD-20261204 chart', exact: true }).waitFor();
+      await page.getByText('Most active · Volume', { exact: true }).waitFor();
+      assert.equal(await page.locator('.home-search-sheet-list .home-pair-row').first().getAttribute('aria-label'), 'Open CRUDEOILM-20261204 chart');
+      assert.equal(await page.locator('.home-search-sheet-list .home-pair-row').first().locator('img').getAttribute('src'), '/commodities/oil.svg');
+      assert.ok(await page.locator('.home-search-sheet-list img').first().evaluate(img => img.complete && img.naturalWidth > 0));
       assert.ok(await page.getByText('MCX · 09:00–23:30 IST', { exact: true }).isVisible());
       assert.ok(await page.getByRole('tab', { name: 'MCX', exact: true }).evaluate(el => el.getBoundingClientRect().right <= innerWidth));
       await page.getByRole('button', { name: 'Close search', exact: true }).last().click();

@@ -1,4 +1,5 @@
 /** Discovery order is editorial (familiar names first), not a live market-cap ranking. */
+import { compareCommodityPriority } from "./commodity-discovery.ts";
 export type MarketGroup = "india" | "us" | "crypto" | "commodities";
 export type DirectoryInstrument = { symbol: string; name: string; instrumentKey?: string; categories: string[]; assetType?: string };
 const leaders: Record<MarketGroup, string[]> = {
@@ -24,6 +25,7 @@ export function marketDisplayName(item: DirectoryInstrument): string {
   return item.name.replace(/\s+(?:xStock|bStocks) Token/gi, "").replace(/\s+perpetual$/i, "");
 }
 export function compareMarketInstruments(a: DirectoryInstrument, b: DirectoryInstrument): number {
+  if (a.instrumentKey?.startsWith("MCX_FO|") && b.instrumentKey?.startsWith("MCX_FO|")) return compareCommodityPriority(a, b);
   const groupA = marketGroup(a), groupB = marketGroup(b);
   if (groupA !== groupB) return ["india", "us", "crypto", "commodities"].indexOf(groupA) - ["india", "us", "crypto", "commodities"].indexOf(groupB);
   // Keep hundreds of strikes behind their underlying contracts in search.

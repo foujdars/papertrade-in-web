@@ -14,6 +14,7 @@ import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHo
 import { CandleLoader } from "./CandleLoader";
 import { SessionBoard } from "./SessionBoard";
 import { StockLogo } from "@/components/StockLogo";
+import { rankCommodityRows } from "@/lib/commodity-discovery";
 
 import {
   ArrowRight,
@@ -262,8 +263,8 @@ export function HomeWorkspace({
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
   const searchQuoteKeys = useMemo(() => {
     if (!searchFocused) return "";
-    const rows = search.trim() ? shelfRows.matches.slice(0, 20) : shelf === "mcx" ? [...shelfRows.recent, ...shelfRows.popular].slice(0, 30) : shelfRows.recent.slice(0, 6);
-    return rows.map(stock => stock.instrumentKey).filter((key): key is string => Boolean(key)).join(",");
+    const rows = search.trim() ? shelfRows.matches.slice(0, 20) : shelf === "mcx" ? [...shelfRows.popular, ...shelfRows.recent] : shelfRows.recent.slice(0, 6);
+    return [...new Set(rows.map(stock => stock.instrumentKey).filter((key): key is string => Boolean(key)))].join(",");
   }, [search, searchFocused, shelfRows, shelf]);
   useEffect(() => {
     if (!searchQuoteKeys) return;
@@ -295,7 +296,10 @@ export function HomeWorkspace({
     return { price: live?.price || stock.price, change: live ? live.change : stock.changePercent, volume: live?.volume ?? 0 };
   };
   const seen = new Set<string>();
-  const recentLines = shelfRows.recent.slice(0, 5).map(stock => {
+  const commodityRows = rankCommodityRows(shelfRows.popular, stock => priced(stock).volume);
+  const topCommodities = commodityRows.slice(0, 6);
+  const topCommoditySymbols = new Set(topCommodities.map(stock => stock.symbol));
+  const recentLines = shelfRows.recent.filter(stock => shelf !== "mcx" || !topCommoditySymbols.has(stock.symbol)).slice(0, 5).map(stock => {
     seen.add(stock.symbol);
     return { key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) };
   });
@@ -332,9 +336,10 @@ export function HomeWorkspace({
                     <div className="home-search-sheet-list">
                       {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
                         {shelf === "mcx" && <div className="home-search-group"><b>{commoditySessionLabel ?? "MCX futures"}</b></div>}
+                        {shelf === "mcx" && <><div className="home-search-group"><b>{commodityRows.some(stock => priced(stock).volume > 0) ? "Most active · Volume" : "Popular commodities"}</b></div>{topCommodities.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) }))}</>}
                         {!!recentLines.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
                         {recentLines.map(searchLine)}
-                        {shelf === "mcx" && shelfRows.popular.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) }))}
+                        {shelf === "mcx" && commodityRows.length > 6 && <><div className="home-search-group"><b>More commodities</b></div>{commodityRows.slice(6).filter(stock => !seen.has(stock.symbol)).map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) }))}</>}
                         {!!gainerLines.length && <div className="home-search-group"><b>Gainers</b></div>}
                         {gainerLines.map(searchLine)}
                         {!!loserLines.length && <div className="home-search-group"><b>Losers</b></div>}
