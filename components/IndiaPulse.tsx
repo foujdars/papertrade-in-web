@@ -167,7 +167,7 @@ function usePulse() {
   return { pulse, range, setRange, observedAt };
 }
 
-export function IndiaPulse() {
+export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
   const { pulse, observedAt } = usePulse();
   const chartId = useId();
   const [expanded, setExpanded] = useState(false);
@@ -193,7 +193,7 @@ export function IndiaPulse() {
         {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : <div id={chartId} className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Chart unavailable"}{pulse?.sessionLive && pulse.breadth ? <span className="india-breadth-pending">Advance {pulse.breadth.advance.toLocaleString("en-IN")} · Decline {pulse.breadth.decline.toLocaleString("en-IN")}</span> : null}</div>}
       </div>
     </section>
-    <section className="home-section india-gauge-panel" aria-label="India VIX and Nifty put/call ratio">
+    {showGauges && <section className="home-section india-gauge-panel" aria-label="India VIX and Nifty put/call ratio">
       <div className="india-vix">
         <div className="india-gauge-heading"><h3>India VIX</h3><small>Expected 30-day volatility</small></div>
         <MarketGauge variant="vix" position={band?.position ?? null} label={vix ? `India VIX ${vix.price.toFixed(2)}, ${band!.label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "India VIX unavailable; indicative volatility bands"} />
@@ -206,7 +206,7 @@ export function IndiaPulse() {
         <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong></div>
         <div className="india-gauge-foot"><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.{pcrStatus && <><br />{pcrStatus}</>} The needle shows the put share of total open interest.</p></InfoTip></div>
       </div>
-    </section>
+    </section>}
   </div>;
 }
 
