@@ -15,7 +15,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByText('BHARTIARTL',{exact:true}).first().waitFor();await page.waitForTimeout(200);
   assert.equal(await page.locator('.home-index-card i').count(),0,'index quotes have no live dots');assert.equal(await page.locator('.home-breadth-preview').count(),3);
   assert.equal(await page.locator('.home-breadth-preview').first().getAttribute('aria-label'),'Nifty 50: 2 rising, 1 falling, 1 unchanged');
-  const meter=await page.locator('.home-breadth-meter').first().evaluate(e=>[...e.children].map(c=>parseFloat(c.style.width)));assert.deepEqual(meter,[50,25,25]);
+  assert.equal(await page.locator('.home-breadth-meter').count(),0);assert.deepEqual(await page.locator('.home-breadth-counts').first().locator('em').allTextContents(),['2 up','1 down']);assert.equal(await page.locator('.home-breadth-preview .stock-logo').count(),3);
   for(const theme of ['light','neon']){
    if(theme==='neon')await page.getByRole('button',{name:'Theme',exact:true}).click();
    for(const width of [320,390,768,1280]){
@@ -25,22 +25,19 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
     const indices=await page.locator('.home-index-card').evaluateAll(elements=>elements.map(e=>({y:e.getBoundingClientRect().y,height:e.getBoundingClientRect().height})));assert.ok(indices.every(i=>Math.abs(i.y-indices[0].y)<1 && i.height>=44 && i.height<76),'indices share one compact row with usable touch targets');
     const tiles=await page.locator('.home-market-card-v2').evaluateAll(elements=>elements.map(e=>({bg:getComputedStyle(e).backgroundColor,height:e.getBoundingClientRect().height})));assert.ok(tiles.every(t=>t.height<110),'compact overview cards');assert.notEqual(await page.locator('.home-market-pair').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)','shared market panel has a themed surface');
     const pulse=await page.locator('.home-pulse-first').evaluate(e=>({height:e.getBoundingClientRect().height,children:[...e.children].map(c=>({tag:c.className,height:c.getBoundingClientRect().height,display:getComputedStyle(c).display,padding:getComputedStyle(c).padding,position:getComputedStyle(c).position}))}));assert.ok(pulse.height<130,`indices and session strip stay short: ${width} ${JSON.stringify(pulse)}`);
-    assert.ok(await page.locator('.home-session-board').evaluate(el=>el.getBoundingClientRect().height<=30),'sessions stay in one tiny row');
+    assert.equal(await page.locator('.home-session-board').count(),0,'home session row removed');
     assert.ok(await page.locator('.india-breadth-card').evaluate(el=>Boolean(el.compareDocumentPosition(document.querySelector('.home-derivatives')) & Node.DOCUMENT_POSITION_FOLLOWING)),'derivatives follow the advance/decline chart');
     assert.ok(await page.locator('.home-index-change').evaluateAll(elements=>elements.every(e=>e.scrollWidth<=e.clientWidth+1)),'percentage and point changes fit');
     if(width===390){await page.locator('.home-dashboard-scroll').evaluate(e=>e.scrollTop=0);await page.screenshot({path:`outputs/home-market-${theme}.png`});await page.locator('.home-market-pair').screenshot({path:`outputs/home-market-cards-${theme}.png`});}
    }
   }
   await page.setViewportSize({width:390,height:844});
-  assert.equal(await page.locator('.home-session-board i').count(),0,'session strip has no dots');
-  assert.equal(await page.locator('.home-session-board > div > span').count(),5,'all session names retained');
-  await page.getByLabel('Market session times and alerts',{exact:true}).click();const times=page.getByRole('region',{name:'Session times',exact:true});await times.waitFor();assert.equal(await times.locator('li').count(),5);await times.getByRole('button',{name:'Session open alerts on',exact:true}).click();await times.getByRole('button',{name:'Session open alerts off',exact:true}).waitFor();await times.getByRole('button',{name:'Session open alerts off',exact:true}).click();await page.keyboard.press('Escape');await times.waitFor({state:'hidden'});
-  await page.getByLabel('Market session times and alerts',{exact:true}).click();await times.waitFor();await page.getByRole('button',{name:'Indian markets',exact:true}).click();await times.waitFor({state:'hidden'});
+  await page.getByRole('button',{name:"Today's profit and loss — open positions",exact:true}).click();assert.equal(await page.evaluate(()=>window.qaPositions),true,'zero-trade P&L opens positions');
   await page.getByRole('button',{name:'Open your watchlists',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaWatchlists),true);
   await page.getByRole('button',{name:'Open NIFTY 50 chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaOpened),'NIFTY');
   await page.getByRole('button',{name:/Open market movers/}).click();const movers=page.getByRole('dialog',{name:'Market movers',exact:true});await movers.waitFor();await movers.getByRole('tab',{name:'Losers',exact:true}).click();await movers.getByRole('button',{name:'Open RELIANCE chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaOpened),'RELIANCE');await movers.waitFor({state:'hidden'});
   await page.getByRole('button',{name:/Open equity market/}).click();const equity=page.getByRole('dialog',{name:'Equity market watch'});await equity.waitFor();await equity.getByRole('tab',{name:'Bank',exact:true}).click();await equity.getByRole('button',{name:'Open HDFCBANK chart',exact:true}).waitFor();await equity.getByRole('button',{name:'A–Z',exact:true}).click();await page.keyboard.press('Escape');await equity.waitFor({state:'hidden'});
   await page.evaluate(()=>window.qaIndices([{symbol:'NIFTY',label:'NIFTY 50',price:null,points:null,changePercent:null,live:false}]));await page.getByText('Awaiting quotes',{exact:true}).waitFor({state:'attached'});assert.equal(await page.locator('.home-index-change .positive').count(),0);assert.deepEqual(errors,[]);
-  console.log('PASS: home indices have complete quotes/no live dots; compact light/dark layouts at 320–1280px; breadth totals and bars; mover tabs, index filters, chart actions, Escape and unavailable quotes.');
+  console.log('PASS: home indices have complete quotes/no live dots; compact light/dark layouts at 320–1280px; breadth counts and logos; empty-position P&L action; mover tabs, index filters, chart actions, Escape and unavailable quotes.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

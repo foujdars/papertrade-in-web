@@ -13,7 +13,6 @@ import { SectorHeat } from "./SectorHeat";
 import { formatUsd } from '@/lib/global-order-engine';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
-import { SessionBoard } from "./SessionBoard";
 import { StockLogo } from "@/components/StockLogo";
 import { rankCommodityRows } from "@/lib/commodity-discovery";
 
@@ -382,10 +381,8 @@ export function HomeWorkspace({
               );
             })}
           </div>
-          <SessionBoard />
         </section>}
 
-        {!(activeMarket === 'india' && cards.market) && <SessionBoard />}
 
         {activeMarket === "india" && <div className="home-market-pair">
           <MarketMovers onOpen={onOpenStock} />
@@ -396,7 +393,7 @@ export function HomeWorkspace({
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
             <div className="home-portfolio-row" aria-label="Portfolio snapshot">
-              <button className="home-today-pnl" onClick={onOpenPnl} aria-label="Today's profit and loss — view P&L"><small>Today P&L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
+              <button className="home-today-pnl" onClick={onOpenPositions} aria-label="Today's profit and loss — open positions"><small>Today P&L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
               <button onClick={onOpenHoldings} aria-label="Holdings"><small>Holdings</small><b>{holdingsCount}</b></button>
               <button onClick={onOpenPositions} aria-label="Open positions"><small>Open</small><b>{openPositionsCount}</b></button>
               <button onClick={onOpenTradeHistory} aria-label="Closed trades"><small>Closed</small><b>{closedTradesCount}</b></button>

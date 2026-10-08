@@ -166,10 +166,8 @@
 .terminal-shell .home-hub.home-studio .home-market-slot + .home-market-slot .home-market-card-v2 { border-left: 1px solid var(--line); border-radius: 0 14px 14px 0; }
 .home-market-card-v2 .home-market-card-copy { min-height: 16px; margin-bottom: 5px; }
 .home-mover-previews { gap: 0; }
-.home-mover-preview { grid-template-columns: 10px minmax(0, 1fr) auto; min-height: 25px; align-items: center; }
+.home-mover-preview { grid-template-columns: minmax(0, 1fr) auto; min-height: 25px; align-items: center; }
 .home-mover-preview > small { display: none; }
-.home-mover-preview::before { content: '↑'; color: var(--market-up); font-size: 13px; font-weight: 650; }
-.home-mover-preview[data-direction="down"]::before { content: '↓'; color: var(--market-down); }
 .home-mover-preview > b { font-size: 11px; }
 .home-breadth-previews { gap: 3px; }
 .home-breadth-preview { column-gap: 3px; row-gap: 2px; }
