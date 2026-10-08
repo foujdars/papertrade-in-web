@@ -16,7 +16,7 @@ test("India VIX, index breadth and FII/DII cash keep their signs", () => {
 });
 
 test("VIX bands are explicit indicators and invalid index closes never draw a false plunge", () => {
-  assert.deepEqual([14.99, 15, 20, 30].map(value => vixBand(value).label), ["Calm", "Watch", "Elevated", "Fear"]);
+  assert.deepEqual([14.99, 15, 20, 30].map(value => vixBand(value).label), ["Calm", "Watch", "Elevated", "High"]);
   assert.equal(vixBand(13.41).position < 25, true);
   assert.deepEqual(niftyCloses({ chart: { result: [{ timestamp: [1790601600, 1790688000, 1790774400], indicators: { quote: [{ close: [24600, null, 0] }] } }] } }), [{ date: "2026-09-28", close: 24600 }]);
 });
