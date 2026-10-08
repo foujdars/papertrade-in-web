@@ -112,3 +112,26 @@
 .terminal-shell .home-global-position-details summary { cursor:pointer; }
 .terminal-shell .home-global-account .home-global-empty { margin:0; padding:0 10px 8px; font-size:11px; }
 @media(max-width:360px) { .terminal-shell .home-vix-value-row { gap:2px; } .terminal-shell .home-vix-value-row small { font-size:8px; } .terminal-shell .home-portfolio-row small { font-size:8px; } }
+
+/* Separate overview tiles without adding tall card chrome. */
+.terminal-shell .home-hub.home-studio .home-pulse-first,
+.terminal-shell .home-hub.home-studio .home-market-pair { border:0; background:transparent; box-shadow:none; }
+.terminal-shell .home-hub.home-studio .home-index-grid { gap:6px; padding:0; }
+.terminal-shell .home-hub.home-studio .home-index-card,
+.terminal-shell .home-hub.home-studio .home-index-card:first-child,
+.terminal-shell .home-hub.home-studio .home-index-card:last-child { padding:4px 6px; border:1px solid var(--line); border-radius:13px; background:var(--surface); box-shadow:0 2px 5px #14213b04; }
+.terminal-shell .home-hub.home-studio .home-market-pair { gap:8px; }
+.terminal-shell .home-hub.home-studio .home-market-card-v2,
+.terminal-shell .home-hub.home-studio .home-market-slot + .home-market-slot .home-market-card-v2 { border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+.terminal-shell .home-hub.home-studio .home-portfolio-row { gap:4px; padding:0 6px 7px; border-top:0; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row>button,
+.terminal-shell .home-hub.home-studio .home-portfolio-row>button:last-child,
+.terminal-shell .home-hub.home-studio .home-portfolio-row>.home-funds-used { padding:6px 4px; border:1px solid var(--line); border-radius:10px; background:var(--surface); min-height:52px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row>button:hover,
+.terminal-shell .home-hub.home-studio .home-portfolio-row>button:active { background:var(--purple-soft); border-color:var(--purple); }
+@media(max-width:360px) {
+ .terminal-shell .home-hub.home-studio .home-index-card>b { font-size:14px; }
+ .terminal-shell .home-hub.home-studio .home-portfolio-row { gap:3px; padding-inline:4px; }
+ .terminal-shell .home-hub.home-studio .home-portfolio-row>button,
+ .terminal-shell .home-hub.home-studio .home-portfolio-row>.home-funds-used { padding-inline:3px; }
+}
