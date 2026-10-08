@@ -35,7 +35,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   }
   await page.setViewportSize({width:390,height:844});await star.click();
   const watchlists=page.getByRole('dialog',{name:'Custom watchlists',exact:true});await watchlists.waitFor();await watchlists.getByRole('button',{name:/My favourites/}).click();
-  await watchlists.getByRole('button',{name:'Close custom watchlists',exact:true}).click();assert.ok(await star.evaluate(el=>el.classList.contains('saved')),'saved state preserved');
+  await page.setViewportSize({width:390,height:540});await page.waitForTimeout(200);
+  await watchlists.getByRole('button',{name:'Close custom watchlists',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);
+  assert.ok(await page.locator('.lightweight-chart').evaluate(el=>{const table=el.querySelector('table');return !!table&&Math.abs(table.getBoundingClientRect().height-el.clientHeight)<3;}),'chart canvas fills restored host after favourites and keyboard close');
+  assert.ok(await star.evaluate(el=>el.classList.contains('saved')),'saved state preserved');
   assert.equal(await star.evaluate(el=>getComputedStyle(el).color),'rgb(234, 179, 8)','saved favourite turns yellow');
   await page.locator('.desktop-chart-symbol .chart-compare-link').click();const compare=page.getByRole('dialog',{name:'Compare symbols',exact:true});await compare.waitFor();
   await compare.getByLabel('Search symbols to compare').fill('HDFCBANK');await compare.locator('.compare-picker-list button').first().click();await compare.getByRole('button',{name:'Close compare symbols',exact:true}).click();

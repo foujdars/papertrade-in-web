@@ -79,7 +79,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
     const falling = quotes?.filter(row => row.change < 0).length ?? 0;
     const total = quotes?.length ?? 0;
     return <span className="home-breadth-preview" key={label} aria-label={total ? `${label}: ${rising} rising, ${falling} falling, ${total - rising - falling} unchanged` : `${label}: awaiting quotes`}>
-      <b><StockLogo symbol={label === 'Nifty 50' ? 'NIFTY' : label === 'Bank Nifty' ? 'BANKNIFTY' : 'NIFTYIT'} size={16}/>{label}</b><span className="home-breadth-counts">{total ? <><em className="up">{rising} up</em><em className="down">{falling} down</em></> : <em>—</em>}</span>
+      <b>{label}</b><span className="home-breadth-counts">{total ? <><em className="up">{rising} up</em><em className="down">{falling} down</em></> : <em>—</em>}</span>
     </span>;
   };
   const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;

@@ -1621,6 +1621,7 @@ export function MarketChart({
     let replayClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let avwapClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
+    let measuredWidth = 0, measuredHeight = 0;
     let profileClient: ReturnType<typeof createProfileDataClient> | undefined;
     let profileRefresh: ReturnType<typeof setInterval> | undefined;
 
@@ -2616,12 +2617,17 @@ export function MarketChart({
           if (!chartApi.current || chartApi.current !== chart) return;
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
-          if (chart.options().width !== width || chart.options().height !== height) chart.resize(width, height, true);
+          measuredWidth = width; measuredHeight = height;
+          // Explicit viewport/modal recovery must resize the rendered canvas even
+          // when cached chart options already match the restored host dimensions.
+          chart.resize(width, height, true);
           fitStudyPanes();
           scheduleOverlayRefresh();
         });
       };
-      observer = new ResizeObserver(resizeChart);
+      observer = new ResizeObserver(() => {
+        if (Math.floor(host.clientWidth) !== measuredWidth || Math.floor(host.clientHeight) !== measuredHeight) resizeChart?.();
+      });
       observer.observe(host);
       window.addEventListener("resize", resizeChart);
       window.visualViewport?.addEventListener("resize", resizeChart);

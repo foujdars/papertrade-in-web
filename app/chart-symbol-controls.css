@@ -25,3 +25,12 @@
   .terminal-shell .trade-cockpit .chart-symbol-search { gap:2px; padding-left:5px; padding-right:3px; }
   .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { width:28px; min-width:28px; height:28px; min-height:28px; flex-basis:28px; }
 }
+
+.terminal-shell .watchlist-picker-modal { max-height:calc(100dvh - 32px); overflow-y:auto; border-radius:18px; padding:18px; animation:watchlist-window-in 160ms ease-out; }
+.terminal-shell .watchlist-picker-modal .custom-watchlist-choices { gap:8px; }
+.terminal-shell .watchlist-picker-modal .custom-watchlist-choices > button { min-height:48px; transition:background 140ms ease,border-color 140ms ease; }
+.terminal-shell .watchlist-picker-modal .custom-watchlist-choices > button[aria-pressed="true"] { border-color:var(--purple); background:var(--purple-soft); }
+.terminal-shell .watchlist-picker-modal .custom-watchlist-choices small { font-size:11px; }
+.terminal-shell .watchlist-picker-modal .custom-watchlist-choices em { font-size:12px; }
+@keyframes watchlist-window-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion:reduce) { .terminal-shell .watchlist-picker-modal { animation:none; } .terminal-shell .watchlist-picker-modal .custom-watchlist-choices > button { transition:none; } }

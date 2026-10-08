@@ -15,7 +15,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByText('BHARTIARTL',{exact:true}).first().waitFor();await page.waitForTimeout(200);
   assert.equal(await page.locator('.home-index-card i').count(),0,'index quotes have no live dots');assert.equal(await page.locator('.home-breadth-preview').count(),3);
   assert.equal(await page.locator('.home-breadth-preview').first().getAttribute('aria-label'),'Nifty 50: 2 rising, 1 falling, 1 unchanged');
-  assert.equal(await page.locator('.home-breadth-meter').count(),0);assert.deepEqual(await page.locator('.home-breadth-counts').first().locator('em').allTextContents(),['2 up','1 down']);assert.equal(await page.locator('.home-breadth-preview .stock-logo').count(),3);
+  assert.equal(await page.locator('.home-breadth-meter').count(),0);assert.deepEqual(await page.locator('.home-breadth-counts').first().locator('em').allTextContents(),['2 up','1 down']);assert.equal(await page.locator('.home-breadth-preview .stock-logo').count(),0);
   for(const theme of ['light','neon']){
    if(theme==='neon')await page.getByRole('button',{name:'Theme',exact:true}).click();
    for(const width of [320,390,768,1280]){
@@ -38,6 +38,6 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.getByRole('button',{name:/Open market movers/}).click();const movers=page.getByRole('dialog',{name:'Market movers',exact:true});await movers.waitFor();await movers.getByRole('tab',{name:'Losers',exact:true}).click();await movers.getByRole('button',{name:'Open RELIANCE chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaOpened),'RELIANCE');await movers.waitFor({state:'hidden'});
   await page.getByRole('button',{name:/Open equity market/}).click();const equity=page.getByRole('dialog',{name:'Equity market watch'});await equity.waitFor();await equity.getByRole('tab',{name:'Bank',exact:true}).click();await equity.getByRole('button',{name:'Open HDFCBANK chart',exact:true}).waitFor();await equity.getByRole('button',{name:'A–Z',exact:true}).click();await page.keyboard.press('Escape');await equity.waitFor({state:'hidden'});
   await page.evaluate(()=>window.qaIndices([{symbol:'NIFTY',label:'NIFTY 50',price:null,points:null,changePercent:null,live:false}]));await page.getByText('Awaiting quotes',{exact:true}).waitFor({state:'attached'});assert.equal(await page.locator('.home-index-change .positive').count(),0);assert.deepEqual(errors,[]);
-  console.log('PASS: home indices have complete quotes/no live dots; compact light/dark layouts at 320–1280px; breadth counts and logos; empty-position P&L action; mover tabs, index filters, chart actions, Escape and unavailable quotes.');
+  console.log('PASS: home indices have complete quotes/no live dots; compact light/dark layouts at 320–1280px; breadth counts without index logos; empty-position P&L action; mover tabs, index filters, chart actions, Escape and unavailable quotes.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
