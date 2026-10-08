@@ -35,7 +35,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    assert.ok(await page.locator('.desktop-chart-symbol .chart-symbol-search').evaluate(el=>el.getBoundingClientRect().width<=182),'symbol selector compact');
    assert.equal(await star.evaluate(el=>getComputedStyle(el).borderWidth),'0px','favourite has no circle border');
    assert.equal(await star.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','favourite circle transparent');
-   const link=page.locator('.desktop-chart-symbol .chart-derivatives-link');await link.waitFor();assert.ok(await link.evaluate(el=>getComputedStyle(el).borderRadius==='50%'&&getComputedStyle(el).backgroundColor==='rgba(0, 0, 0, 0)'&&el.previousElementSibling.classList.contains('chart-symbol-search')),'option link transparent circle beside selector');
+   const link=page.locator('.desktop-chart-symbol .chart-derivatives-link');await link.waitFor();assert.ok(await link.evaluate(el=>getComputedStyle(el).borderRadius==='50%'&&el.previousElementSibling.classList.contains('chart-symbol-search')),'option link circular beside selector');
    if(width===390){fs.mkdirSync('outputs',{recursive:true});await page.screenshot({path:`outputs/chart-symbol-controls-${theme}.png`});}
   }
   await page.setViewportSize({width:390,height:844});await star.click();

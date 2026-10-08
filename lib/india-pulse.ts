@@ -5,10 +5,10 @@ export type IndexBreadth = { name: string; advance: number; decline: number };
 export type IndiaVix = { price: number; change: number; changePercent: number; low: number | null; high: number | null };
 // Indicative display bands, not exchange-defined risk classifications.
 export function vixBand(price: number) {
-  if (price < 15) return { label: "Calm", tone: "calm", position: Math.max(0, price / 15) * 25 };
-  if (price < 20) return { label: "Watch", tone: "watch", position: 25 + (price - 15) / 5 * 25 };
-  if (price < 30) return { label: "Elevated", tone: "elevated", position: 50 + (price - 20) / 10 * 25 };
-  return { label: "High", tone: "high", position: Math.min(100, 75 + (price - 30) / 10 * 25) };
+  if (price < 15) return { label: "Calm", description: "Below 15 · Lower expected volatility", tone: "calm", position: Math.max(0, price / 15) * 25 };
+  if (price < 20) return { label: "Watch", description: "15–20 · Moderate expected volatility", tone: "watch", position: 25 + (price - 15) / 5 * 25 };
+  if (price < 30) return { label: "Elevated", description: "20–30 · Elevated expected volatility", tone: "elevated", position: 50 + (price - 20) / 10 * 25 };
+  return { label: "Fear", description: "30 or above · High expected volatility", tone: "high", position: Math.min(100, 75 + (price - 30) / 10 * 25) };
 }
 export type CashFlow = { date: string; label: string; fii: number; dii: number };
 export type AdPoint = { t: number; advance: number; decline: number };
