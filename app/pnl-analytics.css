@@ -128,3 +128,6 @@
 .terminal-shell .pnl-finding-symbol { gap:3px; }
 .terminal-shell .pnl-finding-symbol .stock-logo { flex:none; width:20px!important; height:20px!important; }
 @media(min-width:1100px) { .terminal-shell .pnl-summary-six { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+/* Keep the calendar above the cumulative P&L section at every width. */
+.terminal-shell .pnl-overview-grid { grid-template-columns:minmax(0,1fr); }
