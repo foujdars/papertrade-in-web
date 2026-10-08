@@ -128,28 +128,3 @@
 .terminal-shell .pnl-finding-symbol { gap:3px; }
 .terminal-shell .pnl-finding-symbol .stock-logo { flex:none; width:20px!important; height:20px!important; }
 @media(min-width:1100px) { .terminal-shell .pnl-summary-six { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-.pnl-market-workspace { display:grid; gap:9px; min-width:0; }
-.pnl-market-switch { display:flex; justify-self:end; gap:3px; padding:3px; border:1px solid var(--pnl-border,var(--line)); background:var(--soft); border-radius:10px; }
-.pnl-market-switch button { min-height:32px; padding:4px 12px; border:0; border-radius:7px; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
-.pnl-market-switch button[aria-pressed="true"] { background:var(--surface); color:var(--purple); }
-.pnl-market-switch button:focus-visible { outline:2px solid var(--purple); }
-.pnl-market-panels { display:grid; min-width:0; gap:8px; }
-.pnl-market-panels.is-both { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.pnl-market-panel { min-width:0; }
-.pnl-market-panel>h2 { margin:0 0 7px; font-size:12px; }
-.terminal-shell .pnl-market-panel .pnl-overview-grid { grid-template-columns:minmax(0,1fr); }
-.terminal-shell .pnl-market-panels.is-both .pnl-summary-six { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.terminal-shell .pnl-market-panels.is-both .pnl-a-card { padding:8px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-a-card h3 { font-size:12px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-grid { gap:2px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-day { min-height:33px; padding:2px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-day b { font-size:9px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-day small { font-size:7px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-controls { flex-wrap:wrap; gap:2px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-controls input { max-width:85px; font-size:9px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-card>header { flex-wrap:wrap; gap:4px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-insight-grid { grid-template-columns:minmax(0,1fr); }
-.terminal-shell .pnl-market-panels.is-both .pnl-finding-list { grid-template-columns:minmax(0,1fr); }
-.terminal-shell .pnl-market-panels.is-both .pnl-drawdown-heading,.terminal-shell .pnl-market-panels.is-both .pnl-chart-readout { flex-wrap:wrap; }
-.terminal-shell .pnl-market-panels.is-both .pnl-chart-readout button { font-size:9px; padding:4px; }
-.terminal-shell .pnl-market-panels.is-both .pnl-calendar-weekdays { font-size:8px; }
