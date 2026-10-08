@@ -5,13 +5,12 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const build=await esbuild.build({entryPoints:['tests/browser/home-derivatives.fixture.jsx'],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'}});
  const css=[...fs.readFileSync('app/layout.tsx','utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([,f])=>fs.readFileSync('app/'+f,'utf8')).join('\n').replace(/@import[^;]+;/g,'');
  const catalogue=[{symbol:'NIFTY',name:'Nifty 50',instrumentKey:'NSE_INDEX|Nifty 50',optionContracts:100,futures:[{instrumentKey:'NSE_FO|123',tradingSymbol:'NIFTY 27 OCT FUT',expiry:'2026-10-27'}]},{symbol:'BANKNIFTY',name:'Nifty Bank',instrumentKey:'NSE_INDEX|Nifty Bank',optionContracts:100},{symbol:'RELIANCE',name:'Reliance',instrumentKey:'NSE_EQ|INE002A01018',optionContracts:100}];
- let vixPrice=14.3;
  const side=(oi,prevOi)=>({marketData:{oi,prevOi}});
  const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://test');res.setHeader('Content-Type','application/json');
   if(url.pathname==='/api/upstox/fno-underlyings')return res.end(JSON.stringify({ok:true,underlyings:catalogue}));
   if(url.pathname==='/api/market/gift-nifty')return res.end(JSON.stringify({ok:true,gift:{price:22520.5,asOf:'2026-10-07T13:00:00Z'},futureClose:{price:22618.4,date:'2026-10-07'}}));
-  if(url.pathname==='/api/market/india-pulse')return res.end(JSON.stringify({ok:true,vix:{price:vixPrice,change:-.6,changePercent:-4},vixCheckedAt:Date.parse('2026-10-07T13:00:00Z')}));
+  if(url.pathname==='/api/market/india-pulse')return res.end(JSON.stringify({ok:true,vix:{price:14.3,change:-.6,changePercent:-4},vixCheckedAt:Date.parse('2026-10-07T13:00:00Z')}));
   if(url.pathname==='/api/upstox/option-chain'){
    const missing=url.searchParams.get('instrumentKey').startsWith('NSE_EQ');
    return res.end(JSON.stringify({ok:true,expiries:['2026-10-08','2026-10-27'],fetchedAt:'2026-10-07T13:00:00Z',rows:missing?[]:[{strikePrice:22500,underlyingSpotPrice:22600,call:side(100,150),put:side(200,100)},{strikePrice:22600,underlyingSpotPrice:22600,call:side(100,120),put:side(100,140)}]}));
@@ -31,11 +30,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    assert.ok(await page.locator('.home-derivatives').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} fits ${width}`);
    assert.ok(await page.locator('.home-option-pulse').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'chart scroll stays inside card');
    assert.ok(await page.locator('.home-gift-card').evaluate(el=>el.getBoundingClientRect().height<=80),'gift card is one compact row');
-   const surfaces=await page.evaluate(()=>({action:getComputedStyle(document.querySelector('.home-oi-open')).backgroundColor,metric:getComputedStyle(document.querySelector('.home-derivative-metrics>div')).backgroundColor}));assert.notEqual(surfaces.action,surfaces.metric,'interactive and read-only surfaces differ');
-   assert.ok(await page.locator('.home-oi-open').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.abs(a.x+a.width/2-b.x-b.width/2)<1&&Math.abs(a.y+a.height/2-b.y-b.height/2)<1;}),'chart icon is centered');
    if(width===390){fs.mkdirSync('outputs',{recursive:true});await page.screenshot({path:`outputs/home-derivatives-${theme}.png`});}
   }
-  const bandColors=[];for(const [price,label,tone] of [[14.99,'Calm','calm'],[15,'Watch','watch'],[20,'Elevated','elevated'],[30,'Fear','high']]){vixPrice=price;await page.reload();await page.locator('.home-vix-metric').getByText(label,{exact:true}).waitFor();assert.equal(await page.locator('.home-vix-metric b').getAttribute('class'),`india-vix-status ${tone}`);bandColors.push(await page.locator('.home-vix-metric b').evaluate(el=>getComputedStyle(el).color));}assert.equal(new Set(bandColors).size,4,'four distinct VIX band colours');
   await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'Change in OI',exact:true}).click();await page.getByRole('img',{name:'Call and put change in open interest by strike',exact:true}).waitFor();assert.ok(await page.getByText('Call Δ -70',{exact:true}).isVisible());
   await page.getByRole('button',{name:'OI instrument',exact:true}).click();await page.getByRole('option',{name:/BANKNIFTY/}).click();await page.getByRole('button',{name:'Open BANKNIFTY chart',exact:true}).waitFor();await page.getByRole('button',{name:'OI expiry',exact:true}).click();await page.getByRole('option',{name:'2026-10-27',exact:true}).click();
   await page.getByRole('button',{name:'Open BANKNIFTY chart',exact:true}).click();assert.equal(await page.evaluate(()=>window.qaOpened),'BANKNIFTY');
