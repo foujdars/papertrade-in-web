@@ -54,7 +54,8 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
   const advanceY = y(last.advance), declineY = y(last.decline);
   const closeLabels = Math.abs(advanceY - declineY) < 34;
   const upperLabelY = Math.max(top + 7, Math.min(height - bottom - 50, (advanceY + declineY) / 2 - 17));
-  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === "advance" ? 0 : 34) : Math.min(height - bottom - 16, y(last[key]));
+  const upperKey = advanceY <= declineY ? "advance" : "decline";
+  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === upperKey ? 0 : 34) : Math.min(height - bottom - 16, y(last[key]));
   return <svg id={id} ref={chartRef} className="india-ad-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`NSE advances and declines through the session. Advances ${last.advance.toLocaleString("en-IN")}, ${advanceShare} percent; declines ${last.decline.toLocaleString("en-IN")}, ${total ? 100 - advanceShare : 0} percent.`}>
     {[0, max / 2, max].map(value => <text className="india-breadth-axis" key={value} x={left - 7} y={y(value) + 4} textAnchor="end">{Math.round(value).toLocaleString("en-IN")}</text>)}
     <line className="grid" x1={left} x2={left} y1={top} y2={height - bottom} />

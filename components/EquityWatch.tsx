@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUp, ArrowDown, ChartNoAxesColumnIncreasing, ChevronRight, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
@@ -79,15 +79,14 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
     const falling = quotes?.filter(row => row.change < 0).length ?? 0;
     const total = quotes?.length ?? 0;
     return <span className="home-breadth-preview" key={label} aria-label={total ? `${label}: ${rising} rising, ${falling} falling, ${total - rising - falling} unchanged` : `${label}: awaiting quotes`}>
-      <b>{label}</b><span className="home-breadth-counts">{total ? <><em className="up"><ArrowUp size={12} aria-hidden="true"/>{rising}</em><em className="down"><ArrowDown size={12} aria-hidden="true"/>{falling}</em></> : <em>—</em>}</span>
-      <span className="home-breadth-meter" aria-hidden="true">{total > 0 && <><i className="rising" style={{width:`${rising / total * 100}%`}}/><i className="unchanged" style={{width:`${(total - rising - falling) / total * 100}%`}}/><i className="falling" style={{width:`${falling / total * 100}%`}}/></>}</span>
+      <b><StockLogo symbol={label === 'Nifty 50' ? 'NIFTY' : label === 'Bank Nifty' ? 'BANKNIFTY' : 'NIFTYIT'} size={16}/>{label}</b><span className="home-breadth-counts">{total ? <><em className="up">{rising} up</em><em className="down">{falling} down</em></> : <em>—</em>}</span>
     </span>;
   };
   const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
   return <div id="equity-watch" className="home-market-slot">
     <button type="button" className="home-market-card home-market-card-v2" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
-      <span className="home-market-card-copy"><span className="home-market-card-title"><ChartNoAxesColumnIncreasing size={17} aria-hidden="true"/><b>Equity watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
+      <span className="home-market-card-copy"><span className="home-market-card-title"><b>Equity watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
       <span className="home-market-subtitle">Constituent breadth</span>
       <span className="home-breadth-previews">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
     </button>
