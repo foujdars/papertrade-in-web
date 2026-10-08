@@ -9,7 +9,7 @@
 .terminal-shell .trade-cockpit .desktop-chart-symbol .chart-style-link { margin-left:4px; }
 .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { display:grid; place-items:center; width:32px; min-width:32px; height:32px; min-height:32px; flex:0 0 32px; padding:0; border:1px solid var(--line); border-radius:50%; color:var(--purple); background:var(--surface); }
 .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link.active { color:var(--purple); border-color:var(--purple); background:var(--surface); }
-.terminal-shell .chart-body > .chart-floating-favourite { position:absolute; z-index:19; top:10px; right:80px; display:grid; place-items:center; width:40px; height:40px; min-width:40px; padding:0; border:1px solid var(--line); border-radius:50%; color:var(--muted); background:transparent; box-shadow:none; }
+.terminal-shell .chart-body > .chart-floating-favourite { position:absolute; z-index:19; top:10px; right:80px; display:grid; place-items:center; width:40px; height:40px; min-width:40px; padding:0; border:0; border-radius:0; color:var(--muted); background:transparent; box-shadow:none; }
 .terminal-shell .chart-body > .chart-floating-favourite.saved { color:#eab308; background:transparent; border-color:var(--line); }
 .terminal-shell .chart-body > .chart-floating-favourite:hover { background:transparent; }
 .terminal-shell .chart-body > .chart-floating-favourite.saved svg { stroke:#b7791f; }
