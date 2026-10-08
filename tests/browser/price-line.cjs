@@ -11,6 +11,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  try{
   const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);await page.addStyleTag({content:'.price-chart-wrap,.price-chart,.chart-stack{height:100%!important}'});await page.waitForFunction(()=>window.qaSeries?.data().length>300);
+  const checkStablePrices=async()=>{
+   assert.equal(await page.evaluate(()=>window.qaChart.options().localization.priceFormatter(22296)), '22,296.00');
+   assert.equal(await page.evaluate(()=>window.qaChart.options().localization.priceFormatter(22296.256)), '22,296.26');
+   const widths=[];
+   for(const price of [22296,22296.25,22296.1,22296,22296.99,22296.25]){
+    await page.evaluate(p=>{const bars=window.qaSeries.data();const last=bars.at(-1);window.qaSeries.update({...last,open:p,high:p+1,low:p-1,close:p});},price);
+    await page.waitForTimeout(80);widths.push(await page.evaluate(()=>window.qaChart.timeScale().width()));
+   }
+   assert.ok(Math.max(...widths)-Math.min(...widths)<=1, 'plot width stays stable across whole/fractional live prices');
+   await page.evaluate(()=>window.qaSeries.update({...window.qaSeries.data().at(-1),open:110,high:111,low:109,close:110}));
+  };
+  await checkStablePrices();
   const aim=async()=>{const host=await page.locator('.lightweight-chart').boundingBox();await page.mouse.move(host.x+170,host.y+180);await page.locator('.chart-price-plus').waitFor();return page.evaluate(()=>({price:Number(document.querySelector('.chart-price-plus button').getAttribute('aria-label').split('at ')[1]),y:parseFloat(document.querySelector('.chart-price-plus').style.top)}));};
   assert.equal(await page.locator('.chart-price-plus').count(),0,'no price action before crosshair');
   await aim();assert.equal(await page.locator('.chart-price-plus').evaluate(el=>el.getBoundingClientRect().height),18,'compact label height');assert.equal(await page.evaluate(()=>window.qaChart.options().crosshair.horzLine.labelVisible),false,'no duplicate native price label');
@@ -23,7 +35,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   const line=await page.evaluate(()=>window.qaManager.exportDrawings()[0]);assert.equal(line.type,'horizontal-line');assert.ok(Math.abs(line.anchors[0].price-cursor.price)<.006,'line uses crosshair price, not candle close');
   await page.getByRole('button',{name:'Undo',exact:true}).click();await page.waitForFunction(()=>window.qaManager.getAllDrawings().length===0);await page.getByRole('button',{name:'Redo',exact:true}).click();await page.waitForFunction(()=>window.qaManager.getAllDrawings().length===1);
   await page.reload();await page.waitForFunction(()=>window.qaManager?.getAllDrawings().length===1&&window.qaSeries?.data().length>300);assert.deepEqual(await page.evaluate(()=>window.qaManager.exportDrawings()[0].anchors),line.anchors);
-  await page.getByRole('button',{name:'Theme',exact:true}).click();await page.waitForFunction(()=>window.qaSeries?.data().length>300);await aim();assert.ok(await page.locator('.chart-price-plus').isVisible());
+  await page.getByRole('button',{name:'Theme',exact:true}).click();await page.waitForFunction(()=>window.qaSeries?.data().length>300);await checkStablePrices();await aim();assert.ok(await page.locator('.chart-price-plus').isVisible());
   const host=await page.locator('.lightweight-chart').boundingBox();const paneHeight=await page.evaluate(()=>window.qaChart.panes()[0].getHeight());await page.mouse.move(host.x+170,host.y+paneHeight+35);await page.locator('.chart-price-plus').waitFor({state:'hidden'});
   await aim();await page.evaluate(()=>window.qaTool('horizontal-line'));await page.locator('.chart-price-plus').waitFor({state:'hidden'});await page.evaluate(()=>window.qaTool('cursor'));await page.waitForFunction(()=>window.qaChart.options().crosshair.horzLine.visible&&!document.querySelector('.lightweight-chart').classList.contains('is-drawing'));
   const touch=await page.context().newCDPSession(page);await page.mouse.move(0,0);await page.evaluate(()=>window.qaChart.clearCrosshairPosition());

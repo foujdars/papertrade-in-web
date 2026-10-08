@@ -889,7 +889,11 @@ export function MarketChart({
       const start = replayRef.current.start;
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
-      const scaleWidth = chartApi.current?.priceScale("right").width() ?? 72;
+      const scale = chartApi.current?.priceScale("right");
+      const scaleWidth = scale?.width() ?? 88;
+      // Keep the axis at its widest measured label for this chart instance.
+      // Live prices must not repeatedly shrink/grow the plot or its overlays.
+      if (scale && scaleWidth > scale.options().minimumWidth) scale.applyOptions({ minimumWidth: Math.ceil(scaleWidth) });
       setPriceScaleWidth((current) => Math.abs(current - scaleWidth) < 1 ? current : Math.max(48, scaleWidth));
       const selectedDrawing = drawingManager.current?.getSelectedDrawing();
       const anchors = selectedDrawing?.anchors ?? [];
@@ -1644,7 +1648,7 @@ export function MarketChart({
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
-          minimumWidth: 58,
+          minimumWidth: 88,
           entireTextOnly: true,
         },
         leftPriceScale: { visible: false },
@@ -1673,7 +1677,7 @@ export function MarketChart({
         kineticScroll: { mouse: true, touch: true },
         localization: {
           locale: instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN",
-          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 0, maximumFractionDigits: externalFeed ? globalPriceFormatRef.current.precision : 2 }),
+          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
@@ -2612,7 +2616,7 @@ export function MarketChart({
           if (!chartApi.current || chartApi.current !== chart) return;
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
-          chart.resize(width, height, true);
+          if (chart.options().width !== width || chart.options().height !== height) chart.resize(width, height, true);
           fitStudyPanes();
           scheduleOverlayRefresh();
         });
@@ -2917,9 +2921,7 @@ export function MarketChart({
 
   useEffect(() => {
     if (externalCandles === undefined || historyRequest) return;
-    const { precision } = globalPriceFormatRef.current;
     candleSeries.current?.applyOptions({ priceFormat: globalPriceFormatRef.current });
-    chartApi.current?.applyOptions({ localization: { priceFormatter: (price: number) => price.toLocaleString("en-US", { maximumFractionDigits: precision }) } });
     const initial = dataRef.current.length === 0;
     const previous = dataRef.current;
     const next = reconcileLiveCandles(previous, externalCandles, null, timeframe);
@@ -3341,7 +3343,7 @@ export function MarketChart({
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 18 }}>
           <button type="button" aria-label={`Add horizontal line at ${priceCursor.anchor.price.toFixed(priceCursor.precision)}`} title="Add horizontal line at this price" onPointerDown={event => { event.preventDefault(); event.stopPropagation(); }} onClick={event => { event.stopPropagation(); addCrosshairPriceLine(); }}>+</button>
-          <span>{priceCursor.anchor.price.toLocaleString('en-IN', { maximumFractionDigits: priceCursor.precision })}</span>
+          <span>{priceCursor.anchor.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>}
         {sessionShades.map((shade) => <div key={shade.key} className="chart-session-shade" style={{ left: shade.left, width: shade.width, background: shade.color }} />)}
         {sessionShades.flatMap((shade) => shade.edges.map((edge) => <span key={`${shade.key}-${edge.label}-${edge.x}`} className="chart-session-edge" style={{ left: edge.x }}>{edge.label}</span>))}
