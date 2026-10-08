@@ -22,6 +22,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   for(const theme of ['light','neon'])for(const width of [320,390,768,1280]){
    await page.setViewportSize({width,height:844});await page.locator('.terminal-shell').evaluate((el,t)=>el.dataset.theme=t,theme);
    assert.ok(await page.locator('.chart-controls').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} toolbar fits ${width}`);
+   if(width<=940){
+    assert.ok(await page.locator('.chart-controls').evaluate(el=>el.getBoundingClientRect().height<=40),'compact toolbar');
+    assert.ok(await page.locator('.permanent-trade-footer .chart-trade-buttons button').first().evaluate(el=>el.getBoundingClientRect().height<=40),'compact trade buttons');
+    assert.ok(await page.locator('.chart-statusbar').evaluate(el=>el.getBoundingClientRect().height<=44),'range and indicators use compact adjacent rows');
+   }
    const button=page.locator('.desktop-chart-symbol .chart-compare-link');
    assert.ok(await button.evaluate(el=>getComputedStyle(el).borderRadius==='50%'),'compare is circular');
    assert.ok(await button.evaluate(el=>el.parentElement.classList.contains('chart-symbol-search')),'compare inside symbol surface');

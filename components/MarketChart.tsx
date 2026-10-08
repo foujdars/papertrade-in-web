@@ -724,7 +724,7 @@ export function MarketChart({
   const drawingTapRef = useRef<{id:string;time:number}|null>(null);
   useEffect(() => { setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
   const [drawingActions, setDrawingActions] = useState<{ x: number; y: number } | null>(null);
-  const [priceScaleWidth, setPriceScaleWidth] = useState(72);
+  const [priceScaleWidth, setPriceScaleWidth] = useState(42);
   const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
   const drawingAimRef = useRef<Anchor | null>(null);
   const lastCrosshairAnchorRef = useRef<Anchor | null>(null);
@@ -890,7 +890,7 @@ export function MarketChart({
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
       const scale = chartApi.current?.priceScale("right");
-      const scaleWidth = scale?.width() ?? 88;
+      const scaleWidth = scale?.width() ?? 42;
       // Keep the axis at its widest measured label for this chart instance.
       // Live prices must not repeatedly shrink/grow the plot or its overlays.
       if (scale && scaleWidth > scale.options().minimumWidth) scale.applyOptions({ minimumWidth: Math.ceil(scaleWidth) });
@@ -1636,6 +1636,7 @@ export function MarketChart({
           background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
           textColor: neon ? "#a4adc7" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
+          fontSize: 11,
           attributionLogo: false,
           panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
@@ -1649,7 +1650,7 @@ export function MarketChart({
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
-          minimumWidth: 88,
+          minimumWidth: 42,
           entireTextOnly: true,
         },
         leftPriceScale: { visible: false },
