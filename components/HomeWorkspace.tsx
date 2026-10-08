@@ -153,7 +153,7 @@ export function HomeWorkspace({
   const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
   useEffect(() => {
-    try { setPreferences(normalizeHomePreferences(JSON.parse(localStorage.getItem(storageKey) ?? 'null'))); }
+    try { setPreferences({...normalizeHomePreferences(JSON.parse(localStorage.getItem(storageKey) ?? 'null')), market: 'india'}); }
     catch { setPreferenceMessage('Preferences could not be loaded on this device.'); }
     setPreferencesReady(true);
     const timer = window.setInterval(() => setNow(Date.now()), 30000);

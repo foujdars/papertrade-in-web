@@ -514,6 +514,7 @@ export function TradingDashboard() {
   const [balance, setBalance] = useState(1000000);
   const [showApi, setShowApi] = useState(false);
   const [homeOpen, setHomeOpen] = useState(true);
+  const [homeVisit, setHomeVisit] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [holdingsOpen, setHoldingsOpen] = useState(false);
@@ -2745,6 +2746,7 @@ export function TradingDashboard() {
     }
     setOptionChainOpen(false);
     if (section === "home") {
+      setHomeVisit(visit => visit + 1);
       setHomeOpen(true);
       setSidebarOpen(false); setPositionsOpen(false); setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setFnoListOpen(false); setOptionChainOpen(false); setOrderSheetOpen(false); setFnoTradeDockOpen(false);
@@ -3230,7 +3232,7 @@ export function TradingDashboard() {
       }} />}
 
       {homeOpen && <HomeWorkspace
-        key={user?.id ?? 'guest'}
+        key={`${user?.id ?? 'guest'}:${homeVisit}`}
         preferenceOwner={user?.id ?? 'guest'}
         favouriteSymbols={[...new Set(customWatchlists.flatMap(list => list.symbols))]}
         recentSymbols={recentStocks}
