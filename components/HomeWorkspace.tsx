@@ -81,7 +81,7 @@ export function HomeWorkspace({
   globalOpenOrders,
   globalOpenPnl,
   globalPnlComplete,
-  todayPnl,
+  todayPnl, indiaFundsInUse = 0, globalClosedCount = 0, onOpenGlobalPnl,
   holdingsCount,
   openPositionsCount,
   closedTradesCount,
@@ -116,6 +116,9 @@ export function HomeWorkspace({
   globalPnlComplete: boolean;
   onAddCash: (currency: 'INR' | 'USD') => void;
   todayPnl: number;
+  indiaFundsInUse?: number;
+  globalClosedCount?: number;
+  onOpenGlobalPnl?: () => void;
   holdingsCount: number;
   openPositionsCount: number;
   closedTradesCount: number;
@@ -394,18 +397,24 @@ export function HomeWorkspace({
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
             <div className="home-portfolio-row" aria-label="Portfolio snapshot">
               <button className="home-today-pnl" onClick={onOpenPositions} aria-label="Today's profit and loss — open positions"><small>Today P&L</small><strong className={privateBalances||openChangeToday===null?"":todayPnl >= 0 ? "positive" : "negative"}>{privateBalances?'••••':openChangeToday===null?"—":`${todayPnl>=0?"+":""}${formatInr(todayPnl)}`}</strong></button>
+              <div className="home-funds-used" title="Capital committed to open Indian positions"><small>Funds in use</small><b>{privateBalances ? "••••" : formatInr(indiaFundsInUse)}</b></div>
               <button onClick={onOpenHoldings} aria-label="Holdings"><small>Holdings</small><b>{holdingsCount}</b></button>
               <button onClick={onOpenPositions} aria-label="Open positions"><small>Open</small><b>{openPositionsCount}</b></button>
               <button onClick={onOpenTradeHistory} aria-label="Closed trades"><small>Closed</small><b>{closedTradesCount}</b></button>
             </div>
           </section>}
 
-          {activeMarket === 'global' && <section className="home-section home-global-account">
-            <header><span><Globe2 size={17}/><b>Global performance</b></span><small>USD</small></header>
-            <div className="home-global-balance"><div><small>OPEN P&amp;L</small><strong className={!privateBalances && globalOpenPnl < 0 ? 'negative' : 'positive'}>{privateBalances ? '••••' : globalPnlComplete ? formatUsd(globalOpenPnl) : 'Awaiting quotes'}</strong><span>Your open contracts</span></div><div><small>FUNDS IN USE</small><b>{privateBalances ? '••••' : globalWallet !== null && globalAvailable !== null ? formatUsd(globalWallet - globalAvailable) : '—'}</b><span>Positions &amp; pending orders</span></div></div>
+          {activeMarket === 'global' && <section className="home-section home-portfolio-card home-global-account">
+            <header><span><Globe2 size={17}/><b>Global performance</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenGlobalPnl ?? onOpenPnl}>View P&amp;L <ChevronRight size={14}/></button></div></header>
+            <div className="home-portfolio-row" aria-label="Global portfolio snapshot">
+              <button className="home-today-pnl" onClick={onOpenGlobalPnl ?? onOpenPnl} aria-label="Global open profit and loss"><small>Open P&amp;L</small><strong className={!privateBalances && globalOpenPnl < 0 ? 'negative' : 'positive'}>{privateBalances ? '••••' : globalPnlComplete ? formatUsd(globalOpenPnl) : 'Awaiting quotes'}</strong></button>
+              <div className="home-funds-used" title="Funds committed to global positions and pending orders"><small>Funds in use</small><b>{privateBalances ? '••••' : globalWallet !== null && globalAvailable !== null ? formatUsd(globalWallet-globalAvailable) : '—'}</b></div>
+              <button onClick={onOpenGlobalPnl ?? onOpenPnl}><small>Open</small><b>{globalPositions.length}</b></button>
+              <button onClick={onOpenGlobalPnl ?? onOpenPnl}><small>Pending</small><b>{globalOpenOrders}</b></button>
+              <button onClick={onOpenGlobalPnl ?? onOpenPnl}><small>Closed</small><b>{globalClosedCount}</b></button>
+            </div>
             {globalWalletError && <p className="home-global-wallet-error" role="alert">Dollar wallet unavailable: {globalWalletError}</p>}
-            <div className="home-global-stats"><span><b>{globalPositions.length}</b> open positions</span><span><b>{globalOpenOrders}</b> pending orders</span></div>
-            {!!globalPositions.length && <div className="home-global-positions"><small>OPEN POSITIONS</small>{globalPositions.slice(0, 4).map((position, index) => <button key={`${position.symbol}:${index}`} onClick={() => onOpenStock(position.symbol)}><span><b>{position.symbol}</b><small>{position.side} · view chart</small></span><ChevronRight size={17}/></button>)}</div>}
+            {!!globalPositions.length && <details className="home-global-position-details"><summary>Open positions · {globalPositions.length}</summary><div className="home-global-positions">{globalPositions.slice(0,4).map((position,index)=><button key={`${position.symbol}:${index}`} onClick={()=>onOpenStock(position.symbol)}><span><b>{position.symbol}</b><small>{position.side} · view chart</small></span><ChevronRight size={17}/></button>)}</div></details>}
             {!globalPositions.length && <p className="home-global-empty">No global positions yet. Search an instrument above to practise in dollars.</p>}
           </section>}
 

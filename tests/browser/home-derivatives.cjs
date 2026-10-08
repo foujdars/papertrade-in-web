@@ -5,13 +5,13 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  const build=await esbuild.build({entryPoints:['tests/browser/home-derivatives.fixture.jsx'],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'}});
  const css=[...fs.readFileSync('app/layout.tsx','utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([,f])=>fs.readFileSync('app/'+f,'utf8')).join('\n').replace(/@import[^;]+;/g,'');
  const catalogue=[{symbol:'NIFTY',name:'Nifty 50',instrumentKey:'NSE_INDEX|Nifty 50',optionContracts:100,futures:[{instrumentKey:'NSE_FO|123',tradingSymbol:'NIFTY 27 OCT FUT',expiry:'2026-10-27'}]},{symbol:'BANKNIFTY',name:'Nifty Bank',instrumentKey:'NSE_INDEX|Nifty Bank',optionContracts:100},{symbol:'RELIANCE',name:'Reliance',instrumentKey:'NSE_EQ|INE002A01018',optionContracts:100}];
- let vixPrice=14.3, putOiTotal=300;
+ let vixPrice=15.27, putOiTotal=300;
  const side=(oi,prevOi)=>({marketData:{oi,prevOi}});
  const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://test');res.setHeader('Content-Type','application/json');
   if(url.pathname==='/api/upstox/fno-underlyings')return res.end(JSON.stringify({ok:true,underlyings:catalogue}));
   if(url.pathname==='/api/market/gift-nifty')return res.end(JSON.stringify({ok:true,gift:{price:22520.5,asOf:'2026-10-07T13:00:00Z'},futureClose:{price:22618.4,date:'2026-10-07'}}));
-  if(url.pathname==='/api/market/india-pulse')return res.end(JSON.stringify({ok:true,vix:{price:vixPrice,change:-.6,changePercent:-4},vixCheckedAt:Date.parse('2026-10-07T13:00:00Z')}));
+  if(url.pathname==='/api/market/india-pulse')return res.end(JSON.stringify({ok:true,vix:{price:vixPrice,change:-.6,changePercent:9.94},vixCheckedAt:Date.parse('2026-10-07T13:00:00Z')}));
   if(url.pathname==='/api/upstox/option-chain'){
    const missing=url.searchParams.get('instrumentKey').startsWith('NSE_EQ');
    return res.end(JSON.stringify({ok:true,expiries:['2026-10-08','2026-10-27'],fetchedAt:'2026-10-07T13:00:00Z',rows:missing?[]:[{strikePrice:22500,underlyingSpotPrice:22600,call:side(100,150),put:side(putOiTotal-100,100)},{strikePrice:22600,underlyingSpotPrice:22600,call:side(100,120),put:side(100,140)}]}));
@@ -30,6 +30,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    await page.setViewportSize({width,height:844});await page.locator('.terminal-shell').evaluate((el,theme)=>el.dataset.theme=theme,theme);
    assert.ok(await page.locator('.home-derivatives').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} fits ${width}`);
    assert.ok(await page.locator('.home-option-pulse').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'chart scroll stays inside card');
+   assert.ok(await page.locator('.home-derivative-metrics > div').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().height<=60 && el.scrollWidth<=el.clientWidth+1)),'compact metric values fit');
+   assert.ok(await page.locator('.home-vix-value-row').evaluate(el=>{const a=el.querySelector('b').getBoundingClientRect(),b=el.querySelector('small').getBoundingClientRect();return b.x>=a.right && Math.abs(a.bottom-b.bottom)<4;}),'VIX change sits beside value');
    assert.ok(await page.locator('.home-gift-card').evaluate(el=>el.getBoundingClientRect().height<=80),'gift card is one compact row');
    assert.ok(await page.locator('.home-oi-open').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.abs(a.x+a.width/2-b.x-b.width/2)<1&&Math.abs(a.y+a.height/2-b.y-b.height/2)<1;}),'chart icon centred');
    assert.equal(await page.locator('.home-option-pulse .modern-select-trigger').first().evaluate(el=>getComputedStyle(el).backgroundColor),await page.locator('.terminal-shell').evaluate(el=>getComputedStyle(el).getPropertyValue('--surface').trim()).then(s=>s.startsWith('#')?page.evaluate(s=>{const d=document.createElement('span');d.style.color=s;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c;},s):s),'selectors use white/theme surface');
