@@ -7,6 +7,6 @@ export function writePreference(key: string, value: unknown) { try { localStorag
 export function normalizePnlScope(input: unknown): PnlScope {
   const v = input && typeof input === "object" ? input as Partial<PnlScope> : {};
   const validCustom = validPnlDate(v.start ?? "") && validPnlDate(v.end ?? "") && v.start! <= v.end!;
-  return { ...DEFAULT_PNL_SCOPE, period: v.period === "custom" ? validCustom ? "custom" : "all" : v.period === "month" || v.period === "30d" ? v.period : "all", asset: v.asset === "stocks" || v.asset === "fno" || v.asset === "global" ? v.asset : "all", product: v.product === "INTRADAY" || v.product === "DELIVERY" ? v.product : "all", start: validPnlDate(v.start ?? "") ? v.start! : "", end: validPnlDate(v.end ?? "") ? v.end! : "" };
+  return { ...DEFAULT_PNL_SCOPE, period: v.period === "custom" ? validCustom ? "custom" : "all" : v.period === "month" || v.period === "30d" ? v.period : "all", asset: v.asset === "india" || v.asset === "stocks" || v.asset === "fno" || v.asset === "global" ? v.asset : "all", product: v.product === "INTRADAY" || v.product === "DELIVERY" ? v.product : "all", start: validPnlDate(v.start ?? "") ? v.start! : "", end: validPnlDate(v.end ?? "") ? v.end! : "" };
 }
 export const readPnlScope = () => normalizePnlScope(readPreference(PNL_SCOPE_KEY));
