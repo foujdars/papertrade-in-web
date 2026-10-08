@@ -80,3 +80,11 @@ test('holding durations and direction groups preserve counts and net totals', ()
   assert.deepEqual(new Set(groupPnl(trades,[],{},'Holding duration').map(g=>g.label)),new Set(['30 minutes–2 hours','Duration unavailable','Under 30 minutes','1–7 days']));
   const groups=groupPnl(trades,[],{},'Direction'); assert.equal(groups[0].label,'Long'); assert.equal(groups.reduce((s,g)=>s+g.count,0),4); assert.equal(groups.reduce((s,g)=>s+g.net,0),16);
 });
+
+test('Indian market scope keeps all domestic segments and honours date/product filters', () => {
+  const trades=[make(90),make(-20,1,{product:'DELIVERY'}),make(15,2)];
+  const orders=[{id:'entry0',assetType:'EQUITY'},{id:'entry1',assetType:'OPTION'},{id:'entry2',assetType:'FUTURE',instrumentKey:'MCX_FO|123'}];
+  const indian=filterPnlTrades(trades,orders,{...DEFAULT_PNL_SCOPE,asset:'india'},now);
+  assert.deepEqual(indian.map(t=>t.id),['t0','t1','t2']);
+  assert.deepEqual(filterPnlTrades(trades,orders,{...DEFAULT_PNL_SCOPE,asset:'india',product:'INTRADAY',day:'2026-09-03'},now).map(t=>t.id),['t2']);
+});

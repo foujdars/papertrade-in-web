@@ -2,7 +2,7 @@ import type { PaperOrder } from "./paper-trading";
 import type { ClosedPaperTrade } from "./trade-analytics";
 import type { TradeJournalEntry } from "./trading-coach";
 
-export type PnlScope = { period: "all" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "stocks" | "fno" | "global"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
+export type PnlScope = { period: "all" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "india" | "stocks" | "fno" | "global"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
 export const DEFAULT_PNL_SCOPE: PnlScope = { period: "all", start: "", end: "", asset: "all", product: "all" };
 export type PnlDimension = "Symbol" | "Strategy" | "Market" | "Product" | "Direction" | "Entry time" | "Holding duration";
 export const PNL_DIMENSIONS: PnlDimension[] = ["Symbol", "Strategy", "Market", "Product", "Direction", "Entry time", "Holding duration"];
@@ -29,7 +29,7 @@ export function filterPnlTrades(trades: ClosedPaperTrade[], orders: PaperOrder[]
   if (!bounds.valid) return [];
   return trades.filter(t => {
     const day = pnlDay(t.closedAt);
-    return Number.isFinite(t.netPnl) && (!bounds.start || day >= bounds.start) && (!bounds.end || Boolean(day) && day <= bounds.end) && (!scope.day || day === scope.day) && (scope.product === "all" || t.product === scope.product) && (scope.asset === "all" || tradeAsset(t, lookup) === scope.asset);
+    return Number.isFinite(t.netPnl) && (!bounds.start || day >= bounds.start) && (!bounds.end || Boolean(day) && day <= bounds.end) && (!scope.day || day === scope.day) && (scope.product === "all" || t.product === scope.product) && (scope.asset === "all" || scope.asset === "india" || tradeAsset(t, lookup) === scope.asset);
   });
 }
 export function summarisePnl(trades: ClosedPaperTrade[]) {
