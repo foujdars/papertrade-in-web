@@ -22,6 +22,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    assert.ok(Math.max(...widths)-Math.min(...widths)<=1, 'plot width stays stable across whole/fractional live prices');
    await page.evaluate(()=>window.qaSeries.update({...window.qaSeries.data().at(-1),open:110,high:111,low:109,close:110}));
   };
+  assert.ok(await page.evaluate(()=>window.qaChart.priceScale("right").width())<75, "low-price axis gives more width to the chart");
   await checkStablePrices();
   const aim=async()=>{const host=await page.locator('.lightweight-chart').boundingBox();await page.mouse.move(host.x+170,host.y+180);await page.locator('.chart-price-plus').waitFor();return page.evaluate(()=>({price:Number(document.querySelector('.chart-price-plus button').getAttribute('aria-label').split('at ')[1]),y:parseFloat(document.querySelector('.chart-price-plus').style.top)}));};
   assert.equal(await page.locator('.chart-price-plus').count(),0,'no price action before crosshair');

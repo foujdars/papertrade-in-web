@@ -436,6 +436,17 @@ export function TradingDashboard() {
   const [tradingWatchlistCount, setTradingWatchlistCount] = useState(0);
   const [customWatchlists, setCustomWatchlists] = useState<CustomWatchlist[]>([]);
   const [watchlistPickerOpen, setWatchlistPickerOpen] = useState(false);
+  const watchlistPickerWasOpen = useRef(false);
+  useEffect(() => {
+    if (watchlistPickerOpen) { watchlistPickerWasOpen.current = true; return; }
+    if (!watchlistPickerWasOpen.current) return;
+    watchlistPickerWasOpen.current = false;
+    // Mobile keyboards restore the viewport asynchronously after closing a list.
+    // Re-measure the chart after layout and keyboard transitions have settled.
+    const timers = [0, 200, 450].map(delay => window.setTimeout(() => window.dispatchEvent(new Event("resize")), delay));
+    document.querySelector<HTMLButtonElement>(".chart-floating-favourite")?.focus({ preventScroll: true });
+    return () => timers.forEach(timer => window.clearTimeout(timer));
+  }, [watchlistPickerOpen]);
   const [watchlistTarget, setWatchlistTarget] = useState<Instrument | null>(null);
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [search, setSearch] = useState("");
@@ -3425,7 +3436,7 @@ export function TradingDashboard() {
         />
       )}
       {watchlistPickerOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setWatchlistPickerOpen(false)}>
+        <div className="modal-backdrop watchlist-picker-backdrop" role="presentation" onMouseDown={() => setWatchlistPickerOpen(false)}>
           <section className="modal watchlist-picker-modal" role="dialog" aria-modal="true" aria-label="Custom watchlists" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Custom watchlists</span><h2>{watchlistTarget ? `Add ${watchlistTarget.symbol}` : "Manage watchlists"}</h2></div><button className="icon-button" onClick={() => setWatchlistPickerOpen(false)} aria-label="Close custom watchlists"><X size={20} /></button></div>
             {!watchlistTarget && customWatchlists.length > 0 && (
@@ -3437,13 +3448,13 @@ export function TradingDashboard() {
               <div className="custom-watchlist-choices">
                 {customWatchlists.map((list) => {
                   const included = list.symbols.includes(watchlistTarget.symbol);
-                  return <button key={list.id} onClick={() => toggleWatchlistMembership(list.id)}><span className={included ? "checked" : ""}>{included ? "✓" : ""}</span><span><b>{list.name}</b><small>{list.symbols.length} stocks</small></span><em>{included ? "Added" : "Add"}</em></button>;
+                  return <button key={list.id} aria-pressed={included} onClick={() => toggleWatchlistMembership(list.id)}><span className={included ? "checked" : ""}>{included ? "✓" : ""}</span><span><b>{list.name}</b><small>{list.symbols.length} stocks</small></span><em>{included ? "Added" : "Add"}</em></button>;
                 })}
               </div>
             )}
             {customWatchlists.length < 5 ? (
               <div className="new-watchlist-form">
-                <label>New watchlist name<input value={newWatchlistName} maxLength={24} onChange={(event) => setNewWatchlistName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createCustomWatchlist(); }} placeholder="Example: Swing trades" autoFocus={!watchlistTarget || !customWatchlists.length} /></label>
+                <label>New watchlist name<input value={newWatchlistName} maxLength={24} onChange={(event) => setNewWatchlistName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") createCustomWatchlist(); }} placeholder="Example: Swing trades" autoFocus={!watchlistTarget} /></label>
                 <button className="primary-button" type="button" disabled={!newWatchlistName.trim()} onClick={createCustomWatchlist}><Plus size={17} /> Create {watchlistTarget ? "and add" : "watchlist"}</button>
               </div>
             ) : <p className="watchlist-limit-note">You have created the maximum of 5 custom watchlists.</p>}

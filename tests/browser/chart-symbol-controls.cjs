@@ -22,6 +22,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   for(const theme of ['light','neon'])for(const width of [320,390,768,1280]){
    await page.setViewportSize({width,height:844});await page.locator('.terminal-shell').evaluate((el,t)=>el.dataset.theme=t,theme);
    assert.ok(await page.locator('.chart-controls').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} toolbar fits ${width}`);
+   if(width<=940){
+    assert.ok(await page.locator('.chart-controls').evaluate(el=>el.getBoundingClientRect().height<=40),'compact toolbar');
+    assert.ok(await page.locator('.permanent-trade-footer .chart-trade-buttons button').first().evaluate(el=>el.getBoundingClientRect().height<=40),'compact trade buttons');
+    assert.ok(await page.locator('.chart-statusbar').evaluate(el=>el.getBoundingClientRect().height<=44),'range and indicators use compact adjacent rows');
+   }
    const button=page.locator('.desktop-chart-symbol .chart-compare-link');
    assert.ok(await button.evaluate(el=>getComputedStyle(el).borderRadius==='50%'),'compare is circular');
    assert.ok(await button.evaluate(el=>el.parentElement.classList.contains('chart-symbol-search')),'compare inside symbol surface');
@@ -35,7 +40,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   }
   await page.setViewportSize({width:390,height:844});await star.click();
   const watchlists=page.getByRole('dialog',{name:'Custom watchlists',exact:true});await watchlists.waitFor();await watchlists.getByRole('button',{name:/My favourites/}).click();
-  await watchlists.getByRole('button',{name:'Close custom watchlists',exact:true}).click();assert.ok(await star.evaluate(el=>el.classList.contains('saved')),'saved state preserved');
+  await page.setViewportSize({width:390,height:540});await page.waitForTimeout(200);
+  await watchlists.getByRole('button',{name:'Close custom watchlists',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);
+  assert.ok(await page.locator('.lightweight-chart').evaluate(el=>{const table=el.querySelector('table');return !!table&&Math.abs(table.getBoundingClientRect().height-el.clientHeight)<3;}),'chart canvas fills restored host after favourites and keyboard close');
+  assert.ok(await star.evaluate(el=>el.classList.contains('saved')),'saved state preserved');
   assert.equal(await star.evaluate(el=>getComputedStyle(el).color),'rgb(234, 179, 8)','saved favourite turns yellow');
   await page.locator('.desktop-chart-symbol .chart-compare-link').click();const compare=page.getByRole('dialog',{name:'Compare symbols',exact:true});await compare.waitFor();
   await compare.getByLabel('Search symbols to compare').fill('HDFCBANK');await compare.locator('.compare-picker-list button').first().click();await compare.getByRole('button',{name:'Close compare symbols',exact:true}).click();

@@ -724,7 +724,7 @@ export function MarketChart({
   const drawingTapRef = useRef<{id:string;time:number}|null>(null);
   useEffect(() => { setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
   const [drawingActions, setDrawingActions] = useState<{ x: number; y: number } | null>(null);
-  const [priceScaleWidth, setPriceScaleWidth] = useState(72);
+  const [priceScaleWidth, setPriceScaleWidth] = useState(42);
   const drawingGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; anchor: Anchor | null; origin: { x: number; y: number } | null } | null>(null);
   const drawingAimRef = useRef<Anchor | null>(null);
   const lastCrosshairAnchorRef = useRef<Anchor | null>(null);
@@ -890,7 +890,7 @@ export function MarketChart({
       const x = start === null ? null : chartApi.current?.timeScale().timeToCoordinate(chartTimeFromEpoch(start, timeframe)) ?? null;
       setReplayMarkerX(x);
       const scale = chartApi.current?.priceScale("right");
-      const scaleWidth = scale?.width() ?? 88;
+      const scaleWidth = scale?.width() ?? 42;
       // Keep the axis at its widest measured label for this chart instance.
       // Live prices must not repeatedly shrink/grow the plot or its overlays.
       if (scale && scaleWidth > scale.options().minimumWidth) scale.applyOptions({ minimumWidth: Math.ceil(scaleWidth) });
@@ -1621,6 +1621,7 @@ export function MarketChart({
     let replayClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let avwapClick: ((event: MouseEventParams<Time>) => void) | null = null;
     let resizeFrame = 0;
+    let measuredWidth = 0, measuredHeight = 0;
     let profileClient: ReturnType<typeof createProfileDataClient> | undefined;
     let profileRefresh: ReturnType<typeof setInterval> | undefined;
 
@@ -1635,6 +1636,7 @@ export function MarketChart({
           background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
           textColor: neon ? "#a4adc7" : "#65708a",
           fontFamily: "Inter, system-ui, sans-serif",
+          fontSize: 11,
           attributionLogo: false,
           panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
@@ -1648,7 +1650,7 @@ export function MarketChart({
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
-          minimumWidth: 88,
+          minimumWidth: 42,
           entireTextOnly: true,
         },
         leftPriceScale: { visible: false },
@@ -2616,12 +2618,17 @@ export function MarketChart({
           if (!chartApi.current || chartApi.current !== chart) return;
           const width = Math.max(1, Math.floor(host.clientWidth));
           const height = Math.max(1, Math.floor(host.clientHeight));
-          if (chart.options().width !== width || chart.options().height !== height) chart.resize(width, height, true);
+          measuredWidth = width; measuredHeight = height;
+          // Explicit viewport/modal recovery must resize the rendered canvas even
+          // when cached chart options already match the restored host dimensions.
+          chart.resize(width, height, true);
           fitStudyPanes();
           scheduleOverlayRefresh();
         });
       };
-      observer = new ResizeObserver(resizeChart);
+      observer = new ResizeObserver(() => {
+        if (Math.floor(host.clientWidth) !== measuredWidth || Math.floor(host.clientHeight) !== measuredHeight) resizeChart?.();
+      });
       observer.observe(host);
       window.addEventListener("resize", resizeChart);
       window.visualViewport?.addEventListener("resize", resizeChart);
