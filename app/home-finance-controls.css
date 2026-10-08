@@ -79,3 +79,20 @@
 @media (prefers-reduced-motion:reduce) {
   .terminal-shell :is(.home-gift-quote,.home-deal-count) { transition:none; }
 }
+
+/* Scope these treatments to the three OI controls and two risk metrics. */
+.terminal-shell .home-option-pulse>header { align-items:stretch; grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px; }
+.terminal-shell .home-option-pulse .modern-select-trigger { background:var(--surface); }
+.terminal-shell .home-option-pulse .home-oi-open { display:grid; place-items:center; align-self:stretch; width:44px; height:100%; background:var(--surface); }
+.terminal-shell .home-option-pulse .home-oi-open svg { display:block; }
+.terminal-shell .home-derivative-metrics>div.home-risk-metric { background:var(--risk-tint,var(--surface)); color:var(--ink); }
+.terminal-shell .home-risk-metric[data-tone="calm"] { --risk-tint:#dcf5e9; }
+.terminal-shell .home-risk-metric[data-tone="watch"] { --risk-tint:#fff4c6; }
+.terminal-shell .home-risk-metric[data-tone="elevated"] { --risk-tint:#ffead6; }
+.terminal-shell .home-risk-metric[data-tone="high"] { --risk-tint:#ffe1e6; }
+.terminal-shell[data-theme="neon"] .home-risk-metric[data-tone="calm"] { --risk-tint:#173c32; }
+.terminal-shell[data-theme="neon"] .home-risk-metric[data-tone="watch"] { --risk-tint:#403820; }
+.terminal-shell[data-theme="neon"] .home-risk-metric[data-tone="elevated"] { --risk-tint:#452e22; }
+.terminal-shell[data-theme="neon"] .home-risk-metric[data-tone="high"] { --risk-tint:#442832; }
+.terminal-shell .home-risk-metric small { color:inherit; }
+.terminal-shell .home-vix-band { font-weight:650; }
