@@ -3246,6 +3246,9 @@ export function TradingDashboard() {
         })}
         feedLive={feedStatus.mode === "live"}
         balance={balance}
+        indiaFundsInUse={openPositions.reduce((sum, position) => sum + paperOrderCapitalValue(tradingUniverse.find(item => item.symbol === position.symbol)?.assetType, position.product, position.quantity, position.averagePrice), 0)}
+        globalClosedCount={globalPnlTrades.length}
+        onOpenGlobalPnl={() => { setPnlScope({...DEFAULT_PNL_SCOPE, asset: "global"}); openNavigationSection("pnl"); }}
         globalWallet={globalTrading.account?.wallet ?? null}
         globalWalletError={globalTrading.error}
         globalAvailable={globalTrading.account ? availablePerpCash(globalTrading.account) : null}
