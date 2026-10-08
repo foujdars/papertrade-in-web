@@ -53,3 +53,12 @@
   .terminal-shell .permanent-trade-footer :is(.chart-footer-pnl,.chart-positions-trigger,.price-tasks-button) { height:20px; min-height:20px; }
   .terminal-shell .permanent-trade-footer .chart-trade-buttons button { height:40px; min-height:40px; border-radius:8px; }
 }
+
+/* Match the symbol surface to the adjacent chart controls. */
+.terminal-shell .trade-cockpit .chart-symbol-search { height:36px; min-height:36px; padding-block:0; align-items:center; }
+.terminal-shell .trade-cockpit .chart-symbol-search :is(.desktop-symbol-trigger,.trade-symbol-trigger) { height:32px; }
+@media (max-width:940px) {
+  .terminal-shell .trade-cockpit .chart-symbol-search { height:32px; min-height:32px; }
+  .terminal-shell .trade-cockpit .chart-symbol-search :is(.desktop-symbol-trigger,.trade-symbol-trigger,.chart-compare-link) { height:28px; min-height:28px; }
+  .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { width:28px; min-width:28px; flex-basis:28px; }
+}

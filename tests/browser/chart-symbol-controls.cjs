@@ -27,6 +27,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
     assert.ok(await page.locator('.permanent-trade-footer .chart-trade-buttons button').first().evaluate(el=>el.getBoundingClientRect().height<=40),'compact trade buttons');
     assert.ok(await page.locator('.chart-statusbar').evaluate(el=>el.getBoundingClientRect().height<=44),'range and indicators use compact adjacent rows');
    }
+   assert.ok(await page.locator('.trade-cockpit .desktop-chart-symbol .chart-symbol-search').evaluate(el=>{const adjacent=el.closest('.chart-controls').querySelector('.chart-functions-trigger');return Math.abs(el.getBoundingClientRect().height-adjacent.getBoundingClientRect().height)<1;}),'symbol search matches fx height');
    const button=page.locator('.desktop-chart-symbol .chart-compare-link');
    assert.ok(await button.evaluate(el=>getComputedStyle(el).borderRadius==='50%'),'compare is circular');
    assert.ok(await button.evaluate(el=>el.parentElement.classList.contains('chart-symbol-search')),'compare inside symbol surface');
