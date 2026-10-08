@@ -1,0 +1,29 @@
+/* Semantic interaction cues across all workspaces, sheets and dialogs. */
+.terminal-shell { --action-surface:#edf0f3; --action-hover:#e1e5ea; --readonly-surface:#fff; --vix-calm:#087b59; --vix-watch:#876400; --vix-elevated:#b85012; --vix-fear:#c42d43; }
+.terminal-shell[data-theme="neon"] { --action-surface:#263143; --action-hover:#334158; --readonly-surface:var(--surface); --vix-calm:#5cdbb1; --vix-watch:#f3d16b; --vix-elevated:#ffb276; --vix-fear:#ff8da0; }
+:root:root .terminal-shell :is(button:not(:disabled),a[href],summary,select:not(:disabled),[role="button"]:not([aria-disabled="true"])) { background:var(--action-surface)!important; color:var(--ink)!important; }
+:root:root .terminal-shell :is(button:not(:disabled),a[href],summary,[role="button"]:not([aria-disabled="true"])) { cursor:pointer; }
+:root:root .terminal-shell :is(button:not(:disabled),a[href],summary):hover { background:var(--action-hover)!important; }
+:root:root .terminal-shell :is(button,a[href],summary,select,input):focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
+:root:root .terminal-shell :is(button:disabled,[aria-disabled="true"]) { background:var(--readonly-surface)!important; cursor:default; }
+:root:root .terminal-shell :is(.home-section,.home-gift-difference,.home-derivative-metrics>div,.india-flow-stats>div,.pnl-stat-grid>div,.metric-card,.bot-stat-card) { background:var(--readonly-surface)!important; }
+:root:root .terminal-shell :is(button[aria-selected="true"],button[aria-pressed="true"],.mobile-bottom-nav button.active) { border-color:var(--purple); box-shadow:inset 0 -2px var(--purple); }
+/* Retain order direction and selected-star identity without coloured surfaces. */
+:root:root .terminal-shell :is(.chart-trade-buttons,.fno-trade-actions) button.buy { color:var(--market-up,#087b59)!important; }
+:root:root .terminal-shell :is(.chart-trade-buttons,.fno-trade-actions) button.sell { color:var(--market-down,#c42d43)!important; }
+:root:root .terminal-shell .chart-body>button.chart-floating-favourite { background:transparent!important; box-shadow:none; }
+.terminal-shell .home-option-pulse>header { align-items:stretch; grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px; }
+.terminal-shell .home-oi-open { display:grid; place-items:center; width:44px; height:100%; align-self:stretch; }
+.terminal-shell .home-oi-open svg { display:block; }
+.terminal-shell .india-vix-status.calm { color:var(--vix-calm)!important; }
+.terminal-shell .india-vix-status.watch { color:var(--vix-watch)!important; }
+.terminal-shell .india-vix-status.elevated { color:var(--vix-elevated)!important; }
+.terminal-shell .india-vix-status.high { color:var(--vix-fear)!important; }
+.terminal-shell .home-vix-metric .india-vix-status { font-weight:650; }
+
+:root:root .terminal-shell .chart-floating-favourite.saved { color:#eab308!important; }
+:root:root .terminal-shell :is([class$="-card"],[class$="-metric"]):not(button):not(a):not([role="button"]) { background:var(--readonly-surface)!important; }
+.terminal-shell .india-vix-status { background:transparent!important; }
+
+:root:root .terminal-shell input:enabled:not([type="checkbox"]):not([type="radio"]) { background:var(--action-surface)!important; color:var(--ink); }
+:root:root .terminal-shell .chart-body>button.chart-floating-favourite:hover { background:transparent!important; }
