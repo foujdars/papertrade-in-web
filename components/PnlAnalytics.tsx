@@ -152,7 +152,7 @@ function PnlCalendar({ trades, scope, onScope, now, onSelect }: { trades: Closed
   </section>;
 }
 
-export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now, currency = "INR", globalSummaryTrades, embedded = false, controlsOnly = false }: { embedded?: boolean; controlsOnly?: boolean; globalSummaryTrades?: ClosedPaperTrade[]; trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number; currency?: PnlCurrency }) {
+export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, tab, onTab, onSelect, now, currency = "INR", globalSummaryTrades }: { globalSummaryTrades?: ClosedPaperTrade[]; trades: ClosedPaperTrade[]; calendarTrades: ClosedPaperTrade[]; orders: PaperOrder[]; scope: PnlScope; onScope: (scope: PnlScope) => void; tab: PnlTab; onTab: (tab: PnlTab) => void; onSelect: Drill; now: number; currency?: PnlCurrency }) {
   const stats = useMemo(() => summarisePnl(trades), [trades]), curve = useMemo(() => pnlCurve(trades), [trades]);
   const globalStats = useMemo(() => summarisePnl(globalSummaryTrades ?? []), [globalSummaryTrades]);
   const consolidated = scope.asset === "all" && globalSummaryTrades !== undefined;
@@ -166,7 +166,7 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
   const bounds = pnlBounds(scope, now), allIds = trades.map(t => t.id);
   const setScope = (patch: Partial<PnlScope>) => onScope({ ...scope, ...patch, day: null });
   return <PnlMoneyContext.Provider value={money}><div className="pnl-analytics">
-    {!embedded && <><div className="pnl-scope-controls">
+    <div className="pnl-scope-controls">
       <ModernSelect label="Period" ariaLabel="P&L period" value={scope.period} choices={[{ value: "all", label: "All time", description: "Every recorded completed exit" }, { value: "month", label: "This month", description: "From the first of this month, in IST" }, { value: "30d", label: "Last 30 days", description: "A rolling window including today" }, { value: "custom", label: "Custom dates", description: "Choose your own start and end dates" }]} onChange={period => setScope({ period, start: scope.start || `${pnlDay(now).slice(0, 7)}-01`, end: scope.end || pnlDay(now) })} />
       <ModernSelect label="Market" ariaLabel="P&L market" value={scope.asset} choices={[{ value: "all", label: "All markets", description: "Indian and Global summaries · separate currencies" }, { value: "india", label: "Indian", description: "Indian stocks, F&O and MCX" }, { value: "stocks", label: "Stocks" }, { value: "fno", label: "F&O", description: "Options and futures" }, { value: "global", label: "Global", description: "BTC, ETH, gold and options · USD" }]} onChange={asset => setScope({ asset })} />
       <ModernSelect label="Product" ariaLabel="P&L product" value={scope.product} choices={[{ value: "all", label: "All products" }, { value: "INTRADAY", label: "Intraday" }, { value: "DELIVERY", label: "Delivery / carry" }]} onChange={product => setScope({ product })} />
@@ -174,8 +174,6 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
     {scope.period === "custom" && <div className="pnl-custom-dates"><label>From<input type="date" value={scope.start} onChange={e => setScope({ start: e.target.value })} /></label><label>Through<input type="date" value={scope.end} onChange={e => setScope({ end: e.target.value })} /></label></div>}
     {!bounds.valid && <p role="alert" className="pnl-filter-error">Choose a valid start and end date. The end date must not precede the start.</p>}
     <nav className="pnl-view-tabs" role="tablist" aria-label="P&L views">{(["overview", "insights", "trades"] as const).map((value, i, tabs) => <button key={value} role="tab" tabIndex={tab === value ? 0 : -1} aria-selected={tab === value} onClick={() => onTab(value)} onKeyDown={e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const next = (i + (e.key === "ArrowRight" ? 1 : 2)) % 3; onTab(tabs[next]); (e.currentTarget.parentElement?.children[next] as HTMLElement)?.focus(); } }}>{value[0].toUpperCase() + value.slice(1)}</button>)}</nav>
-    </>}
-    {!controlsOnly && <>
     {tab === "overview" && <><div className="pnl-summary-six">
       <div className="pnl-net-card"><span>Net P&amp;L</span>{consolidated ? <><button className="pnl-market-metric" onClick={()=>setScope({asset:"india"})}><small>Indian</small><b data-testid="pnl-net" className={signClass(stats.net)}>{rupees(stats.net)}</b></button><button className="pnl-market-metric" onClick={()=>setScope({asset:"global"})}><small>Global</small><b data-testid="pnl-global-net" className={signClass(globalStats.net)}>{dollars(globalStats.net)}</b></button></> : <><b data-testid="pnl-net" className={signClass(stats.net)}>{rupees(stats.net)}</b><small>Completed exits only</small></>}</div>
       {consolidated ? <div><span>Completed trades</span><b data-testid="pnl-count">{stats.count + globalStats.count}</b><div className="pnl-market-counts"><button onClick={()=>setScope({asset:"india"})}>Indian <b>{stats.count}</b></button><button onClick={()=>setScope({asset:"global"})}>Global <b>{globalStats.count}</b></button></div></div> : <button onClick={() => onSelect(allIds, "Completed trades")}><span>Completed trades</span><b data-testid="pnl-count">{stats.count}</b><small>View exits <ChevronRight size={11} /></small></button>}
@@ -191,6 +189,5 @@ export function PnlAnalytics({ trades, calendarTrades, orders, scope, onScope, t
       <div className="pnl-drawdown-detail"><span>Current decline <b>{rupees(curve.currentDrawdown)}</b></span>{curve.troughAt ? <span>{dateText(curve.worstPeakAt)} → {dateText(curve.troughAt)}<b>{curve.recoveredAt ? `Recovered ${dateText(curve.recoveredAt)}` : "That peak is not yet recovered"}</b></span> : <span>No closed-trade drawdown in this selection.</span>}</div>
     </section></div>}
     {tab === "insights" && <PnlInsights trades={trades} orders={orders} journal={journal} onSelect={onSelect} />}
-    </>}
   </div></PnlMoneyContext.Provider>;
 }
