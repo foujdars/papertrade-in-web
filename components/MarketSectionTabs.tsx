@@ -11,13 +11,14 @@ const sections = [
 ] as const;
 
 /** Shared navigation keeps saved stocks inside the Markets workspace. */
-export function MarketSectionTabs({ active, onChange }: {
+export function MarketSectionTabs({ active, onChange, scannerOnly = false }: {
   active: MarketSection;
+  scannerOnly?: boolean;
   onChange: (section: MarketSection) => void;
 }) {
   return (
     <nav className="market-section-tabs" aria-label="Market sections">
-      {sections.map(({ id, label, icon: Icon }) => (
+      {sections.filter(section => !scannerOnly || section.id !== "WATCHLIST").map(({ id, label, icon: Icon }) => (
         <button type="button" key={id} className={active === id ? "active" : ""}
           aria-current={active === id ? "page" : undefined} onClick={() => onChange(id)}>
           <Icon size={16} aria-hidden="true" /><span>{label}</span>

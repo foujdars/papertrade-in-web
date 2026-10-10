@@ -472,18 +472,18 @@ test("Markets has Trading, Investment and Watchlist actions with a single active
   }
 });
 
-test("Watchlist stays in Markets navigation and retains saved-list controls", async () => {
+test("Watchlist and Scanner have separate navigation and retain saved-list controls", async () => {
   const dashboard = await source("components/TradingDashboard.tsx");
   const markets = await source("components/MarketsWorkspace.tsx");
   assert.doesNotMatch(dashboard, /top-watchlist-button/);
-  assert.match(dashboard, /const marketNavigationActive = activeNavigationSection === "markets" \|\| activeNavigationSection === "watchlist"/);
-  assert.match(dashboard, /<MarketSectionTabs active="WATCHLIST"/);
+  assert.match(dashboard, /const marketNavigationActive = activeNavigationSection === "watchlist"/);
+  assert.match(dashboard, /<span>Scanner<\/span>/);
   assert.match(dashboard, /onOpenWatchlist={\(\) => openNavigationSection\("watchlist"\)}/);
   assert.match(dashboard, /marketNavigationActive \? 2/);
   assert.match(dashboard, /setSidebarOpen\(section === "watchlist"\)/);
   assert.match(dashboard, /removeStockFromCustomWatchlist/);
   assert.match(dashboard, /<WatchlistSelector/);
-  assert.match(markets, /<MarketSectionTabs active={scannerGroup}/);
+  assert.match(markets, /<MarketSectionTabs scannerOnly active={scannerGroup}/);
   assert.match(markets, /if \(section === "WATCHLIST"\) onOpenWatchlist\(\)/);
 });
 

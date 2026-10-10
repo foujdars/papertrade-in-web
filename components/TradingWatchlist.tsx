@@ -41,8 +41,8 @@ export function TradingWatchlist(props: Props & { underlyings?: FnoUnderlying[] 
   }, [saved]);
   const stocks = useMemo(() => tradingUniverse(universe, props.instruments, props.underlyings), [props.instruments, props.underlyings, universe]);
   const scope = `${day}:${universe}:${JSON.stringify(inputs)}:${stocks.map(item => item.instrumentKey).join(',')}`;
-  return <section className="trading-watchlist" aria-label="PSBB divergence watchlist">
-    <header className="tw-heading"><div><h2>Trading watchlist</h2><p>PSBB divergences confirmed today · {day} IST</p></div><span className="tw-paper">Live signals</span></header>
+  return <section className="trading-watchlist" aria-label="PSSB MTF scanner">
+    <header className="tw-heading"><div><h2>PSSB MTF</h2></div><span className="tw-paper">Live signals</span></header>
     <div className="tw-controls"><label>Category<select aria-label="Trading stock universe" value={universe} onChange={event => setUniverse(event.target.value as TradingGroup)}>{TRADING_GROUPS.map(item => <option key={item}>{item}</option>)}</select></label></div>
     <p className="tw-scope">{universe} · {stocks.length} symbols · 1m, 5m, 15m, 1H and 4H</p>
     {universe === 'F&O stocks' && <p className="tw-scope">Signals use the underlying stock.</p>}
@@ -178,21 +178,18 @@ function TradingScanBoard({ instruments, inputs, search, onOpen, onCount, scope,
   const pageKey = `${timeframe}:${search}`;
   const [pagination, setPagination] = useState({ key: '', limit: 60 });
   const limit = pagination.key === pageKey ? pagination.limit : 60;
-  const done = Object.keys(current?.reports ?? {}).length, failures = Object.keys(current?.errors ?? {}).length;
+  const failures = Object.keys(current?.errors ?? {}).length;
   const scanning = Object.values(scans).some(scan => scan?.running);
   return <>
     <div className="tw-timeframes" role="tablist" aria-label="Trading timeframes">{TRADING_TIMEFRAMES.map(frame => <button role="tab" aria-selected={frame === timeframe} key={frame} onClick={() => setTimeframe(frame)}>{frame}</button>)}</div>
     <div className="tw-actions"><span>RSI {inputs.length} · swings {inputs.left} / {inputs.left}</span><button onClick={() => void startScan([timeframe])} disabled={scanning || !instruments.length}><RefreshCw size={13} /> Refresh {timeframe}</button><button onClick={() => void startScan(TRADING_TIMEFRAMES)} disabled={scanning || !instruments.length}>Scan all 5</button></div>
-    <p className="tw-scope">Live scans run while this watchlist is open during NSE trading hours. New divergences appear in your alert center.</p>
     {!alertPermission && <button className="tw-alert-permission" onClick={() => void enableAlerts()}>Enable phone alerts</button>}
     <div className="tw-frame-summary" aria-label="Today's divergences by timeframe">{TRADING_TIMEFRAMES.map(frame => <button key={frame} onClick={() => setTimeframe(frame)} aria-pressed={frame === timeframe}><b>{frame}</b><span>{scans[frame] ? Object.values(scans[frame].reports).reduce((total, report) => total + report.rows.length, 0) : '—'} signals</span><small>{scans[frame] ? `${Object.keys(scans[frame].reports).length}/${instruments.length}${scans[frame].running ? '…' : ''}` : 'Not scanned'}</small></button>)}</div>
-    <div className="tw-progress" role="status">{!instruments.length ? 'Loading stocks…' : current?.running ? `Scanning ${timeframe}: ${current.progress ?? 0}/${instruments.length} stocks` : current ? `${done}/${instruments.length} stocks scanned · ${new Date(current.finishedAt ?? Date.now()).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST` : `Not scanned · Refresh ${timeframe} to scan`}</div>
     {failures > 0 && <details className="tw-errors"><summary>{failures} stocks unavailable</summary>{Object.entries(current!.errors).slice(0, 10).map(([key, message]) => <p key={key}>{instruments.find(item => item.instrumentKey === key)?.symbol}: {message}</p>)}</details>}
     <div className="tw-rows">{filtered.slice(0, limit).map(row => <button key={`${row.instrument.instrumentKey}:${row.id}`} className="tw-row" onClick={() => onOpen(row.instrument, timeframe, row.secondTime)} aria-label={`Open ${row.instrument.symbol} ${timeframe} divergence chart`}>
       <div className="tw-row-title"><b>{row.instrument.symbol}</b><span className="tw-badge">{row.side === 'long' ? 'Bullish' : 'Bearish'}</span><ChevronRight size={14} /></div>
       <small>{timeframe} · Confirmed {when(row.confirmedTime)} IST · Tap to review chart</small>
     </button>)}</div>
     {filtered.length > limit && <button className="tw-more" onClick={() => setPagination({ key: pageKey, limit: limit + 60 })}>Show more divergences</button>}
-    {!filtered.length && done > 0 && !current?.running && <p className="tw-empty">No divergence confirmed today in the scanned stocks.</p>}
   </>;
 }
