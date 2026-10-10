@@ -40,7 +40,7 @@ const MAX_HISTORY_SCANS = 120;
 // unique equity symbols. Keep a bounded request, but leave enough headroom for
 // newly listed shares so the full trading universe is not rejected.
 const MAX_NSE_CASH_INSTRUMENTS = 4_000;
-const scannerCache = new Map<"VOLUME" | "OPEN_HIGH", { expiresAt: number; payload: Record<string, unknown> }>();
+const scannerCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 const volumeHistoryCache = new Map<string, { sessionDate: string; expiresAt: number; points: HistoricalVolumePoint[] }>();
 
 function indiaDateKey(value: Date | number | string) {
@@ -86,10 +86,6 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, source: "Upstox live quotes + adjusted daily candles", rule: "Daily Volume > 5 × SMA(Volume, 20)", rows, scanned: instruments.length, fetchedAt: new Date().toISOString() }, { headers: { "Cache-Control": "private, max-age=0" } });
     }
     const mode = payload.mode === "OPEN_HIGH" ? "OPEN_HIGH" : "VOLUME";
-    const cached = scannerCache.get(mode);
-    if (payload.force !== true && cached && cached.expiresAt > Date.now()) {
-      return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
-    }
     if (!Array.isArray(payload.instruments) || payload.instruments.length < 1 || payload.instruments.length > MAX_NSE_CASH_INSTRUMENTS) {
       return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: `Provide between 1 and ${MAX_NSE_CASH_INSTRUMENTS.toLocaleString("en-IN")} NSE cash instruments.` } }, { status: 400 });
     }
@@ -101,6 +97,10 @@ export async function POST(request: Request) {
     if (instruments.length !== payload.instruments.length) {
       return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "The NSE instrument list contains an unsupported entry." } }, { status: 400 });
     }
+
+    const resultKey = `${mode}:${instruments.map(item => item.instrumentKey).sort().join(",")}`;
+    const cached = scannerCache.get(resultKey);
+    if (payload.force !== true && cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
 
     const batches = Array.from({ length: Math.ceil(instruments.length / 500) }, (_, index) => instruments.slice(index * 500, index * 500 + 500));
     const quotePayloads = await Promise.all(batches.map((batch) => {
@@ -156,7 +156,7 @@ export async function POST(request: Request) {
         historiesScanned: 0,
         fetchedAt: new Date().toISOString(),
       };
-      scannerCache.set(mode, { expiresAt: Date.now() + 60_000, payload: responsePayload });
+      scannerCache.set(resultKey, { expiresAt: Date.now() + 60_000, payload: responsePayload });
       return Response.json(responsePayload, { headers: { "Cache-Control": "private, max-age=20" } });
     }
     const rankedCandidates = candidates
@@ -191,7 +191,7 @@ export async function POST(request: Request) {
     };
     // Empty results are refreshed quickly. This prevents a transient partial
     // quote/history response from leaving the Volume Shocker blank for minutes.
-    scannerCache.set(mode, { expiresAt: Date.now() + (rows.length ? 2 * 60_000 : 15_000), payload: responsePayload });
+    scannerCache.set(resultKey, { expiresAt: Date.now() + (rows.length ? 2 * 60_000 : 15_000), payload: responsePayload });
     return Response.json(responsePayload, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch (error) {
     return upstoxErrorResponse(error);

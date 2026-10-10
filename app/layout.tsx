@@ -34,6 +34,7 @@ import "./global-markets.css";
 import "./home-studio.css";
 import "./trading-watchlist.css";
 import "./watchlist-order.css";
+import "./workspace-list-picker.css";
 import "./watchlist-workspace.css";
 import "./android-studio.css";
 import "./home-market-design.css";
