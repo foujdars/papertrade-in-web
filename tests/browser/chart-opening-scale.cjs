@@ -15,7 +15,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    res.setHeader('Content-Type','application/json');
    const step=url.searchParams.get('timeframe')==='1D'?86400:300,before=Number(url.searchParams.get('before'));
    if(before){requests.push(before);return setTimeout(()=>{if(failOnce){failOnce=false;res.statusCode=503;res.end(JSON.stringify({ok:false}));return;}res.end(JSON.stringify({ok:true,candles:bars(before-step*300,300,step),history:{nextBefore:before-step*300,hasMore:true}}));},300);}
-   return res.end(JSON.stringify({ok:true,candles:bars(start,300,step),quotes:{},segments:['historical']}));
+   const candles=bars(start,300,step);
+   if(url.searchParams.get('years')==='5')candles[candles.length-2]={...candles[candles.length-2],low:0};
+   return res.end(JSON.stringify({ok:true,candles,quotes:{},segments:['historical']}));
   }
   res.setHeader('Content-Type',url.pathname==='/qa.js'?'application/javascript':'text/html');
   res.end(url.pathname==='/qa.js'?bundle.outputFiles[0].text:`<meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}.price-chart-wrap{height:100%!important}.price-chart,.chart-stack{height:100%!important}</style><div id="root"></div><script>window.fixtureCandles=${JSON.stringify(bars(start,300,300))}</script><script src="/qa.js"></script>`);
@@ -29,6 +31,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.addInitScript(start=>localStorage.setItem('papertrade-lwc-drawings-v1:NSE_EQ|TEST',JSON.stringify([{id:'zero-anchor',type:'horizontal-ray',anchors:[{time:start+86400*290,price:0}],style:{lineColor:'#2563eb',lineWidth:1},options:{visible:false}}])),start);
   await page.goto('http://127.0.0.1:3232');await page.waitForFunction(()=>window.qaSeries?.data().length===300&&window.qaManager?.getAllDrawings().length===1);await page.waitForTimeout(250);
   for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:844});await page.waitForTimeout(150);const range=await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange());assert.ok(range.from>90 && range.to<120,JSON.stringify({width,range}));}
-  await page.evaluate(()=>{window.qaChart.priceScale('right').setAutoScale(false);window.qaChart.priceScale('right').setVisibleRange({from:80,to:140});});await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange()),{from:80,to:140});assert.deepEqual(errors,[]);console.log('PASS: opening scale fits positive candles despite zero drawing anchor, at four widths; manual scale remains intact.');
+  await page.goto('http://127.0.0.1:3232?prior');
+  await page.waitForFunction(()=>window.qaSeries?.data().length===300&&document.querySelector('.chart-previous-day'));
+  await page.waitForTimeout(500);
+  for(const width of [320,390,768,1280]){
+   await page.setViewportSize({width,height:844});await page.waitForTimeout(150);
+   const priorRange=await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange());
+   assert.ok(priorRange.from>90&&priorRange.to<120,`Prior levels must not force zero into the scale: ${JSON.stringify({width,priorRange})}`);
+  }
+  await page.evaluate(()=>{window.qaChart.priceScale('right').setAutoScale(false);window.qaChart.priceScale('right').setVisibleRange({from:80,to:140});});await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange()),{from:80,to:140});assert.deepEqual(errors,[]);console.log('PASS: positive opening scale with hidden zero drawings and invalid daily prior-level history; manual scale remains intact.');
  } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
