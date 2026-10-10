@@ -1,4 +1,5 @@
 "use client";
+import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
 
 import { CandleLoader } from "./CandleLoader";
@@ -1697,7 +1698,14 @@ export function MarketChart({
         lastValueVisible: true,
         title: "",
         autoscaleInfoProvider: (baseImplementation: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
-          const base = baseImplementation();
+          let base = baseImplementation();
+          if (base && kind !== "histogram") {
+            const visible = chart.timeScale().getVisibleLogicalRange();
+            const bars = prepareStyleCandles(dataRef.current, chartStyleRef.current);
+            const from = visible ? Math.max(0, Math.floor(visible.from)) : 0;
+            const to = visible ? Math.min(bars.length, Math.ceil(visible.to) + 1) : bars.length;
+            base = { ...base, priceRange: priceRangeWithoutZeroAnchor(base.priceRange, bars.slice(from, to)) };
+          }
           const tool = orderToolRef.current;
           if (!base || !tool?.enabled || candlesOnlyRef.current) return base;
           const levels = [tool.entryPrice, tool.targetPrice, tool.stopLossPrice].filter((value) => Number.isFinite(value) && value > 0);
