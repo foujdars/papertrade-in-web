@@ -1,0 +1,36 @@
+/* Workspace panels occupy the viewport without reserving space in the chart. */
+.app-dialog.watchlist-order-dialog, .app-dialog.workspace-list-dialog {
+  position: fixed; inset: 0; margin: 0; width: 100%; height: 100dvh; max-width: none; max-height: none;
+  box-sizing: border-box; border: 0; border-radius: 0; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--surface); color: var(--ink); overflow: hidden;
+}
+.app-dialog.watchlist-order-dialog[open], .app-dialog.workspace-list-dialog[open] { display: flex; flex-direction: column; animation: workspace-panel-enter 240ms cubic-bezier(.2,.7,.2,1); }
+@keyframes workspace-panel-enter { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.watchlist-order-list { flex: 1; min-height: 0; max-height: none; }
+.watchlist-order-heading, .watchlist-order-hint, .watchlist-order-footer { flex-shrink: 0; }
+.watchlist-order-list > li { min-height: 54px; padding: 5px 3px; border-radius: 0; }
+.watchlist-order-footer { border-top: 1px solid var(--line); margin-top: 12px; }
+.workspace-list-trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.workspace-list-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-list-trigger > svg { flex: none; color: var(--muted); }
+.workspace-list-field { display: grid; gap: 6px; width: 100%; font-size: 12px; color: var(--muted); }
+.workspace-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; padding-bottom: 12px; }
+.workspace-list-heading h2 { margin: 0; font-size: 18px; }
+.workspace-list-close { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.workspace-list-search { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); }
+.workspace-list-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 14px; }
+.workspace-list-options { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.workspace-list-options > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.workspace-list-options > button[aria-pressed="true"] { background: var(--purple-soft); }
+.workspace-list-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.workspace-list-copy strong { font-size: 14px; font-weight: 600; }
+.workspace-list-copy small { font-size: 12px; line-height: 1.4; color: var(--muted); }
+.workspace-list-badge { flex: none; font-size: 10px; padding: 3px 6px; border-radius: 5px; background: var(--surface); color: var(--muted); }
+.workspace-list-check { flex: none; width: 18px; color: var(--purple); }
+.workspace-list-empty { padding: 20px 12px; color: var(--muted); font-size: 13px; }
+.workspace-list-trigger:focus-visible, .workspace-list-options > button:focus-visible, .workspace-list-close:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .app-dialog.watchlist-order-dialog[open], .app-dialog.workspace-list-dialog[open] { animation: none; } }
+.terminal-shell[data-motion="reduced"] .app-dialog.watchlist-order-dialog[open], .terminal-shell[data-motion="reduced"] .app-dialog.workspace-list-dialog[open] { animation: none; }
+.terminal-shell .scanner-workspace .scanner-filter-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
+.terminal-shell .scanner-workspace .scanner-filter-row .scanner-choice { display: grid; min-width: 0; gap: 5px; margin: 0; }
+.terminal-shell .scanner-workspace .scanner-filter-row .workspace-list-trigger { min-width: 0; padding-inline: 10px; }

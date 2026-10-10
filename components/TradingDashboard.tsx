@@ -39,6 +39,7 @@ import { ChartStyleMenu } from "@/components/ChartStyleMenu";
 import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
 import { reconcileWatchlistOrder } from "@/lib/watchlist-order";
+import type { TradingGroup } from "@/lib/trading-universes";
 import { TradingWatchlist } from "@/components/TradingWatchlist";
 import { TRADING_WATCHLIST_ID } from "@/lib/psbb-watchlist";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
@@ -2884,7 +2885,7 @@ export function TradingDashboard() {
     }
   }
 
-  const tradingScanner = <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={""} active={marketsOpen} onOpen={(instrument, frame, time) => {
+  const tradingScanner = (universe: TradingGroup) => <TradingWatchlist universe={universe} instruments={stockUniverse} underlyings={fnoUnderlyings} search={""} active={marketsOpen} onOpen={(instrument, frame, time) => {
             const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
             if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
             else pendingTradingHistory.current = history;
@@ -3429,6 +3430,7 @@ export function TradingDashboard() {
       {marketsOpen && marketsInitialGroup !== "IPO" && (
         <MarketsWorkspace
           tradingScanner={tradingScanner}
+          underlyings={fnoUnderlyings}
           key={marketsInitialGroup}
           stockUniverse={stockUniverse}
           quotes={marketQuotes}

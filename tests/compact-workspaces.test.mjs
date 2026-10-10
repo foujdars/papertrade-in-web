@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import * as tradingUniverses from "../lib/trading-universes.ts";
 import * as homeQuotes from "../lib/home-quotes.ts";
 import * as homePreferences from "../lib/home-preferences.ts";
 import * as globalMarkets from "../lib/global-markets.ts";
@@ -281,6 +282,8 @@ async function componentHarness(path, name, initialStates = []) {
   };
   const mocks = {
     react,
+    "@/lib/trading-universes": tradingUniverses,
+    "./WorkspaceListPicker": { WorkspaceListPicker: () => null },
     "./useTransientBack": { useTransientBack() {}, hasTransientBackLayer() { return false; }, TRANSIENT_BACK_EVENT: "papertrade:dismiss-layer" },
     "./CandleLoader": { CandleLoader: () => null },
     "./usePullToRefresh": { usePullToRefresh() {} },
@@ -424,7 +427,7 @@ test("scanner runs automatically; empty success clears old matches; failure keep
   });
   let payload = { ok: true, rows: [], fetchedAt: "2026-09-07T10:00:00.000Z" };
   const fetchMock = t.mock.method(globalThis, "fetch", async () => ({ ok: payload.ok, json: async () => payload }));
-  const props = { activeScanner: "VOLUME", scrollHost: {current:null}, group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
+  const props = { universe: "Nifty 50 stocks", activeScanner: "VOLUME", scrollHost: {current:null}, group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
   const harness = await componentHarness("components/MarketsWorkspace.tsx", "ScannerResults");
   const render = () => harness.render(props);
   const refresh = async () => {

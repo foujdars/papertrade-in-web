@@ -1,6 +1,9 @@
 "use client";
 
 import { Activity, ArrowRight, Clock3, RefreshCw, ScanSearch } from "lucide-react";
+import { TRADING_GROUPS, tradingUniverse, type TradingGroup } from "@/lib/trading-universes";
+import type { FnoUnderlying } from "@/lib/fno";
+import { WorkspaceListPicker } from "./WorkspaceListPicker";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { CandleLoader } from "./CandleLoader";
 import { usePullToRefresh } from "./usePullToRefresh";
@@ -36,18 +39,6 @@ const investmentScannerOptions: ScannerOption[] = [
   { id: "rsi-divergence-daily", label: NIMBLE_STRATEGIES["rsi-divergence-daily"].label, description: NIMBLE_STRATEGIES["rsi-divergence-daily"].description, cadence: "1D" },
 ];
 const allScannerOptions = [...tradingScannerOptions, ...investmentScannerOptions];
-const nifty500ScannerIds = new Set<ScannerId>([
-  "ema-30-50-100",
-  "rsi-divergence-daily",
-  "macd-orb",
-  "adx-golden-cross",
-  "macd-triple-ema",
-]);
-
-function usesNifty500Universe(scanner: ScannerId) {
-  return nifty500ScannerIds.has(scanner);
-}
-
 function normalizedScannerSymbol(symbol: string) {
   return symbol.trim().toUpperCase().replace(/-(?:EQ|BE|BZ|SM|ST)$/, "");
 }
@@ -85,10 +76,10 @@ function isTechnicalRow(row: ScannerRow): row is TechnicalScannerRow {
   return "signal" in row;
 }
 
-function readSavedSnapshots() {
+function readSavedSnapshots(storageKey: string) {
   if (typeof window === "undefined") return {};
   try {
-    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<Record<ScannerId, ScannerSnapshot>>;
+    return JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Partial<Record<ScannerId, ScannerSnapshot>>;
   } catch {
     return {};
   }
@@ -119,12 +110,19 @@ type WorkspaceProps = {
   group: "TRADING" | "INVESTMENT";
   onGroupChange: (group: "TRADING" | "INVESTMENT") => void;
   onScannerViewed?: (label: string) => void;
-  tradingScanner: ReactNode;
+  underlyings: FnoUnderlying[];
+  tradingScanner: (universe: TradingGroup) => ReactNode;
 };
 const MTF_SELECTION_KEY = "papertrade-scanner-workspace-selection";
 
 export function MarketsWorkspace(props: WorkspaceProps) {
   const scrollHost = useRef<HTMLElement | null>(null);
+  const [universe, setUniverse] = useState<TradingGroup>(() => {
+    try { const saved = localStorage.getItem(`papertrade-scanner-universe:${props.group}`); if (TRADING_GROUPS.includes(saved as TradingGroup)) return saved as TradingGroup; } catch {}
+    return "Nifty 50 stocks";
+  });
+  useEffect(() => { try { localStorage.setItem(`papertrade-scanner-universe:${props.group}`, universe); } catch {} }, [props.group, universe]);
+  const scopedInstruments = useMemo(() => tradingUniverse(universe, props.stockUniverse, props.underlyings), [universe, props.stockUniverse, props.underlyings]);
   const options = props.group === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const [selection, setSelection] = useState<ScannerId | "PSBB_MTF">(() => {
     try {
@@ -141,16 +139,17 @@ export function MarketsWorkspace(props: WorkspaceProps) {
   }, [props.group, selection]);
   return <section ref={scrollHost} className="market-discovery-panel scanner-workspace" aria-label="Scanners">
     <MarketSectionTabs active={props.group} onChange={section => section === "WATCHLIST" ? props.onOpenWatchlist() : props.onGroupChange(section)} />
-    <label className="scanner-choice"><span>Scanner</span><select aria-label="Choose scanner" value={selection} onChange={event => setSelection(event.target.value as ScannerId | "PSBB_MTF")}>
-      {props.group === "TRADING" && <option value="PSBB_MTF">PSBB · Multi-timeframe</option>}
-      {options.map(option => <option value={option.id} key={option.id}>{option.label}</option>)}
-    </select></label>
-    {selection === "PSBB_MTF" ? props.tradingScanner : <ScannerResults key={selection} {...props} scrollHost={scrollHost} activeScanner={selection} />}
+    <div className="scanner-filter-row"><div className="scanner-choice"><span>Scanner</span><WorkspaceListPicker label="Choose scanner" title="Choose scanner" value={selection} onChange={value => setSelection(value as ScannerId | "PSBB_MTF")} choices={[
+      ...(props.group === "TRADING" ? [{ id: "PSBB_MTF", label: "PSBB · Multi-timeframe", description: "Confirmed divergences across five timeframes", badge: "MTF" }] : []),
+      ...options.map(option => ({ id: option.id, label: option.label, description: option.description, badge: option.cadence })),
+    ]} /></div><div className="scanner-choice"><span>Universe</span><WorkspaceListPicker label="Trading stock universe" title="Choose universe" value={universe} onChange={value => setUniverse(value as TradingGroup)} choices={TRADING_GROUPS.map(item => ({ id: item, label: item }))} /></div></div>
+    {selection === "PSBB_MTF" ? props.tradingScanner(universe) : <ScannerResults key={`${selection}:${universe}`} {...props} stockUniverse={scopedInstruments} universe={universe} scrollHost={scrollHost} activeScanner={selection} />}
   </section>;
 }
 
-function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash, onScannerViewed, group: scannerGroup, activeScanner, scrollHost }: WorkspaceProps & { activeScanner: ScannerId; scrollHost: RefObject<HTMLElement | null> }) {
-  const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
+function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash, onScannerViewed, group: scannerGroup, activeScanner, universe, scrollHost }: WorkspaceProps & { universe: TradingGroup; activeScanner: ScannerId; scrollHost: RefObject<HTMLElement | null> }) {
+  const storageKey = `${STORAGE_KEY}:universe:${universe}`;
+  const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(() => readSavedSnapshots(storageKey));
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
   const scanMode = "auto";
   const scanInFlightRef = useRef(false);
@@ -166,11 +165,6 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
   const activeAdvancers = useMemo(() => activeRows.filter((row) => row.changePercent >= 0).length, [activeRows]);
   const activeDecliners = activeRows.length - activeAdvancers;
   const instruments = useMemo(() => dedupeScanInstruments(stockUniverse
-    .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey))
-    .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
-  const nifty500Instruments = useMemo(() => dedupeScanInstruments(stockUniverse
-    .filter((item) => /^NSE_EQ\|INE[A-Z0-9]+$/.test(item.instrumentKey)
-      && (item.categories.includes("NIFTY 500") || item.categories.includes("BANK NIFTY")))
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
   const activeQuoteKeys = useMemo(
     () => activeRows.map((row) => row.instrumentKey).filter(Boolean),
@@ -190,7 +184,7 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
   const runSelectedScan = useCallback(async (requestedScanner?: ScannerId, force = false) => {
     if (scanInFlightRef.current) return;
     const scanner = requestedScanner ?? activeScanner;
-    const scanInstruments = usesNifty500Universe(scanner) ? nifty500Instruments : instruments;
+    const scanInstruments = instruments;
     if (!scanInstruments.length) return;
     const option = allScannerOptions.find((item) => item.id === scanner) ?? allScannerOptions[0];
     const controller = new AbortController();
@@ -198,7 +192,7 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
     scanAbortRef.current = controller;
     scanInFlightRef.current = true;
     setLoadingScanner(scanner);
-    const timeout = window.setTimeout(() => controller.abort(), usesNifty500Universe(scanner) ? 75_000 : 45_000);
+    const timeout = window.setTimeout(() => controller.abort(), 75_000);
     try {
       const technical = scanner !== "VOLUME" && scanner !== "OPEN_HIGH";
       const response = await fetch(technical ? "/api/market/technical-scanner" : "/api/market/volume-breakouts", {
@@ -221,7 +215,7 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
             scannedAt: payload.fetchedAt ?? new Date().toISOString(),
           },
         };
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(storageKey, JSON.stringify(next));
         return next;
       });
     } catch (error) {
@@ -235,11 +229,11 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
       scanInFlightRef.current = false;
       setLoadingScanner((current) => current === scanner ? null : current);
     }
-  }, [activeScanner, instruments, nifty500Instruments]);
+  }, [activeScanner, instruments, storageKey]);
 
   useEffect(() => {
     window.localStorage.setItem(SCAN_MODE_STORAGE_KEY, scanMode);
-    const universeAvailable = usesNifty500Universe(activeScanner) ? nifty500Instruments.length > 0 : instruments.length > 0;
+    const universeAvailable = instruments.length > 0;
     if (scanMode !== "auto" || !universeAvailable) return;
     const scanWhenReady = () => {
       if (document.visibilityState === "visible" && navigator.onLine) void runSelectedScan(activeScanner);
@@ -253,7 +247,7 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
       window.removeEventListener("online", scanWhenReady);
       document.removeEventListener("visibilitychange", scanWhenReady);
     };
-  }, [activeScanner, instruments.length, nifty500Instruments.length, runSelectedScan, scanMode, scannerGroup]);
+  }, [activeScanner, instruments.length, runSelectedScan, scanMode, scannerGroup]);
 
   useEffect(() => () => scanAbortRef.current?.abort(), []);
 
@@ -262,9 +256,10 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
   return (
     <section className="scanner-results compact-market-panel" aria-label="NSE market scanners">
 
+      <p className="tw-scope">{universe} · {instruments.length} symbols · {selectedOption.label}</p>
       <div className="market-results-head">
         <button type="button" className="scanner-refresh" disabled={Boolean(loadingScanner)} onClick={() => void runSelectedScan(undefined, true)} aria-label="Refresh scanner"><RefreshCw size={15} /></button>
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : instruments.length ? "Scanning automatically" : "Universe constituents unavailable"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
       <div className="scanner-pull-stage" ref={pullStageRef} data-pull="idle">

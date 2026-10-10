@@ -5,7 +5,7 @@ import { RefreshCw, ChevronRight } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import type { Instrument } from '@/lib/market';
 import type { FnoUnderlying } from '@/lib/fno';
-import { TRADING_GROUPS, tradingUniverse, type TradingGroup } from '@/lib/trading-universes';
+import { tradingUniverse, type TradingGroup } from '@/lib/trading-universes';
 import { useIndicatorSettings } from '@/lib/indicator-settings';
 import { studyDefaults } from '@/lib/indicator-catalog';
 import { addPaperTradeNotification } from '@/lib/notification-center';
@@ -29,8 +29,8 @@ function saveScans(scope: string, scans: Partial<Record<TradingTimeframe, Scan>>
 const when = (time: number) => new Date(time * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 type Props = { instruments: Instrument[]; search: string; active: boolean; onOpen: (instrument: Instrument, timeframe: TradingTimeframe, time: number) => void };
 
-export function TradingWatchlist(props: Props & { underlyings?: FnoUnderlying[] }) {
-  const [universe, setUniverse] = useState<TradingGroup>('Nifty 50 stocks');
+export function TradingWatchlist(props: Props & { underlyings?: FnoUnderlying[]; universe: TradingGroup }) {
+  const universe = props.universe;
   const [day, setDay] = useState(() => indiaDay());
   useEffect(() => { const timer = setInterval(() => setDay(indiaDay()), 30_000); return () => clearInterval(timer); }, []);
   const { settings, setStudy } = useIndicatorSettings();
@@ -42,7 +42,7 @@ export function TradingWatchlist(props: Props & { underlyings?: FnoUnderlying[] 
   const stocks = useMemo(() => tradingUniverse(universe, props.instruments, props.underlyings), [props.instruments, props.underlyings, universe]);
   const scope = `${day}:${universe}:${JSON.stringify(inputs)}:${stocks.map(item => item.instrumentKey).join(',')}`;
   return <section className="trading-watchlist" aria-label="PSBB multi-timeframe scanner">
-    <div className="tw-controls"><label>Universe<select aria-label="Trading stock universe" value={universe} onChange={event => setUniverse(event.target.value as TradingGroup)}>{TRADING_GROUPS.map(item => <option key={item}>{item}</option>)}</select></label></div>
+
     <p className="tw-scope">{stocks.length} stocks · Today’s confirmed divergences</p>
     {universe === 'F&O stocks' && <p className="tw-scope">Signals use the underlying stock.</p>}
     {!stocks.length && <p className="tw-errors">Category constituents unavailable or still loading.</p>}

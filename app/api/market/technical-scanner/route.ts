@@ -23,7 +23,7 @@ const MAX_CANDLE_SCANS = 45;
 // unique equity symbols. Keep a bounded request, but leave enough headroom for
 // newly listed shares so the full trading universe is not rejected.
 const MAX_NSE_CASH_INSTRUMENTS = 4_000;
-const scannerCache = new Map<NimbleStrategy, { expiresAt: number; payload: Record<string, unknown> }>();
+const scannerCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
 function indiaDateKey(value: Date | number | string) {
   const parts = new Intl.DateTimeFormat("en", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
@@ -126,8 +126,7 @@ export async function POST(request: Request) {
     const body = await request.json() as { strategy?: unknown; instruments?: unknown; force?: unknown };
     const strategy = typeof body.strategy === "string" && body.strategy in NIMBLE_STRATEGIES ? body.strategy as NimbleStrategy : null;
     if (!strategy) return Response.json({ ok: false, error: { code: "INVALID_STRATEGY", message: "Choose a supported NimbleScan strategy." } }, { status: 400 });
-    const cached = scannerCache.get(strategy);
-    if (body.force !== true && cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
+
     if (!Array.isArray(body.instruments) || body.instruments.length < 1 || body.instruments.length > MAX_NSE_CASH_INSTRUMENTS) {
       return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: `Provide between 1 and ${MAX_NSE_CASH_INSTRUMENTS.toLocaleString("en-IN")} NSE cash instruments.` } }, { status: 400 });
     }
@@ -137,6 +136,9 @@ export async function POST(request: Request) {
       return typeof candidate.symbol === "string" && typeof candidate.name === "string" && typeof candidate.instrumentKey === "string" && isSupportedNseInstrumentKey(candidate.instrumentKey);
     });
     if (instruments.length !== body.instruments.length) return Response.json({ ok: false, error: { code: "INVALID_INSTRUMENTS", message: "The NSE instrument list contains an unsupported entry." } }, { status: 400 });
+    const resultKey = `${strategy}:${instruments.map(item => item.instrumentKey).sort().join(",")}`;
+    const cached = scannerCache.get(resultKey);
+    if (body.force !== true && cached && cached.expiresAt > Date.now()) return Response.json(cached.payload, { headers: { "Cache-Control": "private, max-age=30" } });
 
     const liquid = await loadLiquidUniverse(instruments, strategy);
     let rateLimitError: UpstoxServerError | null = null;
@@ -177,7 +179,7 @@ export async function POST(request: Request) {
       partial: Boolean(rateLimitError),
       fetchedAt: new Date().toISOString(),
     };
-    scannerCache.set(strategy, { expiresAt: Date.now() + 2 * 60_000, payload: responsePayload });
+    scannerCache.set(resultKey, { expiresAt: Date.now() + 2 * 60_000, payload: responsePayload });
     return Response.json(responsePayload, { headers: { "Cache-Control": "private, max-age=30" } });
   } catch (error) {
     return upstoxErrorResponse(error);
