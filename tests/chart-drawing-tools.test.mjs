@@ -348,3 +348,19 @@ test('horizontal text alignment spans the actual line and either ray direction',
   assert.deepEqual(xs,type==='horizontal-line'?[4,200,396]:direction==='right'?[104,250,396]:[4,50,96]);
  }
 });
+
+
+test('saved annotation prices never enter autoscaling, even when positive or hidden', () => {
+ const registry=createChartDrawingRegistry(drawing,()=>candles);
+ for(const price of [0,1,100000]) for(const visible of [true,false]) {
+  const line=registry.createDrawing('horizontal-line',`saved-${price}-${visible}`,[{time:1,price}],{},{visible});
+  assert.equal(line.autoscaleInfo(0,10),null);
+  assert.equal(line.anchors[0].price,price);
+  assert.equal(line.options.visible,visible);
+  line.updateOptions({visible:!visible});
+  assert.equal(line.autoscaleInfo(0,10),null);
+  line.anchors=[{time:2,price:price+5}];
+  assert.equal(line.anchors[0].price,price+5);
+  assert.equal(line.autoscaleInfo(0,10),null);
+ }
+});

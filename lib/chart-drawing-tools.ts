@@ -59,6 +59,13 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     getAll() { return [...entries.values()]; },
     createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
       const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      // Drawings are annotations, not market prices. The upstream primitive
+      // contributes every anchor to autoscaling, including hidden drawings and
+      // old off-screen levels saved for one instrument. That can flatten only
+      // that symbol's candles (a small positive anchor also prints a 0.00 tick).
+      // Keep drawings editable/visible at their prices without changing the fit.
+      // Explicit order-tool levels are included separately by MarketChart.
+      item.autoscaleInfo = () => null;
       // Native factories only forward their known fields; retain our saved presentation too.
       if (options) item.updateOptions(options);
       if (frame && (item.options as DrawingPresentation).anchorTimeOffset === undefined) item.updateOptions({anchorTimeOffset:axisOffset} as Partial<DrawingOptions>);
