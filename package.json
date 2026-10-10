@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "test:reliability": "node --experimental-strip-types --test tests/market-refresh.test.mjs tests/entry-signals.test.mjs tests/global-closed-alerts.test.mjs tests/technical-alerts-dispatch.test.mjs tests/upstox-candles.test.mjs",
     "test:research": "node --experimental-strip-types --test tests/fundamental-analysis.test.mjs tests/stock-discovery.test.mjs",
     "test:bot": "node --experimental-strip-types --test tests/paper-bot-background.test.mjs tests/paper-bot-api.test.mjs tests/paper-bot.test.mjs tests/paper-bot-ema.test.mjs tests/global-order-engine.test.mjs",
     "test:psbb": "node --experimental-strip-types --test tests/psbb.test.mjs tests/psbb-watchlist.test.mjs tests/psbb-scan-route.test.mjs",

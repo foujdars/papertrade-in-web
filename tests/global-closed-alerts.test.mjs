@@ -8,7 +8,7 @@ const stubs = {
   'server-only': '',
   'global-route': `export async function GET(request) { const s=globalThis.__globalCloudTest; return Response.json(s.feed ? request.url.includes('mode=candles') ? {ok:true,candles:[{time:1}]} : {ok:true,quote:{symbol:'BTCUSD',last:1,at:Date.now()}} : {ok:false},{status:s.feed?200:503}); }`,
   'global-alerts': `export const globalAlertError = () => null; export const isEma21EntryKind = kind => kind.startsWith('ema21-entry-'); export const evaluateGlobalAlert = () => globalThis.__globalCloudTest.signal; export const ema21EntrySignal = () => 'bullish';`,
-  'notification-policy': `export const notificationPreferences = p => ({trades:!!p.trades,pausedUntil:0}); export const quietTime = () => false;`,
+  'notification-policy': `export const notificationPreferences = p => ({trades:!!p.trades,pausedUntil:0}); export const quietTime = () => false; export const divergenceTitle = () => 'Divergence'; export const emaTitle = () => 'EMA entry';`,
   'push-admin': `export const sendPush = async (notice,target) => {globalThis.__globalCloudTest.sent.push({notice,target});};`,
 };
 const plugin = { name:'isolate-global', setup(b) {

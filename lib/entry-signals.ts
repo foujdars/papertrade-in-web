@@ -96,6 +96,7 @@ export function entryPlots(candles: Bar[], inputs: Record<string, number> = {}) 
   let previousLow = N;
   let volumeSum = 0;
   let priceVolume = 0;
+  let volumeComplete = true;
   const opening = new Map<string, { high: number; low: number }>();
   if (openingReady) {
     for (const bar of candles) {
@@ -118,15 +119,21 @@ export function entryPlots(candles: Bar[], inputs: Record<string, number> = {}) 
       dayLow = bar.low;
       volumeSum = 0;
       priceVolume = 0;
+      volumeComplete = true;
     } else {
       dayHigh = Math.max(dayHigh, bar.high);
       dayLow = Math.min(dayLow, bar.low);
     }
     const typical = (bar.high + bar.low + bar.close) / 3;
-    const volume = Number(bar.volume) > 0 ? Number(bar.volume) : 1;
-    priceVolume += typical * volume;
-    volumeSum += volume;
-    vwap[index] = priceVolume / volumeSum;
+    // Zero traded volume contributes nothing. Missing/invalid volume makes the
+    // rest of this session incomplete; never substitute equal-weighted prices.
+    const volume = bar.volume;
+    if (!Number.isFinite(volume) || volume < 0) volumeComplete = false;
+    if (volumeComplete && volume > 0) {
+      priceVolume += typical * volume;
+      volumeSum += volume;
+    }
+    if (volumeComplete && volumeSum > 0) vwap[index] = priceVolume / volumeSum;
     if (index === 0 || index === candles.length - 1) continue;
     const allowedLong = !on("vwap") || !intraday || bar.close >= vwap[index];
     const allowedShort = !on("vwap") || !intraday || bar.close <= vwap[index];
