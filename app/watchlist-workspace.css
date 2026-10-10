@@ -1,0 +1,34 @@
+/* One destination, two clear views. Keep the secondary controls quiet. */
+.terminal-shell .watchlist-workspace-navigation { margin-bottom: 12px; }
+.terminal-shell .watchlist-workspace-navigation .market-section-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 4px; gap: 4px; margin: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--soft); }
+.terminal-shell .watchlist-workspace-navigation .market-section-tabs button { min-height: 42px; border-radius: 10px; font-size: 13px; box-shadow: none; }
+.terminal-shell .watchlist-workspace-navigation .market-section-tabs button.active { background: var(--surface); color: var(--purple); box-shadow: 0 1px 5px #1823370b; }
+.scanner-group-switch { display:flex; align-items:center; gap:24px; border-bottom:1px solid var(--line); margin-top:8px; padding:0 6px; }
+.scanner-group-switch button { background:transparent; border:0; border-bottom:2px solid transparent; border-radius:0; padding:11px 2px; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; }
+.scanner-group-switch button[aria-pressed="true"] { border-bottom-color:var(--purple); color:var(--purple); font-weight:650; }
+.terminal-shell .scanner-workspace { padding-top:12px; }
+.scanner-choice { display:block; margin-bottom:12px; color:var(--muted); font-size:11px; }
+.scanner-choice > span { display:block; margin-bottom:5px; }
+.scanner-choice select { width:100%; min-height:44px; padding:8px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); color:var(--ink); font:inherit; font-size:13px; }
+.scanner-results { min-width:0; }
+.scanner-refresh { display:grid; place-items:center; width:36px; height:36px; flex:none; order:2; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--purple); cursor:pointer; }
+.scanner-workspace .tw-controls select { min-height:40px; margin-bottom:5px; }
+.scanner-workspace .tw-scope { font-size:10px; margin-bottom:8px; }
+.scanner-workspace .tw-frame-summary { margin:8px 0; gap:6px; }
+.scanner-workspace .tw-frame-summary button { min-height:48px; border-radius:10px; gap:3px; padding:7px 2px; }
+.scanner-workspace .tw-frame-summary b { font-size:12px; font-weight:600; }
+.scanner-workspace .tw-frame-summary span { font-size:9px; color:var(--muted); }
+.scanner-workspace .tw-actions { justify-content:flex-start; gap:8px; margin:8px 0; }
+.scanner-workspace .tw-actions > button { min-height:34px; padding:6px 10px; border-radius:9px; font-size:11px; background:var(--surface); }
+.tw-options { margin-left:auto; font-size:11px; position:relative; }
+.tw-options summary { min-height:34px; display:flex; align-items:center; padding:6px; cursor:pointer; }
+.tw-options > div { position:absolute; right:0; top:100%; z-index:5; width:230px; padding:14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 8px 24px #18233718; line-height:1.5; }
+.scanner-workspace .tw-progress { margin:8px 0; font-size:10px; }
+.scanner-workspace .tw-empty { margin:0; padding:18px 0; text-align:center; border:1px dashed var(--line); border-radius:10px; font-size:12px; }
+.scanner-workspace .positions-empty { min-height:120px; padding:20px 12px; }
+.terminal-shell .watchlist-panel .watchlist-market-header { margin-bottom:6px; }
+@media (min-width: 941px) { .scanner-workspace .tw-rows { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.workspace:not(.section-watchlist) .watchlist-tabs-toolbar { display:none; }
+
+@media (max-width: 480px) { .terminal-shell .mobile-bottom-nav button span { font-size:10px; } }

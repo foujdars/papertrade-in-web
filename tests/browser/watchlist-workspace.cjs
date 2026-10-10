@@ -1,0 +1,61 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Browser harness uses externally installed packages. */
+const assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+(async()=>{
+ const server=process.env.START_TEST_SERVER?require('node:child_process').spawn(process.execPath,[require('node:path').resolve('node_modules/vinext/dist/cli.js'),'start','--port','3229'],{stdio:'pipe'}):null;
+ let browser;
+ try{
+  if(server)for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:3229')).ok)break;}catch{}if(i===59)throw Error('Server unavailable');await new Promise(r=>setTimeout(r,500));}
+  const launch={headless:true};if(process.env.CHROMIUM_PACKAGE){const mod=require(process.env.CHROMIUM_PACKAGE),c=mod.default||mod;launch.executablePath=await c.executablePath();launch.args=c.args;}browser=await chromium.launch(launch);
+  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
+  await page.route('**/*.supabase.co/**',r=>r.abort());await page.route('https://assets.upstox.com/**',r=>r.abort());
+  const rows=['Bulk','Bulk','Block'].map((kind,i)=>({symbol:'RELIANCE',name:'Reliance Industries',isin:'INE002A01018',client:`Client ${i}`,side:'Buy',kind,qty:1000,price:100,value:100000,date:'2026-10-06'}));
+  await page.route('**/api/**',r=>{const url=new URL(r.request().url());return r.fulfill({json:url.pathname==='/api/market/deals'?{ok:true,date:'2026-10-06',rows}:url.pathname==='/api/market/news'?{items:[{title:'Reliance Industries announces results',url:'https://example.com/news',source:'Test source',publishedAt:new Date().toISOString(),sentiment:'Positive',importance:3}],updatedAt:new Date().toISOString(),sourceCount:1}:url.pathname==='/api/upstox/candles'?{ok:true,candles:Array.from({length:100},(_,i)=>({time:1789712700+i*300,open:100,high:105,low:95,close:101,volume:1000}))}:{ok:true,quotes:{},candles:[],underlyings:[],instruments:[],connected:false}});});
+  await page.addInitScript(() => { if (!localStorage.getItem('qa-seeded')) { localStorage.setItem('papertrade-custom-watchlists',JSON.stringify([{id:'alpha',name:'My picks',symbols:['RELIANCE']},{id:'beta',name:'Long term',symbols:['INFY']}]));localStorage.setItem('qa-seeded','1'); } });
+  await page.goto(process.env.TEST_BASE_URL||'http://127.0.0.1:3229');await page.locator('.launch-disclaimer').waitFor({state:'hidden',timeout:30000});
+  const section=name=>page.waitForFunction(name=>document.querySelector('.terminal-shell')?.dataset.section===name,name);
+  const nav=page.locator('.mobile-bottom-nav');const tab=name=>nav.getByRole('button',{name,exact:true}).click();
+  await tab('Watchlist');await section('watchlist');
+  assert.equal(await nav.getByRole('button').count(),7);
+  const lists=page.locator('.watchlist-panel .desktop-watchlist-tabs');
+  assert.ok(!(await lists.textContent()).includes('Trading watchlist'));
+  await page.getByRole('button',{name:'Arrange watchlists',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Arrange watchlists'});
+  await dialog.waitFor();
+  await dialog.getByRole('button',{name:'Move Long term up',exact:true}).click();
+  assert.equal(await dialog.locator('.watchlist-order-name').first().textContent(),'Long term');
+  const handle=dialog.getByRole('button',{name:/Reorder My picks,/});
+  await handle.focus();await page.keyboard.press('Home');
+  assert.equal(await dialog.locator('.watchlist-order-name').first().textContent(),'My picks');
+  // Drag a real pointer, then a touch pointer, using the dedicated handles.
+  const start=await handle.boundingBox(),target=await dialog.locator('.watchlist-order-list > li').nth(2).boundingBox();
+  await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2,target.y+target.height/2,{steps:8});await page.mouse.up();
+  assert.equal(await dialog.locator('.watchlist-order-name').nth(2).textContent(),'My picks');
+  const cdp=await page.context().newCDPSession(page);
+  const touchStart=await handle.boundingBox(),touchEnd=await dialog.locator('.watchlist-order-list > li').first().boundingBox();
+  const x=touchStart.x+touchStart.width/2;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:touchStart.y+touchStart.height/2}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:touchEnd.y+touchEnd.height/2}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  assert.equal(await dialog.locator('.watchlist-order-name').first().textContent(),'My picks');
+  await dialog.getByRole('button',{name:'Move Long term up',exact:true}).click();
+  await dialog.getByRole('button',{name:'Done',exact:true}).click();
+  await page.reload();await page.locator('.launch-disclaimer').waitFor({state:'hidden',timeout:30000});await tab('Watchlist');await section('watchlist');
+  assert.match(await lists.getByRole('tab').first().textContent(),/^Long term/);
+  for(const width of [320,390,768,1280]) { await page.setViewportSize({width,height:844});assert.ok(await page.locator('.watchlist-tabs-toolbar').evaluate(e=>e.scrollWidth<=e.clientWidth+1)); }
+  await page.setViewportSize({width:390,height:844});
+  await page.waitForFunction(() => { const tabs=document.querySelector('.watchlist-panel .desktop-watchlist-tabs'),selected=tabs?.querySelector('[aria-selected="true"]');if(!tabs||!selected)return false;const a=tabs.getBoundingClientRect(),b=selected.getBoundingClientRect();return b.left>=a.left-1&&b.right<=a.right+1; });
+  await page.screenshot({path:'/tmp/watchlists-redesign.png'});
+  await page.locator('.watchlist-market-header').getByRole('button',{name:'Scanners',exact:true}).click();await section('markets');
+  const scanners=page.getByRole('region',{name:'Scanners',exact:true});
+  await scanners.getByLabel('Choose scanner').selectOption('PSBB_MTF');
+  assert.equal(await scanners.locator('.tw-timeframes').count(),0);assert.equal(await scanners.locator('.tw-frame-summary button').count(),5);
+  assert.equal(await scanners.getByText('Trading watchlist',{exact:true}).count(),0);
+  await page.screenshot({path:'/tmp/scanners-redesign.png'});
+  await scanners.getByRole('button',{name:'Investment',exact:true}).click();await scanners.getByLabel('Choose scanner').waitFor();
+  assert.equal(await scanners.locator('option[value="PSBB_MTF"]').count(),0);
+  await scanners.getByRole('button',{name:'Trading',exact:true}).click();await scanners.getByLabel('Choose scanner').selectOption('VOLUME');await scanners.locator('.scanner-results').waitFor();
+  await scanners.getByRole('button',{name:'Watchlists',exact:true}).click();await section('watchlist');await page.goBack();await section('markets');await scanners.locator('.scanner-results').waitFor();
+  assert.deepEqual(errors,[]);console.log('PASS: unified navigation, both scanner groups, compact PSBB, pointer/touch/keyboard reorder, persisted order, responsive layout and Back.');
+ }finally{await browser?.close();server?.kill();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

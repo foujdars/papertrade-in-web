@@ -5,7 +5,7 @@ import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { CandleLoader } from "./CandleLoader";
 import { usePullToRefresh } from "./usePullToRefresh";
 import { StockLogo } from "@/components/StockLogo";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { deriveNetChange, formatInr, formatSignedMarketMove, type Instrument } from "@/lib/market";
 import { NIMBLE_STRATEGIES, type NimbleStrategy, type TechnicalScannerRow } from "@/lib/nimble-scanner";
 import type { NormalizedQuote } from "@/lib/upstox";
@@ -110,16 +110,7 @@ function readSavedScanner(group: ScannerGroup): ScannerId {
   return group === "INVESTMENT" ? "ema-30-50-100" : "VOLUME";
 }
 
-export function MarketsWorkspace({
-  stockUniverse,
-  quotes,
-  onQuoteKeysChange,
-  onSelectCash,
-  onOpenWatchlist,
-  group,
-  onGroupChange,
-  onScannerViewed,
-}: {
+type WorkspaceProps = {
   stockUniverse: Instrument[];
   quotes: Record<string, NormalizedQuote>;
   onQuoteKeysChange: (keys: string[]) => void;
@@ -128,19 +119,44 @@ export function MarketsWorkspace({
   group: "TRADING" | "INVESTMENT";
   onGroupChange: (group: "TRADING" | "INVESTMENT") => void;
   onScannerViewed?: (label: string) => void;
-}) {
-  const scannerGroup = group;
-  const setScannerGroup = onGroupChange;
-  const [activeScanner, setActiveScanner] = useState<ScannerId>(() => readSavedScanner(group));
+  tradingScanner: ReactNode;
+};
+const MTF_SELECTION_KEY = "papertrade-scanner-workspace-selection";
+
+export function MarketsWorkspace(props: WorkspaceProps) {
+  const scrollHost = useRef<HTMLElement | null>(null);
+  const options = props.group === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
+  const [selection, setSelection] = useState<ScannerId | "PSBB_MTF">(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(MTF_SELECTION_KEY) ?? "{}")[props.group];
+      if ((props.group === "TRADING" && saved === "PSBB_MTF") || options.some(option => option.id === saved)) return saved;
+    } catch { /* Use the default scanner when storage is unavailable. */ }
+    return props.group === "TRADING" ? "PSBB_MTF" : readSavedScanner(props.group);
+  });
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(MTF_SELECTION_KEY) ?? "{}");
+      localStorage.setItem(MTF_SELECTION_KEY, JSON.stringify({ ...saved, [props.group]: selection }));
+    } catch { /* The current selection remains usable without storage. */ }
+  }, [props.group, selection]);
+  return <section ref={scrollHost} className="market-discovery-panel scanner-workspace" aria-label="Scanners">
+    <MarketSectionTabs active={props.group} onChange={section => section === "WATCHLIST" ? props.onOpenWatchlist() : props.onGroupChange(section)} />
+    <label className="scanner-choice"><span>Scanner</span><select aria-label="Choose scanner" value={selection} onChange={event => setSelection(event.target.value as ScannerId | "PSBB_MTF")}>
+      {props.group === "TRADING" && <option value="PSBB_MTF">PSBB · Multi-timeframe</option>}
+      {options.map(option => <option value={option.id} key={option.id}>{option.label}</option>)}
+    </select></label>
+    {selection === "PSBB_MTF" ? props.tradingScanner : <ScannerResults key={selection} {...props} scrollHost={scrollHost} activeScanner={selection} />}
+  </section>;
+}
+
+function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash, onScannerViewed, group: scannerGroup, activeScanner, scrollHost }: WorkspaceProps & { activeScanner: ScannerId; scrollHost: RefObject<HTMLElement | null> }) {
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(readSavedSnapshots);
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
   const scanMode = "auto";
   const scanInFlightRef = useRef(false);
   const scanAbortRef = useRef<AbortController | null>(null);
-  const marketListRef = useRef<HTMLElement | null>(null);
   const pullStageRef = useRef<HTMLDivElement | null>(null);
 
-  const scannerOptions = scannerGroup === "INVESTMENT" ? investmentScannerOptions : tradingScannerOptions;
   const selectedOption = allScannerOptions.find((option) => option.id === activeScanner) ?? allScannerOptions[0];
   const activeSnapshot = snapshots[activeScanner];
   const activeRows = useMemo(
@@ -241,22 +257,14 @@ export function MarketsWorkspace({
 
   useEffect(() => () => scanAbortRef.current?.abort(), []);
 
-  usePullToRefresh(marketListRef, pullStageRef, Boolean(loadingScanner), () => runSelectedScan(undefined, true));
+  usePullToRefresh(scrollHost, pullStageRef, Boolean(loadingScanner), () => runSelectedScan(undefined, true));
 
   return (
-    <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
-
-      <MarketSectionTabs active={scannerGroup} onChange={(section) => {
-        if (section === "WATCHLIST") onOpenWatchlist();
-        else setScannerGroup(section);
-      }} />
-
-      <div className="trend-tabs market-scanner-tabs" role="tablist" aria-label="Market scanners">
-        {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><b>{option.label}</b><small>{option.cadence}</small></button>)}
-      </div>
+    <section className="scanner-results compact-market-panel" aria-label="NSE market scanners">
 
       <div className="market-results-head">
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><span className="market-pull-hint">Pull down to refresh</span><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
+        <button type="button" className="scanner-refresh" disabled={Boolean(loadingScanner)} onClick={() => void runSelectedScan(undefined, true)} aria-label="Refresh scanner"><RefreshCw size={15} /></button>
+        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : "Scanning automatically"}</small></span>
         {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
       </div>
       <div className="scanner-pull-stage" ref={pullStageRef} data-pull="idle">
