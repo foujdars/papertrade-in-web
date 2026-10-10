@@ -5,8 +5,9 @@ import { DrawingManager } from 'lightweight-charts-drawing';
 import { MarketChart } from '../../components/MarketChart';
 const attach = DrawingManager.prototype.attach;
 DrawingManager.prototype.attach = function (...args) { window.qaChart=args[0]; window.qaSeries=args[1]; window.qaManager=this; return attach.apply(this,args); };
+const niftyMode = new URLSearchParams(location.search).has('nifty');
 const globalMode = new URLSearchParams(location.search).has('global');
-const instrument = {symbol:globalMode?'BTCUSD':'TEST',name:'Chart verification',price:110,change:0,exchange:globalMode?'DELTA':'NSE',instrumentKey:globalMode?'DELTA|BTCUSD':'NSE_EQ|TEST',categories:[]};
+const instrument = niftyMode ? {symbol:'NIFTY',name:'Nifty 50',price:22520.45,change:0,exchange:'NSE',instrumentKey:'NSE_INDEX|Nifty 50',categories:['INDEX']} : {symbol:globalMode?'BTCUSD':'TEST',name:'Chart verification',price:110,change:0,exchange:globalMode?'DELTA':'NSE',instrumentKey:globalMode?'DELTA|BTCUSD':'NSE_EQ|TEST',categories:[]};
 window.qaExtendTimeline = () => {
  const chart=window.qaChart,series=chart.addSeries(LineSeries,{priceScaleId:'timeline-only',visible:false});
  const first=window.qaSeries.data()[0].time;
