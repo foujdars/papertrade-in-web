@@ -38,6 +38,7 @@ import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartStyleMenu } from "@/components/ChartStyleMenu";
 import { CompareSymbolPicker } from "@/components/CompareSymbolPicker";
 import { CHART_TIMEFRAMES, ChartTimeframeMenu, CompactSelectorButton, WatchlistSelector } from "@/components/CompactSelectors";
+import { reconcileWatchlistOrder } from "@/lib/watchlist-order";
 import { TradingWatchlist } from "@/components/TradingWatchlist";
 import { TRADING_WATCHLIST_ID } from "@/lib/psbb-watchlist";
 import { MarketsWorkspace, type ScannerGroup } from "@/components/MarketsWorkspace";
@@ -433,7 +434,7 @@ export function TradingDashboard() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistLimit, setWatchlistLimit] = useState(60);
   const [watchlist, setWatchlist] = useState<string>("NIFTY 50");
-  const [tradingWatchlistCount, setTradingWatchlistCount] = useState(0);
+  const [watchlistOrder, setWatchlistOrder] = useState<string[]>([]);
   const [customWatchlists, setCustomWatchlists] = useState<CustomWatchlist[]>([]);
   const [watchlistPickerOpen, setWatchlistPickerOpen] = useState(false);
   const watchlistPickerWasOpen = useRef(false);
@@ -761,6 +762,7 @@ export function TradingDashboard() {
         const saved = JSON.parse(localStorage.getItem(userPreferenceKey) ?? "{}") as {
           activeSection?: NavigationSection;
           watchlist?: string;
+          watchlistOrder?: string[];
           timeframe?: string;
           marketGroup?: ScannerGroup;
           homeCards?: Partial<HomeCardPreferences>;
@@ -770,7 +772,8 @@ export function TradingDashboard() {
           motionEnabled?: boolean;
           homeExperienceVersion?: number;
         };
-        if (saved.watchlist) setWatchlist(saved.watchlist);
+        if (saved.watchlist) setWatchlist(saved.watchlist === TRADING_WATCHLIST_ID ? "NIFTY 50" : saved.watchlist);
+        setWatchlistOrder(Array.isArray(saved.watchlistOrder) ? saved.watchlistOrder.filter(id => typeof id === "string") : []);
         if (saved.marketGroup === "TRADING" || saved.marketGroup === "INVESTMENT" || saved.marketGroup === "IPO") setMarketsInitialGroup(saved.marketGroup);
         setHomeCards({ ...DEFAULT_HOME_CARDS, ...(saved.homeCards ?? {}) });
         setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
@@ -798,6 +801,7 @@ export function TradingDashboard() {
     localStorage.setItem(userPreferenceKey, JSON.stringify({
       activeSection: activeNavigationSection,
       watchlist,
+      watchlistOrder,
       timeframe,
       marketGroup: marketsInitialGroup,
       homeCards,
@@ -807,7 +811,7 @@ export function TradingDashboard() {
       motionEnabled,
       homeExperienceVersion: HOME_EXPERIENCE_VERSION,
     }));
-  }, [activeNavigationSection, chartPreferencesReady, homeCards, marketsInitialGroup, motionEnabled, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist]);
+  }, [activeNavigationSection, chartPreferencesReady, homeCards, marketsInitialGroup, motionEnabled, recentScanners, recentStocks, timeframe, uiDensity, uiPreferencesReady, userPreferenceKey, watchlist, watchlistOrder]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => setClock(new Date()), 0);
@@ -1251,16 +1255,17 @@ export function TradingDashboard() {
   const derivativeList = watchlist === "Indices" ? "indices" : watchlist === "F&O" ? "fno" : null;
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
   const customWatchlistSymbols = useMemo(() => new Set(customWatchlists.flatMap((list) => list.symbols)), [customWatchlists]);
-  const activeWatchlistName = watchlist === TRADING_WATCHLIST_ID ? "Trading watchlist" : activeCustomList?.name ?? (watchlist === "F&O" ? "F&O stocks" : watchlist);
-  const activeWatchlistCount = watchlist === TRADING_WATCHLIST_ID ? tradingWatchlistCount : activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
-  const watchlistChoices = useMemo(() => [
-    { id: watchlistTabs[0], name: watchlistTabs[0], count: watchlistCounts[watchlistTabs[0]] },
-    { id: TRADING_WATCHLIST_ID, name: "Trading watchlist", count: tradingWatchlistCount, description: "PSBB setups · monthly results" },
-    { id: "Indices", name: "Indices", count: watchlistCounts.Indices, description: "Index charts and derivatives" },
-    { id: "F&O", name: "F&O stocks", count: watchlistCounts["F&O"], description: "Stock charts, futures and options" },
-    ...watchlistTabs.slice(1).map((tab) => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
-    ...customWatchlists.map((list) => ({ id: `custom:${list.id}`, name: list.name, count: list.symbols.length, custom: true })),
-  ], [customWatchlists, watchlistCounts, tradingWatchlistCount]);
+  const activeWatchlistName = activeCustomList?.name ?? (watchlist === "F&O" ? "F&O stocks" : watchlist);
+  const activeWatchlistCount = activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
+  const watchlistChoices = useMemo(() => {
+    const choices = [
+      ...customWatchlists.map(list => ({ id: `custom:${list.id}`, name: list.name, count: list.symbols.length, custom: true })),
+      { id: "Indices", name: "Indices", count: watchlistCounts.Indices },
+      { id: "F&O", name: "F&O stocks", count: watchlistCounts["F&O"] },
+      ...watchlistTabs.map(tab => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
+    ];
+    return reconcileWatchlistOrder(watchlistOrder, choices.map(choice => choice.id)).map(id => choices.find(choice => choice.id === id)!);
+  }, [customWatchlists, watchlistCounts, watchlistOrder]);
   const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return null;
     if (fnoUnderlying?.instrumentKey === spotInstrument.instrumentKey) return fnoUnderlying;
@@ -2879,6 +2884,19 @@ export function TradingDashboard() {
     }
   }
 
+  const tradingScanner = <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={""} active={marketsOpen} onOpen={(instrument, frame, time) => {
+            const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
+            if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
+            else pendingTradingHistory.current = history;
+            openNavigationSection("trade", false);
+            chooseTradeInstrument(instrument);
+            setTimeframe(frame);
+            setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
+            const url = new URL(window.location.href);
+            url.searchParams.set("timeframe", frame);
+            window.history.replaceState({ ...window.history.state, papertradeChart: { instrument, timeframe: frame } }, "", url);
+          }} />;
+
   const chartSymbolControlProps = {
     instrument: selected, venue: selectedVenueLabel, expanded: showTradeSymbols,
     onToggle: () => setShowTradeSymbols(value => !value), compared: !!comparedSymbols.length,
@@ -2904,7 +2922,7 @@ export function TradingDashboard() {
           <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Charts</button>
           <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button>
           <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button>
-          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Watchlist</button>
+          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button>
           <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}>News</button>
           <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button>
           <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}>Analysis</button>
@@ -2944,29 +2962,18 @@ export function TradingDashboard() {
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
           {sidebarOpen && <div className="watchlist-market-header">
 
-            <MarketSectionTabs active="WATCHLIST" onChange={(section) => {
+            <MarketSectionTabs scannerGroup={lastScannerGroupRef.current} active="WATCHLIST" onChange={(section) => {
               if (section === "WATCHLIST") return;
               openNavigationSection("markets");
               setMarketsInitialGroup(section);
             }} />
           </div>}
-          <WatchlistTabs activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); }} onNewList={() => openWatchlistPicker(null)} />
+          <WatchlistTabs onReorder={setWatchlistOrder} activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); }} onNewList={() => openWatchlistPicker(null)} />
           {!derivativeList && <div className="search-box"><Search size={16} /><input aria-label="Search watchlist" value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" />{search && <button type="button" className="icon-button" aria-label="Clear watchlist search" onClick={() => { setSearch(''); setWatchlistLimit(60); }}><X size={16} /></button>}</div>}
           {!sidebarOpen && <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>}
           {!sidebarOpen && showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
-          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : watchlist === TRADING_WATCHLIST_ID ? <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={search} active={activeNavigationSection === "watchlist" || sidebarOpen} onCount={setTradingWatchlistCount} onOpen={(instrument, frame, time) => {
-            const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
-            if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
-            else pendingTradingHistory.current = history;
-            openNavigationSection("trade", false);
-            chooseTradeInstrument(instrument);
-            setTimeframe(frame);
-            setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
-            const url = new URL(window.location.href);
-            url.searchParams.set("timeframe", frame);
-            window.history.replaceState({ ...window.history.state, papertradeChart: { instrument, timeframe: frame } }, "", url);
-          }} /> : <div className="instrument-list">
+          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
@@ -3309,7 +3316,7 @@ export function TradingDashboard() {
       <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={["trade", "fno"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
-        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><Bookmark size={19} /><span>Watchlist</span></button>
+        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("watchlist"); }}><Bookmark size={19} /><span>Watchlist</span></button>
         <button className={activeNavigationSection === "news" ? "active" : ""} onClick={() => openNavigationSection("news")}><Newspaper size={19} /><span>News</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
         <button className={activeNavigationSection === "fundamentals" ? "active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><BookOpenCheck size={19} /><span>Analysis</span></button>
@@ -3421,6 +3428,7 @@ export function TradingDashboard() {
       )}
       {marketsOpen && marketsInitialGroup !== "IPO" && (
         <MarketsWorkspace
+          tradingScanner={tradingScanner}
           key={marketsInitialGroup}
           stockUniverse={stockUniverse}
           quotes={marketQuotes}

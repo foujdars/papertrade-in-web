@@ -308,7 +308,7 @@ async function componentHarness(path, name, initialStates = []) {
   };
   const compiled = ts.transpileModule(await source(path), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const exports = {};
-  new Function("require", "exports", compiled.outputText)((id) => mocks[id] ?? require(id), exports);
+  new Function("require", "exports", compiled.outputText + (name === "ScannerResults" ? "\nexports.ScannerResults = ScannerResults;" : ""))((id) => mocks[id] ?? require(id), exports);
   return {
     states,
     render(props) { stateIndex = 0; refIndex = 0; effects = []; return exports[name](props); },
@@ -424,8 +424,8 @@ test("scanner runs automatically; empty success clears old matches; failure keep
   });
   let payload = { ok: true, rows: [], fetchedAt: "2026-09-07T10:00:00.000Z" };
   const fetchMock = t.mock.method(globalThis, "fetch", async () => ({ ok: payload.ok, json: async () => payload }));
-  const props = { group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
-  const harness = await componentHarness("components/MarketsWorkspace.tsx", "MarketsWorkspace");
+  const props = { activeScanner: "VOLUME", scrollHost: {current:null}, group: "TRADING", stockUniverse: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", categories: [] }], quotes: {}, onQuoteKeysChange() {} };
+  const harness = await componentHarness("components/MarketsWorkspace.tsx", "ScannerResults");
   const render = () => harness.render(props);
   const refresh = async () => {
     automaticRefresh();
@@ -438,38 +438,38 @@ test("scanner runs automatically; empty success clears old matches; failure keep
   assert.equal(fetchMock.mock.callCount(), 1, "The scanner starts automatically without a switch");
 
   const previous = { rows: [{ symbol: "DEMO", name: "Demo", instrumentKey: "NSE_EQ|INE123", lastPrice: 100, changePercent: 1 }], scannedAt: "2026-09-07T09:00:00.000Z" };
-  harness.states[1] = { VOLUME: previous };
+  harness.states[0] = { VOLUME: previous };
   await refresh();
-  assert.deepEqual(harness.states[1].VOLUME.rows, []);
-  assert.equal(harness.states[1].VOLUME.scannedAt, payload.fetchedAt);
-  assert.equal(harness.states[1].VOLUME.error, undefined);
+  assert.deepEqual(harness.states[0].VOLUME.rows, []);
+  assert.equal(harness.states[0].VOLUME.scannedAt, payload.fetchedAt);
+  assert.equal(harness.states[0].VOLUME.error, undefined);
   assert.match(viewText(render()), /0 matches/);
 
-  harness.states[1] = { VOLUME: previous };
+  harness.states[0] = { VOLUME: previous };
   payload = { ok: false, error: { message: "Feed temporarily unavailable" } };
   await refresh();
-  assert.deepEqual(harness.states[1].VOLUME.rows, previous.rows);
-  assert.equal(harness.states[1].VOLUME.scannedAt, previous.scannedAt);
-  assert.equal(harness.states[1].VOLUME.error, payload.error.message);
+  assert.deepEqual(harness.states[0].VOLUME.rows, previous.rows);
+  assert.equal(harness.states[0].VOLUME.scannedAt, previous.scannedAt);
+  assert.equal(harness.states[0].VOLUME.error, payload.error.message);
   assert.match(viewText(render()), /Refresh failed/);
   cleanups.forEach((cleanup) => { if (typeof cleanup === "function") cleanup(); });
 });
 
-test("Markets has Trading, Investment and Watchlist actions with a single active section", async () => {
+test("Watchlists and Scanners have distinct views with scanner categories one level below", async () => {
   const input = await source("components/MarketSectionTabs.tsx");
-  const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   const exports = {};
+  const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } });
   new Function("require", "exports", compiled.outputText)(createRequire(import.meta.url), exports);
-  for (const active of ["WATCHLIST", "TRADING", "INVESTMENT"]) {
-    const actions = [];
-    const view = exports.MarketSectionTabs({ active, onChange: (section) => actions.push(section) });
-    assert.equal(view.props["aria-label"], "Market sections");
-    const buttons = view.props.children;
-    assert.deepEqual(buttons.map((button) => button.key), ["WATCHLIST", "TRADING", "INVESTMENT"]);
-    assert.deepEqual(buttons.filter((button) => button.props["aria-current"] === "page").map((button) => button.key), [active]);
-    for (const button of buttons) button.props.onClick();
-    assert.deepEqual(actions, ["WATCHLIST", "TRADING", "INVESTMENT"]);
-  }
+  const actions = [];
+  const view = exports.MarketSectionTabs({ active: "WATCHLIST", scannerGroup: "INVESTMENT", onChange: section => actions.push(section) });
+  const buttons = elements(view).filter(node => node.type === "button");
+  assert.deepEqual(buttons.map(button => viewText(button)), ["Watchlists", "Scanners"]);
+  buttons[1].props.onClick();
+  assert.deepEqual(actions, ["INVESTMENT"]);
+  const scanned = exports.MarketSectionTabs({ active: "TRADING", onChange() {} });
+  const categories = elements(scanned).filter(node => node.props?.["aria-pressed"] !== undefined);
+  assert.equal(categories.length, 2);
+  assert.equal(categories[0].props["aria-pressed"], true);
 });
 
 test("Watchlist stays in Markets navigation and retains saved-list controls", async () => {
@@ -477,14 +477,14 @@ test("Watchlist stays in Markets navigation and retains saved-list controls", as
   const markets = await source("components/MarketsWorkspace.tsx");
   assert.doesNotMatch(dashboard, /top-watchlist-button/);
   assert.match(dashboard, /const marketNavigationActive = activeNavigationSection === "markets" \|\| activeNavigationSection === "watchlist"/);
-  assert.match(dashboard, /<MarketSectionTabs active="WATCHLIST"/);
+  assert.match(dashboard, /<MarketSectionTabs scannerGroup={lastScannerGroupRef.current} active="WATCHLIST"/);
   assert.match(dashboard, /onOpenWatchlist={\(\) => openNavigationSection\("watchlist"\)}/);
   assert.match(dashboard, /marketNavigationActive \? 2/);
   assert.match(dashboard, /setSidebarOpen\(section === "watchlist"\)/);
   assert.match(dashboard, /removeStockFromCustomWatchlist/);
   assert.match(dashboard, /<WatchlistSelector/);
-  assert.match(markets, /<MarketSectionTabs active={scannerGroup}/);
-  assert.match(markets, /if \(section === "WATCHLIST"\) onOpenWatchlist\(\)/);
+  assert.match(markets, /<MarketSectionTabs active={props.group}/);
+  assert.match(markets, /props.onOpenWatchlist\(\)/);
 });
 
 test("scanner removes redundant controls while keeping automatic and pull refresh", async () => {
@@ -495,7 +495,7 @@ test("scanner removes redundant controls while keeping automatic and pull refres
   assert.match(markets, /window.setInterval\(scanWhenReady, AUTO_SCAN_INTERVAL_MS\)/);
   assert.doesNotMatch(markets, /showStrategyInfo|activeStrategyDescription|scanner-strategy-details|scanner-inline-error/);
   assert.match(markets, /runSelectedScan\(undefined, true\)/);
-  assert.match(markets, /usePullToRefresh\(marketListRef, pullStageRef/);
+  assert.match(markets, /usePullToRefresh\(scrollHost, pullStageRef/);
   assert.match(markets, /Pull down to refresh/);
 });
 

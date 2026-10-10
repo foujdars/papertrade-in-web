@@ -1,28 +1,21 @@
 "use client";
-
-import { Layers3, TrendingUp, Zap } from "lucide-react";
-
+import { Layers3, ScanSearch } from "lucide-react";
 export type MarketSection = "TRADING" | "INVESTMENT" | "WATCHLIST";
 
-const sections = [
-  { id: "WATCHLIST", label: "Watchlist", icon: Layers3 },
-  { id: "TRADING", label: "Trading", icon: Zap },
-  { id: "INVESTMENT", label: "Investment", icon: TrendingUp },
-] as const;
-
-/** Shared navigation keeps saved stocks inside the Markets workspace. */
-export function MarketSectionTabs({ active, onChange }: {
+/** Saved lists and scanner results share one destination, with distinct views. */
+export function MarketSectionTabs({ active, onChange, scannerGroup = "TRADING" }: {
   active: MarketSection;
   onChange: (section: MarketSection) => void;
+  scannerGroup?: "TRADING" | "INVESTMENT";
 }) {
-  return (
-    <nav className="market-section-tabs" aria-label="Market sections">
-      {sections.map(({ id, label, icon: Icon }) => (
-        <button type="button" key={id} className={active === id ? "active" : ""}
-          aria-current={active === id ? "page" : undefined} onClick={() => onChange(id)}>
-          <Icon size={16} aria-hidden="true" /><span>{label}</span>
-        </button>
-      ))}
+  const scanning = active !== "WATCHLIST";
+  return <div className="watchlist-workspace-navigation">
+    <nav className="market-section-tabs" aria-label="Watchlist workspace">
+      <button type="button" className={!scanning ? "active" : ""} aria-current={!scanning ? "page" : undefined} onClick={() => onChange("WATCHLIST")}><Layers3 size={17} aria-hidden="true" />Watchlists</button>
+      <button type="button" className={scanning ? "active" : ""} aria-current={scanning ? "page" : undefined} onClick={() => { if (!scanning) onChange(scannerGroup); }}><ScanSearch size={17} aria-hidden="true" />Scanners</button>
     </nav>
-  );
+    {scanning && <nav className="scanner-group-switch" aria-label="Scanner category">
+      {(["TRADING", "INVESTMENT"] as const).map(group => <button type="button" key={group} aria-pressed={active === group} onClick={() => onChange(group)}>{group === "TRADING" ? "Trading" : "Investment"}</button>)}
+    </nav>}
+  </div>;
 }
