@@ -1078,9 +1078,12 @@ export function MarketChart({
     const bars = Math.max(12, Math.min(visibleBarsRef.current, count));
     const tool = orderToolRef.current;
     const extraRightOffset = tool?.enabled ? Math.max(5, Math.min(10, bars * 0.18)) : Math.max(2, Math.min(4, bars * 0.08));
-    chart.timeScale().setVisibleLogicalRange({
-      from: Math.max(-0.5, count - bars - 0.5),
-      to: count - 1 + extraRightOffset,
+    const scale = chart.timeScale();
+    const firstIndex = scale.timeToIndex(chartTimeFromEpoch(Number(data[count - bars].time), timeframe), false);
+    const lastIndex = scale.timeToIndex(chartTimeFromEpoch(Number(data[count - 1].time), timeframe), false);
+    scale.setVisibleLogicalRange({
+      from: Math.max(-0.5, Number(firstIndex ?? count - bars) - 0.5),
+      to: Number(lastIndex ?? count - 1) + extraRightOffset,
     });
   }
 
@@ -1700,11 +1703,18 @@ export function MarketChart({
         autoscaleInfoProvider: (baseImplementation: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
           let base = baseImplementation();
           if (base && kind !== "histogram") {
-            const visible = chart.timeScale().getVisibleLogicalRange();
+            // Logical indexes belong to every series on the shared timeline,
+            // not to this candle array. Other studies/comparisons can prepend
+            // timestamps, so using those indexes to slice candles can be empty.
+            const visible = chart.timeScale().getVisibleRange();
             const bars = prepareStyleCandles(dataRef.current, chartStyleRef.current);
-            const from = visible ? Math.max(0, Math.floor(visible.from)) : 0;
-            const to = visible ? Math.min(bars.length, Math.ceil(visible.to) + 1) : bars.length;
-            base = { ...base, priceRange: priceRangeWithoutZeroAnchor(base.priceRange, bars.slice(from, to)) };
+            const from = visible ? timeToTimestamp(visible.from) : -Infinity;
+            const to = visible ? timeToTimestamp(visible.to) : Infinity;
+            const visibleBars = bars.filter(bar => {
+              const time = Number(chartTimeFromEpoch(Number(bar.time), timeframe));
+              return time >= from && time <= to;
+            });
+            base = { ...base, priceRange: priceRangeWithoutZeroAnchor(base.priceRange, visibleBars) };
           }
           const tool = orderToolRef.current;
           if (!base || !tool?.enabled || candlesOnlyRef.current) return base;

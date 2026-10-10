@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { LineSeries } from 'lightweight-charts';
 import { DrawingManager } from 'lightweight-charts-drawing';
 import { MarketChart } from '../../components/MarketChart';
 const attach = DrawingManager.prototype.attach;
 DrawingManager.prototype.attach = function (...args) { window.qaChart=args[0]; window.qaSeries=args[1]; window.qaManager=this; return attach.apply(this,args); };
 const globalMode = new URLSearchParams(location.search).has('global');
 const instrument = {symbol:globalMode?'BTCUSD':'TEST',name:'Chart verification',price:110,change:0,exchange:globalMode?'DELTA':'NSE',instrumentKey:globalMode?'DELTA|BTCUSD':'NSE_EQ|TEST',categories:[]};
+window.qaExtendTimeline = () => {
+ const chart=window.qaChart,series=chart.addSeries(LineSeries,{priceScaleId:'timeline-only',visible:false});
+ const first=window.qaSeries.data()[0].time;
+ series.setData(Array.from({length:400},(_,i)=>({time:first-(400-i)*86400,value:1})));
+ const data=window.qaSeries.data(),last=data.at(-1).time;
+ const end=chart.timeScale().timeToIndex(last,false);
+ chart.timeScale().setVisibleLogicalRange({from:end-35,to:end+3});
+};
 function App() {
  const [frame,setFrame]=useState(globalMode?'5m':'1D');
  const [undo,setUndo]=useState(0),[redo,setRedo]=useState(0),[locked,setLocked]=useState(false),[hidden,setHidden]=useState(false);
