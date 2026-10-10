@@ -31,6 +31,12 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.addInitScript(start=>localStorage.setItem('papertrade-lwc-drawings-v1:NSE_EQ|TEST',JSON.stringify([{id:'zero-anchor',type:'horizontal-ray',anchors:[{time:start+86400*290,price:0}],style:{lineColor:'#2563eb',lineWidth:1},options:{visible:false}}])),start);
   await page.goto('http://127.0.0.1:3232');await page.waitForFunction(()=>window.qaSeries?.data().length===300&&window.qaManager?.getAllDrawings().length===1);await page.waitForTimeout(250);
   for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:844});await page.waitForTimeout(150);const range=await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange());assert.ok(range.from>90 && range.to<120,JSON.stringify({width,range}));}
+  await page.evaluate(()=>window.qaExtendTimeline());await page.waitForTimeout(250);
+  for(const width of [320,390,768,1280]){
+   await page.setViewportSize({width,height:844});await page.waitForTimeout(150);
+   const timelineRange=await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange());
+   assert.ok(timelineRange.from>90&&timelineRange.to<120,`Extra timestamps must not bypass the zero-anchor repair: ${JSON.stringify({width,timelineRange})}`);
+  }
   await page.goto('http://127.0.0.1:3232?prior');
   await page.waitForFunction(()=>window.qaSeries?.data().length===300&&document.querySelector('.chart-previous-day'));
   await page.waitForTimeout(500);
@@ -39,6 +45,6 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
    const priorRange=await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange());
    assert.ok(priorRange.from>90&&priorRange.to<120,`Prior levels must not force zero into the scale: ${JSON.stringify({width,priorRange})}`);
   }
-  await page.evaluate(()=>{window.qaChart.priceScale('right').setAutoScale(false);window.qaChart.priceScale('right').setVisibleRange({from:80,to:140});});await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange()),{from:80,to:140});assert.deepEqual(errors,[]);console.log('PASS: positive opening scale with hidden zero drawings and invalid daily prior-level history; manual scale remains intact.');
+  await page.evaluate(()=>{window.qaChart.priceScale('right').setAutoScale(false);window.qaChart.priceScale('right').setVisibleRange({from:80,to:140});});await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>window.qaChart.priceScale('right').getVisibleRange()),{from:80,to:140});assert.deepEqual(errors,[]);console.log('PASS: positive opening scale with hidden zero drawings, extended shared timeline and invalid daily prior-level history; manual scale remains intact.');
  } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
