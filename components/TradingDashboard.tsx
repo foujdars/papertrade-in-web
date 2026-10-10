@@ -123,7 +123,7 @@ import {
   type TradingLimits,
 } from "@/lib/trading-coach";
 
-const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
+const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500"] as const;
 const periods: readonly string[] = CHART_TIMEFRAMES;
 const subscribeToNativePlatform = () => () => {};
 const getAndroidPlatformSnapshot = () => Capacitor.getPlatform() === "android";
@@ -433,7 +433,8 @@ export function TradingDashboard() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistLimit, setWatchlistLimit] = useState(60);
   const [watchlist, setWatchlist] = useState<string>("NIFTY 50");
-  const [tradingWatchlistCount, setTradingWatchlistCount] = useState(0);
+  const [, setTradingWatchlistCount] = useState(0);
+  const [tradingScannerMode, setTradingScannerMode] = useState<"pssb" | "standard">("pssb");
   const [customWatchlists, setCustomWatchlists] = useState<CustomWatchlist[]>([]);
   const [watchlistPickerOpen, setWatchlistPickerOpen] = useState(false);
   const watchlistPickerWasOpen = useRef(false);
@@ -600,15 +601,16 @@ export function TradingDashboard() {
           : pnlOpen
             ? "pnl"
             : workspaceMode;
-  const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
+  const marketNavigationActive = activeNavigationSection === "watchlist";
   const navigationSnapshot = useCallback(() => {
     const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.fundamental-workspace', '.pnl-trade-list'];
     const scroll = Object.fromEntries(selectors.map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
-    return { section: activeNavigationSection, group: marketsInitialGroup, scroll, instrument: selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey };
-  }, [activeNavigationSection, marketsInitialGroup, selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey]);
+    return { section: activeNavigationSection, group: marketsInitialGroup, tradingScannerMode, scroll, instrument: selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey };
+  }, [activeNavigationSection, marketsInitialGroup, tradingScannerMode, selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey]);
   const navigationHistory = useNavigationHistory<ReturnType<typeof navigationSnapshot>>((saved) => {
     openNavigationSection(saved.section, false);
     setMarketsInitialGroup(saved.group);
+    setTradingScannerMode(saved.tradingScannerMode ?? "pssb");
     pendingTradingHistory.current = saved.chartHistory;
     setChartHistory(saved.chartHistory);
     setSelected(saved.instrument); setTimeframe(saved.timeframe);
@@ -770,7 +772,7 @@ export function TradingDashboard() {
           motionEnabled?: boolean;
           homeExperienceVersion?: number;
         };
-        if (saved.watchlist) setWatchlist(saved.watchlist);
+        if (saved.watchlist) setWatchlist(["ALL NSE", TRADING_WATCHLIST_ID].includes(saved.watchlist) ? "Indices" : saved.watchlist);
         if (saved.marketGroup === "TRADING" || saved.marketGroup === "INVESTMENT" || saved.marketGroup === "IPO") setMarketsInitialGroup(saved.marketGroup);
         setHomeCards({ ...DEFAULT_HOME_CARDS, ...(saved.homeCards ?? {}) });
         setRecentStocks(Array.isArray(saved.recentStocks) ? saved.recentStocks.slice(0, 6) : []);
@@ -1104,7 +1106,6 @@ export function TradingDashboard() {
     return universe.filter((item) => {
       const matchesList = Boolean(term)
         || customList?.symbols.includes(item.symbol)
-        || standardList === "ALL NSE"
         || (standardList !== undefined && item.categories.includes(standardList));
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
@@ -1251,16 +1252,14 @@ export function TradingDashboard() {
   const derivativeList = watchlist === "Indices" ? "indices" : watchlist === "F&O" ? "fno" : null;
   const activeCustomList = useMemo(() => customWatchlists.find((list) => `custom:${list.id}` === watchlist) ?? null, [customWatchlists, watchlist]);
   const customWatchlistSymbols = useMemo(() => new Set(customWatchlists.flatMap((list) => list.symbols)), [customWatchlists]);
-  const activeWatchlistName = watchlist === TRADING_WATCHLIST_ID ? "Trading watchlist" : activeCustomList?.name ?? (watchlist === "F&O" ? "F&O stocks" : watchlist);
-  const activeWatchlistCount = watchlist === TRADING_WATCHLIST_ID ? tradingWatchlistCount : activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
+  const activeWatchlistName = activeCustomList?.name ?? (watchlist === "F&O" ? "F&O stocks" : watchlist);
+  const activeWatchlistCount = activeCustomList?.symbols.length ?? watchlistCounts[watchlist as keyof typeof watchlistCounts] ?? 0;
   const watchlistChoices = useMemo(() => [
-    { id: watchlistTabs[0], name: watchlistTabs[0], count: watchlistCounts[watchlistTabs[0]] },
-    { id: TRADING_WATCHLIST_ID, name: "Trading watchlist", count: tradingWatchlistCount, description: "PSBB setups · monthly results" },
-    { id: "Indices", name: "Indices", count: watchlistCounts.Indices, description: "Index charts and derivatives" },
-    { id: "F&O", name: "F&O stocks", count: watchlistCounts["F&O"], description: "Stock charts, futures and options" },
-    ...watchlistTabs.slice(1).map((tab) => ({ id: tab, name: tab, count: watchlistCounts[tab] })),
     ...customWatchlists.map((list) => ({ id: `custom:${list.id}`, name: list.name, count: list.symbols.length, custom: true })),
-  ], [customWatchlists, watchlistCounts, tradingWatchlistCount]);
+    { id: "Indices", name: "Indices", count: watchlistCounts.Indices },
+    { id: "F&O", name: "F&O stocks", count: watchlistCounts["F&O"] },
+    ...watchlistTabs.map(tab => ({ id: tab, name: tab === "BANK NIFTY" ? "NIFTY BANK" : tab, count: watchlistCounts[tab] })),
+  ], [customWatchlists, watchlistCounts]);
   const activeFnoUnderlying = useMemo<FnoUnderlying | null>(() => {
     if (selected.assetType !== "OPTION" || !spotInstrument) return null;
     if (fnoUnderlying?.instrumentKey === spotInstrument.instrumentKey) return fnoUnderlying;
@@ -2879,6 +2878,19 @@ export function TradingDashboard() {
     }
   }
 
+  const pssbScanner = <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={""} active={marketsOpen} onCount={setTradingWatchlistCount} onOpen={(instrument, frame, time) => {
+            const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
+            if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
+            else pendingTradingHistory.current = history;
+            openNavigationSection("trade", false);
+            chooseTradeInstrument(instrument);
+            setTimeframe(frame);
+            setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
+            const url = new URL(window.location.href);
+            url.searchParams.set("timeframe", frame);
+            window.history.replaceState({ ...window.history.state, papertradeChart: { instrument, timeframe: frame } }, "", url);
+          }} />;
+
   const chartSymbolControlProps = {
     instrument: selected, venue: selectedVenueLabel, expanded: showTradeSymbols,
     onToggle: () => setShowTradeSymbols(value => !value), compared: !!comparedSymbols.length,
@@ -2904,7 +2916,8 @@ export function TradingDashboard() {
           <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Charts</button>
           <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button>
           <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button>
-          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Watchlist</button>
+          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button>
+          <button className={activeNavigationSection === "markets" ? "nav-active" : ""} onClick={() => openNavigationSection("markets")}>Scanner</button>
           <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}>News</button>
           <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button>
           <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}>Analysis</button>
@@ -2942,31 +2955,12 @@ export function TradingDashboard() {
 
       {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
         <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
-          {sidebarOpen && <div className="watchlist-market-header">
-
-            <MarketSectionTabs active="WATCHLIST" onChange={(section) => {
-              if (section === "WATCHLIST") return;
-              openNavigationSection("markets");
-              setMarketsInitialGroup(section);
-            }} />
-          </div>}
           <WatchlistTabs activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); }} onNewList={() => openWatchlistPicker(null)} />
-          {!derivativeList && <div className="search-box"><Search size={16} /><input aria-label="Search watchlist" value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search all NSE stocks" />{search && <button type="button" className="icon-button" aria-label="Clear watchlist search" onClick={() => { setSearch(''); setWatchlistLimit(60); }}><X size={16} /></button>}</div>}
+          {!derivativeList && <div className="search-box"><Search size={16} /><input aria-label="Search watchlist" value={search} onChange={(event) => { setSearch(event.target.value); setWatchlistLimit(60); }} placeholder="Search watchlist" />{search && <button type="button" className="icon-button" aria-label="Clear watchlist search" onClick={() => { setSearch(''); setWatchlistLimit(60); }}><X size={16} /></button>}</div>}
           {!sidebarOpen && <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>}
           {!sidebarOpen && showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
-          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : watchlist === TRADING_WATCHLIST_ID ? <TradingWatchlist instruments={stockUniverse} underlyings={fnoUnderlyings} search={search} active={activeNavigationSection === "watchlist" || sidebarOpen} onCount={setTradingWatchlistCount} onOpen={(instrument, frame, time) => {
-            const history = { token: Date.now(), date: new Date((time + 19800) * 1000).toISOString().slice(0, 10) };
-            if (selected.instrumentKey === instrument.instrumentKey) setChartHistory(history);
-            else pendingTradingHistory.current = history;
-            openNavigationSection("trade", false);
-            chooseTradeInstrument(instrument);
-            setTimeframe(frame);
-            setIndicators((current) => ({ ...current, psbb: true, rsi: true }));
-            const url = new URL(window.location.href);
-            url.searchParams.set("timeframe", frame);
-            window.history.replaceState({ ...window.history.state, papertradeChart: { instrument, timeframe: frame } }, "", url);
-          }} /> : <div className="instrument-list">
+          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? item.price;
@@ -3306,10 +3300,11 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "markets" ? 3 : activeNavigationSection === "news" ? 4 : activeNavigationSection === "ipo" ? 5 : activeNavigationSection === "fundamentals" ? 6 : 7 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={["trade", "fno"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
-        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("markets"); }}><Bookmark size={19} /><span>Watchlist</span></button>
+        <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("watchlist"); }}><Bookmark size={19} /><span>Watchlist</span></button>
+        <button className={activeNavigationSection === "markets" ? "active" : ""} onClick={() => openNavigationSection("markets")}><Search size={19} /><span>Scanner</span></button>
         <button className={activeNavigationSection === "news" ? "active" : ""} onClick={() => openNavigationSection("news")}><Newspaper size={19} /><span>News</span></button>
         <button className={activeNavigationSection === "ipo" ? "active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket size={19} /><span>IPO</span></button>
         <button className={activeNavigationSection === "fundamentals" ? "active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><BookOpenCheck size={19} /><span>Analysis</span></button>
@@ -3420,7 +3415,11 @@ export function TradingDashboard() {
         </section>
       )}
       {marketsOpen && marketsInitialGroup !== "IPO" && (
-        <MarketsWorkspace
+        <section className="market-discovery-panel scanner-workspace" aria-label="Scanner">
+          <MarketSectionTabs active={marketsInitialGroup} scannerOnly onChange={group => { if (group !== "WATCHLIST") { rememberWatchlistLocation(); setMarketsInitialGroup(group); } }} />
+          {marketsInitialGroup === "TRADING" && <nav className="scanner-mode-tabs" aria-label="Trading scanner type"><button aria-pressed={tradingScannerMode === "pssb"} onClick={() => setTradingScannerMode("pssb")}>PSSB MTF</button><button aria-pressed={tradingScannerMode === "standard"} onClick={() => setTradingScannerMode("standard")}>Other scanners</button></nav>}
+          {marketsInitialGroup === "TRADING" && tradingScannerMode === "pssb" ? pssbScanner : <MarketsWorkspace
+          hideSectionTabs
           key={marketsInitialGroup}
           stockUniverse={stockUniverse}
           quotes={marketQuotes}
@@ -3430,7 +3429,8 @@ export function TradingDashboard() {
           group={marketsInitialGroup}
           onGroupChange={(group) => { if (group !== marketsInitialGroup) rememberWatchlistLocation(); setMarketsInitialGroup(group); }}
           onScannerViewed={rememberScanner}
-        />
+        />}
+        </section>
       )}
       {optionChainOpen && activeFnoUnderlying && (
         <OptionChainSheet
