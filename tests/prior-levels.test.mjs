@@ -74,3 +74,19 @@ test("financial year and a chosen daily candle can be added", () => {
   assert.equal(byId["3H"].price, 120);
   assert.equal(byId["3O"].price, 100);
 });
+
+
+test("missing zero-price history cannot become a prior low or flatten the chart", () => {
+  const history = [
+    bar("2026-10-01T09:15:00Z", 110, 90),
+    bar("2026-10-02T09:15:00Z", 0, 0, 0, 0),
+    bar("2026-10-03T09:15:00Z", 115, 0, 100, 110),
+    bar("2026-10-04T09:15:00Z", 110, 95, 120, 100),
+    bar("2026-10-05T09:15:00Z", 130, 100),
+  ];
+  const expected = priorMarks([history[0], history[4]], undefined, history[4].time);
+  assert.deepEqual(priorMarks(history, undefined, history[4].time), expected);
+  assert.ok(expected.length > 0);
+  assert.ok(expected.every(mark => mark.price > 0));
+  assert.deepEqual(priorMarks(history.slice(1, 4)), []);
+});

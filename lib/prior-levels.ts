@@ -66,7 +66,16 @@ function marksFor(prefix: string, tone: PriorTone, bars: Bar[], options: PriorOp
 
 /** Levels from daily candles. Each mark keeps the time of the candle that printed it. */
 export function priorMarks(candles: Bar[], options: PriorOptions = DEFAULTS, referenceTime?: number): PriorMark[] {
-  const rows = candles.filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)).slice().sort((a, b) => a.time - b.time);
+  // A missing daily OHLC field can arrive as zero. It is not a traded low
+  // for these positive-price instruments and must not enter the guide series
+  // that independently contributes to the chart's shared price scale.
+  const rows = candles.filter((candle) =>
+    [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)
+    && candle.low > 0
+    && candle.high >= candle.low
+    && candle.open >= candle.low && candle.open <= candle.high
+    && candle.close >= candle.low && candle.close <= candle.high,
+  ).slice().sort((a, b) => a.time - b.time);
   if (!rows.length) return [];
   const today = istDate(rows.at(-1)!.time);
   const past = rows.filter((candle) => istDate(candle.time) < today);
