@@ -119,7 +119,6 @@ export function MarketsWorkspace({
   group,
   onGroupChange,
   onScannerViewed,
-  hideSectionTabs = false,
 }: {
   stockUniverse: Instrument[];
   quotes: Record<string, NormalizedQuote>;
@@ -128,7 +127,6 @@ export function MarketsWorkspace({
   onOpenWatchlist: () => void;
   group: "TRADING" | "INVESTMENT";
   onGroupChange: (group: "TRADING" | "INVESTMENT") => void;
-  hideSectionTabs?: boolean;
   onScannerViewed?: (label: string) => void;
 }) {
   const scannerGroup = group;
@@ -248,10 +246,10 @@ export function MarketsWorkspace({
   return (
     <section ref={marketListRef} className="market-discovery-panel compact-market-panel" aria-label="NSE market scanners">
 
-      {!hideSectionTabs && <MarketSectionTabs scannerOnly active={scannerGroup} onChange={(section) => {
+      <MarketSectionTabs active={scannerGroup} onChange={(section) => {
         if (section === "WATCHLIST") onOpenWatchlist();
         else setScannerGroup(section);
-      }} />}
+      }} />
 
       <div className="trend-tabs market-scanner-tabs" role="tablist" aria-label="Market scanners">
         {scannerOptions.map((option) => <button key={option.id} className={activeScanner === option.id ? "active" : ""} onClick={() => setActiveScanner(option.id)} role="tab" aria-selected={activeScanner === option.id}><b>{option.label}</b><small>{option.cadence}</small></button>)}
