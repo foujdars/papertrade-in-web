@@ -446,7 +446,7 @@ test("scanner runs automatically; empty success clears old matches; failure keep
   assert.deepEqual(harness.states[0].VOLUME.rows, []);
   assert.equal(harness.states[0].VOLUME.scannedAt, payload.fetchedAt);
   assert.equal(harness.states[0].VOLUME.error, undefined);
-  assert.match(viewText(render()), /0 matches/);
+  assert.match(viewText(render()), /No stocks pass this scan/);
 
   harness.states[0] = { VOLUME: previous };
   payload = { ok: false, error: { message: "Feed temporarily unavailable" } };
