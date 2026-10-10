@@ -106,7 +106,7 @@ export async function GET(request: Request) {
         let delivered = 0;
         for (const device of devices.docs) {
           const target = device.data(), prefs = notificationPreferences(target.preferences);
-          if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+          if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
           const isPrice = rule.family === "price";
           const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe), body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };

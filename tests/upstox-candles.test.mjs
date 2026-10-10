@@ -15,7 +15,7 @@ function route() {
     ["2026-01-01T00:00:00+05:30", 111, 120, 108, 118, 30],
   ] } };
   new Function("require", "exports", code)((id) => {
-    if (id === "@/lib/upstox") return { isSupportedNseInstrumentKey: () => true };
+    if (id === "@/lib/upstox") return { isSupportedChartInstrumentKey: () => true };
     if (id === "@/lib/upstox-server") return {
       upstoxFetch: async (path) => { paths.push(path); return payload; },
       upstoxFreshFetch: async (path) => { paths.push(path); return payload; },

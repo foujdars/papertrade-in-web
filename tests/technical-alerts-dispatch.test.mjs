@@ -36,12 +36,17 @@ function database(initial = {}) {
 const stubs = {
   'server-only': '',
   '@supabase/supabase-js': `export const createClient = () => ({ auth: { getUser: async token => token === 'valid' ? { data: { user: { id: globalThis.__technicalTest.validUser } } } : { data: {}, error: 'invalid' } } });`,
-  'push-admin': `export const pushConfigured = () => true; export const pushServices = async () => ({db: globalThis.__technicalTest.db}); export const sendPush = async (notice, target) => { const s = globalThis.__technicalTest; s.sent.push({notice, target}); if(s.failSend) throw new Error('transport outcome unknown'); };`,
+  'push-admin': `export const firebaseProjectId = () => ''; export const pushConfigured = () => true; export const pushServices = async () => ({db: globalThis.__technicalTest.db}); export const sendPush = async (notice, target) => { const s = globalThis.__technicalTest; s.sent.push({notice, target}); if(s.failSend) throw new Error('transport outcome unknown'); };`,
   'candles-route': `export async function GET(request) { const s = globalThis.__technicalTest; s.feedCalls.push(request.url); return Response.json(s.failFeed ? {ok:false} : {ok:true, candles:s.candles}, {status:s.failFeed?503:200}); }`,
   'session-route': `export async function GET() { return Response.json({session: globalThis.__technicalTest.session}); }`,
   'quotes-route': `export async function GET() { const s=globalThis.__technicalTest; return Response.json(s.failFeed?{ok:false}:{ok:true,quotes:s.quotes??{}},{status:s.failFeed?503:200}); }`,
+  // The independent global-alert dispatchers have their own suites. Keep this
+  // suite offline while exercising the real technical-alert handlers.
+  'default-alerts': `export const dispatchDefaultEma21Alerts = async () => ({}); export const dispatchEma5ReversalAlerts = async () => ({});`,
+  'ad-tape': `export const sampleNseAdTape = async () => [];`,
 };
 const plugin = { name: 'isolated-services', setup(b) {
+  b.onResolve({ filter: /ema21-default-server$|ema5-reversal-server$|india-ad-tape$/ }, args => ({ path: args.path.endsWith('india-ad-tape') ? 'ad-tape' : 'default-alerts', namespace: 'stub' }));
   b.onResolve({ filter: /server-only|@supabase\/supabase-js|push-admin|api\/upstox\/(candles|quotes)\/route|api\/market\/session\/route/ }, args => ({ path: args.path.includes('push-admin') ? 'push-admin' : args.path.includes('/candles/') ? 'candles-route' : args.path.includes('/quotes/') ? 'quotes-route' : args.path.includes('/session/') ? 'session-route' : args.path, namespace: 'stub' }));
   b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: stubs[args.path], loader: 'js' }));
 } };
@@ -140,7 +145,7 @@ test('management isolates accounts and enforces revisions, malformed requests an
 test('price alerts use fresh observed quotes once only, without candles or automatic orders', async t => {
   reset(t, { family:'price', threshold:105, condition:'above', timeframe:'1m', repeat:'once' });
   assert.equal((await dispatch()).status,200); assert.equal(read().rules[0].status,'completed');
-  assert.equal(state.sent.length,1); assert.match(state.sent[0].notice.title,/price alert/); assert.match(state.sent[0].notice.body,/quote/); assert.equal(state.feedCalls.length,0);
+  assert.equal(state.sent.length,1); assert.match(state.sent[0].notice.title,/TEST.*(?:₹110|price)/); assert.equal(state.sent[0].notice.body,''); assert.equal(state.feedCalls.length,0);
   await dispatch(); assert.equal(state.sent.length,1);
 });
 test('stale, future, pre-arm quotes and closed sessions never fire price alerts',async t=>{
