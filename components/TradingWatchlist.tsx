@@ -43,8 +43,6 @@ export function TradingWatchlist(props: Props & { underlyings?: FnoUnderlying[];
   const scope = `${day}:${universe}:${JSON.stringify(inputs)}:${stocks.map(item => item.instrumentKey).join(',')}`;
   return <section className="trading-watchlist" aria-label="PSBB multi-timeframe scanner">
 
-    <p className="tw-scope">{stocks.length} stocks · Today’s confirmed divergences</p>
-    {universe === 'F&O stocks' && <p className="tw-scope">Signals use the underlying stock.</p>}
     {!stocks.length && <p className="tw-errors">Category constituents unavailable or still loading.</p>}
     <TradingScanBoard key={scope} scope={scope} {...props} instruments={stocks} inputs={inputs} onOpen={(instrument, frame, time) => {
       for (const id of ['psbb', 'rsi']) {

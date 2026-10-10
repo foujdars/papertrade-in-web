@@ -34,3 +34,7 @@
 .terminal-shell .scanner-workspace .scanner-filter-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 8px; margin-bottom: 8px; }
 .terminal-shell .scanner-workspace .scanner-filter-row .scanner-choice { display: grid; min-width: 0; gap: 5px; margin: 0; }
 .terminal-shell .scanner-workspace .scanner-filter-row .workspace-list-trigger { min-width: 0; padding-inline: 10px; }
+
+.terminal-shell .scanner-workspace .scanner-filter-row.has-refresh { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 40px; align-items: stretch; }
+.terminal-shell .scanner-workspace .scanner-refresh-slot { display: flex; align-items: stretch; }
+.terminal-shell .scanner-workspace .scanner-refresh-slot .scanner-refresh { width: 40px; min-height: 40px; height: 100%; margin: 0; padding: 0; display: grid; place-items: center; }

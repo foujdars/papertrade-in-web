@@ -1,8 +1,9 @@
 "use client";
 
-import { Activity, ArrowRight, Clock3, RefreshCw, ScanSearch } from "lucide-react";
+import { Activity, ArrowRight, RefreshCw, ScanSearch } from "lucide-react";
 import { TRADING_GROUPS, tradingUniverse, type TradingGroup } from "@/lib/trading-universes";
 import type { FnoUnderlying } from "@/lib/fno";
+import { createPortal } from "react-dom";
 import { WorkspaceListPicker } from "./WorkspaceListPicker";
 import { MarketSectionTabs } from "@/components/MarketSectionTabs";
 import { CandleLoader } from "./CandleLoader";
@@ -85,13 +86,6 @@ function readSavedSnapshots(storageKey: string) {
   }
 }
 
-function formatScanTime(value: string) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value));
-}
-
-
-
 function readSavedScanner(group: ScannerGroup): ScannerId {
   if (typeof window === "undefined") return group === "INVESTMENT" ? "ema-30-50-100" : "VOLUME";
   try {
@@ -117,6 +111,7 @@ const MTF_SELECTION_KEY = "papertrade-scanner-workspace-selection";
 
 export function MarketsWorkspace(props: WorkspaceProps) {
   const scrollHost = useRef<HTMLElement | null>(null);
+  const [refreshHost, setRefreshHost] = useState<HTMLDivElement | null>(null);
   const [universe, setUniverse] = useState<TradingGroup>(() => {
     try { const saved = localStorage.getItem(`papertrade-scanner-universe:${props.group}`); if (TRADING_GROUPS.includes(saved as TradingGroup)) return saved as TradingGroup; } catch {}
     return "Nifty 50 stocks";
@@ -139,15 +134,15 @@ export function MarketsWorkspace(props: WorkspaceProps) {
   }, [props.group, selection]);
   return <section ref={scrollHost} className="market-discovery-panel scanner-workspace" aria-label="Scanners">
     <MarketSectionTabs active={props.group} onChange={section => section === "WATCHLIST" ? props.onOpenWatchlist() : props.onGroupChange(section)} />
-    <div className="scanner-filter-row"><div className="scanner-choice"><span>Scanner</span><WorkspaceListPicker label="Choose scanner" title="Choose scanner" value={selection} onChange={value => setSelection(value as ScannerId | "PSBB_MTF")} choices={[
+    <div className={`scanner-filter-row${selection !== "PSBB_MTF" ? " has-refresh" : ""}`}><div className="scanner-choice"><WorkspaceListPicker label="Choose scanner" title="Choose scanner" value={selection} onChange={value => setSelection(value as ScannerId | "PSBB_MTF")} choices={[
       ...(props.group === "TRADING" ? [{ id: "PSBB_MTF", label: "PSBB · Multi-timeframe", description: "Confirmed divergences across five timeframes", badge: "MTF" }] : []),
       ...options.map(option => ({ id: option.id, label: option.label, description: option.description, badge: option.cadence })),
-    ]} /></div><div className="scanner-choice"><span>Universe</span><WorkspaceListPicker label="Trading stock universe" title="Choose universe" value={universe} onChange={value => setUniverse(value as TradingGroup)} choices={TRADING_GROUPS.map(item => ({ id: item, label: item }))} /></div></div>
-    {selection === "PSBB_MTF" ? props.tradingScanner(universe) : <ScannerResults key={`${selection}:${universe}`} {...props} stockUniverse={scopedInstruments} universe={universe} scrollHost={scrollHost} activeScanner={selection} />}
+    ]} /></div><div className="scanner-choice"><WorkspaceListPicker label="Stock universe" title="Choose universe" value={universe} onChange={value => setUniverse(value as TradingGroup)} choices={TRADING_GROUPS.map(item => ({ id: item, label: item }))} /></div>{selection !== "PSBB_MTF" && <div className="scanner-refresh-slot" ref={setRefreshHost} />}</div>
+    {selection === "PSBB_MTF" ? props.tradingScanner(universe) : <ScannerResults key={`${selection}:${universe}`} {...props} stockUniverse={scopedInstruments} universe={universe} scrollHost={scrollHost} refreshHost={refreshHost} activeScanner={selection} />}
   </section>;
 }
 
-function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash, onScannerViewed, group: scannerGroup, activeScanner, universe, scrollHost }: WorkspaceProps & { universe: TradingGroup; activeScanner: ScannerId; scrollHost: RefObject<HTMLElement | null> }) {
+function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash, onScannerViewed, group: scannerGroup, activeScanner, universe, scrollHost, refreshHost }: WorkspaceProps & { universe: TradingGroup; activeScanner: ScannerId; scrollHost: RefObject<HTMLElement | null>; refreshHost?: HTMLElement | null }) {
   const storageKey = `${STORAGE_KEY}:universe:${universe}`;
   const [snapshots, setSnapshots] = useState<Partial<Record<ScannerId, ScannerSnapshot>>>(() => readSavedSnapshots(storageKey));
   const [loadingScanner, setLoadingScanner] = useState<ScannerId | null>(null);
@@ -162,8 +157,6 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
     () => validScannerRows(activeScanner, activeSnapshot?.rows ?? []),
     [activeScanner, activeSnapshot],
   );
-  const activeAdvancers = useMemo(() => activeRows.filter((row) => row.changePercent >= 0).length, [activeRows]);
-  const activeDecliners = activeRows.length - activeAdvancers;
   const instruments = useMemo(() => dedupeScanInstruments(stockUniverse
     .map(({ symbol, name, instrumentKey }) => ({ symbol, name, instrumentKey }))), [stockUniverse]);
   const activeQuoteKeys = useMemo(
@@ -256,12 +249,8 @@ function ScannerResults({ stockUniverse, quotes, onQuoteKeysChange, onSelectCash
   return (
     <section className="scanner-results compact-market-panel" aria-label="NSE market scanners">
 
-      <p className="tw-scope">{universe} · {instruments.length} symbols · {selectedOption.label}</p>
-      <div className="market-results-head">
-        <button type="button" className="scanner-refresh" disabled={Boolean(loadingScanner)} onClick={() => void runSelectedScan(undefined, true)} aria-label="Refresh scanner"><RefreshCw size={15} /></button>
-        <span><b>{activeSnapshot?.scannedAt ? `${activeRows.length} matches` : "Scanner results"}</b><small role={activeSnapshot?.error ? "status" : undefined} title={activeSnapshot?.error}>{activeSnapshot?.error && "Refresh failed · "}{activeSnapshot?.scannedAt ? <><Clock3 size={12} /> Updated {formatScanTime(activeSnapshot.scannedAt)} IST</> : activeSnapshot?.error ? "Retrying automatically" : instruments.length ? "Scanning automatically" : "Universe constituents unavailable"}</small></span>
-        {activeSnapshot?.scannedAt && <div><span className="positive">{activeAdvancers} rising</span><i /><span className="negative">{activeDecliners} falling</span></div>}
-      </div>
+      {refreshHost && createPortal(<button type="button" className="scanner-refresh" disabled={Boolean(loadingScanner)} onClick={() => void runSelectedScan(undefined, true)} aria-label="Refresh scanner"><RefreshCw size={15} /></button>, refreshHost)}
+      {activeSnapshot?.error && <p className="tw-errors" role="status">Refresh failed · {activeSnapshot.error}</p>}
       <div className="scanner-pull-stage" ref={pullStageRef} data-pull="idle">
         <div className="scanner-pull-feedback" aria-live="off"><span className="pull-hint">Pull down to refresh</span><span className="pull-ready"><RefreshCw size={15} />Release to refresh</span><span className="pull-refreshing"><CandleLoader compact label="Refreshing scanner" />Refreshing</span></div>
       <div className="market-discovery-list">
