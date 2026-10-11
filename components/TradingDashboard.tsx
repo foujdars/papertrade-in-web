@@ -2944,11 +2944,14 @@ export function TradingDashboard() {
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <section className="more-menu-panel" aria-label="More options">
-                <div className="mobile-utility-grid" aria-label="Quick access">
-                  <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={20} aria-hidden="true"/><span>Wallet</span></button>
-                  <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={20} aria-hidden="true"/> : <Moon size={20} aria-hidden="true"/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
-                  <button onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><Target size={20} aria-hidden="true"/><span>Coach</span></button>
-                  <button className={botOpen ? "active" : ""} onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><Bot size={20} aria-hidden="true" /><span>Bot</span></button>
+                <header className="tools-menu-heading"><b>Tools & settings</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
+                <div className="tools-menu-features">
+                  <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>
+                  <button aria-label="Bot" onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><span className="tools-menu-icon"><Bot size={21} /></span><span><b>Trading bot</b><small>Strategies, controls & activity</small></span><ChevronRight size={18} /></button>
+                </div>
+                <div className="tools-menu-secondary">
+                  <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={18}/><span>Wallet</span></button>
+                  <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
                 </div>
               </section>
             </>}

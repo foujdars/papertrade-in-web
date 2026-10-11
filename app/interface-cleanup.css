@@ -95,11 +95,12 @@
   }
 }
 
+/* Only keyboard-editable fields hide navigation; timeframe checkboxes keep it visible. */
 @media (max-width: 940px) {
-  .terminal-shell:has(input:focus) .mobile-bottom-nav { display: none !important; }
-  .terminal-shell:has(input:focus) .home-workspace,
-  .terminal-shell:has(input:focus) .market-discovery-panel,
-  .terminal-shell:has(input:focus) .watchlist-panel { bottom: env(safe-area-inset-bottom, 0px); }
+  .terminal-shell:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="hidden"]), textarea):focus) .mobile-bottom-nav { display: none !important; }
+  .terminal-shell:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="hidden"]), textarea):focus) .home-workspace,
+  .terminal-shell:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="hidden"]), textarea):focus) .market-discovery-panel,
+  .terminal-shell:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]):not([type="file"]):not([type="hidden"]), textarea):focus) .watchlist-panel { bottom: env(safe-area-inset-bottom, 0px); }
   .terminal-shell .notification-center-panel,
   .terminal-shell .more-menu-panel { top: calc(var(--mobile-header-height) + 5px); }
 }

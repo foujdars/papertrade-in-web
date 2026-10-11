@@ -73,7 +73,7 @@ export function TradingCoach({ selected, orders, trades, limits, proposedOptionL
     const restore = window.setTimeout(() => setJournal(readTradeJournal()), 0);
     const previousFocus = document.activeElement as HTMLElement | null;
     dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => { window.clearTimeout(restore); previousFocus?.focus(); };
+    return () => { window.clearTimeout(restore); (previousFocus?.isConnected && previousFocus.matches('button, input, textarea, select, a[href], [tabindex]') ? previousFocus : document.querySelector<HTMLElement>('[aria-label="More options"]'))?.focus({ preventScroll: true }); };
   }, []);
   const [draftLimits, setDraftLimits] = useState(limits);
   const [expandedTrade, setExpandedTrade] = useState<string | null>(trades[0]?.id ?? null);
