@@ -42,3 +42,31 @@ test('Entry setups displays only the selected EMA lines and defaults away from t
   assert.equal(priorSettings.inputs.line21,0);
   assert.equal(studyDefaults('ema').inputs.length,5);
 });
+
+test('session VWAP never invents volume or enables volume-filtered entries without it', () => {
+  const candles = [
+    bar('2026-09-24T09:15:00Z', 100, 110, 90),
+    bar('2026-09-24T09:20:00Z', 100, 110, 90),
+    bar('2026-09-25T09:15:00Z', 112, 114, 108),
+    bar('2026-09-25T09:20:00Z', 112, 113, 111),
+  ];
+  for (const volume of [0, undefined, NaN, Infinity, -1]) {
+    const withoutVolume = candles.map(candle => ({ ...candle, volume }));
+    const filtered = entryPlots(withoutVolume, { ...onlyLevel, vwap: 1 });
+    assert.ok(filtered.vwap.every(Number.isNaN), `No VWAP for ${volume}`);
+    assert.ok(filtered.long.every(Number.isNaN), 'Missing VWAP cannot approve an entry');
+    assert.equal(entryPlots(withoutVolume, onlyLevel).long[2], 108, 'Turning the filter off preserves price-only setups');
+  }
+});
+
+test('session VWAP skips zero-volume candles, rejects incomplete volume and resets next day', () => {
+  const candles = [
+    { ...bar('2026-09-24T09:15:00Z', 100), volume: 100 },
+    { ...bar('2026-09-24T09:20:00Z', 200), volume: 0 },
+    { ...bar('2026-09-24T09:25:00Z', 130), volume: 200 },
+    { ...bar('2026-09-24T09:30:00Z', 140), volume: NaN },
+    { ...bar('2026-09-24T09:35:00Z', 150), volume: 100 },
+    { ...bar('2026-09-25T09:15:00Z', 160), volume: 100 },
+  ];
+  assert.deepEqual(entryPlots(candles).vwap, [100, 100, 120, NaN, NaN, 160]);
+});

@@ -34,42 +34,45 @@ export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock
   const futureClose = gift?.futureKey === futureKey ? gift?.futureClose : null;
   useEffect(() => {
     const controller = new AbortController();
-    void fetch('/api/upstox/fno-underlyings', { signal: controller.signal }).then(r => r.json()).then(p => { if (!controller.signal.aborted && p.ok && p.underlyings?.length) setCatalogue(p.underlyings.filter((r: FnoUnderlying) => r.optionContracts > 0)); }).catch(() => {});
+    void fetch('/api/upstox/fno-underlyings', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(r => r.json()).then(p => { if (!controller.signal.aborted && p.ok && p.underlyings?.length) setCatalogue(p.underlyings.filter((r: FnoUnderlying) => r.optionContracts > 0)); }).catch(() => {});
     return () => controller.abort();
   }, []);
   useEffect(() => {
     const controller = new AbortController();
     let busy = false;
     const refresh = async () => {
-      if (busy || document.visibilityState === 'hidden') return;
+      if (busy || controller.signal.aborted || document.visibilityState === 'hidden') return;
       busy = true;
       try {
         const results = await Promise.allSettled([
-          fetch(`/api/market/gift-nifty?${new URLSearchParams(futureKey ? { futureKey } : {})}`, { signal: controller.signal, cache: 'no-store' }).then(r => r.json()),
-          fetch('/api/market/india-pulse', { signal: controller.signal, cache: 'no-store' }).then(r => r.json()),
+          fetch(`/api/market/gift-nifty?${new URLSearchParams(futureKey ? { futureKey } : {})}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]), cache: 'no-store' }).then(r => r.json()),
+          fetch('/api/market/india-pulse', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]), cache: 'no-store' }).then(r => r.json()),
         ]);
         if (controller.signal.aborted) return;
         const g = results[0], v = results[1];
         setGift(g.status === 'fulfilled' && g.value.ok ? { ...g.value, futureKey } : null);
         setVix(v.status === 'fulfilled' && v.value.ok ? v.value.vix ?? null : null);
-        setVixTime(v.status === 'fulfilled' && v.value.vixCheckedAt ? new Date(v.value.vixCheckedAt).toISOString() : '');
+        const checkedAt = v.status === 'fulfilled' && v.value.ok && v.value.vixCheckedAt ? new Date(v.value.vixCheckedAt).getTime() : NaN;
+        setVixTime(Number.isFinite(checkedAt) ? new Date(checkedAt).toISOString() : '');
       } finally { busy = false; }
     };
     void refresh(); const timer = window.setInterval(() => void refresh(), 60_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('online', refresh);
+    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('online', refresh); };
   }, [futureKey]);
   useEffect(() => {
     const controller = new AbortController();
     let busy = false;
     const refresh = async () => {
-      if (busy || document.visibilityState === 'hidden') return;
+      if (busy || controller.signal.aborted || document.visibilityState === 'hidden') return;
       busy = true;
       try {
         const params = new URLSearchParams({ instrumentKey: selected });
         let active = expiry;
         if (active && active < new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })) { setExpiry(''); setExpiries([]); setRows([]); setAsOf(''); setState('loading'); return; }
         if (!active) {
-          const list = await fetch(`/api/upstox/option-chain?${params}`, { signal: controller.signal }).then(r => r.json());
+          const list = await fetch(`/api/upstox/option-chain?${params}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(r => r.json());
           if (!list.ok || !list.expiries?.length) throw Error();
           const available = list.expiries.filter((d: string) => d >= new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
           if (!available.length) throw Error();
@@ -77,14 +80,16 @@ export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock
           setExpiries(available); active = available[0]; setExpiry(active); return;
         }
         params.set('expiry', active);
-        const p = await fetch(`/api/upstox/option-chain?${params}`, { signal: controller.signal, cache: 'no-store' }).then(r => r.json());
+        const p = await fetch(`/api/upstox/option-chain?${params}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]), cache: 'no-store' }).then(r => r.json());
         if (!p.ok || !Array.isArray(p.rows) || !p.rows.length) throw Error();
         if (!controller.signal.aborted) { setRows(p.rows); setAsOf(p.fetchedAt || new Date().toISOString()); setState('ready'); }
       } catch { if (!controller.signal.aborted) { setRows([]); setState('error'); } }
       finally { busy = false; }
     };
     void refresh(); const timer = window.setInterval(() => void refresh(), 60_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('online', refresh);
+    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('online', refresh); };
   }, [selected, expiry]);
   const summary = useMemo(() => oiSummary(rows), [rows]);
   const spot = rows.find(row => Number.isFinite(row.underlyingSpotPrice) && row.underlyingSpotPrice > 0)?.underlyingSpotPrice ?? null;

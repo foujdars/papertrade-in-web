@@ -11,7 +11,7 @@ export function useNseSession(exchange: "NSE" | "MCX" = "NSE") {
       if (pending || controller.signal.aborted) return;
       pending = true;
       try {
-        const response = await fetch(exchange === "NSE" ? "/api/market/session" : "/api/market/session?exchange=MCX", { cache: "no-store", signal: controller.signal });
+        const response = await fetch(exchange === "NSE" ? "/api/market/session" : "/api/market/session?exchange=MCX", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) });
         const payload = await response.json();
         if (!response.ok || !payload.session || !Array.isArray(payload.session.sessions)) throw new Error("No exchange session");
         if (!controller.signal.aborted) setSession(payload.session);

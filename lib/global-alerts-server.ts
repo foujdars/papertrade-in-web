@@ -80,7 +80,7 @@ export async function dispatchCloudGlobalAlerts(db: Firestore, now = Date.now())
       let delivered = 0;
       for (const device of devices.docs) {
         const target = device.data(), prefs = notificationPreferences(target.preferences);
-        if (prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
+        if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
         const isEma = isEma21EntryKind(rule.kind);
         const notice: PushNotice = { id: `global:${queued.userId}:${rule.id}`, kind: "trade", title: isEma ? emaTitle(rule.symbol, rule.timeframe) : divergenceTitle(rule.symbol, rule.timeframe), body: "", url: `/?symbol=${rule.symbol}&timeframe=${rule.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
         await sendPush(notice, { token: target.token }); delivered++;
