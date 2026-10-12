@@ -90,3 +90,22 @@ test("home renders the mover board from the NSE scan route", async () => {
   assert.match(lib, /Volume/);
   assert.doesNotMatch(view, /Sample stock/);
 });
+
+test('Home requests only the two summary lists; opening movers still provides every category', async t => {
+  const { build } = await import('esbuild');
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    const scan = JSON.parse(options.body); calls.push(scan);
+    return Response.json({ data: [{ s: 'NSE:TEST', d: ['TEST',110,scan.sort.sortOrder==='asc'?-10:10,10,1000,3,110,40,110,100,2.5e9,'Test Ltd'] }] });
+  });
+  const built = await build({ entryPoints:['app/api/market/movers/route.ts'],bundle:true,write:false,platform:'node',format:'esm' });
+  const route = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`);
+  const summary = await route.GET(new Request('https://papertrade.test/api/market/movers?summary=1'));
+  const body = await summary.json();
+  assert.equal(calls.length,2);assert.deepEqual(Object.keys(body.lists).sort(),['gainers','losers']);
+  assert.equal(summary.headers.get('cache-control'),'no-store');
+  const full = await (await route.GET(new Request('https://papertrade.test/api/market/movers'))).json();
+  assert.equal(calls.length,10);assert.equal(Object.keys(full.lists).length,8);
+  await route.GET(new Request('https://papertrade.test/api/market/movers?summary=1'));
+  assert.equal(calls.length,10,'Concurrent views keep separate cached response shapes');
+});

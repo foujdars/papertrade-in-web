@@ -134,7 +134,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           if (points.length) {
             const a = {...points[0]}, b = {...points.at(-1)!};
             const label = drawingLineTextPosition(type,a,b,viewport.width,presentation);
-            if (drawingTextVisible(type,a,label,viewport.width,viewport.height)) geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
+            if (drawingTextVisible(type,a,label,viewport.width,viewport.height,presentation)) geometry = [...geometry,{type:'text',position:{x:label.x,y:label.y},text:presentation.text,align:label.align}];
           }
         }
         return geometry;

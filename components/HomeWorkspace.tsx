@@ -153,6 +153,17 @@ export function HomeWorkspace({
   const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
   useEffect(() => {
+    // Warm chart modules while Home is idle so the first chart click does not
+    // wait for both libraries to download before candles can be drawn.
+    const warm = () => { void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).catch(() => {}); };
+    if (typeof window.requestIdleCallback === "function") {
+      const idle = window.requestIdleCallback(warm, { timeout: 2_000 });
+      return () => window.cancelIdleCallback(idle);
+    }
+    const timer = window.setTimeout(warm, 1_500);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
     try { setPreferences({...normalizeHomePreferences(JSON.parse(localStorage.getItem(storageKey) ?? 'null')), market: 'india'}); }
     catch { setPreferenceMessage('Preferences could not be loaded on this device.'); }
     setPreferencesReady(true);

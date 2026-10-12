@@ -2979,7 +2979,7 @@ export function MarketChart({
       setOlderHistory("loading");
       const before = Math.min(cursor ?? Infinity, Number(dataRef.current[0].time));
       try {
-        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&before=${before}`, { signal: controller.signal, cache: "no-store" });
+        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&before=${before}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]), cache: "no-store" });
         const body = await response.json();
         if (!response.ok || !body.ok || !Array.isArray(body.candles)) throw new Error("Older candles unavailable");
         if (controller.signal.aborted || chartApi.current !== chart) return;
@@ -3038,7 +3038,7 @@ export function MarketChart({
         const params = new URLSearchParams();
         if (historyRequest?.years) params.set("years", String(historyRequest.years));
         if (historyRequest?.date) params.set("date", historyRequest.date);
-        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&${params}`, { signal: controller.signal });
+        const response = await fetch(`${comparisonRequest(instrument.instrumentKey, timeframe)}&${params}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]), cache: "no-store" });
         const body = await response.json();
         if (!response.ok || !body.ok || !body.candles?.length) throw new Error(typeof body.error === "string" ? body.error : body.error?.message || "No history is available for this date.");
         if (controller.signal.aborted) return;
@@ -3080,13 +3080,17 @@ export function MarketChart({
     const controller = new AbortController();
     let retryTimer = 0;
     let candleAttempt = 0;
+    let busy = false, rateLimitedUntil = 0;
+    const segments = new Set<string>();
     onFeedStatusRef.current({ mode: dataRef.current.length ? "stale" : "loading", message: dataRef.current.length ? "Refreshing candles…" : "Connecting to Upstox…" });
 
     async function loadUpstoxCandles() {
-      const segments = new Set<string>();
+      if (busy || controller.signal.aborted || document.hidden || Date.now() < rateLimitedUntil) return;
+      busy = true;
       const pull = async (scope: "historical" | "intraday") => {
         const params = new URLSearchParams({ instrumentKey: instrument.instrumentKey, timeframe, scope });
-        const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal });
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]);
+        const response = await fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal });
         const payload = await response.json() as {
           ok?: boolean;
           candles?: Candle[];
@@ -3098,7 +3102,7 @@ export function MarketChart({
           failure.retryAfterSeconds = payload.error?.retryAfterSeconds ?? (payload.error?.code === "RATE_LIMITED" ? 30 : undefined);
           throw failure;
         }
-        if (controller.signal.aborted) return payload;
+        if (signal.aborted) throw signal.reason;
         const wasEmpty = dataRef.current.length === 0;
         dataRef.current = reconcileLiveCandles(dataRef.current, payload.candles, lastLiveTickRef.current, timeframe);
         rememberChartCandles(`${instrument.instrumentKey}:${timeframe}`, dataRef.current);
@@ -3121,8 +3125,8 @@ export function MarketChart({
       };
       try {
         const historicalOnlyTimeframe = timeframe === "1W" || timeframe === "1M" || timeframe === "1Y";
-        const requests = [pull("historical")];
-        if (!historicalOnlyTimeframe) requests.push(pull("intraday"));
+        const requests = segments.has("historical") ? [] : [pull("historical")];
+        if (!historicalOnlyTimeframe && !segments.has("intraday")) requests.push(pull("intraday"));
         const results = await Promise.allSettled(requests);
         if (controller.signal.aborted) return;
         if (results.some(result => result.status === "rejected")) {
@@ -3134,6 +3138,7 @@ export function MarketChart({
         if (controller.signal.aborted) return;
         candleAttempt += 1;
         const hinted = Number((error as Error & { retryAfterSeconds?: number })?.retryAfterSeconds);
+        if (Number.isFinite(hinted) && hinted > 0) rateLimitedUntil = Date.now() + hinted * 1_000;
         const delayMs = exponentialBackoffMs(candleAttempt, { baseMs: 3_000, capMs: 60_000, retryAfterMs: Number.isFinite(hinted) && hinted > 0 ? hinted * 1_000 : undefined });
         const retryAfterSeconds = Math.max(1, Math.round(delayMs / 1_000));
         const hasVerifiedCandles = dataRef.current.length > 0;
@@ -3143,13 +3148,18 @@ export function MarketChart({
           message: `${error instanceof Error ? error.message : "Upstox candles are unavailable."} No simulation · retrying in ${retryAfterSeconds}s`,
         });
         retryTimer = window.setTimeout(() => void loadUpstoxCandles(), retryAfterSeconds * 1_000);
-      }
+      } finally { busy = false; }
     }
 
+    const resume = () => { if (!document.hidden && !busy && Date.now() >= rateLimitedUntil) { window.clearTimeout(retryTimer); void loadUpstoxCandles(); } };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
     void loadUpstoxCandles();
     return () => {
       controller.abort();
       window.clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
     };
   }, [instrument.instrumentKey, timeframe, isReplay, historyRequest]);
 

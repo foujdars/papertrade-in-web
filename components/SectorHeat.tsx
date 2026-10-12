@@ -1,25 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
+import { startVisiblePolling } from "@/lib/visible-polling";
 import { heatLevel, type SectorTile } from "@/lib/sector-heat";
 
 export function SectorHeat({ onWatch, onOpen }: { onWatch: (index: string) => void; onOpen: (symbol: string) => void }) {
   const [sectors, setSectors] = useState<SectorTile[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const controller = new AbortController();
-    const load = () => {
-      fetch("/api/market/sector-heat", { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => {
-          if (!body?.ok || !Array.isArray(body.sectors)) { setFailed(true); return; }
-          setFailed(false);
-          setSectors(body.sectors);
-        })
-        .catch(() => { if (!controller.signal.aborted) setFailed(true); });
-    };
-    load();
-    const timer = window.setInterval(load, 60_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    return startVisiblePolling(async signal => {
+      const response = await fetch("/api/market/sector-heat", {signal,cache:"no-store"});
+      const body = await response.json();
+      if (signal.aborted) return;
+      if (!response.ok || !body?.ok || !body.sectors) {setFailed(true);return;}
+      setFailed(false);setSectors(body.sectors);
+    }, 30000, () => setFailed(true));
   }, []);
   return <section className="home-section home-sector-heat" aria-label="Sector heat map">
     <header><span><b>Sector heat map</b></span><small>NSE</small></header>

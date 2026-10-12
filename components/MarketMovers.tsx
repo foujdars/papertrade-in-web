@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOVER_TABS, volumeMetrics, type Mover, type MoverTab } from "@/lib/market-movers";
 import { StockLogo } from "@/components/StockLogo";
+import { startVisiblePolling } from "@/lib/visible-polling";
 import { useTransientBack } from "./useTransientBack";
 
-type Lists = Record<MoverTab, Mover[]>;
+type Lists = Partial<Record<MoverTab, Mover[]>>;
 
 const price = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
@@ -21,21 +22,14 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
   const [open, setOpen] = useState(false);
   useTransientBack(open, () => setOpen(false));
   useEffect(() => {
-    const controller = new AbortController();
-    const load = () => {
-      fetch("/api/market/movers", { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => {
-          if (!body?.ok || !body.lists) { setFailed(true); return; }
-          setFailed(false);
-          setLists(body.lists);
-        })
-        .catch(() => { if (!controller.signal.aborted) setFailed(true); });
-    };
-    load();
-    const timer = window.setInterval(load, 30_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
-  }, []);
+    return startVisiblePolling(async signal => {
+      const response = await fetch(`/api/market/movers${open ? "" : "?summary=1"}`, {signal,cache:"no-store"});
+      const body = await response.json();
+      if (signal.aborted) return;
+      if (!response.ok || !body?.ok || !body.lists) {setFailed(true);return;}
+      setFailed(false);setLists(body.lists);
+    }, 15000, () => setFailed(true));
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -71,7 +65,7 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
           <StockLogo symbol={row.symbol} size={28} />
           <span className="home-pair-name"><b>{row.symbol}</b><small>{row.name}</small><small className="home-pair-vol">{volumeMetrics(row) || "—"}</small></span>
           <span className="home-pair-quote"><strong>{price.format(row.price)}</strong><em className={row.change < 0 ? "down" : "up"}>{percent(row.change)}</em></span>
-        </button>)}</div> : <div className="india-pulse-wait">{lists || failed ? "No names on this list right now" : "Loading NSE movers"}</div>}
+        </button>)}</div> : <div className="india-pulse-wait">{Array.isArray(lists?.[tab]) || failed ? "No names on this list right now" : "Loading NSE movers"}</div>}
       </div>
     </>, document.querySelector(".terminal-shell") ?? document.body)}
   </div>;

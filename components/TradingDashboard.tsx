@@ -19,6 +19,7 @@ import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 import { ChartHistoryControls } from "./ChartHistoryControls";
 import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
+import { ModernSelect } from "./ModernSelect";
 import { startVisiblePolling } from "@/lib/visible-polling";
 
 import {
@@ -384,9 +385,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
         <div className="security-note"><LockKeyhole size={17} /> Broker tokens are read only by secure server routes. They are never sent to the browser.</div>
         <div className="connection-settings">
           <label>Broker
-            <select name="broker" value={broker} onChange={(event) => setBroker(event.target.value)}>
-              <option>Upstox</option><option>Dhan</option><option>Zerodha Kite</option><option>Angel One</option><option>Fyers</option>
-            </select>
+            <ModernSelect hideLabel label="Broker" value={broker} choices={["Upstox","Dhan","Zerodha Kite","Angel One","Fyers"].map(value=>({value,label:value}))} onChange={setBroker}/>
           </label>
           {broker === "Upstox" ? (
             <div className={`connection-state ${configured ? "connected" : configured === false ? "missing" : "checking"}`}>
@@ -3515,7 +3514,7 @@ export function TradingDashboard() {
                         <div className="pnl-trade-review-head">
                           <span><b>Trade review</b><small>Entry and exit candles</small></span>
                           <button type="button" className="chart-replay-link" onClick={() => { setPnlTradeMenuId(null); setReplayReviewTimeframe(pnlReviewTimeframe); openNavigationSection("trade"); chooseTradeInstrument(reviewInstrument); setReplayInstrument(reviewInstrument); }} aria-label={`Bar replay for ${reviewInstrument.symbol}`} title="Bar replay"><StepBack size={17} /></button>
-                          <label className="pnl-review-period">Timeframe<select value={pnlReviewTimeframe} onChange={event => chooseTimeframe(event.target.value)}>{CHART_TIMEFRAMES.map(period => <option key={period} value={period}>{period}</option>)}</select></label>
+                          <label className="pnl-review-period">Timeframe<ModernSelect hideLabel label="Trade review timeframe" value={pnlReviewTimeframe} choices={CHART_TIMEFRAMES.map(value=>({value,label:value}))} onChange={chooseTimeframe}/></label>
                         </div>
                         <div className="pnl-trade-review-body">
                           <MarketChart
