@@ -1,5 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { appendAdTape, inNseCashSession, istDay, nseBreadth, selectAdTape, type AdPoint, type NseBreadth } from "./india-pulse.ts";
+import { appendAdTape, mergeAdSamples, inNseCashSession, istDay, nseBreadth, selectAdTape, type AdPoint, type NseBreadth } from "./india-pulse.ts";
 import { firebaseProjectId, pushServices } from "./push-admin.ts";
 
 const DOC = "marketPulse/nseAdTape";
@@ -26,9 +26,7 @@ function clean(value: unknown): AdPoint[] {
 }
 
 function merge(left: AdPoint[], right: AdPoint[]) {
-  const byMinute = new Map<number, AdPoint>();
-  for (const point of [...left, ...right]) byMinute.set(point.t, point);
-  return [...byMinute.values()].sort((a, b) => a.t - b.t).slice(-420);
+  return mergeAdSamples(left, right);
 }
 
 async function storeOf(db?: Firestore) {
@@ -37,12 +35,29 @@ async function storeOf(db?: Firestore) {
   return (await pushServices()).db;
 }
 
+/** Stop downloading the homepage as soon as both verified counts arrive. */
+export async function readBreadth(response: Response) {
+  if (!response.ok || !response.body) return null;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let html = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      html += decoder.decode(value, { stream: !done });
+      const breadth = nseBreadth(html);
+      if (breadth) return breadth;
+      if (done) return null;
+    }
+  } finally { void reader.cancel().catch(() => {}); }
+}
+
 export async function liveNseBreadth() {
   if (homeCache && homeCache.until > Date.now()) return homeCache.breadth;
   homePending ??= (async () => {
     try {
       const response = await fetch(HOME, { cache: "no-store", headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(8000) });
-      const breadth = response.ok ? nseBreadth(await response.text()) : null;
+      const breadth = await readBreadth(response);
       homeCache = { until: Date.now() + 10_000, breadth };
       return breadth;
     } catch {

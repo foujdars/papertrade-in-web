@@ -39,8 +39,8 @@ export function nextData(html: string): unknown {
 }
 
 export function nseBreadth(html: string): NseBreadth | null {
-  const advance = Number(html.match(/class="baradv">(\d[\d,]*)/)?.[1]?.replace(/,/g, ""));
-  const decline = Number(html.match(/class="bardecl">(\d[\d,]*)/)?.[1]?.replace(/,/g, ""));
+  const advance = Number(html.match(/class="baradv">\s*(\d[\d,]*)\s*</)?.[1]?.replace(/,/g, ""));
+  const decline = Number(html.match(/class="bardecl">\s*(\d[\d,]*)\s*</)?.[1]?.replace(/,/g, ""));
   if (!Number.isFinite(advance) || !Number.isFinite(decline) || advance + decline < 50) return null;
   return { advance, decline };
 }
@@ -242,4 +242,19 @@ export function flowsInRange<T extends { date: string }>(rows: T[], days: number
   cut.setUTCDate(cut.getUTCDate() - (days - 1));
   const limit = cut.toISOString().slice(0, 10);
   return rows.filter(row => (isoDay(row.date) ?? row.date) >= limit).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Preserve verified samples when a different server instance returns a shorter tape. */
+export function mergeAdSamples(previous: AdPoint[], incoming: AdPoint[]): AdPoint[] {
+  const valid = [...previous, ...incoming].filter(p => Number.isFinite(p.t) && Number.isFinite(p.advance) && Number.isFinite(p.decline) && p.advance >= 0 && p.decline >= 0 && p.advance + p.decline >= 50);
+  if (!valid.length) return [];
+  const day = istDay(Math.max(...valid.map(p => p.t)));
+  const minutes = new Map<number, AdPoint>();
+  for (const point of valid) if (istDay(point.t) === day) minutes.set(Math.floor(point.t / 60000), point);
+  return [...minutes.values()].sort((a, b) => a.t - b.t).slice(-420);
+}
+
+/** Missing samples are gaps, not an invented continuous move. */
+export function adLinePath(points: AdPoint[], key: "advance" | "decline", x: (t: number) => number, y: (n: number) => number) {
+  return points.map((point, i) => `${!i || point.t - points[i - 1].t > 5 * 60000 ? "M" : "L"}${x(point.t).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
 }
