@@ -19,6 +19,7 @@ import { prepareClosedTradeDeletion } from "@/lib/closed-trade-deletion";
 import { readChartTimeframe, saveChartTimeframe } from "@/lib/chart-timeframe-preference";
 import { ChartHistoryControls } from "./ChartHistoryControls";
 import { candlesEqual, type ChartHistoryRequest } from "@/lib/chart-history";
+import { startVisiblePolling } from "@/lib/visible-polling";
 
 import {
   Newspaper, Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, BookOpenCheck, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
@@ -1237,12 +1238,12 @@ export function TradingDashboard() {
       selected.instrumentKey,
       fnoTopInstrument?.instrumentKey,
       ...LIVE_INDEX_TICKERS.map((item) => item.instrumentKey),
-      ...fnoListQuoteKeys,
-      ...marketScannerQuoteKeys,
+      ...(homeOpen ? [] : fnoListQuoteKeys),
+      ...(homeOpen ? [] : marketScannerQuoteKeys),
       ...positionSymbols.map((symbol) => tradingUniverse.find((item) => item.symbol === symbol)?.instrumentKey).filter((value): value is string => Boolean(value)),
-      ...visibleInstruments.map((item) => item.instrumentKey),
+      ...(homeOpen ? [] : visibleInstruments.map((item) => item.instrumentKey)),
     ].filter((value): value is string => Boolean(value) && !isGlobalInstrumentKey(value)))].slice(0, 500).join(","),
-    [fnoListQuoteKeys, fnoTopInstrument?.instrumentKey, marketScannerQuoteKeys, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
+    [homeOpen, fnoListQuoteKeys, fnoTopInstrument?.instrumentKey, marketScannerQuoteKeys, positionSymbols, selected.instrumentKey, tradingUniverse, visibleInstruments],
   );
   const watchlistCounts = useMemo(() => ({
     "NIFTY 50": stockUniverse.filter((item) => item.categories.includes("NIFTY 50")).length,
@@ -1350,27 +1351,25 @@ export function TradingDashboard() {
   }, [deltaQuoteSymbols]);
 
   useEffect(() => {
-    const controller = new AbortController();
     if (!quoteKeys) return;
     let retryAt = 0;
-    let requestInFlight = false;
 
-    async function loadWatchlistQuotes() {
-      if (requestInFlight || Date.now() < retryAt) return;
-      requestInFlight = true;
+    async function loadWatchlistQuotes(signal: AbortSignal) {
+      if (Date.now() < retryAt) return;
       try {
         const response = await fetch("/api/upstox/quotes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keys: quoteKeys.split(",") }),
           cache: "no-store",
-          signal: controller.signal,
+          signal,
         });
         const payload = await response.json() as {
           ok?: boolean;
           quotes?: Record<string, NormalizedQuote>;
           error?: { code?: string; retryAfterSeconds?: number };
         };
+        if (signal.aborted) return;
         if (response.ok && payload.ok && payload.quotes) {
           setMarketQuotes((current) => {
             const next = { ...current };
@@ -1393,19 +1392,13 @@ export function TradingDashboard() {
           setToast("Upstox rate limit reached. Live trading is paused; retrying automatically.");
         }
       } catch {
-        retryAt = Date.now() + 30_000;
-      } finally {
-        requestInFlight = false;
+        // Retry transport failures at the next poll or immediately on resume.
+        // Explicit broker rate limits above still retain their retry deadline.
       }
     }
 
-    void loadWatchlistQuotes();
-    const interval = window.setInterval(() => void loadWatchlistQuotes(), 20_000);
-    return () => {
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, [quoteKeys, selected.instrumentKey, selected.symbol]);
+    return startVisiblePolling(loadWatchlistQuotes, homeOpen ? 5_000 : 20_000);
+  }, [homeOpen, quoteKeys]);
 
   useEffect(() => {
     if (!protectionFeedInstruments.length) return;

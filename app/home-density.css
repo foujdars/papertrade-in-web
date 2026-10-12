@@ -1,0 +1,50 @@
+/* Home uses the same theme, with compact chart geometry and less nested card chrome. */
+.terminal-shell .home-hub.home-studio .home-dashboard-scroll { gap: 8px; padding: 8px 12px calc(72px + env(safe-area-inset-bottom)); }
+.terminal-shell .home-hub.home-studio .home-section { border-radius: 14px; }
+.terminal-shell .home-hub.home-studio .home-section > header { min-height: 38px; padding: 0 10px; }
+.terminal-shell .home-hub.home-studio .home-section > header button { min-height: 44px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser { padding: 2px; border-radius: 12px; }
+.terminal-shell .home-hub.home-studio .home-market-chooser > button { min-height: 44px; padding-block: 4px; border-radius: 9px; }
+.terminal-shell .home-hub.home-studio .home-index-card { min-height: 60px; padding: 5px 7px; gap: 2px; }
+.terminal-shell .home-hub.home-studio .home-index-card > b { font-variant-numeric: tabular-nums; line-height: 1.25; }
+.terminal-shell .home-hub.home-studio .home-market-card-v2 { min-height: 76px; padding: 7px 8px; }
+.terminal-shell .home-hub.home-studio .home-market-card-copy { margin-bottom: 4px; }
+.terminal-shell .home-hub.home-studio .home-mover-preview { min-height: 22px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row { gap: 0; padding: 0 6px 6px; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row > :is(button,.home-funds-used) { min-height: 44px; border: 0; border-right: 1px solid var(--line); border-radius: 0; padding: 4px; background: none; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row > :last-child { border-right: 0; }
+.terminal-shell .home-hub.home-studio .home-portfolio-row > button:last-child { border: 0; border-radius: 0; background: none; }
+.terminal-shell .home-market-data { display: grid; gap: 8px; min-width: 0; align-items: start; }
+.terminal-shell .home-market-data > * { min-width: 0; margin-top: 0; }
+.terminal-shell .home-hub .india-pulse-layout { gap: 8px; }
+.terminal-shell .home-hub .india-breadth-head { grid-template-columns: auto minmax(0,1fr) 44px; gap: 6px; }
+.terminal-shell .home-hub .india-breadth-expand { width: 44px; }
+.terminal-shell .home-hub .india-pulse-layout .india-ad { padding: 0 8px 6px; }
+.terminal-shell .home-hub .home-gift-card { padding: 5px!important; gap: 0; }
+.terminal-shell .home-hub .home-gift-card > :is(button,div) { min-height: 44px; padding: 4px 6px; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: none; }
+.terminal-shell .home-hub .home-gift-card > :last-child { border-right: 0; }
+.terminal-shell .home-hub .home-option-pulse { padding: 8px!important; }
+.terminal-shell .home-hub .home-derivative-metrics { gap: 0; margin-bottom: 6px; }
+.terminal-shell .home-hub .home-derivative-metrics > div { border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--risk-tint,transparent); padding: 4px 6px; min-height: 44px; }
+.terminal-shell .home-hub .home-derivative-metrics > div:last-child { border-right: 0; }
+.terminal-shell .home-hub .home-oi-tabs { margin-bottom: 4px; }
+.terminal-shell .home-hub .home-oi-tabs button { min-height: 44px; padding-block: 6px; }
+.terminal-shell .home-hub .home-oi-legend { margin-block: 5px; }
+.terminal-shell .home-hub .home-option-pulse footer { padding-top: 4px; }
+.terminal-shell .home-hub .home-heat { padding: 0 8px 8px; gap: 4px; }
+.terminal-shell .home-hub .home-heat button { min-height: 44px; padding: 4px 2px; }
+.terminal-shell .home-hub .india-flows-slot { margin-top: 0; }
+.terminal-shell .home-hub .india-flows { padding: 8px 10px; border-radius: 14px; }
+.terminal-shell .home-hub .india-flow-heading { margin-bottom: 2px; }
+.terminal-shell .home-hub .india-flow-summary { margin-bottom: 4px; }
+.terminal-shell .home-hub .india-flow-detail { padding: 6px 8px; gap: 3px 8px; }
+.terminal-shell .home-hub .home-deal-counts { padding: 6px 8px; gap: 6px; }
+.terminal-shell .home-hub .home-deal-count.home-market-card { padding: 6px 8px; min-height: 48px; border-radius: 10px; }
+.terminal-shell .home-hub .home-deals-summary > .home-deal-meta { padding-bottom: 6px; }
+@media (min-width: 900px) {
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding-inline: 20px; }
+  .terminal-shell .home-market-data { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .terminal-shell .home-market-data.has-derivatives > .india-pulse-layout { grid-column: 1; grid-row: 1; }
+  .terminal-shell .home-market-data.has-derivatives > .home-sector-heat { grid-column: 1; grid-row: 2; }
+  .terminal-shell .home-market-data.has-derivatives > .home-derivatives { grid-column: 2; grid-row: 1 / 3; }
+}

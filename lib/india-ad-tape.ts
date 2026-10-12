@@ -9,6 +9,7 @@ const UA = "Mozilla/5.0 (compatible; PaperTrade/1.0)";
 let memory: { day: string; points: AdPoint[]; closedDay: string; closed: AdPoint[] } = { day: "", points: [], closedDay: "", closed: [] };
 let syncedAt = 0;
 let homeCache: { until: number; breadth: NseBreadth | null } | null = null;
+let homePending: Promise<NseBreadth | null> | null = null;
 
 function clean(value: unknown): AdPoint[] {
   if (!Array.isArray(value)) return [];
@@ -38,22 +39,37 @@ async function storeOf(db?: Firestore) {
 
 export async function liveNseBreadth() {
   if (homeCache && homeCache.until > Date.now()) return homeCache.breadth;
-  try {
-    const response = await fetch(HOME, { headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(8000) });
-    const breadth = response.ok ? nseBreadth(await response.text()) : null;
-    homeCache = { until: Date.now() + 20_000, breadth };
-    return breadth;
-  } catch {
-    return homeCache?.breadth ?? null;
-  }
+  homePending ??= (async () => {
+    try {
+      const response = await fetch(HOME, { cache: "no-store", headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(8000) });
+      const breadth = response.ok ? nseBreadth(await response.text()) : null;
+      homeCache = { until: Date.now() + 10_000, breadth };
+      return breadth;
+    } catch {
+      // Keep historical points, but never stamp an old count as a new live sample.
+      return null;
+    }
+  })().finally(() => { homePending = null; });
+  return homePending;
 }
 
 export async function recordNseAdTape(breadth: NseBreadth | null, db?: Firestore, now = Date.now()) {
   const day = istDay(now);
-  const store = await storeOf(db).catch(() => null);
+  // A slow history store must not delay the current market count indefinitely.
+  const deadline = Date.now() + 2_000;
+  const bounded = async <T>(operation: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([operation, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Tape store timed out")), Math.max(0, deadline - Date.now()));
+      })]);
+    } finally { clearTimeout(timer); }
+  };
+  const store = await bounded(storeOf(db)).catch(() => null);
+  let canPersist = Boolean(store);
   if (store && now - syncedAt > 15_000) {
     try {
-      const saved = await store.doc(DOC).get();
+      const saved = await bounded(store.doc(DOC).get());
       const data = saved.data();
       const savedDay = typeof data?.day === "string" ? data.day : "";
       const savedPoints = clean(data?.points);
@@ -68,7 +84,11 @@ export async function recordNseAdTape(breadth: NseBreadth | null, db?: Firestore
         memory.closed = merge(memory.closed, savedPoints);
       }
       syncedAt = now;
-    } catch { /* The live count still draws from this instance. */ }
+    } catch {
+      // A cold instance must not overwrite the saved session with one point
+      // when it could not read that session's history.
+      canPersist = false;
+    }
   }
   let rolled = false;
   if (memory.day !== day) {
@@ -82,10 +102,10 @@ export async function recordNseAdTape(breadth: NseBreadth | null, db?: Firestore
   const next = appendAdTape(memory.points, breadth, now);
   const changed = next !== memory.points || rolled;
   memory = { ...memory, day, points: next };
-  if (changed && store) {
+  if (changed && store && canPersist) {
     try {
       const pack = (points: AdPoint[]) => points.map(point => ({ t: point.t, a: point.advance, d: point.decline }));
-      await store.doc(DOC).set({ day, points: pack(next), closedDay: memory.closedDay, closed: pack(memory.closed), updatedAt: now });
+      await bounded(store.doc(DOC).set({ day, points: pack(next), closedDay: memory.closedDay, closed: pack(memory.closed), updatedAt: now }));
     } catch { /* Keep the tape in memory until the next write. */ }
   }
   return selectAdTape(next, memory.closed, now);

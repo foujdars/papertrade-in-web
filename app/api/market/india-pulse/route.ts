@@ -21,12 +21,14 @@ type Pulse = {
   sessionLive: boolean;
 };
 
-let cache: { until: number; value: Pulse } | null = null;
-let pending: Promise<Pulse> | null = null;
+type Part = "breadth" | "vix" | "flows" | "gauges";
+type Snapshot = Partial<Pulse>;
+const cache = new Map<Part, { until: number; live: boolean; value: Snapshot }>();
+const pending = new Map<Part, Promise<Snapshot>>();
 let pcrCache: { until: number; value: PutCallRatio | null } | null = null;
 
 async function text(url: string) {
-  const response = await fetch(url, { headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(8000) });
+  const response = await fetch(url, { cache: "no-store", headers: { "user-agent": UA, accept: "text/html" }, signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error("Moneycontrol unavailable");
   return response.text();
 }
@@ -55,33 +57,56 @@ async function niftyPcr(now: number): Promise<PutCallRatio | null> {
   return value;
 }
 
-async function load(): Promise<Pulse> {
-  const now = Date.now();
-  const [breadth, vixResult, scraped, history, nifty, pcr] = await Promise.all([
-    liveNseBreadth(),
-    fetch(VIX, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => {
-      const value = indiaVix(response.ok ? await response.json() : null);
-      return { value, checkedAt: value ? Date.now() : null };
-    }).catch(() => ({ value: null, checkedAt: null })),
+async function loadPart(part: Part, now: number): Promise<Snapshot> {
+  if (part === "breadth") {
+    const breadth = await liveNseBreadth();
+    // Sample as soon as breadth arrives; daily flows and option chains cannot hold it up.
+    const sampledAt = Date.now();
+    const tape = await recordNseAdTape(breadth, undefined, sampledAt);
+    return { breadth, tape, sessionLive: inNseCashSession(sampledAt) };
+  }
+  if (part === "vix") {
+    try {
+      const response = await fetch(VIX, { cache: "no-store", headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+      const vix = indiaVix(response.ok ? await response.json() : null);
+      return { vix, vixCheckedAt: vix ? Date.now() : null };
+    } catch { return { vix: null, vixCheckedAt: null }; }
+  }
+  if (part === "gauges") {
+    const [vix, pcr] = await Promise.all([getPart("vix", now), niftyPcr(now)]);
+    return { ...vix, pcr };
+  }
+  const [scraped, history, nifty] = await Promise.all([
     text(FLOWS).then(html => fiiDii(nextData(html))).catch(() => []),
-    fetch(FLOW_HISTORY, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => historyFlows(response.ok ? await response.json() : [])).catch(() => []),
-    fetch(NIFTY, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => niftyCloses(response.ok ? await response.json() : null)).catch(() => []),
-    niftyPcr(now),
+    fetch(FLOW_HISTORY, { cache: "no-store", headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => historyFlows(response.ok ? await response.json() : [])).catch(() => []),
+    fetch(NIFTY, { cache: "no-store", headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(8000) }).then(async response => niftyCloses(response.ok ? await response.json() : null)).catch(() => []),
   ]);
-  const flows = withNifty(mergeFlows(scraped, history), nifty);
-  const tape = await recordNseAdTape(breadth, undefined, now);
-  return { breadth, tape, vix: vixResult.value, vixCheckedAt: vixResult.checkedAt, flows, pcr, sessionLive: inNseCashSession(now) };
+  return { flows: withNifty(mergeFlows(scraped, history), nifty) };
 }
 
-export async function GET() {
-  const now = Date.now();
+async function getPart(part: Part, now: number): Promise<Snapshot> {
   const live = inNseCashSession(now);
-  // Never carry the previous session's cached tape across the 9:15 IST opening.
-  const untilOpen = istStamp(istDay(now), 9, 15) - now;
-  const freshFor = live ? 20_000 : untilOpen > 0 ? Math.min(10 * 60 * 1000, untilOpen) : 10 * 60 * 1000;
-  if (cache && cache.until > now && cache.value.sessionLive === live) return Response.json({ ok: true, ...cache.value }, { headers: { "Cache-Control": "no-store" } });
-  pending ??= load().finally(() => { pending = null; });
-  const value = await pending;
-  cache = { until: Date.now() + freshFor, value };
-  return Response.json({ ok: true, ...value }, { headers: { "Cache-Control": "no-store" } });
+  const hit = cache.get(part);
+  if (hit && hit.until > now && hit.live === live) return hit.value;
+  const existing = pending.get(part);
+  if (existing) return existing;
+  const request = loadPart(part, now).then(value => {
+    const untilOpen = istStamp(istDay(now), 9, 15);
+    const ttl = part === "breadth" ? (live ? 10_000 : 60_000) : part === "flows" ? 5 * 60_000 : live ? 20_000 : 60_000;
+    // Do not carry the previous session through the opening, even across a slow request.
+    const until = Math.min(now + ttl, untilOpen > now ? untilOpen : Infinity);
+    cache.set(part, { until, live, value });
+    return value;
+  }).finally(() => pending.delete(part));
+  pending.set(part, request);
+  return request;
+}
+
+export async function GET(request: Request) {
+  const now = Date.now();
+  const part = new URL(request.url).searchParams.get("part");
+  const value = part === "breadth" || part === "vix" || part === "flows" || part === "gauges"
+    ? await getPart(part, now)
+    : Object.assign({}, ...await Promise.all([getPart("breadth", now), getPart("gauges", now), getPart("flows", now)]));
+  return Response.json({ ok: true, sessionLive: inNseCashSession(), ...value }, { headers: { "Cache-Control": "no-store" } });
 }

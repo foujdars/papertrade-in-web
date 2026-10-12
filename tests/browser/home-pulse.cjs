@@ -39,7 +39,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         assert.equal(await page.locator('.home-heat button').count(), 16);
         const tiles = await page.locator('.home-heat button').evaluateAll(els => els.map(el => ({ height: el.getBoundingClientRect().height, overflow: el.scrollWidth > el.clientWidth + 1 })));
         assert.ok(tiles.every(t => t.height >= 44 && t.height < 60 && !t.overflow), `${theme} compact readable heat tiles at ${width}px: ${JSON.stringify(tiles)}`);
-        assert.ok(await page.locator('.home-heat b').evaluateAll(els => els.every(el => el.scrollWidth <= el.clientWidth + 1)), 'Full sector names fit on one line');
+        assert.ok(await page.locator('.home-heat b').evaluateAll(els => els.every(el => el.scrollWidth <= el.clientWidth + 1)), `Full sector names fit on one line at ${width}: ${JSON.stringify(await page.locator('.home-heat b').evaluateAll(es=>es.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>({text:e.textContent,scroll:e.scrollWidth,width:e.clientWidth,font:getComputedStyle(e).fontSize}))))}`);
         assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el => el.scrollWidth <= el.clientWidth + 1), `${theme} home fits ${width}px`);
         await bars.first().locator('.flow-hit').tap();
         await bars.last().locator('.fii').tap();

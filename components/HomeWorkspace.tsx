@@ -419,15 +419,17 @@ export function HomeWorkspace({
           </section>}
 
         </div>
-        {activeMarket === "india" ? <IndiaPulse showGauges={!cards.market}/> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/>}
-        {activeMarket === 'india' && cards.market && <HomeDerivatives onOpenStock={onOpenStock} onOpenInstrument={onOpenInstrument}/>}
+        {activeMarket === "india" ? <div className={`home-market-data${cards.market ? " has-derivatives" : ""}`}>
+          <IndiaPulse showGauges={!cards.market}/>
+          {cards.market && <HomeDerivatives onOpenStock={onOpenStock} onOpenInstrument={onOpenInstrument}/>}
+          <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); setSectorTick(tick => tick + 1); }} />
+        </div> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/> }
         {activeMarket === 'india' && preferencesReady && !!attention.length && <section className="home-section home-attention"><header><span><AlertCircle size={17}/><b>Needs attention</b></span><small>{visibleAttention.length} to review</small></header><div>
           {visibleAttention.slice(0,3).map(item => <div className="home-attention-entry" key={item.id}><button className="home-attention-open" onClick={()=>onAttention?.(item)}><span className={item.tone==='warning'?'home-attention-warning':'home-attention-info'}>{item.tone==='warning'?<AlertCircle size={18}/>:<Bell size={18}/>}</span><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight size={17}/></button><div className="home-reminder-actions"><button onClick={()=>deferReminder(item,true)}><CheckCircle2 size={14}/> Reviewed</button><button onClick={()=>deferReminder(item,false)}><Clock3 size={14}/> Remind in 1 hour</button></div></div>)}
           {!visibleAttention.length && <p className="home-reminder-note">No new reminders to review.</p>}
           {!!hiddenAttention.length && <><button className="home-hidden-toggle" aria-expanded={showHidden} onClick={()=>setShowHidden(!showHidden)}>{showHidden?'Hide':'Show'} reviewed / later ({hiddenAttention.length})</button>{showHidden && hiddenAttention.map(item => <div className="home-hidden-reminder" key={item.id}><span><b>{item.title}</b><small>{preferences.reminders[item.id].reviewed?'Reviewed · returns if details change':`Remind at ${new Date(preferences.reminders[item.id].until).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`}</small></span><button onClick={()=>restoreReminder(item.id)}>Restore</button></div>)}</>}
         </div></section>}
         {preferenceMessage && <p className="home-preference-message" role="status">{preferenceMessage}<button aria-label="Dismiss preference message" onClick={()=>setPreferenceMessage('')}><X size={14}/></button></p>}
-        {activeMarket === 'india' && <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); setSectorTick(tick => tick + 1); }} />}
         {activeMarket === 'india' && <IndiaFlows />}
         {activeMarket === 'india' && <BulkDeals onOpen={onOpenStock} />}
       </div>
