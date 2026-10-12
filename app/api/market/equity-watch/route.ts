@@ -23,9 +23,9 @@ async function load(indexSymbol: string): Promise<WatchQuote[]> {
 
 export async function GET(request: Request) {
   const index = watchIndex(new URL(request.url).searchParams.get("index"));
-  const freshFor = inNseCashSession() ? 30_000 : 10 * 60 * 1000;
+  const freshFor = inNseCashSession() ? 10_000 : 10 * 60 * 1000;
   const hit = cache.get(index.id);
-  const headers = { "Cache-Control": `public, max-age=${inNseCashSession() ? 20 : 120}` };
+  const headers = { "Cache-Control": "no-store" };
   if (hit && hit.until > Date.now()) return Response.json({ ok: true, index: index.id, label: index.label, rows: hit.rows }, { headers });
   const flight = pending.get(index.id) ?? load(index.symbol).catch(() => [] as WatchQuote[]).finally(() => pending.delete(index.id));
   pending.set(index.id, flight);

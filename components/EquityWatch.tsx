@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { sortWatch, volumeLabel, WATCH_INDICES, type WatchIndexId, type WatchQuote, type WatchSort } from "@/lib/equity-watch";
 import { StockLogo } from "@/components/StockLogo";
+import { startVisiblePolling } from "@/lib/visible-polling";
 import { useTransientBack } from "./useTransientBack";
 
 const price = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
@@ -28,17 +29,13 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const [bankBreadth, setBankBreadth] = useState<WatchQuote[] | null>(null);
   const [itBreadth, setItBreadth] = useState<WatchQuote[] | null>(null);
   useEffect(() => {
-    const controller = new AbortController();
-    const pull = (indexId: string, apply: (rows: WatchQuote[]) => void) => {
-      fetch(`/api/market/equity-watch?index=${indexId}`, { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => { if (body?.ok && Array.isArray(body.rows)) apply(body.rows); })
-        .catch(() => undefined);
-    };
-    const load = () => { pull("nifty50", setNiftyBreadth); pull("bank", setBankBreadth); pull("it", setItBreadth); };
-    load();
-    const timer = window.setInterval(load, 30_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    return startVisiblePolling(async signal => {
+      await Promise.allSettled(([['nifty50',setNiftyBreadth],['bank',setBankBreadth],['it',setItBreadth]] as const).map(async ([indexId,apply]) => {
+        const response = await fetch(`/api/market/equity-watch?index=${indexId}`, {signal,cache:"no-store"});
+        const body = await response.json();
+        if (!signal.aborted && response.ok && body?.ok && Array.isArray(body.rows)) apply(body.rows);
+      }));
+    }, 15_000);
   }, []);
   useEffect(() => {
     if (!focusTick || !focusIndex || !WATCH_INDICES.some(item => item.id === focusIndex)) return;
@@ -47,22 +44,15 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   }, [focusIndex, focusTick]);
   useEffect(() => {
     if (!open) return;
-    const controller = new AbortController();
-    const load = () => {
-      fetch(`/api/market/equity-watch?index=${index}`, { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => {
-          if (!body?.ok || !Array.isArray(body.rows)) { setFailed(true); return; }
-          setFailed(false);
-          setRows(body.rows);
-        })
-        .catch(() => { if (!controller.signal.aborted) setFailed(true); });
-    };
     setFailed(false);
     setRows(null);
-    load();
-    const timer = window.setInterval(load, 60_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    return startVisiblePolling(async signal => {
+      const response = await fetch(`/api/market/equity-watch?index=${index}`, {signal,cache:"no-store"});
+      const body = await response.json();
+      if (signal.aborted) return;
+      if (!response.ok || !body?.ok || !Array.isArray(body.rows)) {setFailed(true);return;}
+      setFailed(false);setRows(body.rows);
+    }, 15_000, () => setFailed(true));
   }, [index, open]);
   useEffect(() => {
     if (!open) return;

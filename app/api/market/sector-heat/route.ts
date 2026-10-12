@@ -27,7 +27,7 @@ async function load() {
 
 export async function GET() {
   const freshFor = inNseCashSession() ? 30_000 : 10 * 60 * 1000;
-  const headers = { "Cache-Control": `public, max-age=${inNseCashSession() ? 20 : 120}` };
+  const headers = { "Cache-Control": "no-store" };
   if (cache && cache.until > Date.now()) return Response.json({ ok: true, sectors: cache.sectors }, { headers });
   pending ??= load().finally(() => { pending = null; });
   const sectors = await pending;

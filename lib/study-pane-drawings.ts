@@ -67,15 +67,16 @@ export function drawingTextPosition(a: {x:number;y:number}, b: {x:number;y:numbe
   return { x, y, align, anchor: align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle' } as const;
 }
 
-/** Alignment follows the rendered horizontal line, while visibility follows its anchor. */
+/** Align labels to the visible part of a horizontal line, including older ray anchors. */
 export function drawingLineTextPosition(tool: string, a: {x:number;y:number}, b: {x:number;y:number}, width: number, options: DrawingPresentation = {}) {
   if (tool === 'horizontal-line') return drawingTextPosition({x:0,y:a.y}, {x:width,y:a.y}, options);
-  if (tool === 'horizontal-ray') return drawingTextPosition(a, {x:options.direction === 'left' ? 0 : width,y:a.y}, options);
+  if (tool === 'horizontal-ray') return drawingTextPosition({x:Math.max(0,Math.min(width,a.x)),y:a.y}, {x:options.direction === 'left' ? 0 : width,y:a.y}, options);
   return drawingTextPosition(a,b,options);
 }
 
-/** Single-anchor annotations leave with their candle, even when the line extends. */
-export function drawingTextVisible(tool: string, a: { x: number; y: number }, label: { x: number; y: number }, width: number, height: number) {
-  if (["horizontal-ray", "horizontal-line", "vertical-line"].includes(tool) && (a.x < 0 || a.x > width)) return false;
+/** Ray labels remain while the ray intersects the plot; vertical labels follow their candle. */
+export function drawingTextVisible(tool: string, a: { x: number; y: number }, label: { x: number; y: number }, width: number, height: number, options: DrawingPresentation = {}) {
+  if (tool === "vertical-line" && (a.x < 0 || a.x > width)) return false;
+  if (tool === "horizontal-ray" && (options.direction === "left" ? a.x < 0 : a.x > width)) return false;
   return label.x >= 0 && label.x <= width && label.y >= 0 && label.y <= height;
 }

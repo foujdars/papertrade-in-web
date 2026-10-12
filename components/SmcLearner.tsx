@@ -1,4 +1,5 @@
 "use client";
+import { ModernSelect } from "./ModernSelect";
 import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
 
 
@@ -124,7 +125,7 @@ export function SmcLearner({ candles, chart, series, timeframe, replay, dark, re
         <p className="smc-note">Only untouched zones are shown: purple = order block, gold = FVG, pink = breaker. ▲ Bullish / potential support · ▼ Bearish / potential resistance. Zones disappear on the first retest, including a touch by the live candle.</p>
         <div className="smc-options"><label><input type="checkbox" checked={rangeVisible} onChange={e => setRangeVisible(e.target.checked)}/> Premium / discount range</label></div>
         {rangeVisible && <p className="smc-note">The latest confirmed swing high–low range is split at 50%. Premium and discount describe position in this range, not fair value or an entry recommendation.</p>}
-        <label className="smc-lesson-select">Learn a concept<select value={lesson} onChange={e => { setLesson(e.target.value as SmcKind); setSelected(null); }}>{enabledKinds.map(k => <option key={k}>{k}</option>)}</select></label>
+        <label className="smc-lesson-select">Learn a concept<ModernSelect hideLabel label="Learn a concept" value={lesson} choices={enabledKinds.map(kind=>({value:kind,label:kind}))} onChange={value=>{setLesson(value);setSelected(null);}}/></label>
         <article ref={explanationRef} className="smc-explanation"><h3>{lesson}</h3><p>{SMC_LESSONS[lesson]}</p>{focused && <><strong>{focused.direction} · {focused.status}</strong><p>{focused.reason}</p><small>Source candle: {dateText(focused.origin)} IST<br/>Confirmation candle: {dateText(focused.confirmed)} IST — known after its close</small><button onClick={() => {
           const index = candles.findIndex(bar => bar.time === focused.confirmed);
           if (index >= 0) chart?.timeScale().setVisibleLogicalRange({ from: Math.max(-2, index - 24), to: index + 12 });

@@ -1,4 +1,5 @@
 "use client";
+import { ModernSelect } from "./ModernSelect";
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
@@ -98,7 +99,7 @@ export function OptionChainSheet({
         <button className="option-sheet-handle" onPointerDown={beginSheetDrag} aria-label="Drag option chain up or down"><span /></button>
         <header className="option-sheet-header">
           <div><span className="eyebrow">NSE option chain</span><h2 className="stock-identity"><StockLogo symbol={underlying.symbol} instrumentKey={underlying.instrumentKey} size={26} />{underlying.symbol}</h2><small>Spot {spotPrice ? formatInr(spotPrice) : "—"}</small></div>
-          <label>Expiry<select value={expiry} disabled={!expiries.length} onChange={(event) => { setLoading(true); setError(""); setRows([]); setExpiry(event.target.value); }}>{expiries.map((item) => <option key={item} value={item}>{new Date(`${item}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</option>)}</select></label>
+          <label>Expiry<ModernSelect hideLabel label="Expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(value=>({value,label:new Date(`${value}T00:00:00`).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}))} onChange={value=>{setLoading(true);setError("");setRows([]);setExpiry(value);}}/></label>
           <button className="icon-button" onClick={onClose} aria-label="Close option chain"><X size={20} /></button>
         </header>
         <div className="option-sheet-legend"><span>CALL</span><span>STRIKE</span><span>PUT</span></div>

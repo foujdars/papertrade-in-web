@@ -309,7 +309,7 @@ test('holding day boundary uses IST and missing purchase dates are not invented'
  assert.equal(unknown.purchasedAt,null);assert.equal(unknown.dayPnl,0);
 });
 
-test('ray text leaves with its anchor while its price stays on the scale', () => {
+test('ray text follows the visible ray even when its original candle leaves the viewport', () => {
   const registry=createChartDrawingRegistry(drawing,()=>candles,()=>({width:400,height:600,formatPrice:price=>price.toFixed(2)}));
   const ray=registry.createDrawing('horizontal-ray','ray',[{time:1,price:100}],{}, {visible:true,text:'Support',textHorizontal:'left'});
   let offset=0;
@@ -318,12 +318,16 @@ test('ray text leaves with its anchor while its price stays on the scale', () =>
   assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,1);
   assert.equal(ray.priceAxisViews()[0].text(),'100.00');
   assert.equal(ray.priceAxisViews()[0].visible(),true);
-  offset=-2; // Text's +4px alignment must not keep it alive after anchor exits.
-  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,0);
+  offset=-2; // A rightward ray still intersects the plot when its origin moves left.
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,1);
   assert.equal(ray.priceAxisViews()[0].visible(),true);
   offset=401;
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,0);
   assert.equal(ray.priceAxisViews()[0].visible(),false);
   ray.updateOptions({direction:'left',showPriceLabel:false});
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,1);
+  offset=-2;
+  assert.equal(ray.computeGeometry(ray.getViewport()).filter(g=>g.type==='text').length,0);
   assert.equal(ray.horizontalRayOptions.direction,'left');
   assert.equal(ray.priceAxisViews()[0].visible(),false);
   ray.updateStyle({lineWidth:3,lineDash:[8,5]});
