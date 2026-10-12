@@ -104,3 +104,16 @@ test("flow grouping preserves every cash total while reserving the latest day at
   assert.deepEqual(flowChartRows(daily, 6), daily);
   assert.deepEqual(flowChartRows([], 6), []);
 });
+
+
+test('breadth history survives short instance snapshots without mixing sessions or drawing across gaps', async () => {
+  const { mergeAdSamples, adLinePath } = await import('../lib/india-pulse.ts');
+  const t = Date.parse('2026-10-12T04:00:00Z');
+  const p = (dt, advance = 1000) => ({ t: t + dt, advance, decline: 500 });
+  const merged = mergeAdSamples([p(0), p(60000)], [p(60000, 1100), p(600000)]);
+  assert.deepEqual(merged, [p(0), p(60000, 1100), p(600000)]);
+  assert.deepEqual(mergeAdSamples(merged, []), merged);
+  assert.deepEqual(mergeAdSamples(merged, [p(86400000)]), [p(86400000)]);
+  const path = adLinePath(merged, 'advance', n => (n - t) / 60000, n => n);
+  assert.equal(path, 'M0.0,1000.0 L1.0,1100.0 M10.0,1000.0');
+});

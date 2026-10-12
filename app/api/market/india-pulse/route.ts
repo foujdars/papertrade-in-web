@@ -59,7 +59,8 @@ async function niftyPcr(now: number): Promise<PutCallRatio | null> {
 
 async function loadPart(part: Part, now: number): Promise<Snapshot> {
   if (part === "breadth") {
-    const breadth = await liveNseBreadth();
+    // Hydrate history while the source is loading, not after it finishes.
+    const [breadth] = await Promise.all([liveNseBreadth(), recordNseAdTape(null, undefined, now)]);
     // Sample as soon as breadth arrives; daily flows and option chains cannot hold it up.
     const sampledAt = Date.now();
     const tape = await recordNseAdTape(breadth, undefined, sampledAt);

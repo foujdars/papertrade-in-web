@@ -183,3 +183,18 @@ test('a stale REST snapshot cannot roll indices back and aborted requests cannot
     assert.equal(h.state.quotes['NSE_INDEX|Nifty 50'].lastPrice,25100);
   } finally {h.stop();}
 });
+
+
+test('breadth streams complete counts without waiting for the rest of the homepage', async () => {
+  const source = await moduleWithStubs('lib/india-ad-tape.ts', { './push-admin.ts': 'export const firebaseProjectId=()=>null; export const pushServices=async()=>({});' });
+  let stream, cancelled = false;
+  const body = new ReadableStream({ start(c) { stream = c; }, cancel() { cancelled = true; } });
+  const result = source.readBreadth(new Response(body));
+  const enc = new TextEncoder();
+  stream.enqueue(enc.encode('<span class="baradv">1,234</span><span class="bardecl">5'));
+  let resolved = false; result.then(() => { resolved = true; });
+  await settle(); assert.equal(resolved, false, 'A chunk ending inside a count must not truncate it');
+  stream.enqueue(enc.encode('67</span>'));
+  assert.deepEqual(await result, { advance: 1234, decline: 567 });
+  assert.equal(cancelled, true, 'The remaining page never has to download');
+});
