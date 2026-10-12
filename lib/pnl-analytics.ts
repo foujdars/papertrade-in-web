@@ -1,3 +1,4 @@
+import { isGlobalPnlTrade } from "./pnl-reporting.ts";
 import type { PaperOrder } from "./paper-trading";
 import type { ClosedPaperTrade } from "./trade-analytics";
 import type { TradeJournalEntry } from "./trading-coach";
@@ -17,6 +18,7 @@ export function pnlBounds(scope: PnlScope, now: number) {
   return { start: "", end: "", valid: true };
 }
 export function tradeAsset(trade: ClosedPaperTrade, ordersById: Map<string, PaperOrder>) {
+  if (isGlobalPnlTrade(trade)) return "global";
   const sources = trade.sourceOrderIds.map(id => ordersById.get(id));
   const asset = sources.map(order => order?.assetType).find(Boolean);
   if (asset) return asset === "OPTION" || asset === "FUTURE" ? "fno" : asset === "EQUITY" ? "stocks" : "unknown";
@@ -29,7 +31,7 @@ export function filterPnlTrades(trades: ClosedPaperTrade[], orders: PaperOrder[]
   if (!bounds.valid) return [];
   return trades.filter(t => {
     const day = pnlDay(t.closedAt);
-    return Number.isFinite(t.netPnl) && (!bounds.start || day >= bounds.start) && (!bounds.end || Boolean(day) && day <= bounds.end) && (!scope.day || day === scope.day) && (scope.product === "all" || t.product === scope.product) && (scope.asset === "all" || scope.asset === "india" || tradeAsset(t, lookup) === scope.asset);
+    return Number.isFinite(t.netPnl) && (!bounds.start || day >= bounds.start) && (!bounds.end || Boolean(day) && day <= bounds.end) && (!scope.day || day === scope.day) && (scope.product === "all" || t.product === scope.product) && (scope.asset === "all" || (scope.asset === "india" ? !isGlobalPnlTrade(t) : tradeAsset(t, lookup) === scope.asset));
   });
 }
 export function summarisePnl(trades: ClosedPaperTrade[]) {
@@ -81,7 +83,7 @@ export function groupPnl(trades: ClosedPaperTrade[], orders: PaperOrder[], journ
     let label: string;
     switch (dimension) {
       case "Strategy": { const plans = new Set(trade.sourceOrderIds.slice(0, -1).map(id => lookup.get(id)?.journalPlan?.strategy?.trim()).filter(Boolean)); label = journal[trade.id]?.strategy?.trim() || (plans.size > 1 ? "Mixed entries" : entry?.journalPlan?.strategy?.trim()) || "Unclassified"; break; }
-      case "Market": { const asset = tradeAsset(trade, lookup); label = asset === "stocks" ? "Stocks" : asset === "fno" ? "F&O" : "Unclassified"; break; }
+      case "Market": { const asset = tradeAsset(trade, lookup); label = asset === "global" ? "Global" : asset === "stocks" ? "Indian stocks" : asset === "fno" ? "Indian F&O" : "Indian · other / legacy"; break; }
       case "Product": label = trade.product === "INTRADAY" ? "Intraday" : "Delivery / carry forward"; break;
       case "Direction": label = trade.direction === "LONG" ? "Long" : "Short"; break;
       case "Entry time": {

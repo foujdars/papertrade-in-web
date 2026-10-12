@@ -88,3 +88,32 @@ test('Indian market scope keeps all domestic segments and honours date/product f
   assert.deepEqual(indian.map(t=>t.id),['t0','t1','t2']);
   assert.deepEqual(filterPnlTrades(trades,orders,{...DEFAULT_PNL_SCOPE,asset:'india',product:'INTRADAY',day:'2026-09-03'},now).map(t=>t.id),['t2']);
 });
+
+test('mixed market filters keep native rows and never leak Global into Indian scopes', () => {
+  const indian=make(100), global=make(-20,1,{id:'global:perp:exit',sourceOrderIds:[]});
+  const source=[indian,global], orders=[{id:'entry0',assetType:'EQUITY'}];
+  assert.deepEqual(filterPnlTrades(source,orders,DEFAULT_PNL_SCOPE,now),source);
+  assert.deepEqual(filterPnlTrades(source,orders,{...DEFAULT_PNL_SCOPE,asset:'india'},now),[indian]);
+  assert.deepEqual(filterPnlTrades(source,orders,{...DEFAULT_PNL_SCOPE,asset:'global'},now),[global]);
+  assert.deepEqual(filterPnlTrades(source,orders,{...DEFAULT_PNL_SCOPE,asset:'stocks'},now),[indian]);
+  assert.equal(groupPnl(source,orders,{},'Market').find(g=>g.label==='Global').count,1);
+});
+
+test('combined reporting converts Global P&L and fees once without modifying the ledger', async () => {
+  const {pnlReportingTrades,PNL_REPORTING_USD_INR:fx}=await import('../lib/pnl-reporting.ts');
+  const indian=make(100), global=make(-20,1,{id:'global:option:exit',sourceOrderIds:[]});
+  const source=[indian,global], before=JSON.stringify(source), combined=pnlReportingTrades(source,true), stats=summarisePnl(combined);
+  assert.equal(stats.net,100-20*fx);assert.equal(stats.charges,10+10*fx);assert.equal(stats.count,2);assert.equal(stats.winRate,50);
+  near(stats.grossGains-stats.grossLosses-stats.charges,stats.net);
+  assert.equal(pnlCurve(combined).points.at(-1).value,stats.net);
+  assert.equal(combined[1].id,global.id);assert.equal(combined[1].entryPrice,global.entryPrice);
+  assert.equal(JSON.stringify(source),before);assert.equal(pnlReportingTrades([global],false)[0].netPnl,-20);
+});
+
+test('selected-day and product totals reconcile across both markets', async () => {
+  const {pnlReportingTrades,PNL_REPORTING_USD_INR:fx}=await import('../lib/pnl-reporting.ts');
+  const rows=[make(100),make(2,1,{id:'global:perp:a',closedAt:make(100).closedAt}),make(3,2,{id:'global:option:b',product:'DELIVERY'})];
+  const chosen=filterPnlTrades(rows,[],{...DEFAULT_PNL_SCOPE,day:'2026-09-01',product:'INTRADAY'},now);
+  assert.equal(chosen.length,2);assert.equal(summarisePnl(pnlReportingTrades(chosen,true)).net,100+2*fx);
+  assert.equal(filterPnlTrades(rows,[],{...DEFAULT_PNL_SCOPE,day:'2026-09-03',asset:'global',product:'DELIVERY'},now).length,1);
+});
