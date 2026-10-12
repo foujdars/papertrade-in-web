@@ -131,3 +131,30 @@
 
 /* Keep the calendar above the cumulative P&L section at every width. */
 .terminal-shell .pnl-overview-grid { grid-template-columns:minmax(0,1fr); }
+
+/* One clearly labelled report, with native market totals and a shared reporting unit. */
+.pnl-review-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }
+.pnl-review-heading h2 { margin:0; font-size:22px; letter-spacing:-.5px; }
+.pnl-review-heading p { margin:4px 0 0; color:var(--muted); font-size:11px; }
+.pnl-review-heading > span { flex:none; padding:6px 8px; border-radius:8px; color:var(--purple); background:var(--purple-soft); font-size:10px; }
+.pnl-market-summary { display:grid; grid-template-columns:1fr; gap:7px; margin:2px 0 8px; }
+.pnl-market-summary.is-combined { grid-template-columns:1.15fr 1fr 1fr; }
+.pnl-market-summary > :is(div,button) { min-width:0; display:flex; flex-direction:column; justify-content:center; align-items:stretch; gap:7px; margin:0; padding:12px 10px; border:1px solid var(--pnl-border); border-radius:13px; text-align:left; color:var(--ink); background:var(--surface); }
+.pnl-market-summary > .pnl-total-result { border-color:color-mix(in srgb,var(--purple) 35%,var(--line)); background:var(--purple-soft); }
+.pnl-market-summary > button { cursor:pointer; }
+.pnl-market-summary > button:hover { border-color:var(--purple); }
+.pnl-market-summary span { display:flex; align-items:center; justify-content:space-between; gap:3px; font-size:11px; }
+.pnl-market-summary :is(strong,b) { font-size:clamp(13px,3.4vw,22px); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; letter-spacing:-.4px; }
+.pnl-market-summary small { color:var(--muted); font-size:9px; line-height:1.45; }
+.pnl-report-note { margin:7px 0 12px; color:var(--muted); font-size:10px; line-height:1.5; }
+.pnl-report-note summary { cursor:pointer; padding:4px 0; color:var(--muted); }
+.pnl-report-note p { margin:5px 0; }
+.pnl-currency-note { color:var(--muted); font-size:10px; line-height:1.4; margin:6px 0; }
+.terminal-shell .pnl-summary-six { margin-bottom:14px; }
+.terminal-shell .pnl-summary-six > :is(div,button) { min-height:76px; padding:10px; }
+.pnl-scope-caption { padding:0 0 8px; line-height:1.5; }
+@media (max-width:360px) {
+  .pnl-market-summary { gap:5px; }
+  .pnl-market-summary > :is(div,button) { padding:10px 7px; }
+  .pnl-review-heading h2 { font-size:20px; }
+}

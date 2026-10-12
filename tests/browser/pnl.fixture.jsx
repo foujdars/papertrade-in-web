@@ -9,12 +9,13 @@ const orders=trades.map((t,i)=>({id:`entry${i}`,assetType:i%4?'EQUITY':'OPTION',
 function App(){
  const [scope,setScope]=useState(DEFAULT_PNL_SCOPE),[tab,setTab]=useState('overview'),[theme,setTheme]=useState('light'),[drill,setDrill]=useState(null),[empty,setEmpty]=useState(false),[combined,setCombined]=useState(false);
  const source=empty?[]:trades;
- const global=combined&&!empty?[{...trades[0],id:"global1",symbol:"BTCUSD",netPnl:125,charges:5,grossPnl:130}]:undefined;
- const filtered=filterPnlTrades(scope.asset==="global"?(global??[]):source,orders,{...scope,asset:scope.asset==="global"?"all":scope.asset},now);
- const calendar=useMemo(()=>filterPnlTrades(source,orders,{...scope,day:null},now),[source,scope]);
+ const global=combined&&!empty?[{...trades[0],id:"global:perp:qa1",symbol:"BTCUSD",netPnl:125,charges:5,grossPnl:130}]:undefined;
+ const all=[...source,...(global??[])];
+ const filtered=filterPnlTrades(all,orders,scope,now);
+ const calendar=useMemo(()=>filterPnlTrades([...source,...(global??[])],orders,{...scope,day:null},now),[source,scope,combined,empty]);
  window.qaCombined=setCombined;window.qaTheme=setTheme;window.qaEmpty=setEmpty;window.qaTrades=trades;window.qaScope=scope;
  return <main className="terminal-shell" data-theme={theme}><section className="pnl-modal">
- <PnlAnalytics globalSummaryTrades={global===undefined?undefined:filterPnlTrades(global,[],{...scope,asset:"all"},now)} currency={scope.asset==="global"?"USD":"INR"} trades={filtered} calendarTrades={calendar} orders={orders} scope={scope} onScope={s=>{setScope(s);setDrill(null)}} tab={tab} onTab={setTab} onSelect={(ids,label)=>{setDrill({ids,label});setTab('trades')}} now={now}/>
+ <PnlAnalytics currency={scope.asset==="global"?"USD":"INR"} trades={filtered} calendarTrades={calendar} orders={orders} scope={scope} onScope={s=>{setScope(s);setDrill(null)}} tab={tab} onTab={setTab} onSelect={(ids,label)=>{setDrill({ids,label});setTab('trades')}} now={now}/>
  {tab==='trades'&&<div data-testid="drill">{drill?.label}<output>{JSON.stringify(drill?.ids??filtered.map(t=>t.id))}</output></div>}
  </section></main>
 }
