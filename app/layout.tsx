@@ -44,6 +44,7 @@ import "./modern-popup.css";
 import "./market-colours.css";
 import "./chart-symbol-controls.css";
 import "./home-finance-controls.css";
+import "./home-density.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

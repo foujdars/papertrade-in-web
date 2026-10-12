@@ -4,6 +4,7 @@ import { FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type
 import { useTransientBack } from "./useTransientBack";
 import { ChevronRight } from "lucide-react";
 import { MarketGauge } from "./MarketGauge";
+import { startVisiblePolling } from "@/lib/visible-polling";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
@@ -40,7 +41,7 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
     observer.observe(chartRef.current);
     return () => observer.disconnect();
   }, []);
-  const height = expanded ? 300 : width >= 600 ? 210 : 180, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 28;
+  const height = expanded ? 300 : width >= 600 ? 160 : 128, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 28;
   const last = points[points.length - 1];
   const max = axisMax(Math.max(...points.flatMap(point => [point.advance, point.decline])));
   const bounds = sessionBounds(points);
@@ -87,7 +88,7 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
   const plotted = useMemo(() => flowChartRows(rows, chartWidth < 440 ? 6 : 24), [rows, chartWidth]);
   const selected = plotted.find(row => row.date === selectedDate) ?? plotted.at(-1)!;
   const width = Math.max(300, chartWidth);
-  const height = 172;
+  const height = 144;
   const left = 46;
   const right = 12;
   const top = 14;
@@ -100,7 +101,7 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
   const labelEvery = Math.max(1, Math.ceil(plotted.length / (width < 440 ? 4 : 6)));
   const cashTick = (value: number) => value === 0 ? "0" : `${value < 0 ? "−" : ""}${new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 0 }).format(Math.abs(value))}`;
   return <div className="india-flow-visual">
-    <svg ref={chartRef} className="india-flow-chart" viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars; choose a date for exact figures">
+    <svg ref={chartRef} className="india-flow-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars; choose a date for exact figures">
     {[-flowMax, 0, flowMax].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={yFlow(value)} y2={yFlow(value)} /><text className="flow-axis" x={left - 8} y={yFlow(value) + 4} textAnchor="end">{cashTick(value)}</text></g>)}
     {plotted.map((row, index) => {
       const x = left + index * slot + slot / 2;
@@ -149,27 +150,29 @@ function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[numbe
   </div>;
 }
 
-function usePulse() {
+function usePulse(part: "breadth" | "gauges" | "flows", enabled = true) {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [observedAt, setObservedAt] = useState(0);
+  const [failed, setFailed] = useState(false);
   const [range, setRange] = useState<(typeof FLOW_WINDOWS)[number]["id"]>("1M");
   useEffect(() => {
-    const controller = new AbortController();
-    const load = () => {
-      fetch("/api/market/india-pulse", { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => { if (body?.ok) { setObservedAt(Date.now()); setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }); } })
-        .catch(() => undefined);
-    };
-    load();
-    const timer = window.setInterval(load, 30_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
-  }, []);
-  return { pulse, range, setRange, observedAt };
+    if (!enabled) return;
+    return startVisiblePolling(async signal => {
+      setObservedAt(Date.now());
+      const response = await fetch(`/api/market/india-pulse?part=${part}`, { signal, cache: "no-store" });
+      const body = await response.json();
+      if (signal.aborted) return;
+      if (!response.ok || !body?.ok) throw new Error("Pulse unavailable");
+      setFailed(false);
+      setPulse({ breadth: body.breadth ?? null, tape: Array.isArray(body.tape) ? body.tape : [], vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) });
+    }, part === "breadth" ? 10_000 : part === "flows" ? 5 * 60_000 : 30_000, () => setFailed(true));
+  }, [part, enabled]);
+  return { pulse, range, setRange, observedAt, failed };
 }
 
 export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
-  const { pulse, observedAt } = usePulse();
+  const { pulse, observedAt, failed } = usePulse("breadth");
+  const { pulse: gauges } = usePulse("gauges", showGauges);
   const chartId = useId();
   const [expanded, setExpanded] = useState(false);
   useTransientBack(expanded, () => setExpanded(false));
@@ -179,17 +182,17 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
   const adStatus = marketOpen
     ? latestPoint ? observedAt - latestPoint.t < 3 * 60_000 ? "Live" : "Last sample" : "Waiting for live data"
     : latestPoint ? sampleTime >= "15:25" ? "Final sample" : "Last sample" : "Chart unavailable";
-  const vix = pulse?.vix;
+  const vix = gauges?.vix;
   const band = vix ? vixBand(vix.price) : null;
-  const vixStatus = pulse?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} · checked ${checkedTime(pulse.vixCheckedAt)}` : "";
-  const pcr = pulse?.pcr;
+  const vixStatus = gauges?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} · checked ${checkedTime(gauges.vixCheckedAt)}` : "";
+  const pcr = gauges?.pcr;
   const pcrCheckedAt = pcr ? Date.parse(pcr.asOf) : NaN;
   const pcrStatus = Number.isFinite(pcrCheckedAt) ? `${marketOpen ? "Market open" : "Market closed"} · OI checked ${checkedTime(pcrCheckedAt)}` : "";
   const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : null;
   const oi = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
   return <div className="india-pulse-layout">
     <section className={`home-section india-pulse india-breadth-card${expanded ? " is-expanded" : ""}`} aria-label="Indian market pulse">
-      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
+      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}{failed || (marketOpen && adStatus === "Last sample") ? " · Delayed" : ""}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
       <div className="india-ad">
         {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : <div id={chartId} className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : "Chart unavailable"}{pulse?.sessionLive && pulse.breadth ? <span className="india-breadth-pending">Advance {pulse.breadth.advance.toLocaleString("en-IN")} · Decline {pulse.breadth.decline.toLocaleString("en-IN")}</span> : null}</div>}
       </div>
@@ -212,7 +215,7 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
 }
 
 export function IndiaFlows() {
-  const { pulse, range, setRange } = usePulse();
+  const { pulse, range, setRange } = usePulse("flows");
   const windowDays = FLOW_WINDOWS.find(item => item.id === range)?.days ?? 31;
   const series = flowsInRange(pulse?.flows ?? [], windowDays);
   const latest = pulse?.flows[0];

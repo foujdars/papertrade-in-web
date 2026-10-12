@@ -6,8 +6,8 @@ import type { oiSummary } from '@/lib/home-derivatives';
 const format = (value: number) => value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const compact = (value: number) => value.toLocaleString('en-IN', { notation: 'compact', maximumFractionDigits: 1 });
 
-export function OpenInterestChart({ rows, change, spot, symbol, levels }: {
-  rows: ReturnType<typeof oiSummary>['strikes']; change: boolean; spot: number | null; symbol: string; levels: ReturnType<typeof oiLevels>;
+export function OpenInterestChart({ rows, change, spot, symbol, levels, dense = false }: {
+  rows: ReturnType<typeof oiSummary>['strikes']; change: boolean; spot: number | null; symbol: string; levels: ReturnType<typeof oiLevels>; dense?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null), [width, setWidth] = useState(360);
   useEffect(() => {
@@ -32,7 +32,7 @@ export function OpenInterestChart({ rows, change, spot, symbol, levels }: {
     lanes[lane] = boxX + boxWidth;
     return { kind, label, price: price!, boxWidth, boxX, lane };
   });
-  const top = 28 + lanes.length * 18, bottom = top + 138, height = bottom + 47;
+  const top = 28 + lanes.length * 18, bottom = top + (dense ? 100 : 138), height = bottom + 47;
   const values = rows.flatMap(row => [row.call[change ? 'change' : 'oi'], row.put[change ? 'change' : 'oi']]);
   const scale = oiChartScale(values), y = (value: number) => bottom - (value - scale.min) / (scale.max - scale.min) * (bottom - top);
   const barWidth = Math.min(12, step * .3);
