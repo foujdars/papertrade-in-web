@@ -1,5 +1,4 @@
 "use client";
-import { CHART_PALETTE } from "@/lib/chart-palette";
 import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
 
@@ -1476,23 +1475,23 @@ export function MarketChart({
   useEffect(() => {
     const chart = chartApi.current;
     if (!chart) return;
-    const palette = CHART_PALETTE[chartTheme];
+    const neon = chartTheme === "neon";
     chart.applyOptions({
       layout: {
-        background: { type: ColorType.Solid, color: palette.surface },
-        textColor: palette.text,
+        background: { type: ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+        textColor: neon ? "#a4adc7" : "#65708a",
         attributionLogo: false,
-        panes: { separatorColor: palette.line, separatorHoverColor: palette.separatorHover, enableResize: true },
+        panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
       },
       grid: {
-        vertLines: { color: palette.grid },
-        horzLines: { color: palette.grid },
+        vertLines: { color: neon ? "#19233c" : "#edf0f6" },
+        horzLines: { color: neon ? "#19233c" : "#edf0f6" },
       },
-      rightPriceScale: { borderColor: palette.line },
-      timeScale: { borderColor: palette.line },
+      rightPriceScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
+      timeScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
       crosshair: {
-        vertLine: { color: palette.crosshair, labelBackgroundColor: palette.crosshairLabel },
-        horzLine: { color: palette.crosshair, labelBackgroundColor: palette.crosshairLabel },
+        vertLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+        horzLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
       },
     });
   }, [chartTheme]);
@@ -1591,7 +1590,7 @@ export function MarketChart({
     }
     if (chartAction.type === "toggle-grid") {
       gridVisibleRef.current = !gridVisibleRef.current;
-      const color = gridVisibleRef.current ? getComputedStyle(chartHost.current ?? document.documentElement).getPropertyValue("--ui-grid").trim() || CHART_PALETTE.light.grid : "rgba(0,0,0,0)";
+      const color = gridVisibleRef.current ? "#edf0f6" : "rgba(0,0,0,0)";
       chart.applyOptions({ grid: { vertLines: { color }, horzLines: { color } } });
     }
     if (chartAction.type === "toggle-crosshair") {
@@ -1633,26 +1632,25 @@ export function MarketChart({
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
       if (cancelled) return;
       const neon = chartTheme === "neon";
-      const palette = CHART_PALETTE[chartTheme];
       const chart = lwc.createChart(host, {
         autoSize: false,
         width: Math.max(1, Math.floor(host.clientWidth)),
         height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
-          background: { type: lwc.ColorType.Solid, color: palette.surface },
-          textColor: palette.text,
-          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
+          textColor: neon ? "#a4adc7" : "#65708a",
+          fontFamily: "Inter, system-ui, sans-serif",
           fontSize: 11,
           attributionLogo: false,
-          panes: { separatorColor: palette.line, separatorHoverColor: palette.separatorHover, enableResize: true },
+          panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
         },
         grid: {
-          vertLines: { color: palette.grid, style: lwc.LineStyle.Dashed },
-          horzLines: { color: palette.grid, style: lwc.LineStyle.Dashed },
+          vertLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          horzLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
         },
         rightPriceScale: {
           visible: true,
-          borderColor: palette.line,
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
@@ -1661,7 +1659,7 @@ export function MarketChart({
         },
         leftPriceScale: { visible: false },
         timeScale: {
-          borderColor: palette.line,
+          borderColor: neon ? "#2c3859" : "#dfe3ec",
           timeVisible: !CALENDAR_TIMEFRAMES.has(timeframe),
           secondsVisible: timeframe === "1m",
           tickMarkFormatter: (time: Time, tickType: number) => chartTickTime(time, timeframe, tickType),
@@ -1678,8 +1676,8 @@ export function MarketChart({
         },
         crosshair: {
           mode: magnetArmed() ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
-          vertLine: { color: palette.crosshair, width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: palette.crosshairLabel },
-          horzLine: { color: palette.crosshair, width: 1, style: lwc.LineStyle.Dashed, labelVisible: false, labelBackgroundColor: palette.crosshairLabel },
+          vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelVisible: false, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
         },
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
@@ -1891,13 +1889,13 @@ export function MarketChart({
         const purple = studyId === "rsi";
         if (purple === rsiScalePurple) return;
         rsiScalePurple = purple;
-        const label = purple ? (rsiCursorColor("rsi") ?? "#8054da") : (palette.crosshairLabel);
+        const label = purple ? (rsiCursorColor("rsi") ?? "#8054da") : (neon ? "#342353" : "#252b3d");
         chart.applyOptions({
           crosshair: {
             horzLine: {
               visible: crosshairVisibleRef.current && !normalizeTool(activeToolRef.current),
               labelVisible: purple,
-              color: palette.crosshair,
+              color: neon ? "#bf9aff" : "#8c96aa",
               labelBackgroundColor: label,
             },
           },

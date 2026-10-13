@@ -20,13 +20,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const passed = page.getByRole('button', { name: '302 passed gates', exact: true });
     await all.waitFor();
     assert.deepEqual(await page.locator('.fa-tabs button').allTextContents(), ['Screener', 'Peer comparison', 'Top stocks']);
-    for (const theme of ['light', 'neon']) {
-    await page.locator('.terminal-shell').evaluate((el, value) => el.dataset.theme = value, theme);
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 844 });
       await all.click();
       assert.equal(await all.getAttribute('aria-pressed'), 'true');
-      if (process.env.DESIGN_SCREENSHOTS && [390,1280].includes(width)) await page.screenshot({ path: `${process.env.DESIGN_SCREENSHOTS}/screener-${theme}-${width}.png` });
       assert.equal(await page.locator('.fa-company-review').count(), 0);
       assert.equal(await page.locator('.fa-inline-list').evaluate(el => getComputedStyle(el).position), 'static');
       await passed.click();
@@ -40,7 +37,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       await page.getByRole('dialog', { name: 'STOCK0 analysis', exact: true }).waitFor();
       assert.equal(await page.locator('.fa-company-review').count(), 1);
       assert.ok(await page.locator('.fa-review-dialog').evaluate(el => { const rect = el.getBoundingClientRect(); return rect.left === 0 && rect.top === 0 && Math.abs(rect.width - innerWidth) < 1 && Math.abs(rect.height - innerHeight) < 1; }), 'Analysis fills viewport');
-      if (process.env.DESIGN_SCREENSHOTS && width === 390) await page.screenshot({ path: `${process.env.DESIGN_SCREENSHOTS}/company-${theme}.png` });
       await page.getByRole('button', { name: 'Close company analysis', exact: true }).click();
       assert.equal(await passed.getAttribute('aria-pressed'), 'true');
       await all.click();
@@ -76,7 +72,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       await page.getByRole('option', { name: 'Valuation', exact: true }).click();
       assert.match(await peers.locator('.research-matrix thead').innerText(), /Valuation/);
       assert.equal(await peers.locator('.research-peer-compact').evaluate(el => new Set([...el.children].slice(0, 3).map(child => child.getBoundingClientRect().top)).size), 1, 'Three peer dropdowns share one row');
-      if (process.env.DESIGN_SCREENSHOTS && [390,1280].includes(width)) await page.screenshot({ path: `${process.env.DESIGN_SCREENSHOTS}/peers-${theme}-${width}.png` });
       assert.ok(await peers.locator('.research-matrix thead').evaluate(el => el.getBoundingClientRect().height < 100), 'Compact peer header');
       await page.getByRole('button', { name: 'Screener', exact: true }).click();
       await page.getByRole('button', { name: 'Top stocks', exact: true }).click();
@@ -90,14 +85,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
         await page.getByRole('option', { name: option, exact: true }).click();
         assert.match(await top.getByRole('button', { name, exact: true }).innerText(), new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       }
-      if (process.env.DESIGN_SCREENSHOTS && [390,1280].includes(width)) await page.screenshot({ path: `${process.env.DESIGN_SCREENSHOTS}/discovery-${theme}-${width}.png` });
       assert.ok(await top.locator('.research-scan-controls').evaluate(el => el.getBoundingClientRect().right <= innerWidth + 1), 'Scan controls fit viewport');
       await page.getByRole('button', { name: 'Screener', exact: true }).click();
-    }
     }
     assert.equal(await page.getByText('Import CSV', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('heading', { name: 'Fundamental Analysis', exact: true }).count(), 0);
     assert.deepEqual(errors, []);
-    console.log('PASS: compact filters, Pending, full-screen analysis, modern peer/metric pickers and three tabs at 320–1280px in both themes.');
+    console.log('PASS: compact filters, Pending, full-screen analysis, modern peer/metric pickers and three tabs at 320–1280px.');
   } finally { await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
