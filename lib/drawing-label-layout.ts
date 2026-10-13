@@ -5,6 +5,7 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
   const placed: LabelBox[] = [], padding = 5, top = Math.min(48, height / 5);
   if (width < 24 || height < 24) return placed;
   for (const label of labels) {
+    if (!Number.isFinite(label.x) || !Number.isFinite(label.y) || label.y < 0 || label.y > height) continue;
     // User text belongs to its chart point. Clip it instead of relocating it
     // to an edge or a collision-free row when the candle moves off-screen.
     if (label.anchored) {
@@ -39,6 +40,7 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
 }
 export function paintDrawingLabels(ctx: CanvasRenderingContext2D, labels: DrawingLabel[], width: number, height: number) {
   ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
   const layout = layoutDrawingLabels(labels, width, height, (text, size) => { ctx.font = `${size}px sans-serif`; return ctx.measureText(text).width; });
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   for (const item of layout) {

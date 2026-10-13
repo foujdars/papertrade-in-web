@@ -39,8 +39,7 @@ export function OpeningRange({ candles, chart, series, timeframe, refreshRef }: 
   const shift = IST_OFFSET_SECONDS;
   const scale = chart.timeScale();
   const pane = chart.paneSize(0);
-  const plotRight = chart.priceScale("right").width();
-  const plotWidth = Math.max(0, pane.width - plotRight);
+  const plotWidth = chart.timeScale().width();
   const xOf = (epoch: number) => {
     const chartTime = (epoch + shift) as UTCTimestamp;
     const exact = scale.timeToCoordinate(chartTime);
@@ -78,13 +77,13 @@ export function OpeningRange({ candles, chart, series, timeframe, refreshRef }: 
       const boxRight = Math.min(plotWidth, Math.max(xStart, xEnd));
       const lineRight = Math.min(plotWidth, Math.max(xEnd, xExtend));
       const lineLeft = Math.max(0, Math.min(xEnd, xExtend));
-      return <div key={range.date} className="chart-opening-range" aria-hidden="true">
+      return <div key={range.date} className="chart-opening-range" style={{ width: plotWidth, height: pane.height, overflow: "hidden", inset: "0 auto auto 0" }} aria-hidden="true">
         {boxRight - boxLeft > 1 && <div className="chart-or-box" style={{ left: boxLeft, width: boxRight - boxLeft, top, height }} />}
         {range.complete && lineRight - lineLeft > 1 && <>
           <div className="chart-or-line high" style={{ left: lineLeft, width: lineRight - lineLeft, top: yHigh }} />
           <div className="chart-or-line low" style={{ left: lineLeft, width: lineRight - lineLeft, top: yLow }} />
-          <span className="chart-or-tag high" style={{ left: Math.max(8, lineRight - 4), top: yHigh }}>ORH {priceLabel(range.high)}</span>
-          <span className="chart-or-tag low" style={{ left: Math.max(8, lineRight - 4), top: yLow }}>ORL {priceLabel(range.low)}</span>
+          {yHigh >= 8 && yHigh <= pane.height - 8 && <span className="chart-or-tag high" style={{ left: Math.max(8, lineRight - 4), top: yHigh }}>ORH {priceLabel(range.high)}</span>}
+          {yLow >= 8 && yLow <= pane.height - 8 && <span className="chart-or-tag low" style={{ left: Math.max(8, lineRight - 4), top: yLow }}>ORL {priceLabel(range.low)}</span>}
         </>}
       </div>;
     })}

@@ -38,13 +38,13 @@ export function PreviousDayLevels({ candles, chart, series, timeframe, session, 
   if (!levels) return <div className="chart-or-note">Yesterday’s full range is not on this chart yet</div>;
   if (!chart || !series) return null;
   const pane = chart.paneSize(0);
-  const width = Math.max(0, pane.width - chart.priceScale("right").width());
+  const width = Math.max(0, chart.timeScale().width());
   const rows = [
     { key: "high", label: "PDH", price: levels.high, className: "high" },
     { key: "close", label: "PDC", price: levels.close, className: "close" },
     { key: "low", label: "PDL", price: levels.low, className: "low" },
   ];
-  return <div className="chart-previous-day" aria-label={`Previous day ${levels.date}`}>
+  return <div className="chart-previous-day" style={{ width, height: pane.height, overflow: "hidden", inset: "0 auto auto 0" }} aria-label={`Previous day ${levels.date}`}>
     {rows.map((row) => {
       const y = series.priceToCoordinate(row.price);
       if (y == null || y < 8 || y > pane.height - 8) return null;

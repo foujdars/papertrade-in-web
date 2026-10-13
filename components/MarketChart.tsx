@@ -3521,7 +3521,7 @@ export function MarketChart({
           </div>
         ))}
         {!candlesOnly && orderTool?.enabled && riskCoordinates && (
-          <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} style={{ right: priceScaleWidth }} aria-label="Position target and stop-loss controls">
+          <div className={`chart-risk-tool chart-bracket-tool ${orderTool.side.toLowerCase()} ${hiddenBracket === entryKey ? "bracket-hidden" : ""}`} style={{ right: priceScaleWidth, bottom: "auto", height: chartApi.current?.paneSize(0).height ?? 0 }} aria-label="Position target and stop-loss controls">
             {riskCoordinates.entry !== null && <div className="risk-line risk-entry-line" style={{ top: riskCoordinates.entry }}>
               <div className="bracket-pill">
                 <button type="button" aria-pressed={hiddenBracket === entryKey} aria-label={hiddenBracket === entryKey ? "Show position" : "Hide position"} title={hiddenBracket === entryKey ? "Show position" : "Hide position"} onClick={() => setHiddenBracket(hiddenBracket === entryKey ? "" : entryKey)}>{hiddenBracket === entryKey ? <EyeOff size={11} /> : <Eye size={11} />}</button>

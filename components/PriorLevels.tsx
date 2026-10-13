@@ -87,25 +87,19 @@ export function PriorLevels({ candles, chart, series, timeframe, instrumentKey, 
   const labelAt = Math.max(0, plotRight - 34);
   const shift = ["1D", "1W", "1M", "1Y"].includes(timeframe) ? 0 : 19_800;
   const height = chart.paneSize(0).height;
-  const range = chart.priceScale("right").getVisibleRange();
   const placed = [...marks].sort((a, b) => b.price - a.price);
-  let labelY = -999;
-  return <div className="chart-previous-day" aria-label="Prior highs and lows">
+  return <div className="chart-previous-day" style={{ width: plotRight, height, overflow: "hidden", inset: "0 auto auto 0" }} aria-label="Prior highs and lows">
     {placed.map((row) => {
-      let y = series.priceToCoordinate(row.price);
-      if (y == null || y < 8 || y > height - 8) {
-        if (!range) return null;
-        if (row.price >= range.to) y = 10;
-        else if (row.price <= range.from) y = height - 10;
-        else return null;
-      }
+      const y = series.priceToCoordinate(row.price);
+      // Off-screen levels have no label; never pin their prices to a plot edge.
+      if (y == null || !Number.isFinite(y) || y < 8 || y > height - 8) return null;
       const raw = chart.timeScale().timeToCoordinate((row.time + shift) as UTCTimestamp);
-      const start = raw == null || raw < 0 ? 0 : Math.min(raw, labelAt - 8);
-      const textY = y < labelY + 12 ? labelY + 12 : y;
-      labelY = textY;
+      if (raw != null && raw >= labelAt - 6) return null;
+      const start = raw == null || raw < 0 ? 0 : raw;
+      if (labelAt - 4 - start <= 2) return null;
       return <div key={row.id} className={`chart-prior-mark ${row.tone}`}>
         {labelAt - 4 - start > 2 && <i className="chart-prior-line" style={{ top: y, left: start, width: labelAt - 4 - start }} />}
-        <button type="button" className="chart-prior-label" style={{ top: textY, left: labelAt }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onAlert?.(row.price); }} aria-label={`${row.label} ${priceLabel(row.price)}. Set alert`} title={`${row.label} ${priceLabel(row.price)}`}>{row.label}</button>
+        <button type="button" className="chart-prior-label" style={{ top: y, left: labelAt }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onAlert?.(row.price); }} aria-label={`${row.label} ${priceLabel(row.price)}. Set alert`} title={`${row.label} ${priceLabel(row.price)}`}>{row.label}</button>
       </div>;
     })}
   </div>;
