@@ -85,3 +85,17 @@
   .terminal-shell .notification-center-panel > header b { font-size: 15px; }
   .terminal-shell .notification-center-panel > header .icon-button { flex: 0 0 36px; width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
 }
+
+/* Match the profile window's dimmed, blurred background for header panels. */
+.terminal-shell .more-menu-scrim,
+.terminal-shell .notification-center-scrim {
+  background: rgba(9, 14, 32, .42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: default;
+  touch-action: none;
+}
+@media (max-width: 760px) {
+  .terminal-shell .more-menu-panel,
+  .terminal-shell .notification-center-panel { border-radius: 20px; }
+}

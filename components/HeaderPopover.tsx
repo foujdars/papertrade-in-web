@@ -13,6 +13,12 @@ export function HeaderPopover({ className, label, children }: { className: strin
     if (!element || !trigger) return;
     const update = () => {
       const viewport = window.visualViewport;
+      const header = trigger.closest('.topbar');
+      const scrim = element.previousElementSibling;
+      // Keep header controls sharp while the content behind the popup blurs.
+      if (scrim instanceof HTMLElement && scrim.matches('.more-menu-scrim, .notification-center-scrim')) {
+        scrim.style.top = `${Math.max(viewport?.offsetTop ?? 0, header?.getBoundingClientRect().bottom ?? 0)}px`;
+      }
       const nav = document.querySelector<HTMLElement>('.mobile-bottom-nav');
       const navRect = nav?.getBoundingClientRect();
       const visibleNav = navRect && navRect.height > 0 && getComputedStyle(nav!).display !== 'none';
