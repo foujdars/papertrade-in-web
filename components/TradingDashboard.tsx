@@ -1,4 +1,5 @@
 "use client";
+import { useHeaderPanels } from "./useHeaderPanels";
 import { HeaderPopover } from "./HeaderPopover";
 import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls';
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
@@ -554,7 +555,7 @@ export function TradingDashboard() {
   const [fundsCurrency, setFundsCurrency] = useState<"INR" | "USD">("INR");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const { notificationsOpen, moreMenuOpen, accountOpen, setNotificationsOpen, setMoreMenuOpen, setAccountOpen } = useHeaderPanels();
   const [coachOpen, setCoachOpen] = useState(false);
   const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
   const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
@@ -566,7 +567,6 @@ export function TradingDashboard() {
   const [recentStocks, setRecentStocks] = useState<string[]>([]);
   const [recentScanners, setRecentScanners] = useState<string[]>([]);
   const [uiPreferencesReady, setUiPreferencesReady] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [accountDeleteArmed, setAccountDeleteArmed] = useState(false);
   const [accountDeleteWorking, setAccountDeleteWorking] = useState(false);
   useEffect(() => {
@@ -2028,7 +2028,7 @@ export function TradingDashboard() {
   useTransientBack(downloadOpen, () => setDownloadOpen(false));
   useTransientBack(feedbackOpen, () => setFeedbackOpen(false));
   useTransientBack(accountOpen && !accountDeleteArmed, () => { setAccountOpen(false); setAccountDeleteArmed(false); });
-  useTransientBack(accountDeleteArmed, () => setAccountDeleteArmed(false));
+  useTransientBack(accountOpen && accountDeleteArmed, () => setAccountDeleteArmed(false));
   const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => !isGlobalPnlTrade(trade) && tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
   const pendingDeletion = useMemo(() => pendingDeleteIds ? prepareClosedTradeDeletion(orders, pendingDeleteIds) : null, [orders, pendingDeleteIds]);
   function toggleTradeSelection(id: string) {
@@ -2930,7 +2930,7 @@ export function TradingDashboard() {
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
           {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
-          <NotificationCenter />
+          <NotificationCenter open={notificationsOpen} setOpen={setNotificationsOpen} />
           <button type="button" className="icon-button header-coach-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }} aria-label="Open trading coach" title="Trading coach"><Target size={19} /></button>
           <div className="more-menu-wrap">
             <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
@@ -2951,7 +2951,7 @@ export function TradingDashboard() {
           </div>
           <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
-          {authConfigured && user && <button className="profile-button account-button" onClick={() => setAccountOpen(true)} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
+          {authConfigured && user && <button className="profile-button account-button" onClick={() => { setAccountDeleteArmed(false); setAccountDeleteError(""); setAccountOpen(value => !value); }} aria-expanded={accountOpen} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
       </header>
 
