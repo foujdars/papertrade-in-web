@@ -32,8 +32,7 @@ function NotificationIcon({ item }: { item: PaperTradeNotification }) {
   return <Activity size={17} />;
 }
 
-export function NotificationCenter() {
-  const [open, setOpen] = useState(false);
+export function NotificationCenter({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
   const [items, setItems] = useState<PaperTradeNotification[]>([]);
   useTransientBack(open, () => setOpen(false));
 
