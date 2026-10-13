@@ -1,4 +1,5 @@
 "use client";
+import { HeaderPopover } from "./HeaderPopover";
 import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls';
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
 import { NewsWorkspace } from "./NewsWorkspace";
@@ -2935,7 +2936,7 @@ export function TradingDashboard() {
             <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
-              <section className="more-menu-panel" aria-label="More options">
+              <HeaderPopover className="more-menu-panel" label="More options">
                 <header className="tools-menu-heading"><b>Tools & settings</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
                 <div className="tools-menu-features">
                   <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>
@@ -2945,7 +2946,7 @@ export function TradingDashboard() {
                   <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={18}/><span>Wallet</span></button>
                   <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
                 </div>
-              </section>
+              </HeaderPopover>
             </>}
           </div>
           <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>

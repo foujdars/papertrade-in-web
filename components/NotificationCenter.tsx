@@ -1,4 +1,5 @@
 "use client";
+import { HeaderPopover } from "./HeaderPopover";
 import { NotificationSettings } from "./NotificationSettings";
 import { StockLogo } from "@/components/StockLogo";
 
@@ -66,7 +67,7 @@ export function NotificationCenter() {
       </button>
       {open && <>
         <button className="notification-center-scrim" aria-label="Close notifications" onClick={() => setOpen(false)} />
-        <section className="notification-center-panel" aria-label="PaperTrade notification centre">
+        <HeaderPopover className="notification-center-panel" label="PaperTrade notification centre">
           <header>
             <div><span>ALERTS</span><b>Notification centre</b></div>
             <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close notifications"><X size={19} /></button>
@@ -87,7 +88,7 @@ export function NotificationCenter() {
             </article>)}
             {!items.length && <div className="notification-empty"><Bell size={28} /><b>No alerts yet</b><span>Stop-loss, target, portfolio, IPO and market-session alerts will appear here.</span></div>}
           </div>
-        </section>
+        </HeaderPopover>
       </>}
     </div>
   );
