@@ -97,9 +97,9 @@ export function AnchoredVwap({ candles, chart, series, timeframe, instrumentKey,
   return <>
     {anchor === null && <div className="chart-or-note">Tap a candle to start. Dragging still scrolls.</div>}
     {anchor !== null && points.length < 2 && <div className="chart-or-note">Tap an earlier candle. The line runs forward from there.</div>}
-    {points.length > 1 && <svg className="chart-avwap-line" aria-hidden="true"><polyline points={points.join(" ")} /></svg>}
-    {aimX != null && anchor === null && <span className="chart-avwap-aim" style={{ left: aimX }} />}
+    {points.length > 1 && <svg className="chart-avwap-line" style={{ width: scale?.width() ?? 0, height: chart?.paneSize(0).height ?? 0, overflow: "hidden" }} aria-hidden="true"><polyline points={points.join(" ")} /></svg>}
+    {aimX != null && aimX >= 0 && aimX <= (scale?.width() ?? 0) && anchor === null && <span className="chart-avwap-aim" style={{ left: aimX }} />}
     {anchor === null && !replay && <button type="button" className="chart-avwap-anchor" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); remember(aim); }}>Anchor</button>}
-    {anchor !== null && aimX != null && <button type="button" className="chart-avwap-tag" style={{ left: aimX }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); window.localStorage.removeItem(storageKey(instrumentKey)); setAnchor(null); }} aria-label="Clear anchored VWAP">AVWAP</button>}
+    {anchor !== null && aimX != null && aimX >= 0 && aimX <= (scale?.width() ?? 0) && <button type="button" className="chart-avwap-tag" style={{ left: aimX }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); window.localStorage.removeItem(storageKey(instrumentKey)); setAnchor(null); }} aria-label="Clear anchored VWAP">AVWAP</button>}
   </>;
 }
