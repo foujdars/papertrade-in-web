@@ -11,7 +11,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       if (attempt === 59) throw new Error('Production test server did not start');
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    let launch = { headless: true };
+    let launch = { headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) };
     if (process.env.CHROMIUM_PACKAGE) {
       const mod = require(process.env.CHROMIUM_PACKAGE), packaged = mod.default || mod;
       launch = { ...launch, executablePath: await packaged.executablePath(), args: packaged.args };
@@ -111,7 +111,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       await page.setViewportSize({ width, height: 844 });
       await workspace.evaluate(el => { el.scrollTop = 0; });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Page fits ${width}px`);
-      assert.ok(await workspace.evaluate(el => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight > el.clientHeight), `Scrollable feed fits ${width}px`);
+      assert.ok(await workspace.evaluate(el => {
+        const area = innerWidth > 940 ? el.querySelector('.news-list') : el;
+        return area.scrollWidth <= area.clientWidth + 1 && area.scrollHeight > area.clientHeight;
+      }), `Scrollable feed fits ${width}px`);
       await workspace.locator('article').last().scrollIntoViewIfNeeded();
       assert.ok(await workspace.locator('article').last().evaluate(el => { const rect = el.getBoundingClientRect(); const pane = document.querySelector('.news-workspace').getBoundingClientRect(); return rect.bottom <= pane.bottom + 1; }), `Last headline reachable at ${width}px`);
       await workspace.evaluate(el => { el.scrollTop = 0; });
