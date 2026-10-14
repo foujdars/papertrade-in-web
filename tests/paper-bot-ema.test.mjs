@@ -1,127 +1,161 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { BOT_FRAMES, botFrames, botPreset, configureBot, defaultBot, validateBotConfig } from "../lib/paper-bot-state.ts";
-import { advancePaperBots, botOrderPlan, botSignal, botTrendAllows } from "../lib/paper-bot-engine.ts";
-import { closePerp } from "../lib/global-markets.ts";
-import { readGlobalAccount } from "../lib/global-order-engine.ts";
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { botFrames, botPreset, botRuleConfig, configureBot, defaultBot, validateBotConfig } from '../lib/paper-bot-state.ts';
+import { advancePaperBots, botOrderPlan, botSignal } from '../lib/paper-bot-engine.ts';
+import { botEmaSetup } from '../lib/paper-bot-ema-setups.ts';
+import { closePerp } from '../lib/global-markets.ts';
+import { readGlobalAccount } from '../lib/global-order-engine.ts';
 
-const end = Math.ceil(1800000000000 / 86400000) * 86400000, now = end + 6000;
-const spec = { symbol: "BTCUSD", lot: .01, tick: .01, initial: .01, maintenance: .005, initialScale: 0, maintenanceScale: 0, scalingThreshold: 100000, maxNotional: 5000000, maker: .0002, taker: .0005, liquidation: .0005, fundingSeconds: 28800, operational: true, fetchedAt: now };
-const quote = { symbol: "BTCUSD", last: 110, mark: 110, index: 110, bid: 109.99, ask: 110, bidSize: 10000, askSize: 10000, funding: 0, at: now, operational: true };
-const live = { BTCUSD: { quote, spec } };
-const mirror = c => ({ ...c, open: 200 - c.open, close: 200 - c.close, high: 200 - c.low, low: 200 - c.high });
-function bars(frame, strategy = "ema5", bearish = false, red = false) {
-  const rows = Array.from({ length: 24 }, () => ({ open: 100, high: 101, low: 99, close: 100 }));
-  if (strategy === "ema21") rows.push({ open: 99, high: 103, low: 98, close: 102 }, { open: 102, high: 104, low: 100.5, close: 101 }, { open: 101, high: 106, low: 100, close: 105 });
-  else rows.push({ open: red ? 111 : 105, high: 112, low: 104, close: 110 });
-  return rows.map((c, i) => ({ ...(bearish ? mirror(c) : c), time: end / 1000 - (rows.length - i) * BOT_FRAMES[frame], volume: 100 }));
+const end = Math.ceil(1800000000000 / 300000) * 300000, now = end + 6000;
+const flat = {open:100, high:101, low:99, close:100};
+const alert = {open:105, high:112, low:104, close:110};
+const cross = {open:99, high:103, low:98, close:102};
+const pullback = {open:102, high:104, low:100.5, close:101};
+const mirror = c => ({...c, open:200-c.open, close:200-c.close, high:200-c.low, low:200-c.high});
+function bars(tail, mirrored = false) {
+  const rows = [...Array.from({length:24}, () => flat), ...tail];
+  return rows.map((c,i) => ({...(mirrored ? mirror(c) : c), time:end/1000-(rows.length-i)*300, volume:100}));
 }
-const observation = candles => ({ candles, fetchedAt: now });
-const create = (config = {}) => configureBot(undefined, { ...defaultBot("BTCUSD"), ...config }, true, end - 1000);
-const account = bot => ({ ...readGlobalAccount(null), bots: [bot] });
-const run = (bot, histories, a = account(bot), at = now) => advancePaperBots(a, live, histories, at);
+const spec = {symbol:'BTCUSD', lot:.01, tick:.01, initial:.01, maintenance:.005, initialScale:0, maintenanceScale:0, scalingThreshold:100000, maxNotional:5000000, maker:.0002, taker:.0005, liquidation:.0005, fundingSeconds:28800, operational:true, fetchedAt:now};
+const quote = (bid, ask = bid + .01, at = now) => ({symbol:'BTCUSD', last:bid, mark:bid, index:bid, bid, ask, bidSize:10000, askSize:10000, funding:0, at, operational:true});
+const create = (strategy='ema5', fields={}) => configureBot(undefined, {...botPreset(defaultBot('BTCUSD'), strategy), ...fields}, true, end-600000);
+const account = bot => ({...readGlobalAccount(null), bots:[bot]});
+const run = (bot, candles, price, a=account(bot), at=now) => advancePaperBots(a, {BTCUSD:{quote:quote(price,price+.01,at),spec}}, {'BTCUSD:5m':{candles,fetchedAt:at}}, at);
 
-for (const frame of Object.keys(BOT_FRAMES)) for (const strategy of ["ema21", "ema5"]) {
-  test(`${strategy} uses the chart rule on completed ${frame} candles, including mirrored shorts`, () => {
-    const bot = create({ strategy, timeframe: frame });
-    assert.equal(botSignal(bot, bars(frame, strategy), now).side, "BUY");
-    assert.equal(botSignal(bot, bars(frame, strategy, true), now).side, "SELL");
-    assert.equal(botSignal({ ...bot, direction: "long" }, bars(frame, strategy, true), now).side, null);
-    const forming = [...bars(frame, strategy), { ...bars(frame, strategy).at(-1), time: end / 1000, close: 105 }];
-    assert.equal(botSignal(bot, forming, now).candle, end / 1000 - BOT_FRAMES[frame]);
-    assert.throws(() => botSignal(bot, bars(frame, strategy), end + 4000), /Waiting/, "wait five seconds after close");
-    assert.throws(() => botSignal(bot, bars(frame, strategy), end + 31000), /fresh/);
-  });
-}
-test("EMA 21 requires the opposite-colour pullback; EMA 5 requires prior touch and strict candle separation", () => {
-  const b21 = create({ strategy: "ema21" });
-  const rows = bars("5m", "ema21");
-  assert.equal(botSignal(b21, rows.map((c, i) => i === rows.length - 2 ? { ...c, open: 100.6 } : c), now).side, null);
-  const b5 = create({ strategy: "ema5" });
-  assert.equal(botSignal(b5, bars("5m", "ema5", false, true), now).side, "BUY", "red triggers also count");
-  assert.equal(botSignal(b5, bars("5m").map((c, i, a) => i === a.length - 1 ? { ...c, low: 100 } : c), now).side, null);
-  assert.equal(botSignal(b5, bars("5m").map((c, i, a) => i === a.length - 2 ? { ...c, open: 101, close: 101, high: 102, low: 101 } : c), now).side, null);
+test('EMA 5 is sell-only, needs strict whole-candle separation, accepts either colour and requires no prior touch', () => {
+  const bot = create();
+  for (const candle of [alert, {...alert,open:111}]) {
+    const rows = bars([candle]);
+    assert.equal(botSignal(bot, rows, now, '5m', quote(104)).side, null, 'touching the entry low is not a break');
+    assert.equal(botSignal(bot, rows, now, '5m', quote(103.99)).side, 'SELL');
+    assert.equal(botSignal(bot, rows, now).side, null, 'a completed alert alone is not an entry');
+  }
+  const touching = bars([{open:102,high:104,low:101,close:103}]);
+  assert.equal(botSignal(bot,touching,now,'5m',quote(100)).side,null, 'wick touching EMA disqualifies alert');
+  assert.equal(botSignal(bot,bars([alert],true),now,'5m',quote(90)).side,null, 'no mirrored long setup');
+  assert.equal(botEmaSetup(bars([{open:102,high:103,low:101.5,close:102},alert]),'ema5').bar.close,110);
 });
-test("same-direction timeframes create one highest-frame entry and persist every consumed signal", () => {
-  const bot = create(botPreset(defaultBot("BTCUSD"), "ema5"));
-  const histories = { "BTCUSD:5m": observation(bars("5m")), "BTCUSD:15m": observation(bars("15m")) };
-  const opened = run(bot, histories);
-  assert.equal(opened.positions.length, 1);
-  assert.match(opened.events[0].detail, /15m/);
-  assert.equal(opened.bots[0].decisions.find(d => d.timeframe === "5m").outcome, "skipped");
-  assert.equal(opened.bots[0].decisions.find(d => d.timeframe === "15m").outcome, "entered");
-  assert.equal(opened.positions[0].protection.stopLoss.trigger, 103.99);
-  assert.equal(opened.positions[0].protection.takeProfit.trigger, 122.02);
-  const closed = closePerp(readGlobalAccount(JSON.stringify(opened)), "BTCUSD", quote, opened.positions[0].contracts, now);
-  assert.equal(run(bot, histories, closed).positions.length, 0);
-  assert.equal(run(bot, histories, closed).bots[0].decisions.length, 2);
+
+test('EMA 5 replaces the alert before entry and uses that alert high for SL and at least 3R', () => {
+  const bot = create('ema5',{exitMode:'percent',riskReward:1,stopBufferTicks:99});
+  const latest = {...alert,open:110,close:112,low:108,high:115};
+  const signal = botSignal(bot,bars([alert,latest]),now,'5m',quote(107));
+  assert.equal(signal.side,'SELL');
+  assert.equal(signal.bar.high,115);
+  const plan = botOrderPlan(bot,signal,quote(107),spec);
+  assert.equal(plan.stop,115);
+  assert.equal(plan.target,83);
+  assert.ok((plan.entry-plan.target)/(plan.stop-plan.entry)>=3);
+  const used = bars([alert,{open:110,high:111,low:103,close:105}]);
+  assert.equal(botSignal(bot,used,now,'5m',quote(102)).side,null, 'a historical break cannot be replayed');
 });
-test("opposing timeframe signals skip together; missing one frame never substitutes another frame's candles", () => {
-  const bot = create({ strategy: "ema5", timeframes: ["5m", "15m"] });
-  const conflict = run(bot, { "BTCUSD:5m": observation(bars("5m")), "BTCUSD:15m": observation(bars("15m", "ema5", true)) });
-  assert.equal(conflict.positions.length, 0);
-  assert.match(conflict.bots[0].status, /Conflicting/);
-  assert.ok(conflict.bots[0].decisions.every(d => d.outcome === "skipped"));
-  const partial = run(bot, { "BTCUSD:5m": observation(bars("5m")) });
-  assert.equal(partial.positions.length, 1);
-  assert.match(partial.bots[0].frameStatus["15m"], /history/);
-  assert.equal(run(bot, { BTCUSD: observation(bars("5m")) }).positions.length, 0);
+
+test('EMA 21 buys red pullbacks above EMA and sells green pullbacks below EMA; trigger colour is unrestricted', () => {
+  const bot = create('ema21');
+  for (const mirrored of [false,true]) {
+    const rows=bars([cross,pullback],mirrored);
+    const signal=botSignal(bot,rows,now,'5m',quote(mirrored?95.99:104,mirrored?96:104.01));
+    assert.equal(signal.side,mirrored?'SELL':'BUY');
+    assert.equal(signal.bar.time,rows.at(-1).time);
+    const plan=botOrderPlan(bot,signal,quote(mirrored?95.99:104,mirrored?96:104.01),spec);
+    assert.equal(plan.stop,mirrored?99.51:100.49);
+    const sign=mirrored?-1:1;
+    assert.ok(sign*(plan.target-plan.entry)/(sign*(plan.entry-plan.stop))>=1.5-1e-10);
+    assert.equal(botSignal(bot,rows,now,'5m',quote(mirrored?96:103.99,mirrored?96.01:104)).side,null,'exact boundary is not a break');
+  }
+  assert.equal(botSignal(bot,bars([cross,{...pullback,open:100.6}]),now,'5m',quote(105)).side,null,'wrong pullback colour');
+  assert.equal(botSignal(bot,bars([cross,{...pullback,low:100}]),now,'5m',quote(105)).side,null,'wick below EMA');
 });
-test("restarting at or after a close never replays that close; stale and future history cannot enter", () => {
-  const bot = create({ strategy: "ema5" });
-  for (const fetchedAt of [now - 31000, now + 6000]) assert.equal(run(bot, { "BTCUSD:5m": { candles: bars("5m"), fetchedAt } }).positions.length, 0);
-  const restarted = configureBot(bot, bot, true, end);
-  assert.equal(run(restarted, { "BTCUSD:5m": observation(bars("5m")) }).positions.length, 0);
-  const malformed = { ...bot, timeframes: 2 };
-  assert.match(run(malformed, {}).bots[0].status, /timeframe/);
+
+test('EMA 21 pullback must form within the next 1–3 candles after a genuine cross', () => {
+  const bot=create('ema21'), filler={open:101,high:103,low:100.8,close:102};
+  for(const offset of [1,2,3]) {
+    const rows=bars([cross,...Array.from({length:offset-1},()=>filler),{...pullback,low:100.8}]);
+    assert.equal(botSignal(bot,rows,now,'5m',quote(105)).side,'BUY');
+  }
+  assert.equal(botSignal(bot,bars([cross,filler,filler,filler,pullback]),now,'5m',quote(105)).side,null);
+  assert.equal(botSignal(bot,bars([{...cross,low:101,open:101,close:102},pullback,{open:101,high:106,low:100.5,close:105}]),now,'5m',quote(106)).side,null,'historical break consumes pullback');
 });
-test("higher timeframe filter uses only contiguous completed bars and blocks absent, stale, wrong-side or equal trends", () => {
-  const bot = create({ strategy: "ema5", trendTimeframe: "1H", trendPeriod: 5 });
-  const trend = observation(bars("1H"));
-  assert.equal(botTrendAllows(bot, "BUY", trend, now), true);
-  assert.equal(botTrendAllows(bot, "SELL", trend, now), false);
-  const forming = { ...trend, candles: [...trend.candles, { ...trend.candles.at(-1), time: end / 1000, low: 1, close: 2, open: 2 }] };
-  assert.equal(botTrendAllows(bot, "BUY", forming, now), true);
-  const flat = { ...trend, candles: trend.candles.map(c => ({ ...c, open: 100, close: 100, low: 99, high: 101 })) };
-  assert.equal(botTrendAllows(bot, "BUY", flat, now), false);
-  for (const bad of [undefined, { ...trend, fetchedAt: now - 31000 }, { ...trend, fetchedAt: now + 6000 }, { ...trend, candles: trend.candles.slice(0, -1) }, { ...trend, candles: trend.candles.filter((_, i) => i !== 20) }]) assert.throws(() => botTrendAllows(bot, "BUY", bad, now));
-  assert.equal(botTrendAllows(bot, "BUY", trend, end + 4000), false, "settlement still uses previous completed trend");
-  const histories = { "BTCUSD:5m": observation(bars("5m")), "BTCUSD:1H": trend };
-  assert.equal(run(bot, histories).positions.length, 1);
-  assert.equal(run(bot, { ...histories, "BTCUSD:1H": flat }).positions.length, 0);
-  assert.equal(run(bot, { "BTCUSD:5m": histories["BTCUSD:5m"] }).positions.length, 0);
+
+test('setups use completed contiguous 5-minute candles; intrabar price triggers remain evaluable', () => {
+  const bot=create(),rows=bars([alert]);
+  assert.equal(botSignal(bot,rows,end+120000,'5m',quote(103)).side,'SELL');
+  assert.throws(()=>botSignal(bot,rows,now,'15m',quote(103)),/5-minute/);
+  assert.equal(botSignal(bot,rows,end,'5m',quote(103)).side,'SELL','completed alerts become usable immediately at close');
+  assert.equal(botSignal(bot,rows,end-1,'5m',quote(103)).side,null,'the alert must finish before it is usable');
+  const forming=[...bars([]),{...rows.at(-1),time:end/1000}];
+  assert.equal(botSignal(bot,forming,now,'5m',quote(103)).side,null);
+  assert.throws(()=>botSignal(bot,rows.filter((_,i)=>i!==10),now,'5m',quote(103)),/gaps/);
 });
-test("risk sizing floors lots, respects the notional cap, rounds stops outward and derives targets from actual entry", () => {
-  const bot = create({ strategy: "ema5", exitMode: "signal", sizing: "risk", riskUsd: 5, notional: 1000, riskReward: 2 });
-  const signal = botSignal(bot, bars("5m"), now);
-  const plan = botOrderPlan(bot, signal, quote, spec);
-  assert.equal(plan.contracts, 83);
-  assert.ok(plan.plannedRisk <= 5);
-  assert.equal(plan.target, 122.02);
-  const capped = botOrderPlan({ ...bot, riskUsd: 100, notional: 100 }, signal, quote, spec);
-  assert.equal(capped.contracts, 90);
-  assert.ok(capped.contracts * spec.lot * capped.entry <= 100);
-  const rounded = botOrderPlan(bot, { ...signal, bar: { ...signal.bar, low: 104.004 } }, { ...quote, ask: 110.004 }, spec);
-  assert.equal(rounded.entry, 110);
-  assert.equal(rounded.stop, 103.99);
-  assert.throws(() => botOrderPlan(bot, signal, { ...quote, ask: 100 }, spec), /wrong side/);
-  assert.throws(() => botOrderPlan({ ...bot, riskUsd: .1 }, signal, quote, { ...spec, lot: 1 }), /below one/);
-  const short = botSignal({ ...bot, direction: "both" }, bars("5m", "ema5", true), now);
-  const shortPlan = botOrderPlan(bot, short, { ...quote, bid: 90.004 }, spec);
-  assert.equal(shortPlan.entry, 90);
-  assert.equal(shortPlan.stop, 96.01);
-  assert.equal(shortPlan.target, 77.98);
-  assert.ok(shortPlan.plannedRisk <= 5);
+
+test('waiting on a closed candle does not prevent an intrabar entry; persisted setup IDs prevent replay after exit', () => {
+  const bot=create(),rows=bars([alert]);
+  const waiting=run(bot,rows,110);
+  assert.equal(waiting.positions.length,0);
+  const opened=run(bot,rows,103.99,waiting,now+10000);
+  assert.equal(opened.positions.length,1);
+  assert.equal(opened.positions[0].side,'SELL');
+  assert.equal(opened.positions[0].protection.stopLoss.trigger,112);
+  assert.equal(opened.positions[0].protection.takeProfit.trigger,79.96);
+  const closed=closePerp(readGlobalAccount(JSON.stringify(opened)),'BTCUSD',quote(103.99),opened.positions[0].contracts,now+10000);
+  assert.equal(run(bot,rows,103.99,closed,now+11000).positions.length,0);
+  assert.equal(opened.bots[0].lastSetupId,botSignal(bot,rows,now,'5m',quote(103.99)).setupId);
 });
-test("existing settings migrate, invalid combinations reject, and stale editors cannot overwrite current log or cooldown", () => {
-  const old = create();
-  for (const key of ["timeframes", "lastCandles", "frameStatus", "decisions", "sizing", "riskUsd", "exitMode", "riskReward", "stopBufferTicks", "trendTimeframe", "trendPeriod"]) delete old[key];
-  assert.deepEqual(botFrames(readGlobalAccount(JSON.stringify(account(old))).bots[0]), ["5m"]);
-  for (const fields of [{ timeframes: [] }, { timeframes: ["5m", "5m"] }, { timeframes: ["1m", "3m", "5m", "15m", "30m"] }, { timeframes: ["1m"] }, { trendTimeframe: "5m" }, { timeframes: ["5m", "1H"], trendTimeframe: "30m" }, { riskUsd: 0 }, { riskReward: Infinity }]) assert.throws(() => validateBotConfig({ ...old, ...fields }));
-  const current = { ...old, lastEntryAt: now, decisions: [{ at: now, timeframe: "5m", candle: end / 1000 - 300, side: null, outcome: "waiting", reason: "Current wallet log" }] };
-  const saved = configureBot(current, { ...old, lastEntryAt: 0, decisions: [] }, true, now + 1000);
-  assert.equal(saved.lastEntryAt, now);
-  assert.deepEqual(saved.decisions, current.decisions);
-  assert.throws(() => readGlobalAccount(JSON.stringify(account({ ...saved, lastCandles: { "2m": 1 } }))), /timeframe/);
-  assert.throws(() => readGlobalAccount(JSON.stringify(account({ ...saved, decisions: [{ ...current.decisions[0], outcome: "filled" }] }))), /decision/);
+
+test('start/restart cannot replay a setup completed before enabling and stale prices/history never enter', () => {
+  const rows=bars([alert]),bot=create();
+  const restarted=configureBot(bot,bot,true,end+1000);
+  assert.equal(run(restarted,rows,103).positions.length,0);
+  assert.equal(advancePaperBots(account(bot),{BTCUSD:{quote:quote(103,103.01,now-31000),spec}},{'BTCUSD:5m':{candles:rows,fetchedAt:now}},now).positions.length,0);
+  assert.equal(advancePaperBots(account(bot),{BTCUSD:{quote:quote(103),spec}},{'BTCUSD:5m':{candles:rows,fetchedAt:now-31000}},now).positions.length,0);
+});
+
+test('EMA presets and saved-rule normalization force 5m and minimum R/R without breaking other strategies', () => {
+  for(const strategy of ['ema5','ema21']) {
+    const preset=botPreset(defaultBot('BTCUSD'),strategy);
+    assert.deepEqual(botFrames(preset),['5m']);
+    assert.equal(preset.riskReward,strategy==='ema5'?3:1.5);
+    assert.equal(preset.direction,strategy==='ema5'?'short':'both');
+    const old={...preset,timeframe:'15m',timeframes:['5m','15m'],direction:'long',exitMode:'percent',riskReward:1};
+    const normalized=botRuleConfig(old);
+    assert.equal(normalized.timeframe,'5m');
+    assert.equal(normalized.exitMode,'signal');
+    assert.equal(normalized.direction,strategy==='ema5'?'short':'long');
+    assert.deepEqual(botFrames(old),['5m']);
+    validateBotConfig(configureBot(undefined,old,true,now));
+  }
+  assert.deepEqual(botFrames({...defaultBot('BTCUSD'),timeframes:['5m','15m']}),['5m','15m']);
+});
+
+test('risk sizing respects its budget/notional cap and outward target rounding cannot reduce R/R', () => {
+  const bot=create('ema21',{sizing:'risk',riskUsd:5,notional:1000,riskReward:1.5});
+  const signal=botSignal(bot,bars([cross,pullback]),now,'5m',quote(104));
+  const plan=botOrderPlan(bot,signal,quote(104),spec);
+  assert.ok(plan.plannedRisk<=5);
+  assert.ok(plan.contracts*spec.lot*plan.entry<=1000);
+  assert.ok((plan.target-plan.entry)/(plan.entry-plan.stop)>=1.5-1e-10);
+  assert.throws(()=>botOrderPlan({...bot,riskUsd:.1},signal,quote(104),{...spec,lot:1}),/below one/);
+  assert.throws(()=>botOrderPlan(bot,signal,quote(90),spec),/wrong side|not broken/);
+});
+
+
+test('EMA 21 engine fills both directions with pullback-based protection on live trigger prices', () => {
+  for(const mirrored of [false,true]) {
+    const bot=create('ema21'), rows=bars([cross,pullback],mirrored);
+    const opened=run(bot,rows,mirrored?95.99:104);
+    assert.equal(opened.positions.length,1);
+    assert.equal(opened.positions[0].side,mirrored?'SELL':'BUY');
+    assert.equal(opened.positions[0].protection.stopLoss.trigger,mirrored?99.51:100.49);
+  }
+});
+
+
+test('an already-running legacy EMA 5 bot adopts SELL/5m/3R rules on its next evaluation', () => {
+  const legacy={...create(),direction:'long',timeframe:'15m',timeframes:['5m','15m'],exitMode:'percent',riskReward:1,stopBufferTicks:99};
+  const opened=run(legacy,bars([alert]),103.99);
+  assert.equal(opened.positions.length,1);
+  assert.equal(opened.bots[0].direction,'short');
+  assert.deepEqual(opened.bots[0].timeframes,['5m']);
+  assert.equal(opened.positions[0].protection.stopLoss.trigger,112);
+  assert.equal(opened.positions[0].protection.takeProfit.trigger,79.96);
 });

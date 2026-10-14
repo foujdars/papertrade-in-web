@@ -1,9 +1,9 @@
 import type { Candle } from "./market";
 import { freshPerpQuote, type PerpAccount, type PerpQuote, type PerpSpec } from "./global-markets.ts";
 import { roundGlobalPrice, sizeToContracts, submitGlobalOrder } from "./global-order-engine.ts";
-import { ema21EntryAt } from "./global-alerts.ts";
-import { ema5ReversalAt, emaSeries } from "./ema5-reversal.ts";
-import { BOT_FRAMES, BOT_STRATEGIES, botDay, botFrames, botScope, validateBotConfig, type BotFrame, type PaperBot, type BotDecision } from "./paper-bot-state.ts";
+import { emaSeries } from "./ema5-reversal.ts";
+import { botEmaSetup } from "./paper-bot-ema-setups.ts";
+import { botRuleConfig, BOT_FRAMES, BOT_STRATEGIES, botDay, botFrames, botScope, validateBotConfig, type BotFrame, type PaperBot, type BotDecision } from "./paper-bot-state.ts";
 
 export type BotObservation = { candles: Candle[]; fetchedAt: number };
 const ema = emaSeries;
@@ -18,7 +18,7 @@ function rsi(values: number[], period: number) {
   }
   return result;
 }
-/** Completed contiguous candles only; EMA entries allow five seconds for the close to settle. */
+/** Completed contiguous candles only; freshness can span the active trigger candle. */
 function closedBotCandles(rows: Candle[], frame: BotFrame, now: number, required: number, delay = 0, freshWindow = 30) {
   const seconds = BOT_FRAMES[frame];
   const closed = [...rows].filter(c => c.time + seconds + delay <= now / 1000).sort((a, b) => a.time - b.time);
@@ -32,21 +32,30 @@ function closedBotCandles(rows: Candle[], frame: BotFrame, now: number, required
   if (candles.at(-1)!.time !== expected || now / 1000 - (candles.at(-1)!.time + seconds) > freshWindow) throw new Error("Waiting for fresh completed candles");
   return candles;
 }
-export function botSignal(bot: PaperBot, rows: Candle[], now: number, frame: BotFrame = bot.timeframe) {
+export function botSignal(bot: PaperBot, rows: Candle[], now: number, frame: BotFrame = bot.strategy === "ema5" || bot.strategy === "ema21" ? "5m" : bot.timeframe, live?: Pick<PerpQuote, "bid" | "ask">) {
+  bot = { ...bot, ...botRuleConfig(bot) };
+  const emaRule = bot.strategy === "ema5" || bot.strategy === "ema21";
+  if (emaRule && frame !== "5m") throw new Error("EMA 5 and EMA 21 bot entries require the 5-minute chart");
   validateBotConfig(bot);
   const seconds = BOT_FRAMES[frame];
-  const required = bot.strategy === "ema21" ? 27 : bot.strategy === "ema5" ? 6 : (bot.strategy === "ema" ? bot.slow : bot.period) + 2;
-  const candles = closedBotCandles(rows, frame, now, required, bot.strategy === "ema21" || bot.strategy === "ema5" ? 5 : 0);
+  const required = bot.strategy === "ema21" ? 23 : bot.strategy === "ema5" ? 6 : (bot.strategy === "ema" ? bot.slow : bot.period) + 2;
+  const candles = closedBotCandles(rows, frame, now, required, 0, emaRule ? seconds + 5 : 30);
   const last = candles.at(-1)!, values = candles.map(c => c.close), i = values.length - 1;
   let side: "BUY" | "SELL" | null = null;
   let reason = "No new entry signal";
-  if (bot.strategy === "ema21") {
-    const direction = ema21EntryAt(candles, i, ema(values, 21), seconds, last.high, last.low, last.close);
-    if (direction) { side = direction === "bullish" ? "BUY" : "SELL"; reason = `EMA 21 ${direction}: cross, opposite-colour pullback and completed trigger candle break`; }
-  } else if (bot.strategy === "ema5") {
-    const series = ema(values, 5), prior = candles[i - 1];
-    if (ema5ReversalAt(candles, i, series, seconds)) { side = "BUY"; reason = "EMA 5 long: prior candle touched EMA; completed candle low is above EMA 5"; }
-    else if (prior.low <= series[i - 1] && series[i - 1] <= prior.high && last.high < series[i]) { side = "SELL"; reason = "EMA 5 mirrored short: prior candle touched EMA; completed candle high is below EMA 5"; }
+  let setupId: string | undefined;
+  let setupBar = last;
+  if (bot.strategy === "ema21" || bot.strategy === "ema5") {
+    const setup = botEmaSetup(candles, bot.strategy);
+    if (setup) {
+      setupId = setup.id;
+      setupBar = setup.bar;
+      const price = setup.side === "BUY" ? live?.ask : live?.bid;
+      if (price !== undefined && Number.isFinite(price) && (setup.side === "BUY" ? price > setup.bar.high : price < setup.bar.low)) {
+        side = setup.side;
+        reason = bot.strategy === "ema5" ? "EMA 5 SELL: live price broke the latest alert candle low" : `EMA 21 ${side}: live price broke the pullback candle ${side === "BUY" ? "high" : "low"}`;
+      } else reason = `Waiting for live ${setup.side} break of ${bot.strategy === "ema5" ? "alert" : "pullback"} candle ${setup.side === "BUY" ? "high" : "low"}`;
+    } else reason = `Waiting for a qualifying ${bot.strategy === "ema5" ? "EMA 5 alert candle" : "EMA 21 cross and 1–3 candle pullback"}`;
   } else if (bot.strategy === "ema") {
     const fast = ema(values, bot.fast), slow = ema(values, bot.slow);
     if (fast[i - 1] <= slow[i - 1] && fast[i] > slow[i]) side = "BUY";
@@ -62,7 +71,7 @@ export function botSignal(bot: PaperBot, rows: Candle[], now: number, frame: Bot
   }
   if (side && reason === "No new entry signal") reason = `${BOT_STRATEGIES[bot.strategy]} ${side === "BUY" ? "long" : "short"} on completed candle`;
   if (bot.direction === "long" && side === "SELL" || bot.direction === "short" && side === "BUY") { side = null; reason = "Signal excluded by trade direction"; }
-  return { candle: last.time, side, reason, bar: last, timeframe: frame };
+  return { candle: last.time, side, reason, bar: setupBar, timeframe: frame, setupId };
 }
 export function botDailyStats(account: PerpAccount, symbol: string, now: number) {
   const events = account.events.filter(e => e.botId === symbol && botDay(e.at) === botDay(now));
@@ -82,15 +91,20 @@ export function botTrendAllows(bot: PaperBot, side: "BUY" | "SELL", observation:
   return side === "BUY" ? latest.close > trend : latest.close < trend;
 }
 export function botOrderPlan(bot: PaperBot, signal: ReturnType<typeof botSignal>, quote: PerpQuote, spec: PerpSpec) {
+  bot = { ...bot, ...botRuleConfig(bot) };
   if (!signal.side) throw new Error("Entry requires a signal");
   const sign = signal.side === "BUY" ? 1 : -1;
   // submitGlobalOrder fills at this same rounded bid/ask.
   const entry = roundGlobalPrice(signal.side === "BUY" ? quote.ask : quote.bid, spec);
+  if ((bot.strategy === "ema5" || bot.strategy === "ema21") && (sign === 1 ? entry <= signal.bar.high : entry >= signal.bar.low)) throw new Error("Live entry has not broken the setup candle boundary");
   const rawStop = bot.exitMode === "signal" ? (sign === 1 ? signal.bar.low : signal.bar.high) - sign * (bot.stopBufferTicks ?? 1) * spec.tick : entry * (1 - sign * bot.stopPercent / 100);
   const stop = bot.exitMode === "signal" ? Number(((sign === 1 ? Math.floor(rawStop / spec.tick + 1e-9) : Math.ceil(rawStop / spec.tick - 1e-9)) * spec.tick).toFixed(10)) : roundGlobalPrice(rawStop, spec);
   const distance = sign * (entry - stop);
   if (!Number.isFinite(distance) || distance <= 0 || stop <= 0) throw new Error("Signal candle stop is on the wrong side of the live entry price");
-  const target = roundGlobalPrice(bot.exitMode === "signal" ? entry + sign * distance * (bot.riskReward ?? 2) : entry * (1 + sign * bot.targetPercent / 100), spec);
+  const rawTarget = bot.exitMode === "signal" ? entry + sign * distance * (bot.riskReward ?? 2) : entry * (1 + sign * bot.targetPercent / 100);
+  // Round away from entry so tick size cannot reduce the minimum reward/risk.
+  const target = bot.exitMode === "signal" && (bot.strategy === "ema5" || bot.strategy === "ema21") ? Number(((sign === 1 ? Math.ceil(rawTarget / spec.tick - 1e-9) : Math.floor(rawTarget / spec.tick + 1e-9)) * spec.tick).toFixed(10)) : roundGlobalPrice(rawTarget, spec);
+  if (target <= 0) throw new Error("Risk/reward target must be a positive price");
   let contracts = sizeToContracts(bot.notional, "USD", spec, entry);
   if (bot.sizing === "risk") contracts = Math.min(contracts, Math.floor((bot.riskUsd ?? 5) / (distance * spec.lot)));
   if (!contracts) throw new Error("Trade size or risk budget is below one contract lot");
@@ -104,7 +118,7 @@ export function advancePaperBots(account: PerpAccount, data: Record<string, { qu
   let next = account;
   for (const original of account.bots ?? []) {
     if (!original.enabled) continue;
-    const bot = { ...original, lastCandles: { ...(original.lastCandles ?? {}) }, frameStatus: { ...(original.frameStatus ?? {}) } };
+    const bot = { ...original, ...botRuleConfig(original), lastCandles: { ...(original.lastCandles ?? {}) }, frameStatus: { ...(original.frameStatus ?? {}) } };
     const signals: ReturnType<typeof botSignal>[] = [];
     try {
       validateBotConfig(bot);
@@ -114,18 +128,24 @@ export function advancePaperBots(account: PerpAccount, data: Record<string, { qu
       for (const frame of frames) {
         try {
           const observation = freshObservation(observations[botScope(bot.symbol, frame)] ?? (frames.length === 1 ? observations[bot.symbol] : undefined), bot.startedAt, now);
-          const delay = bot.strategy === "ema21" || bot.strategy === "ema5" ? 5 : 0;
+          const delay = 0;
           const latest = observation.candles.reduce((v, c) => c.time + BOT_FRAMES[frame] + delay <= now / 1000 ? Math.max(v, c.time) : v, 0);
           const consumed = bot.lastCandles[frame] ?? (frame === bot.timeframe ? bot.lastCandle : 0);
-          if (latest && latest <= consumed) continue;
-          const signal = botSignal(bot, observation.candles, now, frame);
-          if (signal.candle <= consumed) continue;
+          const emaRule = bot.strategy === "ema5" || bot.strategy === "ema21";
+          if (!emaRule && latest && latest <= consumed) continue;
+          const signal = botSignal(bot, observation.candles, now, frame, snapshot.quote);
+          if (!emaRule && signal.candle <= consumed) continue;
+          if (emaRule && signal.side && signal.setupId === bot.lastSetupId) continue;
+          if (emaRule && signal.side && (signal.bar.time + BOT_FRAMES[frame]) * 1000 <= bot.startedAt) continue;
           bot.lastCandles[frame] = signal.candle;
           bot.lastCandle = Math.max(bot.lastCandle, signal.candle);
           if ((signal.candle + BOT_FRAMES[frame]) * 1000 <= bot.startedAt) throw new Error("Waiting for the next candle close");
           bot.frameStatus[frame] = signal.reason;
-          if (signal.side) signals.push(signal);
-          else recordDecision(bot, { at: now, timeframe: frame, candle: signal.candle, side: null, outcome: "waiting", reason: signal.reason });
+          if (signal.side) {
+            if (signal.setupId) bot.lastSetupId = signal.setupId;
+            signals.push(signal);
+          }
+          else if (signal.candle > consumed) recordDecision(bot, { at: now, timeframe: frame, candle: signal.candle, side: null, outcome: "waiting", reason: signal.reason });
         } catch (e) { bot.frameStatus[frame] = e instanceof Error ? e.message : "Candle evaluation unavailable"; }
       }
       bot.status = frames.map(f => `${f}: ${bot.frameStatus[f] ?? "Waiting for candles"}`).join(" · ").slice(0, 500);

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Bot, Pause, Play, RefreshCw, X } from "lucide-react";
-import { BOT_ASSETS, BOT_FRAMES, BOT_STRATEGIES, BOT_RULES, botFrames, botPreset, botScope, configureBot, defaultBot, validateBotConfig, type BotConfig, type BotSymbol, type BotFrame, type PaperBot } from "@/lib/paper-bot-state";
+import { botRuleConfig, BOT_ASSETS, BOT_FRAMES, BOT_STRATEGIES, BOT_RULES, botFrames, botPreset, botScope, configureBot, defaultBot, validateBotConfig, type BotConfig, type BotSymbol, type BotFrame, type PaperBot } from "@/lib/paper-bot-state";
 import { botDailyStats, botSignal, botOrderPlan, botTrendAllows, type BotObservation } from "@/lib/paper-bot-engine";
 import { closePerp, freshPerpQuote, positionPnl } from "@/lib/global-markets";
 import { formatUsd } from "@/lib/global-order-engine";
@@ -56,7 +56,7 @@ export function BotWorkspace({ trading, onClose, onPnl }: { trading: GlobalTradi
           <div className="bot-card"><span className="eyebrow">Open trade</span>{currentPosition ? <><h3>{currentPosition.side === "BUY" ? "Long" : "Short"} · {currentPosition.contracts} lots</h3><p>{currentPosition.botId ? "Automatic paper trade" : "Manual position · entries wait"}</p><dl><div><dt>Entry</dt><dd>{formatUsd(currentPosition.entry)}</dd></div><div><dt>Open P&L · before fees</dt><dd>{snapshot ? formatUsd(positionPnl(currentPosition, snapshot.quote.mark)) : "—"}</dd></div><div><dt>Stop loss</dt><dd>{currentPosition.protection?.stopLoss?.trigger ? formatUsd(currentPosition.protection.stopLoss.trigger) : "—"}</dd></div><div><dt>Take profit</dt><dd>{currentPosition.protection?.takeProfit?.trigger ? formatUsd(currentPosition.protection.takeProfit.trigger) : "—"}</dd></div></dl>{currentPosition.botId === symbol && <button disabled={trading.busy || !freshPerpQuote(snapshot?.quote, trading.clock)} onClick={() => void close()}>Exit trade & pause</button>}</> : <p>No open trade.</p>}<button onClick={onPnl}>Trade history</button></div>
         </aside>
         <div className="bot-tools">          <details className="bot-card bot-frame-monitor"><summary>Timeframe monitor</summary>{selected ? <ul>{botFrames(selected).map(frame => <li key={frame}><b>{frame}</b><span>{selected.frameStatus?.[frame] ?? "Waiting for a new candle"}</span></li>)}</ul> : <p>Save your strategy to start monitoring each chosen timeframe.</p>}{selected?.trendTimeframe && selected.trendTimeframe !== "off" && <p>Trend gate: {selected.trendTimeframe} EMA {selected.trendPeriod ?? 21}. Longs require a close above EMA; shorts require a close below.</p>}</details>
-          <details className="bot-card bot-help"><summary>Execution rules</summary><p>Select up to four entry timeframes. Each completed candle is evaluated once in the active execution mode. Background mode shares a version-locked wallet across devices. Same-direction signals favour the highest timeframe; conflicting signals skip entry. One position per asset; existing orders or positions block new entries.</p><p>Stops and targets use live observed prices. Daily loss limits block new entries after realised losses and fees reach the limit; they do not close positions or cap total losses.</p><p>Gold uses the XAUTUSD tokenised gold perpetual, rather than a spot-gold quote. In background mode, settings and trades are saved on the server for this account. Signing out does not pause server bots. App-open mode uses this browser only.</p></details>
+          <details className="bot-card bot-help"><summary>Execution rules</summary><p>EMA 5 and EMA 21 use 5-minute setup candles and enter on a live price break without waiting for the trigger candle close. Each setup can enter only once. Other strategies support up to four entry timeframes and evaluate each completed candle once. Background mode shares a version-locked wallet across devices. Same-direction signals favour the highest timeframe; conflicting signals skip entry. One position per asset; existing orders or positions block new entries.</p><p>Stops and targets use live observed prices. Daily loss limits block new entries after realised losses and fees reach the limit; they do not close positions or cap total losses.</p><p>Gold uses the XAUTUSD tokenised gold perpetual, rather than a spot-gold quote. In background mode, settings and trades are saved on the server for this account. Signing out does not pause server bots. App-open mode uses this browser only.</p></details>
         <details className="bot-card bot-decisions"><summary>Decision log</summary>{!selected?.decisions?.length ? <p>New candle decisions and skipped entries will appear here.</p> : <ol>{selected.decisions.slice(-12).reverse().map((d, i) => <li key={`${d.at}:${d.timeframe}:${i}`}><b>{d.timeframe} · {d.side === "BUY" ? "Long" : d.side === "SELL" ? "Short" : "No signal"} · {d.outcome}</b><p>{d.reason}</p><small>{new Date(d.at).toLocaleString("en-IN")} · candle {new Date(d.candle * 1000).toLocaleTimeString("en-IN")}</small></li>)}</ol>}</details>
 </div>
       </div>
@@ -66,11 +66,12 @@ export function BotWorkspace({ trading, onClose, onPnl }: { trading: GlobalTradi
 }
 
 function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: GlobalTrading; onSaved: () => void }) {
-  const [config, setConfig] = useState<BotConfig>(bot);
+  const [config, setConfig] = useState<BotConfig>(() => botRuleConfig(bot));
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<string[]>([]);
   const [checking, setChecking] = useState(false);
-  const update = (fn: (current: BotConfig) => BotConfig) => { setConfig(fn); setPreview([]); setError(""); };
+  const emaRule = config.strategy === "ema5" || config.strategy === "ema21";
+  const update = (fn: (current: BotConfig) => BotConfig) => { setConfig(current => botRuleConfig(fn(current))); setPreview([]); setError(""); };
   type NumericField = "fast" | "slow" | "period" | "oversold" | "overbought" | "notional" | "leverage" | "stopPercent" | "targetPercent" | "maxEntries" | "maxDailyLoss" | "cooldown" | "trendPeriod" | "riskUsd" | "riskReward" | "stopBufferTicks";
   const field = (key: NumericField, label: string, min: number, max: number, step = 1) => <label title={label}>{({ notional: "Notional (USD)", riskUsd: "Stop risk (USD)", stopBufferTicks: "Stop buffer · ticks", riskReward: "Reward / risk", maxEntries: "Entries / day", maxDailyLoss: "Loss limit (USD)", cooldown: "Cooldown · candles" } as Partial<Record<NumericField, string>>)[key] ?? label}<input aria-label={label} type="number" required min={min} max={max} step={step} value={Number.isFinite(config[key]) ? config[key] : ""} onChange={e => update(c => ({ ...c, [key]: e.target.value === "" ? NaN : Number(e.target.value) }))} /></label>;
   const frames = botFrames(config);
@@ -104,9 +105,9 @@ function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: Global
           if (failures[frame]) throw new Error(failures[frame]);
           const history = histories[botScope(config.symbol, frame)];
           if (!history || !Number.isFinite(history.fetchedAt) || now - history.fetchedAt > 30000 || history.fetchedAt > now + 5000) throw new Error("Waiting for fresh candle history");
-          const signal = botSignal(candidate, history.candles, now, frame);
-          if (!signal.side) return `${frame}: ${signal.reason}`;
           const snapshot = trading.snapshots[config.symbol];
+          const signal = botSignal(candidate, history.candles, now, frame, freshPerpQuote(snapshot?.quote, now) ? snapshot!.quote : undefined);
+          if (!signal.side) return `${frame}: ${signal.reason}`;
           if (!freshPerpQuote(snapshot?.quote, now)) return `${frame}: ${signal.reason}. Waiting for a fresh quote to preview sizing.`;
           const filter = botTrendAllows(candidate, signal.side, histories[botScope(config.symbol, config.trendTimeframe as BotFrame)], now);
           if (!filter) return `${frame}: signal blocked by ${config.trendTimeframe} EMA trend filter`;
@@ -131,15 +132,15 @@ function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: Global
   }}>
     <h3>Settings · {BOT_ASSETS[config.symbol]}</h3>
     <fieldset className="bot-editor" disabled={checking || trading.busy}>
-    <div className="bot-presets" aria-label="Your EMA strategy presets"><button type="button" aria-pressed={config.strategy === "ema21"} onClick={() => update(c => botPreset(c, "ema21"))}>EMA 21</button><button type="button" aria-pressed={config.strategy === "ema5"} onClick={() => update(c => botPreset(c, "ema5"))}>EMA 5 reversal</button></div>
+    <div className="bot-presets" aria-label="Your EMA strategy presets"><button type="button" aria-pressed={config.strategy === "ema21"} onClick={() => update(c => botPreset(c, "ema21"))}>EMA 21</button><button type="button" aria-pressed={config.strategy === "ema5"} onClick={() => update(c => botPreset(c, "ema5"))}>EMA 5 SELL</button></div>
     <div className="bot-fields bot-strategy-fields">
       <ModernSelect label="Strategy" value={config.strategy} choices={Object.entries(BOT_STRATEGIES).map(([value, label]) => ({ value: value as BotConfig["strategy"], label }))} onChange={value => update(c => value === "ema21" || value === "ema5" ? botPreset(c, value) : { ...c, strategy: value })} />
-      <ModernSelect label="Direction" ariaLabel="Trade direction" value={config.direction} choices={[{ value: "both", label: "Long & short" }, { value: "long", label: "Long only" }, { value: "short", label: "Short only" }]} onChange={value => update(c => ({ ...c, direction: value }))} />
+      <ModernSelect label="Direction" ariaLabel="Trade direction" value={config.direction} choices={config.strategy === "ema5" ? [{ value: "short", label: "Short only" }] : [{ value: "both", label: "Long & short" }, { value: "long", label: "Long only" }, { value: "short", label: "Short only" }]} onChange={value => update(c => ({ ...c, direction: value }))} />
       {config.strategy === "ema" && <>{field("fast", "Fast EMA period", 2, 99)}{field("slow", "Slow EMA period", 3, 100)}</>}
       {(config.strategy === "rsi" || config.strategy === "breakout") && <>{field("period", config.strategy === "rsi" ? "RSI period" : "Breakout lookback", 2, 100)}{config.strategy === "rsi" && <>{field("oversold", "Oversold threshold", 1, 49)}{field("overbought", "Overbought threshold", 51, 99)}</>}</>}
     </div>
     <details className="bot-strategy-help"><summary>Strategy rules</summary><p className="bot-rule">{BOT_RULES[config.strategy]}</p></details>
-    <fieldset className="bot-timeframes"><legend>Entry timeframes · max 4</legend>{(Object.keys(BOT_FRAMES) as BotFrame[]).map(frame => <label key={frame}><input type="checkbox" aria-label={`Entry timeframe ${frame}`} checked={frames.includes(frame)} disabled={frames.includes(frame) && frames.length === 1 || !frames.includes(frame) && frames.length === 4} onChange={() => toggleFrame(frame)} /><span>{frame}</span></label>)}</fieldset>
+    {emaRule ? <p className="bot-rule">Entry timeframe: 5 minutes · completed setup candle, live price-break entry.</p> : <fieldset className="bot-timeframes"><legend>Entry timeframes · max 4</legend>{(Object.keys(BOT_FRAMES) as BotFrame[]).map(frame => <label key={frame}><input type="checkbox" aria-label={`Entry timeframe ${frame}`} checked={frames.includes(frame)} disabled={frames.includes(frame) && frames.length === 1 || !frames.includes(frame) && frames.length === 4} onChange={() => toggleFrame(frame)} /><span>{frame}</span></label>)}</fieldset>}
 
     <details className="bot-advanced"><summary>Trend filter</summary><div className="bot-fields"><ModernSelect label="Trend timeframe" value={config.trendTimeframe ?? "off"} choices={[{ value: "off", label: "Off" }, ...(Object.keys(BOT_FRAMES) as BotFrame[]).filter(f => BOT_FRAMES[f] > Math.max(...frames.map(frame => BOT_FRAMES[frame]))).map(value => ({ value, label: value }))]} onChange={value => update(c => ({ ...c, trendTimeframe: value, trendPeriod: c.trendPeriod ?? 21 }))} />{config.trendTimeframe && config.trendTimeframe !== "off" && field("trendPeriod", "Trend EMA period", 2, 100)}</div>
     </details>
@@ -148,8 +149,8 @@ function BotSettings({ bot, trading, onSaved }: { bot: PaperBot; trading: Global
       {field("notional", config.sizing === "risk" ? "Maximum notional per trade (USD)" : "Notional per trade (USD)", 1, 100000, .01)}
       {config.sizing === "risk" && field("riskUsd", "Planned stop risk per trade (USD)", .1, 10000, .1)}
       {field("leverage", "Leverage (×)", 1, 20)}
-      <ModernSelect label="Exit plan" value={config.exitMode ?? "percent"} choices={[{ value: "percent", label: "Stop / target %" }, { value: "signal", label: "Signal candle + R/R" }]} onChange={value => update(c => ({ ...c, exitMode: value, riskReward: c.riskReward ?? 2, stopBufferTicks: c.stopBufferTicks ?? 1 }))} />
-      {config.exitMode === "signal" ? <>{field("stopBufferTicks", "Stop buffer (price ticks)", 0, 100)}{field("riskReward", "Reward / risk multiple", .5, 10, .1)}</> : <>{field("stopPercent", "Stop loss (%)", .1, 25, .1)}{field("targetPercent", "Take profit (%)", .1, 50, .1)}</>}
+      {!emaRule && <ModernSelect label="Exit plan" value={config.exitMode ?? "percent"} choices={[{ value: "percent", label: "Stop / target %" }, { value: "signal", label: "Signal candle + R/R" }]} onChange={value => update(c => ({ ...c, exitMode: value, riskReward: c.riskReward ?? 2, stopBufferTicks: c.stopBufferTicks ?? 1 }))} />}
+      {config.exitMode === "signal" ? <>{config.strategy === "ema5" ? <p>Stop-loss: alert candle high</p> : field("stopBufferTicks", "Stop buffer (price ticks)", emaRule ? 1 : 0, 100)}{field("riskReward", "Reward / risk multiple", config.strategy === "ema5" ? 3 : config.strategy === "ema21" ? 1.5 : .5, 10, .1)}</> : <>{field("stopPercent", "Stop loss (%)", .1, 25, .1)}{field("targetPercent", "Take profit (%)", .1, 50, .1)}</>}
     </div>
     <details className="bot-advanced bot-limits"><summary>Daily limits & cooldown</summary><div className="bot-fields">{field("maxEntries", "Maximum entries per day", 1, 100)}{field("maxDailyLoss", "Daily realised loss limit (USD)", 1, 10000, .01)}{field("cooldown", "Cooldown (smallest selected timeframe candles)", 0, 100)}</div></details>
 
