@@ -4,9 +4,10 @@ import type { IpoAllotment } from "./ipo-allotment";
 /** Keep the category and event visible even when the issuer name is long. */
 export function ipoEventTitle(name: string, event: string) {
   const issuer = name.replace(/\s+IPO$/i, "").replace(/\s+(Limited|Ltd\.?)$/i, "").trim();
-  const room = Math.max(1, 42 - "IPO: ".length - ` — ${event}`.length);
+  const prefix = `IPO: ${/closes/.test(event) ? "⏰" : /allotment/.test(event) ? "📬" : /GMP/.test(event) ? "📊" : "🔔"} `;
+  const room = Math.max(1, 42 - prefix.length - ` — ${event}`.length);
   const short = issuer.length > room ? issuer.slice(0, room - 1).trimEnd() + "…" : issuer;
-  return `IPO: ${short} — ${event}`;
+  return `${prefix}${short} — ${event}`;
 }
 export function ipoPrefixedTitle(title: string) {
   return /^IPO\b/i.test(title.trim()) ? title.trim() : `IPO: ${title.replace(/^[^\p{L}\p{N}]+/u, "").trim()}`;
@@ -35,7 +36,7 @@ export function ipoBiddingContext(ipo: IpoSummary, now: number) {
 }
 export function ipoLocalContent(ipo: IpoSummary, event: "gmp" | "gmp-move" | "closing", now: number) {
   return { title: ipoEventTitle(ipo.name, event === "closing" ? "bidding closes today" : event === "gmp" ? "GMP above 15%" : "GMP updated"),
-    body: `${ipoBiddingContext(ipo, now)} Open IPOs to review issue details.` };
+    body: `${event === "closing" ? "⏰ Last day to apply. Check the bidding deadline before you decide. " : "📊 Your IPO watch has a fresh update. "}${ipoBiddingContext(ipo, now)} Tap to explore IPO details.` };
 }
 export function allotmentContext(ipo: IpoAllotment) {
   const event = ipo.state === "published" ? `Allotment results published; scheduled allotment date ${ipoDate(ipo.allotmentDate)}.`

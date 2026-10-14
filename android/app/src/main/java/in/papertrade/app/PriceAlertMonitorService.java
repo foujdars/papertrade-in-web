@@ -296,7 +296,7 @@ public class PriceAlertMonitorService extends Service {
             String fact=symbol+(target?" target hit":" stop hit")+" · "+rupee(price);
             notice.put("id","price-"+alert.optString("id",symbol));notice.put("kind","trade");
             notice.put("title",(target?"🎯 ":"🛑 ")+(fact.length()<=38?fact:symbol+(target?" target hit":" stop hit")));
-            notice.put("body","");
+            notice.put("body",target?"Your paper-trade target level was reached 🙂 Open P&L to check the position and review your plan.":"Your paper-trade stop-loss level was reached. Open P&L to check the position and review your risk plan.");
             notice.put("url","/?screen=pnl");NotificationDelivery.show(this,notice);
         }catch(Exception ignored){}
     }

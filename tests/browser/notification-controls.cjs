@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 (async () => {
   let launch = { headless: true };
+  if (process.env.CHROME_PATH) launch.executablePath = process.env.CHROME_PATH;
   if (process.env.CHROMIUM_PACKAGE) {
     const browserPackage = require(process.env.CHROMIUM_PACKAGE), packaged = browserPackage.default || browserPackage;
     launch = { ...launch, executablePath: await packaged.executablePath(), args: packaged.args };
@@ -22,6 +23,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.locator('.mobile-bottom-nav').waitFor({timeout:60000});
     const open=async()=>{await page.locator('.notification-center-trigger').click();await page.getByRole('switch',{name:'EMA 21 alerts',exact:true}).waitFor();};
     await open();
+    const analysis=page.getByRole('switch',{name:'Analysis updates',exact:true});
+    assert.equal(await analysis.isChecked(),true);
+    await analysis.uncheck();
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('papertrade-notification-preferences-v4')).analysis),false);
+    await analysis.check();
     const ema21=page.getByRole('switch',{name:'EMA 21 alerts',exact:true}),ema5=page.getByRole('switch',{name:'EMA 5 alerts',exact:true});
     assert.equal(await ema21.isChecked(),true);assert.equal(await ema5.isChecked(),true);
     await ema21.uncheck();assert.equal(await ema5.isChecked(),true);
@@ -35,7 +41,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     assert.equal(stored.ema21,true);assert.equal(stored.ema5,false);
     const other=await context.newPage();await other.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3234');
     await other.evaluate(()=>{const key='papertrade-notification-preferences-v4';const p=JSON.parse(localStorage.getItem(key));localStorage.setItem(key,JSON.stringify({...p,ema21:false,ema5:true}));});
-    await page.waitForFunction(()=>{const inputs=[...document.querySelectorAll('.notification-settings input')];return inputs.length===2&&!inputs[0].checked&&inputs[1].checked;});
+    await page.waitForFunction(()=>!document.querySelector('[aria-label="EMA 21 alerts"]').checked&&document.querySelector('[aria-label="EMA 5 alerts"]').checked);
     await other.close();
     await page.evaluate(()=>{
       localStorage.setItem('papertrade-notification-center-v1',JSON.stringify([{id:'ipo-listing-example',kind:'ipo',title:'Example listed today',body:'Example Limited: listed 14 Sept 2026 at ₹120; issue price ₹100 (+20%). Open IPOs for listing details.',createdAt:Date.now(),read:false}]));

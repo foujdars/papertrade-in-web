@@ -109,6 +109,23 @@ The service-role key and upload token are server-only variables. Run both SQL
 migrations in `supabase/migrations/` and follow `SETUP_FROM_SCRATCH.md` for
 the scraper configuration.
 
+Analysis CSV updates use the existing background notification dispatcher. After a
+successful upload saves `latest.csv` and `manifest.json`, it records a notification
+keyed by the CSV content hash. The dispatcher also checks the stored manifest for
+updates uploaded outside the API. Registered devices receive the latest update
+once, with an **Analysis updates** switch and a link to the Analysis screen.
+Updates expire after 24 hours; identical CSV uploads, failed uploads, paused alerts
+and inactive registrations do not generate repeat messages. An uncertain push
+transport outcome is recorded as `needs-review`, rather than blindly resent.
+
+The external scheduler must continue calling `/api/notifications/dispatch` with
+the existing cron authorization; no new scheduled job is needed. IPO feed failures
+no longer block Analysis, session and review processing. Notification settings
+show whether the general and technical dispatchers have reported successful runs
+within three minutes. This status confirms server activity, not phone receipt.
+The Android changes require rebuilding the APK for the Analysis notification
+channel, device switch and direct tap-to-Analysis navigation.
+
 ## Data and safety
 
 The server merges Upstox historical candles with the official current-trading-day intraday OHLC feed. It refreshes true intraday candles every ten seconds, polls the selected symbol's LTP every five seconds, and refreshes watchlist quotes every ten seconds. LTP values are never used to invent candle opens, highs or lows. If the token is missing, expired or rejected, the chart visibly identifies the unavailable feed; paper orders are blocked when a fresh Upstox price is unavailable. The F&O list, option chain and contract charts use official active Upstox instruments and never invent contracts or option prices. Paper orders stay in browser/cloud storage and are never submitted to Upstox or an exchange. This is an educational simulator, not investment advice.

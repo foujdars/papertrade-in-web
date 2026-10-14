@@ -145,7 +145,7 @@ test('management isolates accounts and enforces revisions, malformed requests an
 test('price alerts use fresh observed quotes once only, without candles or automatic orders', async t => {
   reset(t, { family:'price', threshold:105, condition:'above', timeframe:'1m', repeat:'once' });
   assert.equal((await dispatch()).status,200); assert.equal(read().rules[0].status,'completed');
-  assert.equal(state.sent.length,1); assert.match(state.sent[0].notice.title,/TEST.*(?:₹110|price)/); assert.equal(state.sent[0].notice.body,''); assert.equal(state.feedCalls.length,0);
+  assert.equal(state.sent.length,1); assert.match(state.sent[0].notice.title,/TEST.*(?:₹110|price)/); assert.match(state.sent[0].notice.body,/watched price.*chart/); assert.equal(state.feedCalls.length,0);
   await dispatch(); assert.equal(state.sent.length,1);
 });
 test('stale, future, pre-arm quotes and closed sessions never fire price alerts',async t=>{

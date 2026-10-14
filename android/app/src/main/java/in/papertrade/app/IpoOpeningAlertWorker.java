@@ -90,7 +90,7 @@ public class IpoOpeningAlertWorker extends Worker {
                 String body = Double.isFinite(issueSize) && issueSize > 0
                     ? String.format(java.util.Locale.ENGLISH, "Bidding is live until %s. Issue size Rs %,.2f Cr.", NotificationContent.date(endDate), issueSize)
                     : String.format(java.util.Locale.ENGLISH, "Bidding is live until %s.", NotificationContent.date(endDate));
-                showNotification(context, NotificationContent.ipoTitle(name, "bidding opened today"), name + ": " + body + " Open IPOs to review issue details.", ("ipo-opening-" + ipoId + "-" + today).hashCode());
+                showNotification(context, NotificationContent.ipoTitle(name, "bidding opened today"), "🔔 A new IPO is open today! " + name + ": " + body + " Tap to explore the issue details.", ("ipo-opening-" + ipoId + "-" + today).hashCode());
                 preferences.edit().putString(stateKey, today).apply();
             }
             return Result.success();

@@ -16,7 +16,7 @@ public final class NotificationDelivery {
     try{return new JSONObject(context.getSharedPreferences(PREFS,0).getString("preferences","{}"));}catch(Exception e){return new JSONObject();}
   }
   public static String safePath(String path) {
-    return path!=null && (path.matches("/\\?screen=(ipo|pnl)")||path.matches("/\\?symbol=[A-Za-z0-9%_.~!()*'\\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|1D)")||path.matches("/ipo-allotment/(mufg|kfin|bigshare|bse)"))?path:"/";
+    return path!=null && (path.matches("/\\?screen=(ipo|pnl|fundamentals)")||path.matches("/\\?symbol=[A-Za-z0-9%_.~!()*'\\-]{1,300}&timeframe=(1m|3m|5m|15m|30m|1H|1D)")||path.matches("/ipo-allotment/(mufg|kfin|bigshare|bse)"))?path:"/";
   }
   public static void refreshBranding(Context context) {
     if (Build.VERSION.SDK_INT < 24) return;
@@ -40,6 +40,7 @@ public final class NotificationDelivery {
       String id=notice.optString("id","event-"+now);
       if(!NotificationContent.automaticEmaAllowed(id,prefs.optBoolean("ema21",true),prefs.optBoolean("ema5",true)))return;
       String kind=notice.optString("kind","trade"), key="allotment".equals(kind)?"allotment":"portfolio".equals(kind)?"reviews":"practice".equals(kind)?"practice":"ipo".equals(kind)?"ipo":"session".equals(kind)?"sessions":"trades";
+      if("analysis".equals(kind))key="analysis";
       if(prefs.optLong("pausedUntil",0)>now || !prefs.optBoolean(key,!"reviews".equals(key)&&!"practice".equals(key)))return;
       if(notice.optLong("expiresAt",now+60000)<=now)return;
       if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
@@ -60,10 +61,10 @@ public final class NotificationDelivery {
       int hour=ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).getHour();
       boolean session="session".equals(kind);
       boolean silent=!session&&(notice.optBoolean("silent",false)||hour>=21||hour<8);
-      String channelId=silent?"papertrade_quiet_v3":session?"papertrade_sessions_tu_v1":"trade".equals(kind)?"papertrade_trades_tu_v1":"papertrade_ipo_tu_v1";
+      String channelId=silent?"papertrade_quiet_v3":"analysis".equals(kind)?"papertrade_analysis_tu_v1":session?"papertrade_sessions_tu_v1":"trade".equals(kind)?"papertrade_trades_tu_v1":"papertrade_ipo_tu_v1";
       NotificationManager manager=(NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
       if(manager==null)return;
-      if(Build.VERSION.SDK_INT>=26){NotificationChannel channel=new NotificationChannel(channelId,silent?"Quiet updates":session?"Market sessions":"trade".equals(kind)?"My paper trades":"IPO updates",silent?NotificationManager.IMPORTANCE_LOW:NotificationManager.IMPORTANCE_DEFAULT);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);if(!silent)PaperTradeTone.apply(context,channel);manager.createNotificationChannel(channel);}
+      if(Build.VERSION.SDK_INT>=26){NotificationChannel channel=new NotificationChannel(channelId,silent?"Quiet updates":"analysis".equals(kind)?"Analysis updates":session?"Market sessions":"trade".equals(kind)?"My paper trades":"IPO updates",silent?NotificationManager.IMPORTANCE_LOW:NotificationManager.IMPORTANCE_DEFAULT);channel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);if(!silent)PaperTradeTone.apply(context,channel);manager.createNotificationChannel(channel);}
       Intent intent=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("notificationPath",safePath(notice.optString("url")));
       PendingIntent pending=PendingIntent.getActivity(context,id.hashCode()&0x7fffffff,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
       String body=notice.optString("body");

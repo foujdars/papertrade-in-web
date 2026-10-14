@@ -14,9 +14,10 @@ public final class NotificationContent {
   }
   public static String ipoTitle(String name, String event) {
     String issuer = name.replaceFirst("(?i)\\s+IPO$", "").replaceFirst("(?i)\\s+(Limited|Ltd\\.?)$", "").trim();
-    int room = Math.max(1, 42 - 5 - (" — " + event).length());
+    String prefix="IPO: "+(event.contains("closes")?"⏰":event.contains("allotment")?"📬":event.contains("GMP")?"📊":"🔔")+" ";
+    int room = Math.max(1, 42 - prefix.length() - (" — " + event).length());
     if (issuer.length() > room) issuer = issuer.substring(0, room - 1).trim() + "…";
-    return "IPO: " + issuer + " — " + event;
+    return prefix + issuer + " — " + event;
   }
   public static String date(String value) {
     try { return LocalDate.parse(value).format(DateTimeFormatter.ofPattern("dd MMM uuuu", Locale.ENGLISH)); }
