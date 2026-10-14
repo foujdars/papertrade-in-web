@@ -45,6 +45,9 @@
 @media (max-width:940px) {
   .terminal-shell { --mobile-trade-footer-height:68px; }
   .terminal-shell .trade-cockpit .chart-controls { height:40px; min-height:40px; flex-basis:40px; padding:2px 5px; gap:4px; }
+  /* Fill the toolbar, keeping the search left and the chart tools against the right edge. */
+  .terminal-shell .trade-cockpit .desktop-chart-symbol { flex:1 1 auto; gap:12px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol .chart-style-link { margin-left:auto; }
   .terminal-shell .trade-cockpit .chart-symbol-search { border-radius:10px; }
   .terminal-shell .trade-cockpit .desktop-symbol-trigger { height:32px; }
   .terminal-shell .trade-cockpit .chart-controls > .compact-selector-trigger { height:32px; min-height:32px; padding-block:0; }
