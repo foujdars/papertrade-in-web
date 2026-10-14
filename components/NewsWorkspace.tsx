@@ -11,6 +11,11 @@ const REFRESH_MS = 30_000;
 const filters = ['All', 'Positive', 'Negative', 'Mixed', 'Neutral'] as const;
 type Feed = { items: NewsItem[]; updatedAt: string; checkedAt: string; unavailableSources: string[]; sourceCount: number; stale: boolean };
 const timestamp = (value: string) => new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST';
+// Keep refresh anchoring and filter resets on the visible scroll surface.
+function newsScrollArea(root: HTMLElement | null) {
+  const list = root?.querySelector<HTMLElement>('.news-list');
+  return list && getComputedStyle(list).overflowY === 'auto' ? list : root;
+}
 function age(value: string, now: number) {
   const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60_000));
   if (minutes < 1) return 'Just now';
@@ -37,10 +42,11 @@ export function NewsWorkspace({ instruments, onOpenChart }: { instruments: Instr
     lastRequest.current = Date.now();
     setLoading(true);
     // Keep the first visible headline anchored when fresh items arrive above it.
-    const anchor = [...(scrollArea.current?.querySelectorAll<HTMLElement>('[data-news-id]') ?? [])]
-      .find(node => node.getBoundingClientRect().bottom > (scrollArea.current?.getBoundingClientRect().top ?? 0) + 5);
-    const preserveAnchor = scrollArea.current && scrollArea.current.scrollTop > 24 && anchor
-      ? { id: anchor.dataset.newsId, top: anchor.getBoundingClientRect().top, scroll: scrollArea.current.scrollTop } : null;
+    const area = newsScrollArea(scrollArea.current);
+    const anchor = [...(area?.querySelectorAll<HTMLElement>('[data-news-id]') ?? [])]
+      .find(node => node.getBoundingClientRect().bottom > (area?.getBoundingClientRect().top ?? 0) + 5);
+    const preserveAnchor = area && area.scrollTop > 24 && anchor
+      ? { id: anchor.dataset.newsId, top: anchor.getBoundingClientRect().top, scroll: area.scrollTop } : null;
     try {
       const response = await fetch(`/api/market/news${force ? '?refresh=1' : ''}`, {
         cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
@@ -51,7 +57,7 @@ export function NewsWorkspace({ instruments, onOpenChart }: { instruments: Instr
       if (controller.signal.aborted) return;
       setFeed(data); setError(''); setClock(Date.now());
       if (preserveAnchor) requestAnimationFrame(() => {
-        const area = scrollArea.current;
+        const area = newsScrollArea(scrollArea.current);
         if (!area || Math.abs(area.scrollTop - preserveAnchor.scroll) > 2) return;
         const node = [...area.querySelectorAll<HTMLElement>('[data-news-id]')].find(item => item.dataset.newsId === preserveAnchor.id);
         if (node) area.scrollTop += node.getBoundingClientRect().top - preserveAnchor.top;
@@ -87,7 +93,10 @@ export function NewsWorkspace({ instruments, onOpenChart }: { instruments: Instr
 
   const rows = useMemo(() => rankNews(feed?.items ?? []).filter(item => (!important || item.importance === 3) && (filter === 'All' || item.sentiment === filter))
     .map(item => ({ ...item, stocks: matchNewsStocks(item.title, instruments) })), [feed, instruments, filter, important]);
-  const resetScroll = () => { if (scrollArea.current) scrollArea.current.scrollTop = 0; };
+  const resetScroll = () => {
+    const area = newsScrollArea(scrollArea.current);
+    if (area) area.scrollTop = 0;
+  };
   const unavailable = feed?.unavailableSources ?? [];
   const status = error ? (feed ? 'Refresh unavailable · saved news' : error) : feed?.stale ? 'Saved news · retrying' : '';
 
