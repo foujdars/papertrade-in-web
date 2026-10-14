@@ -137,7 +137,7 @@
   .terminal-shell .ipo-studio .ipo-card-list:has(> :is(.candle-loading, .ipo-empty):only-child) { grid-template-rows: 1fr; }
   .terminal-shell .ipo-studio .ipo-card-list > :is(.candle-loading, .ipo-empty) { grid-column: 1 / -1; align-self: stretch; justify-self: stretch; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 180px; }
   .terminal-shell .ipo-studio :is(.ipo-calendar, .ipo-detail-studio) { height: 100%; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-  .terminal-shell .ipo-studio .ipo-detail-studio { max-width: none; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; align-items: start; gap: 14px; padding: 0 8px 16px 0; }
+  .terminal-shell .ipo-studio .ipo-detail-studio { max-width: none; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; align-items: start; gap: 14px; padding: 0 8px 16px 0; }
   .terminal-shell .ipo-detail-studio > * { min-width: 0; }
   .terminal-shell .ipo-detail-studio :is(.ipo-detail-navigation, .ipo-detail-company) { grid-column: 1 / -1; }
   .terminal-shell .ipo-detail-studio .ipo-detail-overview { grid-column: 1; grid-row: 3; }

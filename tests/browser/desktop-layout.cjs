@@ -89,6 +89,8 @@ const surfaces = {
     await page.locator('.ipo-compact-card').last().locator('h3 button').click();
     await page.locator('.ipo-detail-studio').waitFor();
     await page.locator('.ipo-timeline-disclosure summary').click();
+    await page.waitForTimeout(200);
+    assert.ok(await page.locator('.ipo-detail-studio').evaluate(el => el.querySelector('.ipo-timeline-disclosure').getBoundingClientRect().bottom <= el.querySelector('.ipo-registrar').getBoundingClientRect().top), 'Expanded timeline does not overlap the registrar panel');
     await page.locator('.ipo-detail-studio').evaluate(el => el.scrollTop = el.scrollHeight);
     assert.ok(await page.locator('.ipo-detail-studio').evaluate(el => el.scrollHeight <= el.clientHeight + 1 || el.scrollTop > 0), 'IPO detail fits or remains scrollable');
     await page.locator('.ipo-detail-studio .ipo-registrar').scrollIntoViewIfNeeded();
