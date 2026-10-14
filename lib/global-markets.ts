@@ -370,6 +370,7 @@ export type PerpEvent = {
   detail: string;
 };
 export type PerpAccount = {
+  deletedBotActivityIds?: string[];
   bots?: PaperBot[];
   currency?: "USD";
   version: 1;

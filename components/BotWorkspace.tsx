@@ -1,4 +1,5 @@
 "use client";
+import { BotActivity } from "./BotActivity";
 import { useState } from "react";
 import { Bot, Pause, Play, RefreshCw, X } from "lucide-react";
 import { botRuleConfig, BOT_ASSETS, BOT_FRAMES, BOT_STRATEGIES, BOT_RULES, botFrames, botPreset, botScope, configureBot, defaultBot, validateBotConfig, type BotConfig, type BotSymbol, type BotFrame, type PaperBot } from "@/lib/paper-bot-state";
@@ -60,7 +61,7 @@ export function BotWorkspace({ trading, onClose, onPnl }: { trading: GlobalTradi
         <details className="bot-card bot-decisions"><summary>Decision log</summary>{!selected?.decisions?.length ? <p>New candle decisions and skipped entries will appear here.</p> : <ol>{selected.decisions.slice(-12).reverse().map((d, i) => <li key={`${d.at}:${d.timeframe}:${i}`}><b>{d.timeframe} · {d.side === "BUY" ? "Long" : d.side === "SELL" ? "Short" : "No signal"} · {d.outcome}</b><p>{d.reason}</p><small>{new Date(d.at).toLocaleString("en-IN")} · candle {new Date(d.candle * 1000).toLocaleTimeString("en-IN")}</small></li>)}</ol>}</details>
 </div>
       </div>
-      <div className="bot-card bot-activity"><h3>Bot activity</h3>{!account?.events.some(e => e.botId) ? <p>No bot activity yet.</p> : <ul>{account.events.filter(e => e.botId).slice(-20).reverse().map(e => <li key={e.id}><div><b>{e.symbol} · {e.kind}</b><small>{new Date(e.at).toLocaleString("en-IN")} · {e.detail}</small></div><span>{e.contracts} lots @ {formatUsd(e.price)}<small>Net {formatUsd(e.pnl - e.fee)}</small></span></li>)}</ul>}</div>
+      <BotActivity trading={trading} />
     </section>
   </div>;
 }

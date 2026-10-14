@@ -59,6 +59,7 @@ export function readGlobalAccount(text: string | null): PerpAccount {
   if (!text) return { ...newPerpAccount(), currency: "USD", wallet: 10000 };
   let a = readPerpAccount(text);
   validateSavedBots(a.bots);
+  if (a.deletedBotActivityIds !== undefined && (!Array.isArray(a.deletedBotActivityIds) || a.deletedBotActivityIds.length > 10000 || new Set(a.deletedBotActivityIds).size !== a.deletedBotActivityIds.length || a.deletedBotActivityIds.some(id => typeof id !== "string" || !id || id.length > 200))) throw new Error("Saved bot activity settings are invalid; trade history has been preserved.");
   if (a.currency !== undefined && a.currency !== "USD") throw new Error("Unknown global wallet currency.");
   if (!a.currency) a = { ...a, currency: "USD", wallet: a.wallet / USD_INR,
     positions: a.positions.map(p => ({ ...p, currency: "USD", margin: p.margin / USD_INR })),
