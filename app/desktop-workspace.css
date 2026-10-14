@@ -26,48 +26,53 @@
   .terminal-shell .navigation-page { width: 100%; max-width: 1600px; padding: 24px; border-radius: 18px; }
   .terminal-shell :is(.holdings-modal, .orders-modal, .pnl-modal).navigation-page { width: 100%; }
 
-  /* Dashboard: overview on the left, market directory on the right. */
-  .terminal-shell .home-studio .home-dashboard-scroll {
+  /* Full-width market overview with independent panels below it. */
+  .terminal-shell .home-hub.home-studio .home-dashboard-scroll {
     width: 100%; max-width: 1660px; margin: 0 auto; padding: 30px 32px 48px;
-    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
-    grid-auto-flow: row; grid-auto-rows: max-content; align-items: start; align-content: start; gap: 22px;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: max-content; align-items: start; align-content: start; gap: 22px;
   }
-  .terminal-shell .home-studio .home-hero { grid-column: 1 / -1; padding: 0 0 8px; }
-  .terminal-shell .home-studio .home-hero-copy { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(320px, .9fr); column-gap: 32px; align-items: center; }
-  .terminal-shell .home-studio .home-kicker { grid-column: 1; margin-bottom: 9px; font-size: 13px; }
-  .terminal-shell .home-studio .home-hero h1 { grid-column: 1; margin: 0; font-size: 36px; letter-spacing: -1.2px; }
-  .terminal-shell .home-studio .home-global-search { grid-column: 2; grid-row: 1 / 3; width: 100%; min-height: 52px; margin: 0; border-radius: 12px; }
-  .terminal-shell .home-studio .home-market-chooser { grid-column: 1 / -1; margin: 0; width: min(620px, 100%); border-radius: 12px; }
-  .terminal-shell .home-studio .home-market-chooser > button { min-height: 55px; }
-  .terminal-shell .home-studio .home-wallet-card { grid-column: 1; grid-row: 3; padding: 24px 26px 0; border-radius: 18px; }
-  .terminal-shell .home-studio .home-wallet-amount { font-size: 40px; }
-  .terminal-shell .home-studio .home-wallet-label { margin-top: 18px; font-size: 11px; }
-  .terminal-shell .home-studio .home-wallet-other { margin-inline: -26px; padding-inline: 26px; }
-  .terminal-shell .home-studio .market-directory { grid-column: 2; grid-row: 3 / span 3; margin: 0; }
-  .terminal-shell .home-studio .market-directory-list { max-height: 570px; overflow-y: auto; overscroll-behavior: contain; }
-  .terminal-shell .home-studio .market-directory-row { min-height: 68px; padding: 10px 6px; }
-  .terminal-shell .home-studio .market-directory-tabs { margin-bottom: 12px; }
-  .terminal-shell .home-studio .home-pulse-section { grid-column: 1; grid-row: 4; margin: 0; }
-  .terminal-shell .home-studio .home-main-grid { grid-column: 1; grid-row: 5; display: block; }
-  .terminal-shell .home-studio :is(.home-section, .home-resume-card) { margin-top: 0; border-radius: 16px; }
-  .terminal-shell .home-studio .home-section > header { min-height: 58px; padding-inline: 20px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
-  .terminal-shell .home-studio .home-section > header b { font-size: 14px; }
-  .terminal-shell .home-studio .home-index-grid { padding: 8px 12px 18px; }
-  .terminal-shell .home-studio .home-index-card { min-height: 88px; padding-inline: 14px; }
-  .terminal-shell .home-studio .home-index-card strong { font-size: 23px; }
-  .terminal-shell .home-studio .home-index-card > span b { font-size: 11px; }
-  .terminal-shell .home-studio .home-index-card small { font-size: 11px; }
-  .terminal-shell .home-studio .home-portfolio-value { padding-inline: 20px; }
-  .terminal-shell .home-studio .home-portfolio-value strong { font-size: 36px; }
-  .terminal-shell .home-studio .home-portfolio-stats { gap: 12px; padding: 8px 20px 20px; }
-  .terminal-shell .home-studio .home-portfolio-stats button { min-height: 76px; padding: 14px; }
-  .terminal-shell .home-studio .home-portfolio-stats button span { font-size: 11px; }
-  .terminal-shell .home-studio .home-portfolio-stats button b { font-size: 23px; }
-  .terminal-shell .home-studio .home-risk-meter { margin-inline: 20px; margin-bottom: 20px; }
-  .terminal-shell .home-studio .home-attention { grid-column: 2; }
-  .terminal-shell .home-studio .home-resume-card { grid-column: 1; min-height: 90px; }
-  .terminal-shell .home-studio .home-preference-message { grid-column: 1 / -1; }
-  .terminal-shell .home-studio[data-market="global"] .home-main-grid { grid-row: 4; }
+  .terminal-shell .home-hub.home-studio .home-overview-title { display: block; grid-column: 1; grid-row: 1; align-self: center; margin: 0; font-size: 32px; font-weight: 650; letter-spacing: -1px; }
+  .terminal-shell .home-hub.home-studio .home-hero { grid-column: 2; grid-row: 1; margin: 0; padding: 0; }
+  .terminal-shell .home-hub.home-studio .home-hero-copy { display: block; }
+  .terminal-shell .home-hub.home-studio .home-global-search { width: 100%; min-height: 52px; margin: 0; border-radius: 12px; }
+  .terminal-shell .home-hub.home-studio .home-market-chooser { grid-column: 1 / -1; margin: 0; width: min(620px, 100%); border-radius: 12px; }
+  .terminal-shell .home-hub.home-studio .home-market-chooser > button { min-height: 55px; }
+  .terminal-shell .home-hub.home-studio .home-market-chooser button small { display: block; }
+  .terminal-shell .home-hub.home-studio .home-pulse-section { grid-column: 1 / -1; margin: 0; }
+  .terminal-shell .home-hub.home-studio .home-index-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 12px 20px 20px; gap: 18px; }
+  .terminal-shell .home-hub.home-studio .home-index-card { min-height: 100px; padding: 10px 20px; gap: 10px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > .home-index-name { font-size: 13px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 30px; }
+  .terminal-shell .home-hub.home-studio .home-index-card > .home-index-change { font-size: 12px; }
+  .terminal-shell .home-hub.home-studio .home-indices-heading { display: flex; padding: 20px 20px 0; }
+  .terminal-shell .home-hub.home-studio .home-indices-heading h2 { font-size: 16px; }
+  .terminal-shell .home-hub.home-studio .home-main-grid { grid-column: 1 / -1; grid-row: 4; display: block; margin: 0; }
+  .terminal-shell .home-hub.home-studio .home-section { margin: 0; border-radius: 16px; }
+  .terminal-shell .home-hub.home-studio .home-section > header { min-height: 56px; padding-inline: 20px; border-bottom: 1px solid var(--line); }
+  .terminal-shell .home-hub.home-studio .home-section > header b { font-size: 15px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row { padding: 16px; gap: 16px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row > :is(button, .home-funds-used) { min-height: 82px; padding: 12px 16px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row small { font-size: 12px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row b { font-size: 24px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row strong { font-size: 30px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row > .home-today-pnl strong { font-size: 30px; }
+  .terminal-shell .home-hub.home-studio .home-portfolio-row > .home-funds-used b { font-size: 24px; }
+  .terminal-shell .home-hub.home-studio .home-market-pair { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 0; border: 0; background: transparent; }
+  .terminal-shell .home-hub.home-studio .home-market-card-v2 { min-height: 128px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+  .terminal-shell .home-hub.home-studio .home-market-slot + .home-market-slot .home-market-card-v2 { border: 1px solid var(--line); border-radius: 16px; }
+  .terminal-shell .home-hub.home-studio .home-market-card-copy b { font-size: 15px; }
+  .terminal-shell .home-hub.home-studio .home-mover-preview { min-height: 32px; }
+  .terminal-shell .home-hub.home-studio .home-market-data { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+  .terminal-shell .home-hub.home-studio .home-market-data.has-derivatives > .india-pulse-layout { grid-column: 1; grid-row: 1; }
+  .terminal-shell .home-hub.home-studio .home-market-data.has-derivatives > .home-sector-heat { grid-column: 1; grid-row: 2; }
+  .terminal-shell .home-hub.home-studio .home-market-data.has-derivatives > .home-derivatives { grid-column: 2; grid-row: 1 / 3; }
+  .terminal-shell .home-hub.home-studio .market-directory { grid-column: 1 / -1; margin: 0; }
+  .terminal-shell .home-hub.home-studio .market-directory-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .terminal-shell .home-hub.home-studio .market-directory-row { min-height: 74px; }
+  .terminal-shell .home-hub.home-studio .home-attention { grid-column: 1 / -1; }
+  .terminal-shell .home-hub.home-studio .home-preference-message { grid-column: 1 / -1; }
+  .terminal-shell .news-workspace { inset: var(--desktop-header) 0 0 var(--desktop-rail); padding: 26px 30px; }
 
   /* Charts keep their full-height canvas and all existing controls. */
   .terminal-shell .workspace.section-trade { padding: 12px; gap: 12px; }
@@ -107,14 +112,12 @@
     .terminal-shell .main-nav { padding-inline: 9px; }
     .terminal-shell .main-nav button { padding-inline: 12px; }
     .terminal-shell .workspace { grid-template-columns: minmax(0, 1fr) 270px; }
-    .terminal-shell .home-studio .home-dashboard-scroll { padding: 24px 20px 40px; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(290px, .85fr); }
-    .terminal-shell .home-studio .home-hero-copy { grid-template-columns: minmax(180px, 1fr) minmax(270px, 1fr); gap: 20px; }
-    .terminal-shell .home-studio .home-hero h1 { font-size: 30px; }
-    .terminal-shell .home-studio .home-index-grid { grid-template-columns: 1fr; padding: 0 16px 12px; }
-    .terminal-shell .home-studio .home-index-card { min-height: 62px; display: grid; grid-template-columns: 1fr auto; border-right: 0; border-bottom: 1px solid var(--line); }
-    .terminal-shell .home-studio .home-index-card > span { grid-column: 1; }
-    .terminal-shell .home-studio .home-index-card strong { grid-column: 2; grid-row: 1; font-size: 20px; }
-    .terminal-shell .home-studio .home-index-card small { grid-column: 1 / -1; }
+    .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding: 24px 20px 40px; gap: 16px; }
+    .terminal-shell .home-hub.home-studio .home-overview-title { font-size: 28px; }
+    .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 25px; }
+    .terminal-shell .home-hub.home-studio .home-portfolio-row { gap: 8px; padding: 10px; }
+    .terminal-shell .home-hub.home-studio .home-portfolio-row > :is(button, .home-funds-used) { padding: 10px; }
+    .terminal-shell .home-hub.home-studio .home-portfolio-row b { font-size: 18px; }
     .terminal-shell .trade-cockpit .chart-controls { flex-wrap: wrap; flex-basis: auto; }
     .terminal-shell .trade-cockpit .desktop-chart-symbol { flex-basis: 100%; }
     .terminal-shell .navigation-page-backdrop { padding: 20px; }
