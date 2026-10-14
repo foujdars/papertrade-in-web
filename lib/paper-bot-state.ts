@@ -2,10 +2,10 @@ export const BOT_ASSETS = { BTCUSD: "Bitcoin", ETHUSD: "Ethereum", SOLUSD: "Sola
 export type BotSymbol = keyof typeof BOT_ASSETS;
 export const BOT_FRAMES = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1H": 3600, "4H": 14400, "1D": 86400 } as const;
 export type BotFrame = keyof typeof BOT_FRAMES;
-export const BOT_STRATEGIES = { ema21: "My EMA 21 entry", ema5: "My EMA 5 reversal", ema: "EMA crossover", rsi: "RSI reversal", breakout: "Range breakout" } as const;
+export const BOT_STRATEGIES = { ema21: "My EMA 21 entry", ema5: "EMA 5 alert-candle SELL", ema: "EMA crossover", rsi: "RSI reversal", breakout: "Range breakout" } as const;
 export const BOT_RULES = {
-  ema21: "EMA 21 cross → opposite-colour pullback → break of that candle. Long: bullish cross, red pullback above EMA 21, green trigger breaking its high. Short: the mirrored bearish setup. The bot confirms on candle close.",
-  ema5: "Your long reversal: the previous candle touches EMA 5, then a completed candle of either colour has its entire low above EMA 5. Short mode uses the mirrored rule: its entire high below EMA 5 after a touch.",
+  ema21: "5-minute chart, EMA 21. BUY: close crosses above EMA, then a red candle wholly above it within 1–3 candles; buy when live price breaks its high. SELL: close crosses below EMA, then a green candle wholly below it within 1–3 candles; sell on a break of its low. SL one or more ticks beyond the pullback candle; target at least 1:1.5. Trigger candle colour does not matter.",
+  ema5: "5-minute chart, EMA 5, SELL only. A completed alert candle of either colour must have its entire body and wick above EMA 5. Replace it with the latest qualifying candle before entry. Sell when live price breaks below its low; SL at its high; target at least 1:3. No previous EMA touch is required.",
   ema: "Long when the fast EMA crosses above the slow EMA; short on the opposite crossover.",
   rsi: "Long when RSI crosses back above oversold; short when it crosses back below overbought.",
   breakout: "Long when the candle closes above prior range highs; short below prior range lows.",
@@ -22,9 +22,11 @@ export type BotConfig = {
 export type BotDecision = { at: number; timeframe: BotFrame; candle: number; side: "BUY" | "SELL" | null; outcome: "waiting" | "skipped" | "entered"; reason: string };
 export type PaperBot = BotConfig & {
   enabled: boolean; startedAt: number; lastCandle: number; lastEntryAt: number; status: string;
+  lastSetupId?: string;
   lastCandles?: Partial<Record<BotFrame, number>>; frameStatus?: Partial<Record<BotFrame, string>>; decisions?: BotDecision[];
 };
 export function botFrames(config: BotConfig): BotFrame[] {
+  if (config.strategy === "ema5" || config.strategy === "ema21") return ["5m"];
   return [...(config.timeframes ?? [config.timeframe])].sort((a, b) => BOT_FRAMES[a] - BOT_FRAMES[b]);
 }
 export const botScope = (symbol: string, frame: BotFrame) => `${symbol}:${frame}`;
@@ -34,8 +36,17 @@ export const defaultBot = (symbol: BotSymbol): PaperBot => ({
   maxEntries: 5, maxDailyLoss: 100, cooldown: 1, enabled: false, startedAt: 0, lastCandle: 0, lastEntryAt: 0, status: "Ready to configure",
   trendTimeframe: "off", trendPeriod: 21, sizing: "notional", riskUsd: 5, exitMode: "percent", riskReward: 2, stopBufferTicks: 1,
 });
+/** Apply the requested EMA rules to saved bots as well as new configurations. */
+export function botRuleConfig(config: BotConfig): BotConfig {
+  if (config.strategy !== "ema5" && config.strategy !== "ema21") return config;
+  const ema5 = config.strategy === "ema5";
+  return { ...config, timeframe: "5m", timeframes: ["5m"], direction: ema5 ? "short" : config.direction,
+    exitMode: "signal", riskReward: Math.max(ema5 ? 3 : 1.5, config.riskReward ?? (ema5 ? 3 : 1.5)),
+    stopBufferTicks: ema5 ? 0 : Math.max(1, config.stopBufferTicks ?? 1) };
+}
 export function botPreset(config: BotConfig, strategy: "ema21" | "ema5"): BotConfig {
-  return { ...config, strategy, timeframe: "5m", timeframes: ["5m", "15m"], direction: strategy === "ema5" ? "long" : "both", exitMode: "signal", riskReward: 2, stopBufferTicks: 1, trendTimeframe: "off" };
+  return botRuleConfig({ ...config, strategy, direction: strategy === "ema5" ? "short" : "both",
+    riskReward: strategy === "ema5" ? 3 : 1.5, stopBufferTicks: strategy === "ema5" ? 0 : 1, trendTimeframe: "off" });
 }
 export function validateBotConfig(c: BotConfig) {
   if (!Object.hasOwn(BOT_ASSETS, c.symbol) || !Object.hasOwn(BOT_FRAMES, c.timeframe) || !Object.hasOwn(BOT_STRATEGIES, c.strategy) || !["both", "long", "short"].includes(c.direction)) throw new Error("Choose a supported asset, strategy and timeframe.");
@@ -55,6 +66,7 @@ export function validateSavedBots(bots: PaperBot[] | undefined) {
   if (!Array.isArray(bots) || bots.length > 4 || new Set(bots.map(b => b?.symbol)).size !== bots.length) throw new Error("Saved bot settings are invalid; data has been preserved.");
   for (const b of bots) {
     validateBotConfig(b);
+    if (b.lastSetupId !== undefined && (typeof b.lastSetupId !== "string" || b.lastSetupId.length > 160)) throw new Error("Saved bot setup is invalid; data has been preserved.");
     if (typeof b.enabled !== "boolean" || typeof b.status !== "string" || b.status.length > 500 || ![b.startedAt, b.lastCandle, b.lastEntryAt].every(v => Number.isFinite(v) && v >= 0)) throw new Error("Saved bot state is invalid; data has been preserved.");
     for (const [map, numeric] of [[b.lastCandles, true], [b.frameStatus, false]] as const) {
       if (map !== undefined && (!map || typeof map !== "object" || Array.isArray(map) || Object.entries(map).some(([f, v]) => !Object.hasOwn(BOT_FRAMES, f) || (numeric ? typeof v !== "number" || !Number.isSafeInteger(v) || v < 0 : typeof v !== "string" || v.length > 500)))) throw new Error("Saved timeframe state is invalid; data has been preserved.");
@@ -63,6 +75,7 @@ export function validateSavedBots(bots: PaperBot[] | undefined) {
   }
 }
 export function configureBot(previous: PaperBot | undefined, config: BotConfig, enabled: boolean, now: number): PaperBot {
+  config = botRuleConfig(config);
   validateBotConfig(config);
   const frames = botFrames(config);
   const lastCandles = Object.fromEntries(frames.map(frame => [frame, Math.floor(now / 1000 / BOT_FRAMES[frame]) * BOT_FRAMES[frame] - BOT_FRAMES[frame]]));
@@ -70,6 +83,7 @@ export function configureBot(previous: PaperBot | undefined, config: BotConfig, 
   const { symbol, strategy, timeframe, direction, fast, slow, period, oversold, overbought, notional, leverage, stopPercent, targetPercent, maxEntries, maxDailyLoss, cooldown, trendTimeframe, trendPeriod, sizing, riskUsd, exitMode, riskReward, stopBufferTicks } = config;
   return { symbol, strategy, timeframe, direction, fast, slow, period, oversold, overbought, notional, leverage, stopPercent, targetPercent, maxEntries, maxDailyLoss, cooldown, trendTimeframe, trendPeriod, sizing, riskUsd, exitMode, riskReward, stopBufferTicks,
     timeframes: frames, enabled, startedAt: now, lastCandles, lastCandle: lastCandles[timeframe], lastEntryAt: previous?.lastEntryAt ?? 0,
+    lastSetupId: previous?.strategy === config.strategy ? previous.lastSetupId : undefined,
     decisions: previous?.decisions ?? [], frameStatus: Object.fromEntries(frames.map(f => [f, "Waiting for a new candle close"])),
     status: enabled ? "Waiting for the next candle close" : "Paused · existing positions keep their TP/SL" };
 }
