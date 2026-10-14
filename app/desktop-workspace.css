@@ -1,0 +1,123 @@
+/* Presentation only. The existing 940px mobile boundary stays untouched. */
+@media (min-width: 941px) {
+  .terminal-shell { --desktop-rail: 156px; --desktop-header: 64px; }
+  .terminal-shell .topbar { height: var(--desktop-header); flex-basis: var(--desktop-header); gap: 20px; padding-inline: 24px; }
+  .terminal-shell .main-nav {
+    position: fixed; z-index: 90; inset: var(--desktop-header) auto 0 0;
+    width: var(--desktop-rail); height: auto; display: flex; flex-direction: column;
+    align-items: stretch; gap: 6px; padding: 26px 12px;
+    border-right: 1px solid var(--line); background: var(--studio-panel, var(--surface));
+  }
+  .terminal-shell .main-nav button {
+    flex: 0 0 auto; min-height: 44px; padding: 0 16px; border: 1px solid transparent;
+    border-radius: 10px; text-align: left; font-size: 13px; font-weight: 600;
+  }
+  .terminal-shell .main-nav button:hover { background: var(--soft); }
+  .terminal-shell .main-nav .nav-active { color: var(--purple); background: var(--purple-soft); border-color: color-mix(in srgb, var(--purple) 20%, var(--line)); }
+  .terminal-shell .main-nav .nav-active::after { inset: 12px auto 12px -1px; width: 3px; height: auto; border-radius: 3px; }
+  .terminal-shell .top-actions { gap: 10px; }
+  .terminal-shell .workspace { margin-left: var(--desktop-rail); min-width: 0; grid-template-columns: minmax(0, 1fr) 310px; }
+  .terminal-shell .workspace.order-panel-collapsed { grid-template-columns: minmax(0, 1fr) 0; }
+  .terminal-shell .workspace.section-watchlist { grid-template-columns: minmax(0, 1fr); }
+  .terminal-shell .home-workspace { inset: var(--desktop-header) 0 0 var(--desktop-rail); }
+  .terminal-shell .market-discovery-panel { inset: var(--desktop-header) 0 0 var(--desktop-rail); padding: 26px 30px; }
+  .terminal-shell .global-markets { inset: var(--desktop-header) 0 0 var(--desktop-rail); padding: 26px 30px; }
+  .terminal-shell .navigation-page-backdrop { margin-left: var(--desktop-rail); padding: 26px 30px; min-width: 0; }
+  .terminal-shell .navigation-page { width: 100%; max-width: 1600px; padding: 24px; border-radius: 18px; }
+  .terminal-shell :is(.holdings-modal, .orders-modal, .pnl-modal).navigation-page { width: 100%; }
+
+  /* Dashboard: overview on the left, market directory on the right. */
+  .terminal-shell .home-studio .home-dashboard-scroll {
+    width: 100%; max-width: 1660px; margin: 0 auto; padding: 30px 32px 48px;
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+    grid-auto-flow: row; grid-auto-rows: max-content; align-items: start; align-content: start; gap: 22px;
+  }
+  .terminal-shell .home-studio .home-hero { grid-column: 1 / -1; padding: 0 0 8px; }
+  .terminal-shell .home-studio .home-hero-copy { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(320px, .9fr); column-gap: 32px; align-items: center; }
+  .terminal-shell .home-studio .home-kicker { grid-column: 1; margin-bottom: 9px; font-size: 13px; }
+  .terminal-shell .home-studio .home-hero h1 { grid-column: 1; margin: 0; font-size: 36px; letter-spacing: -1.2px; }
+  .terminal-shell .home-studio .home-global-search { grid-column: 2; grid-row: 1 / 3; width: 100%; min-height: 52px; margin: 0; border-radius: 12px; }
+  .terminal-shell .home-studio .home-market-chooser { grid-column: 1 / -1; margin: 0; width: min(620px, 100%); border-radius: 12px; }
+  .terminal-shell .home-studio .home-market-chooser > button { min-height: 55px; }
+  .terminal-shell .home-studio .home-wallet-card { grid-column: 1; grid-row: 3; padding: 24px 26px 0; border-radius: 18px; }
+  .terminal-shell .home-studio .home-wallet-amount { font-size: 40px; }
+  .terminal-shell .home-studio .home-wallet-label { margin-top: 18px; font-size: 11px; }
+  .terminal-shell .home-studio .home-wallet-other { margin-inline: -26px; padding-inline: 26px; }
+  .terminal-shell .home-studio .market-directory { grid-column: 2; grid-row: 3 / span 3; margin: 0; }
+  .terminal-shell .home-studio .market-directory-list { max-height: 570px; overflow-y: auto; overscroll-behavior: contain; }
+  .terminal-shell .home-studio .market-directory-row { min-height: 68px; padding: 10px 6px; }
+  .terminal-shell .home-studio .market-directory-tabs { margin-bottom: 12px; }
+  .terminal-shell .home-studio .home-pulse-section { grid-column: 1; grid-row: 4; margin: 0; }
+  .terminal-shell .home-studio .home-main-grid { grid-column: 1; grid-row: 5; display: block; }
+  .terminal-shell .home-studio :is(.home-section, .home-resume-card) { margin-top: 0; border-radius: 16px; }
+  .terminal-shell .home-studio .home-section > header { min-height: 58px; padding-inline: 20px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .terminal-shell .home-studio .home-section > header b { font-size: 14px; }
+  .terminal-shell .home-studio .home-index-grid { padding: 8px 12px 18px; }
+  .terminal-shell .home-studio .home-index-card { min-height: 88px; padding-inline: 14px; }
+  .terminal-shell .home-studio .home-index-card strong { font-size: 23px; }
+  .terminal-shell .home-studio .home-index-card > span b { font-size: 11px; }
+  .terminal-shell .home-studio .home-index-card small { font-size: 11px; }
+  .terminal-shell .home-studio .home-portfolio-value { padding-inline: 20px; }
+  .terminal-shell .home-studio .home-portfolio-value strong { font-size: 36px; }
+  .terminal-shell .home-studio .home-portfolio-stats { gap: 12px; padding: 8px 20px 20px; }
+  .terminal-shell .home-studio .home-portfolio-stats button { min-height: 76px; padding: 14px; }
+  .terminal-shell .home-studio .home-portfolio-stats button span { font-size: 11px; }
+  .terminal-shell .home-studio .home-portfolio-stats button b { font-size: 23px; }
+  .terminal-shell .home-studio .home-risk-meter { margin-inline: 20px; margin-bottom: 20px; }
+  .terminal-shell .home-studio .home-attention { grid-column: 2; }
+  .terminal-shell .home-studio .home-resume-card { grid-column: 1; min-height: 90px; }
+  .terminal-shell .home-studio .home-preference-message { grid-column: 1 / -1; }
+  .terminal-shell .home-studio[data-market="global"] .home-main-grid { grid-row: 4; }
+
+  /* Charts keep their full-height canvas and all existing controls. */
+  .terminal-shell .workspace.section-trade { padding: 12px; gap: 12px; }
+  .terminal-shell .workspace.section-trade .chart-area { min-width: 0; border: 1px solid var(--line); border-radius: 14px; }
+  .terminal-shell .workspace.section-trade .order-ticket { border: 1px solid var(--line); border-radius: 14px; padding: 20px 18px; }
+  .terminal-shell .trade-cockpit { border-radius: 0; box-shadow: none; }
+  .terminal-shell .trade-cockpit .chart-controls { min-height: 56px; height: auto; flex-basis: 56px; padding: 8px 12px; gap: 8px; }
+  .terminal-shell .trade-cockpit .desktop-symbol-trigger > span { font-size: 15px; max-width: 210px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol { gap: 5px; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol :is(.chart-watchlist-star,.chart-derivatives-link,.chart-replay-link,.chart-style-link,.chart-compare-link) { border: 1px solid var(--line); border-radius: 8px; width: 32px; min-width: 32px; flex-basis: 32px; }
+  .terminal-shell .chart-statusbar { min-height: 30px; padding-inline: 12px; }
+  .terminal-shell .chart-index-strip { height: 54px; flex-basis: 54px; padding: 8px 12px; }
+  .terminal-shell .chart-index-strip > button { border-radius: 8px; box-shadow: none; }
+
+  /* List pages become broad working surfaces, with readable rows. */
+  .terminal-shell .workspace.section-watchlist > .watchlist-panel { padding: 26px 30px; }
+  .terminal-shell .market-section-tabs { width: min(660px, 100%); margin-bottom: 16px; }
+  .terminal-shell .market-section-tabs button { min-height: 46px; font-size: 13px; }
+  .terminal-shell .market-discovery-panel .market-discovery-head { display: flex; min-height: 44px; margin-bottom: 18px; }
+  .terminal-shell .market-discovery-head h2 { font-size: 26px; letter-spacing: -.7px; }
+  .terminal-shell .market-scanner-tabs { padding-bottom: 16px; gap: 10px; }
+  .terminal-shell .compact-market-panel .market-scanner-tabs button { min-height: 46px; padding-inline: 16px; }
+  .terminal-shell .compact-market-panel .market-scanner-tabs button > b { font-size: 13px; }
+  .terminal-shell .market-discovery-panel .market-discovery-list,
+  .terminal-shell .workspace.section-watchlist .instrument-list { grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+  .terminal-shell .market-discovery-panel .trend-stock-row,
+  .terminal-shell .workspace.section-watchlist .instrument-row { min-height: 80px; padding: 14px; border-radius: 12px; }
+  .terminal-shell .ipo-studio { max-width: 1560px; }
+  .terminal-shell .ipo-studio .ipo-card-list { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 20px; }
+  .terminal-shell .ipo-studio .ipo-compact-card { padding: 22px; border-radius: 16px; }
+  .terminal-shell .pnl-modal.navigation-page .pnl-analysis-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 20px; }
+  .terminal-shell .pnl-trade-row { padding: 18px 20px; }
+  .terminal-shell .holdings-layout { gap: 24px; }
+
+  @media (max-width: 1199px) {
+    .terminal-shell { --desktop-rail: 128px; }
+    .terminal-shell .main-nav { padding-inline: 9px; }
+    .terminal-shell .main-nav button { padding-inline: 12px; }
+    .terminal-shell .workspace { grid-template-columns: minmax(0, 1fr) 270px; }
+    .terminal-shell .home-studio .home-dashboard-scroll { padding: 24px 20px 40px; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(290px, .85fr); }
+    .terminal-shell .home-studio .home-hero-copy { grid-template-columns: minmax(180px, 1fr) minmax(270px, 1fr); gap: 20px; }
+    .terminal-shell .home-studio .home-hero h1 { font-size: 30px; }
+    .terminal-shell .home-studio .home-index-grid { grid-template-columns: 1fr; padding: 0 16px 12px; }
+    .terminal-shell .home-studio .home-index-card { min-height: 62px; display: grid; grid-template-columns: 1fr auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    .terminal-shell .home-studio .home-index-card > span { grid-column: 1; }
+    .terminal-shell .home-studio .home-index-card strong { grid-column: 2; grid-row: 1; font-size: 20px; }
+    .terminal-shell .home-studio .home-index-card small { grid-column: 1 / -1; }
+    .terminal-shell .trade-cockpit .chart-controls { flex-wrap: wrap; flex-basis: auto; }
+    .terminal-shell .trade-cockpit .desktop-chart-symbol { flex-basis: 100%; }
+    .terminal-shell .navigation-page-backdrop { padding: 20px; }
+    .terminal-shell .orders-modal.navigation-page .order-row { grid-template-columns: 70px minmax(120px, 1fr) 60px 48px 85px 85px 75px; }
+  }
+}
