@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { queueAnalysisUpdate } from "@/lib/analysis-update-server";
 import {
   FUNDAMENTAL_CSV_PATH,
   FUNDAMENTAL_MANIFEST_PATH,
@@ -47,7 +48,9 @@ export async function POST(request: Request) {
       cacheControl: "60",
     });
     if (manifestUpload.error) throw manifestUpload.error;
-    return Response.json({ ok: true, ...manifest }, { headers: { "Cache-Control": "no-store" } });
+    let notificationQueued = false;
+    try { notificationQueued = await queueAnalysisUpdate(manifest); } catch { /* The scheduler reconciles successful uploads from storage. */ }
+    return Response.json({ ok: true, ...manifest, notificationQueued }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return fundamentalErrorResponse(error);
   }

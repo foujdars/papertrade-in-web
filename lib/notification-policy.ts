@@ -2,9 +2,9 @@ import type { IpoSummary } from "./ipo";
 import type { IpoAllotment } from "./ipo-allotment";
 import { ipoEventTitle, ipoBiddingContext, allotmentContext, listingContext } from "./ipo-notification-content.ts";
 
-export type NotificationPreferences = { ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; ema21: boolean; ema5: boolean; hideAmounts: boolean; pausedUntil: number };
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, ema21: true, ema5: true, hideAmounts: false, pausedUntil: 0 };
-export type PushNotice = { id: string; title: string; body: string; url: string; kind: "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
+export type NotificationPreferences = { analysis: boolean; ipo: boolean; allotment: boolean; trades: boolean; reviews: boolean; practice: boolean; sessions: boolean; ema21: boolean; ema5: boolean; hideAmounts: boolean; pausedUntil: number };
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = { analysis: true, ipo: true, allotment: true, trades: true, reviews: true, practice: true, sessions: true, ema21: true, ema5: true, hideAmounts: false, pausedUntil: 0 };
+export type PushNotice = { id: string; title: string; body: string; url: string; kind: "analysis" | "ipo" | "allotment" | "portfolio" | "practice" | "trade" | "session"; expiresAt: number; silent: boolean };
 export function automaticEmaAllowed(id: string, preferences: NotificationPreferences) {
   return !(id.startsWith("ema21-") && !preferences.ema21) && !(id.startsWith("ema5-") && !preferences.ema5);
 }
@@ -59,7 +59,7 @@ export function ipoDigest(ipos: IpoSummary[], now: number): PushNotice | null {
   const event = rows[0].biddingEndDate === day ? "bidding closes today" : "bidding open";
   const title = count === 1 ? ipoEventTitle(rows[0].name, event)
     : `IPO: ${count} ${slot === "closing" ? "issues close today" : "bidding updates"}`;
-  const body = rows.slice(0, 3).map(ipo => ipoBiddingContext(ipo, now)).join("\n")
+  const body = (rows.some(ipo => ipo.biddingEndDate === day) ? "⏰ Last day to apply. Check the deadline before you decide.\n" : "📊 Your IPO watch has fresh updates.\n") + rows.slice(0, 3).map(ipo => ipoBiddingContext(ipo, now)).join("\n")
     + (count > 3 ? `\n${count - 3} more issues. Open IPOs for the full list.` : "\nOpen IPOs to view issue details.");
   return { id: `ipo-${slot}-${day}`, kind: "ipo", title, body, url: "/?screen=ipo", expiresAt: now + 30 * 60000, silent: false };
 }
@@ -68,7 +68,7 @@ export function allotmentNotice(items: IpoAllotment[], now: number): PushNotice 
   if (!published.length) return null;
   const first = published[0];
   const title = published.length === 1 ? ipoEventTitle(first.name, "allotment published") : `IPO: ${published.length} allotments published`;
-  const body = published.slice(0, 3).map(allotmentContext).join("\n") + (published.length > 3 ? `\n${published.length - 3} more results. Open IPOs for the full list.` : "");
+  const body = "📬 The wait for these results is over 🙂\n" + published.slice(0, 3).map(allotmentContext).join("\n") + (published.length > 3 ? `\n${published.length - 3} more results. Open IPOs for the full list.` : "");
   return { id: `allotment-${published.map(item => item.id).sort().join("-")}`, kind: "allotment", title, body, url: published.length === 1 ? `/ipo-allotment/${first.registrar}` : "/?screen=ipo", expiresAt: now + 6 * 3600000, silent: quietTime(now) };
 }
 export function listingNotice(items: IpoSummary[], now: number): PushNotice | null {
@@ -83,5 +83,5 @@ export function listingNotice(items: IpoSummary[], now: number): PushNotice | nu
 export function reviewNotice(count: number, date: string, now: number): PushNotice | null {
   const { day, minutes, weekday } = indiaClock(now);
   if (date !== day || count < 1 || minutes < 1035 || minutes >= 1045 || weekday === 0 || weekday === 6) return null;
-  return { id: `review-${day}`, kind: "portfolio", title: shadeChoice("✨", [`${count} paper trade${count === 1 ? "" : "s"} to review`, `${count} trades to review`]), body: "", url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
+  return { id: `review-${day}`, kind: "portfolio", title: shadeChoice("✨", [`${count} paper trade${count === 1 ? "" : "s"} to review`, `${count} trades to review`]), body: "Your trading day, ready to revisit 🙂 Open P&L to review your entries, exits and lessons.", url: "/?screen=pnl", expiresAt: now + 30 * 60000, silent: false };
 }

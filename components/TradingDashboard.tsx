@@ -181,8 +181,8 @@ function prepareProtectionAlerts() {
 
 function showProtectionAlert(order: PaperOrder, nativeAlreadyNotified = false) {
   if (typeof window === "undefined") return;
-  const reason = order.exitReason === "TARGET" ? "Target reached" : "Stop-loss reached";
-  const body = `${order.symbol}: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} exited at ${formatInr(order.price)}.`;
+  const reason = `${order.exitReason === "TARGET" ? "🎯" : "🛡️"} ${order.symbol}: ${order.exitReason === "TARGET" ? "target reached" : "stop-loss reached"}`;
+  const body = `Paper position closed: ${order.quantity} unit${order.quantity === 1 ? "" : "s"} at ${formatInr(order.price)}. ${order.exitReason === "TARGET" ? "Time to review what worked 🙂" : "Your planned exit was followed. Open P&L to review the trade."}`;
   addPaperTradeNotification({ id: `trade-${order.id}`, kind: "trade", title: reason, body, symbol: order.symbol, instrumentKey: order.instrumentKey });
   const preferences = readNotificationPreferences();
   if (!preferences.trades || preferences.pausedUntil > Date.now() || nativeAlreadyNotified || document.visibilityState === "visible") {
@@ -190,10 +190,10 @@ function showProtectionAlert(order: PaperOrder, nativeAlreadyNotified = false) {
     return;
   }
   if (Capacitor.getPlatform() === "android" && !nativeAlreadyNotified) {
-    void getNativeTradeAlert().show({ title: `${order.symbol}: paper ${reason.toLowerCase()}`, body, kind: "trade", notificationId: `trade-${order.id}`, url: "/?screen=pnl" }).catch(() => undefined);
+    void getNativeTradeAlert().show({ title: reason, body, kind: "trade", notificationId: `trade-${order.id}`, url: "/?screen=pnl" }).catch(() => undefined);
   } else if ("Notification" in window && Notification.permission === "granted") {
     const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
-    new Notification(`PaperTrade IN - ${reason}`, { body: preferences.hideAmounts ? "Your paper-trade protection event is ready to review." : body, icon: "/papertrade-icon-192.png?v=1.22", tag: `papertrade-${order.id}`, silent: hour >= 21 || hour < 8 });
+    new Notification(reason, { body: preferences.hideAmounts ? "Your paper-trade exit is ready to review. Tap to open P&L." : body, icon: "/papertrade-icon-192.png?v=1.22", tag: `papertrade-${order.id}`, silent: hour >= 21 || hour < 8 });
   }
 }
 
@@ -876,7 +876,7 @@ export function TradingDashboard() {
       }
       if (savedChart.fnoTopMode) setFnoTopMode(savedChart.fnoTopMode);
       const requestedScreen = params.get("screen");
-      if (requestedScreen === "ipo" || requestedScreen === "pnl") {
+      if (requestedScreen === "ipo" || requestedScreen === "pnl" || requestedScreen === "fundamentals") {
         openNavigationSection(requestedScreen);
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("screen");

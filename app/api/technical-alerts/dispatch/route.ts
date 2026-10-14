@@ -109,7 +109,7 @@ export async function GET(request: Request) {
           if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
           const isPrice = rule.family === "price";
-          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe), body: "", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe), body: isPrice ? "🔔 Your watched price has been reached. Tap to inspect the chart and your trade plan." : "📈 A setup matched your alert rule. Tap to review the chart before making your next move.", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
           await sendPush(notice, { token: target.token }); delivered++;
         }
         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

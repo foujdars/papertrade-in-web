@@ -116,6 +116,16 @@ async function workerHarness(preferences) {
   }};
 }
 const push=changes=>({id:"one",title:"IPO update",body:"Test",kind:"ipo",url:"/?screen=ipo",expiresAt:String(Date.now()+60000),silent:"false",...changes});
+test("Analysis push opens the correct screen and honors its own switch", async () => {
+  const notice = push({ kind: 'analysis', title: '📊 Fresh Analysis data is ready!', url: '/?screen=fundamentals' });
+  const worker = await workerHarness({ analysis: true });
+  await worker.push(notice); assert.equal(worker.shown[0].data.url, '/?screen=fundamentals');
+  const disabled = await workerHarness({ analysis: false });
+  await disabled.push(notice); assert.equal(disabled.shown.length, 0);
+  const visible = await workerHarness({ analysis: true }); visible.setVisible(true);
+  await visible.push(notice); assert.equal(visible.messages.length, 1); assert.equal(visible.shown.length, 0);
+});
+
 test("background worker honors pause, drops expired payloads and deduplicates", async () => {
   const paused=await workerHarness({ipo:true,pausedUntil:Date.now()+60000});
   await paused.push(push());assert.equal(paused.shown.length,0);
@@ -197,7 +207,7 @@ test("legacy IPO pushes are labelled before foreground and background delivery",
 test("listing notices require today's confirmed positive prices and explain the comparison",()=>{
   const now=at("10:00:00"), ipo=issue({status:"listed",name:"Example Limited",details:{listingDate:"2026-09-14",issuePrice:100,listingPrice:90}});
   const notice=listingNotice([ipo],now);
-  assert.match(notice.title,/^IPO: Example — listed today$/);
+  assert.match(notice.title,/^IPO: 🔔 Example — listed today$/);
   assert.match(notice.body,/Example Limited.*₹90; issue price ₹100 \(-10%\)/);
   assert.match(notice.body,/not a live quote/);
   for(const details of [{listingDate:"2026-09-13"},{listingPrice:0},{issuePrice:-1},{listingPrice:Infinity},{issuePrice:null}])assert.equal(listingNotice([{...ipo,details:{...ipo.details,...details}}],now),null);

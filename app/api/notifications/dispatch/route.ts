@@ -6,6 +6,7 @@ import { type VolumeShockerDevice, deliverVolumeShockerAlerts } from "@/lib/volu
 import { loadAllotments } from "@/lib/ipo-allotment-server";
 import { GET as getIpos } from "@/app/api/upstox/ipos/route";
 import type { IpoListResponse } from "@/lib/ipo";
+import { deliverAnalysisUpdates } from "@/lib/analysis-update-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,18 +24,19 @@ export async function GET(request: Request) {
   let sent = 0;
   const shockerDevices: VolumeShockerDevice[] = [];
   try {
-    const [response, allotments] = await Promise.all([
+    const [ipoResult, allotmentResult] = await Promise.allSettled([
       getIpos(new Request("https://www.papertrade.site/api/upstox/ipos?status=open,closed,listed&details=1")).then(res => res.json() as Promise<IpoListResponse>),
       loadAllotments(),
     ]);
-    if (!response.ok) throw new Error("IPO feed unavailable");
+    const response = ipoResult.status === "fulfilled" ? ipoResult.value : null;
+    const allotments = allotmentResult.status === "fulfilled" ? allotmentResult.value : null;
     const stateRef = db.doc("notificationSystem/observations"), saved = await stateRef.get();
     const previous = saved.data()?.allotments || {}, day = indiaClock(now).day;
-    const ipos = response.ipos || [], events: PushNotice[] = [];
+    const ipos = response?.ok ? response.ipos || [] : [], events: PushNotice[] = [];
     const digest = ipoDigest(ipos, now); if (digest) events.push(digest);
     const opened = sessionOpenNotice(now); if (opened) events.push(opened);
     // First deployment records a baseline: it must not broadcast old results.
-    const newResults = saved.exists ? allotments.allotments.filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
+    const newResults = saved.exists ? (allotments?.allotments || []).filter(item => previous[item.id] !== "published" && item.state === "published" && item.evidenceUrl && (previous[item.id] || item.allotmentDate === day)) : [];
     const released = allotmentNotice(newResults, now); if (released) events.push(released);
     const listings = ipos.filter(ipo => saved.exists && listingNotice([ipo], now) !== null && !saved.data()?.listed?.[ipo.id]);
     const listing = listingNotice(listings, now);
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
     await db.runTransaction(async tx => {
       const existing = await Promise.all(refs.map(ref => tx.get(ref)));
       events.forEach((event,index) => { if (!existing[index].exists) tx.create(refs[index], { notice: event, status: "pending", createdAt: now, expiresAt: new Date(now + 7 * 86400000) }); });
-      tx.set(stateRef, { allotments: { ...previous, ...Object.fromEntries(allotments.allotments.map(item => [item.id, previous[item.id] === "published" ? "published" : item.state])) }, listed: { ...saved.data()?.listed, ...Object.fromEntries(listings.map(ipo=>[ipo.id,true])) } });
+      tx.set(stateRef, { allotments: { ...previous, ...Object.fromEntries((allotments?.allotments || []).map(item => [item.id, previous[item.id] === "published" ? "published" : item.state])) }, listed: { ...saved.data()?.listed, ...Object.fromEntries(listings.map(ipo=>[ipo.id,true])) } });
     });
     const queued = await db.collection("notificationOutbox").where("status","==","pending").limit(50).get();
     for (const doc of queued.docs) {
@@ -62,6 +64,9 @@ export async function GET(request: Request) {
     let query = db.collection("notificationDevices").orderBy(FieldPath.documentId()).limit(250);
     if (cursor) query = query.startAfter(cursor);
     const devices = await query.get(), calendarCount = (await db.doc(`notificationCalendar/${day}`).get()).data()?.count || 0;
+    let analysisReady = true;
+    try { sent += await deliverAnalysisUpdates(db, devices.docs, now); }
+    catch { analysisReady = false; }
     const clock = indiaClock(now);
     for (const device of devices.docs) {
       const data = device.data(), preferences = notificationPreferences(data.preferences);
@@ -85,7 +90,7 @@ export async function GET(request: Request) {
       }
       if (calendarCount >= 2) continue;
       let notice = reviewNotice(data.reviewCount, data.reviewDate, now);
-      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:shadeChoice("🎯", ["Candle replay is ready"]),body:"",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
+      if (!notice && clock.weekday === 0 && clock.minutes >= 1080 && clock.minutes < 1090 && now-data.lastActive >= 3*86400000) notice = { id:`practice-${day}`,kind:"practice",title:shadeChoice("🎯", ["Ready for a little chart practice?"]),body:"Build your confidence, one candle at a time 🙂 Open your trade reviews and try a replay.",url:"/?screen=pnl",expiresAt:now+30*60000,silent:false };
       if (!notice || data.lastNotice === notice.id || now-data.lastActive < 10*60000) continue;
       // Claim before sending, preventing repeated notifications on overlapping runs.
       await device.ref.update({lastNotice:notice.id});
@@ -95,7 +100,8 @@ export async function GET(request: Request) {
     await cursorRef.set({after:devices.size===250 ? devices.docs.at(-1)!.id : null});
     try { sent += await deliverVolumeShockerAlerts(db, shockerDevices, now); }
     catch { /* A volume-shocker scan must not fail IPO or session delivery. */ }
+    await db.doc("notificationSystem/health").set({ lastRun: Date.now(), ok: analysisReady, sent, ipoFeedReady: response?.ok === true, allotmentFeedReady: allotmentResult.status === "fulfilled" });
     return Response.json({ok:true,sent}, {headers:{"Cache-Control":"no-store"}});
-  } catch { return Response.json({error:"Notification dispatch could not complete. Check service configuration and feed availability."},{status:503}); }
+  } catch { await db.doc("notificationSystem/health").set({ lastRun: Date.now(), ok: false }); return Response.json({error:"Notification dispatch could not complete. Check service configuration and feed availability."},{status:503}); }
   finally { await lock.set({until:0}); }
 }

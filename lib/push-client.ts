@@ -110,13 +110,13 @@ export async function disconnectPush() {
   await connecting?.catch(()=>undefined);
   let token = activeToken;
   if (Capacitor.getPlatform() === "android") {
-    const result = await getNativeTradeAlert().configurePush({ preferences: { ...readNotificationPreferences(), ipo:false, allotment:false, trades:false, reviews:false, practice:false, sessions:false, ema21:false, ema5:false }, requestPermission:false }).catch(()=>undefined);
+    const result = await getNativeTradeAlert().configurePush({ preferences: { ...readNotificationPreferences(), analysis:false, ipo:false, allotment:false, trades:false, reviews:false, practice:false, sessions:false, ema21:false, ema5:false }, requestPermission:false }).catch(()=>undefined);
     token ||= result?.token || "";
     activeToken = token;
     await getNativeTradeAlert().consumeNotifications().catch(()=>undefined);
   } else {
     const registration = await navigator.serviceWorker?.getRegistration("/notifications/");
-    registration?.active?.postMessage({type:"preferences",preferences:{ipo:false,allotment:false,reviews:false,practice:false,trades:false,sessions:false,ema21:false,ema5:false}});
+    registration?.active?.postMessage({type:"preferences",preferences:{analysis:false,ipo:false,allotment:false,reviews:false,practice:false,trades:false,sessions:false,ema21:false,ema5:false}});
     const { getApps } = await import("firebase/app");
     const { getMessaging, deleteToken } = await import("firebase/messaging");
     const app=getApps().find(item=>item.name==="papertrade-push");

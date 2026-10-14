@@ -96,7 +96,7 @@ public class IpoGmpAlertWorker extends Worker {
                         double issueSize = ipo.optDouble("issueSizeCrore", Double.NaN);
                         String issueText = Double.isFinite(issueSize) && issueSize > 0
                             ? String.format(java.util.Locale.ENGLISH, "Issue size Rs %,.2f Cr. ", issueSize) : "";
-                        String closingBody = name + ": bidding closes " + NotificationContent.date(endDate) + ". " + issueText + "Open IPOs to check the bidding deadline and issue details.";
+                        String closingBody = "⏰ Last day to apply. " + name + ": bidding closes " + NotificationContent.date(endDate) + ". " + issueText + "Check the deadline and issue details before you decide.";
                         showNotification(context, NotificationContent.ipoTitle(name, "bidding closes today"), closingBody, ("ipo-closing-" + ipoId + "-" + today).hashCode());
                         preferences.edit().putString(closingStateKey, today).apply();
                     }
@@ -108,7 +108,7 @@ public class IpoGmpAlertWorker extends Worker {
                 if (today.equals(preferences.getString(stateKey, ""))) continue;
                 double gmpAmount = ipo.optDouble("gmpAmount", Double.NaN);
                 String amount = Double.isFinite(gmpAmount) ? String.format(java.util.Locale.ENGLISH, "Rs %.2f / ", gmpAmount) : "";
-                String body = name + ": unofficial GMP " + amount + String.format(java.util.Locale.ENGLISH, "%.2f%% of issue price", gmpPercent)
+                String body = "📊 Your IPO watch has a fresh update. " + name + ": unofficial GMP " + amount + String.format(java.util.Locale.ENGLISH, "%.2f%% of issue price", gmpPercent)
                     + ", updated " + NotificationContent.updatedTime(ipo.optString("gmpUpdatedAt")) + ". Bidding closes " + NotificationContent.date(endDate)
                     + ". This is not a confirmed listing gain. Open IPOs to review issue details.";
                 showNotification(context, NotificationContent.ipoTitle(name, "GMP above 15%"), body, ("ipo-gmp-" + ipoId + "-" + today).hashCode());
