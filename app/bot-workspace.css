@@ -90,3 +90,13 @@
   .bot-timeframes { gap: 3px; }
   .bot-timeframes label { font-size: 10px; }
 }
+
+.bot-activity > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 650; }
+.bot-activity > summary::before { content: '›'; font-size: 22px; transition: transform .15s; }
+.bot-activity[open] > summary::before { transform: rotate(90deg); }
+.bot-activity > summary > span { margin-left: auto; color: var(--muted); font-size: 12px; }
+.bot-activity li > div { min-width: 0; overflow-wrap: anywhere; }
+.bot-activity li > span { flex: 0 0 115px; }
+.bot-activity .bot-activity-delete { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 40px; margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; color: #d14d67; background: var(--surface); font: inherit; cursor: pointer; }
+.bot-activity .bot-activity-delete:disabled { opacity: .5; cursor: default; }
+.bot-activity-note { color: var(--muted); font-size: 11px; }
