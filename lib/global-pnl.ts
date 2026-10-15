@@ -51,7 +51,21 @@ function closes(events: Fill[], prefix: string): ClosedPaperTrade[] {
   return trades;
 }
 
-export function globalClosedTrades(account: Pick<PerpAccount, "events" | "optionEvents"> | null): ClosedPaperTrade[] {
+export function globalClosedTrades(account: Pick<PerpAccount, "events" | "optionEvents" | "deletedGlobalPnlTradeIds"> | null): ClosedPaperTrade[] {
   if (!account) return [];
-  return [...closes(account.events ?? [], "perp"), ...closes(account.optionEvents ?? [], "option")].sort((a, b) => a.closedAt - b.closedAt || a.id.localeCompare(b.id));
+  const deleted = new Set(account.deletedGlobalPnlTradeIds ?? []);
+  return [...closes(account.events ?? [], "perp"), ...closes(account.optionEvents ?? [], "option")].filter(trade => !deleted.has(trade.id)).sort((a, b) => a.closedAt - b.closedAt || a.id.localeCompare(b.id));
+}
+
+/** Hide reports only after matching all fills, preserving FIFO costs and wallet accounting. */
+export function deleteGlobalPnlTrades(account: PerpAccount, ids: readonly string[]): PerpAccount {
+  if (!ids.length) return account;
+  const all = globalClosedTrades({ ...account, deletedGlobalPnlTradeIds: [] });
+  const valid = new Set(all.map(trade => trade.id));
+  if (ids.some(id => !valid.has(id))) throw new Error('A selected global trade is no longer available. Refresh and select again.');
+  const deleted = new Set(account.deletedGlobalPnlTradeIds ?? []);
+  if (ids.every(id => deleted.has(id))) return account;
+  ids.forEach(id => deleted.add(id));
+  if (deleted.size > 10000) throw new Error('Global P&L deletion limit reached.');
+  return { ...account, deletedGlobalPnlTradeIds: [...deleted], revision: account.revision + 1 };
 }
