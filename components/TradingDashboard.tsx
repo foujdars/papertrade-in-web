@@ -3575,7 +3575,7 @@ export function TradingDashboard() {
               <article>
                 <b>Android app</b>
                 <small>Install the beta APK directly from the official website.</small>
-                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.23-beta.apk" download><Download size={18} /> Download Android APK</a>
+                <a className="download-primary" href="/downloads/PaperTrade-IN-v1.24-beta.apk" download><Download size={18} /> Download Android APK</a>
               </article>
               <article>
                 <b>iPhone / iPad app</b>
