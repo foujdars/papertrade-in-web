@@ -3,6 +3,7 @@ import { ChevronRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOVER_TABS, volumeMetrics, type Mover, type MoverTab } from "@/lib/market-movers";
+import { volumeLabel } from '@/lib/equity-watch';
 import { StockLogo } from "@/components/StockLogo";
 import { startVisiblePolling } from "@/lib/visible-polling";
 import { useTransientBack } from "./useTransientBack";
@@ -15,29 +16,29 @@ function percent(change: number) {
   return `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
 }
 
-export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
+export function MarketMovers({ onOpen, inline = false }: { onOpen: (symbol: string) => void; inline?: boolean }) {
   const [lists, setLists] = useState<Lists | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<MoverTab>("gainers");
   const [open, setOpen] = useState(false);
-  useTransientBack(open, () => setOpen(false));
+  useTransientBack(open && !inline, () => setOpen(false));
   useEffect(() => {
     return startVisiblePolling(async signal => {
-      const response = await fetch(`/api/market/movers${open ? "" : "?summary=1"}`, {signal,cache:"no-store"});
+      const response = await fetch(`/api/market/movers${open || inline ? "" : "?summary=1"}`, {signal,cache:"no-store"});
       const body = await response.json();
       if (signal.aborted) return;
       if (!response.ok || !body?.ok || !body.lists) {setFailed(true);return;}
       setFailed(false);setLists(body.lists);
     }, 15000, () => setFailed(true));
-  }, [open]);
+  }, [open, inline]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     window.addEventListener("keydown", onKey);
     return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", onKey); };
-  }, [open]);
+  }, [open, inline]);
   const label = MOVER_TABS.find(item => item.id === tab)?.label ?? "Market movers";
   const rows = lists?.[tab] ?? [];
   const gainers = lists?.gainers ?? [];
@@ -49,7 +50,19 @@ export function MarketMovers({ onOpen }: { onOpen: (symbol: string) => void }) {
     <small>{kind}</small><b title={row?.name}>{row?.symbol ?? '—'}</b>
     <em className={row ? row.change < 0 ? 'down' : row.change > 0 ? 'up' : '' : ''}>{row ? percent(row.change) : '—'}</em>
   </span>;
-  return <div className="home-market-slot">
+  if (inline) return <section className="desktop-movers home-movers-slot" aria-label="Top movers today">
+    <header><div><h2>Top movers today</h2><p>Explore NSE stocks by performance and activity</p></div><span>NSE</span></header>
+    <div className="desktop-mover-tabs" role="tablist" aria-label="Mover list">{MOVER_TABS.map(item => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+    <div className="desktop-market-table" role="table" aria-label={`${label} stocks`}>
+      <div className="desktop-market-table-head" role="row"><span role="columnheader">Company</span><span role="columnheader">Market price</span><span role="columnheader">1D change</span><span role="columnheader">Volume</span></div>
+      {rows.map(row => <button key={row.symbol} className="desktop-stock-row" role="row" aria-label={`Open ${row.symbol} chart`} onClick={() => onOpen(row.symbol)}>
+        <span className="desktop-stock-name" role="cell"><StockLogo symbol={row.symbol} size={34}/><span><b>{row.symbol}</b><small>{row.name}</small></span></span>
+        <span role="cell">₹{price.format(row.price)}</span><span role="cell" className={row.change < 0 ? 'negative' : 'positive'}>{percent(row.change)}</span><span role="cell">{volumeLabel(row.volume)}</span>
+      </button>)}
+      {!rows.length && <p role="status" className="desktop-table-empty">{Array.isArray(lists?.[tab]) || failed ? 'No stocks on this list right now.' : 'Loading market movers…'}</p>}
+    </div>
+  </section>;
+  return <div className="home-market-slot home-movers-slot">
     <button type="button" className="home-market-card home-market-card-v2" data-kind="movers" onClick={() => setOpen(true)} aria-label={lead ? `Open market movers. Top gainer ${lead.symbol} ${percent(lead.change)}` : "Open market movers"}>
       <span className="home-market-card-copy"><span className="home-market-card-title"><b>Movers</b></span><ChevronRight size={17} aria-hidden="true" /></span>
       <span className="home-mover-previews">{moverTile('Top gainer', lead)}{moverTile('Top loser', lag)}</span>

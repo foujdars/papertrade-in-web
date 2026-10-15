@@ -78,7 +78,8 @@ test("home renders the mover board from the NSE scan route", async () => {
     readFile(new URL("../lib/market-movers.ts", import.meta.url), "utf8"),
   ]);
   assert.match(home, /home-market-pair/);
-  assert.match(home, /<MarketMovers onOpen=\{onOpenStock\} \/>/);
+  assert.match(home, /<MarketMovers onOpen=\{onOpenStock\} inline=\{desktop\} \/>/);
+  assert.match(home, /const desktop = useDesktopBrowser\(\)/);
   assert.match(route, /scanner\.tradingview\.com\/india\/scan/);
   assert.match(view, /home-market-card/);
   assert.match(view, /StockLogo/);

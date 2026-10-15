@@ -1,5 +1,6 @@
 "use client";
 import { useHeaderPanels } from "./useHeaderPanels";
+import { useDesktopBrowser } from './useDesktopBrowser';
 import { HeaderPopover } from "./HeaderPopover";
 import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls';
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
@@ -413,6 +414,7 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
 }
 
 export function TradingDashboard() {
+  const desktopBrowser = useDesktopBrowser();
   const exchangeSession = useNseSession();
   const mcxSession = useNseSession("MCX");
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
@@ -525,6 +527,9 @@ export function TradingDashboard() {
   const [holdingsOpen, setHoldingsOpen] = useState(false);
   const [orderSheetOpen, setOrderSheetOpen] = useState(false);
   const [desktopOrderPanelOpen, setDesktopOrderPanelOpen] = useState(true);
+  const [desktopTicketOpen, setDesktopTicketOpen] = useState(false);
+  const [desktopChartWatchlistOpen, setDesktopChartWatchlistOpen] = useState(false);
+  const [desktopDrawingCollapsed, setDesktopDrawingCollapsed] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [marketsInitialGroup, setMarketsInitialGroup] = useState<ScannerGroup>("TRADING");
@@ -2462,6 +2467,7 @@ export function TradingDashboard() {
   }
 
   function chooseTradeInstrument(item: Instrument) {
+    setDesktopChartWatchlistOpen(false);
     setResearchDraft(null);
     if (activeNavigationSection !== "trade" || selected.instrumentKey !== item.instrumentKey) rememberWatchlistLocation();
     const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
@@ -2915,6 +2921,7 @@ export function TradingDashboard() {
           <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}><Home className="desktop-nav-icon" size={16} aria-hidden="true"/>Home</button>
           <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}><LineChart className="desktop-nav-icon" size={16} aria-hidden="true"/>Charts</button>
           <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness className="desktop-nav-icon" size={16} aria-hidden="true"/>Holdings</button>
+          <button className="desktop-nav-positions" onClick={() => setPositionsOpen(true)}>Positions</button>
           <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}><BookOpenCheck className="desktop-nav-icon" size={16} aria-hidden="true"/>Orders</button>
           <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}><Bookmark className="desktop-nav-icon" size={16} aria-hidden="true"/>Watchlist</button>
           <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}><Newspaper className="desktop-nav-icon" size={16} aria-hidden="true"/>News</button>
@@ -2956,8 +2963,9 @@ export function TradingDashboard() {
         </div>
       </header>
 
-      {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${desktopOrderPanelOpen ? "" : "order-panel-collapsed"}`}>
-        <aside className={`watchlist-panel ${sidebarOpen ? "mobile-open" : ""}`}>
+      {!holdingsOpen && !homeOpen && <div className={`workspace section-${activeNavigationSection} ${(desktopBrowser ? desktopTicketOpen || orderSheetOpen : desktopOrderPanelOpen) ? "" : "order-panel-collapsed"}`}>
+        <aside className={`watchlist-panel ${sidebarOpen || desktopBrowser && desktopChartWatchlistOpen ? "mobile-open" : ""}`}>
+          <button className="desktop-chart-watchlist-close" aria-label="Close chart watchlist" onClick={() => setDesktopChartWatchlistOpen(false)}><X size={17}/></button>
           {sidebarOpen && <div className="watchlist-market-header">
 
             <MarketSectionTabs scannerGroup={lastScannerGroupRef.current} active="WATCHLIST" onChange={(section) => {
@@ -3045,8 +3053,8 @@ export function TradingDashboard() {
               magnet={magnet}
               locked={drawingsLocked}
               hidden={hiddenDrawings}
-              collapsed={tradeToolbarCollapsed}
-              onToggleCollapsed={() => setTradeToolbarCollapsed((value) => !value)}
+              collapsed={desktopBrowser ? desktopDrawingCollapsed : tradeToolbarCollapsed}
+              onToggleCollapsed={() => { if (desktopBrowser) setDesktopDrawingCollapsed(value => !value); else setTradeToolbarCollapsed(value => !value); }}
               onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }}
               onAllTools={() => setShowDrawingLibrary(true)}
               onToggleMagnet={() => setMagnet((value) => !value)}
@@ -3135,7 +3143,17 @@ export function TradingDashboard() {
         </section>
 
         {orderSheetOpen && <button className="order-sheet-backdrop" aria-label="Close paper order" onClick={() => setOrderSheetOpen(false)} />}
-        <button type="button" className="desktop-order-panel-toggle" onClick={() => setDesktopOrderPanelOpen((value) => !value)} aria-label={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"} title={desktopOrderPanelOpen ? "Hide paper order panel" : "Show paper order panel"}><ChevronRight size={16} /></button>
+        <nav className="desktop-chart-rail" aria-label="Chart workspace panels">
+          <button onClick={() => openNavigationSection('home')}><Home size={19}/><span>Explore</span></button>
+          <button onClick={openChartPositions}><BriefcaseBusiness size={19}/><span>Positions</span></button>
+          {selectedFnoUnderlying && <button disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}><Link2 size={19}/><span>F&O chain</span></button>}
+          <button onClick={() => openNavigationSection('orders')}><BookOpenCheck size={19}/><span>Orders</span></button>
+          <button aria-pressed={desktopChartWatchlistOpen} onClick={() => { setDesktopChartWatchlistOpen(value => !value); setDesktopTicketOpen(false); setOrderSheetOpen(false); }}><Bookmark size={19}/><span>Watchlist</span></button>
+          <button onClick={() => openNavigationSection('holdings')}><BriefcaseBusiness size={19}/><span>Holdings</span></button>
+          <button aria-label="Toggle paper trade ticket" aria-expanded={desktopTicketOpen || orderSheetOpen} onClick={() => { setDesktopTicketOpen(!(desktopTicketOpen || orderSheetOpen)); setOrderSheetOpen(false); setDesktopChartWatchlistOpen(false); }}><Plus size={19}/><span>Trade</span></button>
+          <button onClick={openHeaderWallet}><WalletCards size={19}/><span>Wallet</span></button>
+        </nav>
+        <button type="button" className="desktop-order-panel-toggle" onClick={() => { if (desktopBrowser) { setDesktopTicketOpen(!(desktopTicketOpen || orderSheetOpen)); setOrderSheetOpen(false); } else setDesktopOrderPanelOpen(value => !value); }} aria-label={(desktopBrowser ? desktopTicketOpen || orderSheetOpen : desktopOrderPanelOpen) ? "Hide paper order panel" : "Show paper order panel"} title="Paper order panel"><ChevronRight size={16} /></button>
         <aside className={`order-ticket ${orderSheetOpen ? "mobile-open" : ""}`}>
           <button className="mobile-order-close icon-button" onClick={() => setOrderSheetOpen(false)} aria-label="Close paper order"><X size={20} /></button>
           {selectedDeltaSymbol ? <GlobalOrderTicket key={`${user?.id ?? "guest"}:${selectedDeltaSymbol}`} owner={user?.id ?? "guest"} symbol={selectedDeltaSymbol} side={side} onSide={setSide} trading={globalTrading} tab={globalTicketTab} onTab={setGlobalTicketTab} /> : selectedDeltaOption ? <GlobalOptionTicket key={`${user?.id ?? "guest"}:${selectedDeltaOption}`} symbol={selectedDeltaOption} side={side} onSide={setSide} trading={globalTrading} tab={globalTicketTab} onTab={setGlobalTicketTab} /> : <>
@@ -3283,6 +3301,7 @@ export function TradingDashboard() {
         onOpenWatchlist={() => openNavigationSection("watchlist")}
         onOpenHoldings={() => openNavigationSection("holdings")}
         onOpenPositions={() => setPositionsOpen(true)}
+        onDesktopNavigate={openNavigationSection}
         onOpenTradeHistory={() => {
           setSelectedPnlDateKey(null);
           setPnlHistoryFilter("all");
