@@ -40,6 +40,7 @@ import { isProfileStyle, prepareStyleCandles, styleBaselinePrice, styleSeriesKin
 import { compareColor, compareQuote, formatCompareDelta, formatComparePrice } from "@/lib/chart-compare";
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
 import { cachedChartCandles, prependChartCandles, candleBucket, candlesEqual, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
+import { movingAverageWarmup } from '@/lib/indicator-discovery';
 import { comparisonRequest } from "@/lib/chart-compare";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -550,6 +551,7 @@ export function MarketChart({
     ? Object.fromEntries(Object.keys(suppliedIndicators).map(key => [key, false])) as ChartIndicators
     : suppliedIndicators.psbb ? { ...suppliedIndicators, rsi: true } : suppliedIndicators, [candlesOnly, suppliedIndicators]);
   const { settings: studySettings, setStudy } = useIndicatorSettings();
+  const averageWarmup = movingAverageWarmup(indicators, studySettings, timeframe);
   const psbbWasEnabled = useRef(false);
   useEffect(() => {
     if (indicators.psbb && !psbbWasEnabled.current) {
@@ -2980,7 +2982,7 @@ export function MarketChart({
     scheduleOverlayRefresh();
   }, [externalCandles,timeframe,priceIncrement,historyRequest]);
 
-  // Fetch only when the user reaches the loaded history's left edge. Keep the
+  // Fetch at the history edge or to supply real moving-average warmup bars. Keep the
   // same candles at the same pixel positions while older bars are prepended.
   useEffect(() => {
     const chart = chartApi.current;
@@ -2991,7 +2993,9 @@ export function MarketChart({
     let emptyPages = 0;
     const load = async () => {
       const range = chart.timeScale().getVisibleLogicalRange();
-      if (busy || ended || failed || !range || range.from > 40 || !dataRef.current.length || !viewportInteractedRef.current) return;
+      if (busy || ended || failed || !range || !dataRef.current.length) return;
+      const needsWarmup = averageWarmup > 0 && range.from < averageWarmup;
+      if (!needsWarmup && (range.from > 40 || !viewportInteractedRef.current)) return;
       busy = true;
       setOlderHistory("loading");
       const before = Math.min(cursor ?? Infinity, Number(dataRef.current[0].time));
@@ -3034,13 +3038,14 @@ export function MarketChart({
     };
     retryOlderHistory.current = () => { failed = false; emptyPages = 0; viewportInteractedRef.current = true; void load(); };
     chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);
+    schedule();
     return () => {
       controller.abort();
       window.clearTimeout(timer);
       retryOlderHistory.current = () => {};
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule);
     };
-  }, [chartGeneration, instrument.instrumentKey, timeframe, isReplay, historyRequest]);
+  }, [chartGeneration, instrument.instrumentKey, timeframe, isReplay, historyRequest, averageWarmup]);
 
   useEffect(() => {
     dateArrowRef.current = null;
