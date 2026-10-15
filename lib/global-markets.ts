@@ -370,6 +370,7 @@ export type PerpEvent = {
   detail: string;
 };
 export type PerpAccount = {
+  deletedGlobalPnlTradeIds?: string[];
   deletedBotActivityIds?: string[];
   bots?: PaperBot[];
   currency?: "USD";

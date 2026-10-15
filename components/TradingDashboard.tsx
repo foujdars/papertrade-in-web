@@ -80,7 +80,7 @@ import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
 import { PNL_SCOPE_KEY, readPnlScope, writePreference } from "@/lib/interface-preferences";
 import { filterPnlTrades, pnlDay, pnlOutcome, summarisePnl, type PnlScope } from "@/lib/pnl-analytics";
-import { globalClosedTrades } from "@/lib/global-pnl";
+import { globalClosedTrades, deleteGlobalPnlTrades } from "@/lib/global-pnl";
 import { priceTaskError, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
@@ -2034,10 +2034,14 @@ export function TradingDashboard() {
   useTransientBack(feedbackOpen, () => setFeedbackOpen(false));
   useTransientBack(accountOpen && !accountDeleteArmed, () => { setAccountOpen(false); setAccountDeleteArmed(false); });
   useTransientBack(accountOpen && accountDeleteArmed, () => setAccountDeleteArmed(false));
-  const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => !isGlobalPnlTrade(trade) && tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
-  const pendingDeletion = useMemo(() => pendingDeleteIds ? prepareClosedTradeDeletion(orders, pendingDeleteIds) : null, [orders, pendingDeleteIds]);
+  const selectedTradeIds = selectingTrades ? visiblePnlTrades.filter((trade) => tradeSelection.ids.includes(trade.id)).map((trade) => trade.id) : [];
+  const selectingGlobalTrades = selectedTradeIds.length ? selectedTradeIds[0].startsWith('global:') : pnlScope.asset === 'global';
+  const selectablePnlTrades = visiblePnlTrades.filter(trade => isGlobalPnlTrade(trade) === selectingGlobalTrades);
+  const deletingGlobalTrades = Boolean(pendingDeleteIds?.some(id => id.startsWith('global:')));
+  const pendingDeletion = useMemo(() => !pendingDeleteIds ? null : pendingDeleteIds.some(id => id.startsWith('global:')) ? { trades: globalPnlTrades.filter(trade => pendingDeleteIds.includes(trade.id)), error: pendingDeleteIds.every(id => id.startsWith('global:')) ? '' : 'Select trades from one market at a time.' } : prepareClosedTradeDeletion(orders, pendingDeleteIds), [orders, pendingDeleteIds, globalPnlTrades]);
   function toggleTradeSelection(id: string) {
-    setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(id) ? selectedTradeIds.filter((selectedId) => selectedId !== id) : [...selectedTradeIds, id] });
+    const sameMarket = selectedTradeIds.filter(selectedId => selectedId.startsWith('global:') === id.startsWith('global:'));
+    setTradeSelection({ scope: tradeSelectionScope, ids: sameMarket.includes(id) ? sameMarket.filter((selectedId) => selectedId !== id) : [...sameMarket, id] });
   }
   const paperOrdersById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
   const orderMarkerRoles = useMemo(() => {
@@ -2196,8 +2200,17 @@ export function TradingDashboard() {
     } catch (error) { setToast(error instanceof Error ? error.message : "Could not add practice cash."); }
   }
 
-  function confirmClosedTradeDeletion() {
+  async function confirmClosedTradeDeletion() {
     if (!pendingDeleteIds) return;
+    if (deletingGlobalTrades) {
+      if (globalTrading.busy || pendingDeletion?.error) return;
+      try {
+        if (!await globalTrading.transact(account => deleteGlobalPnlTrades(account, pendingDeleteIds))) { setToast('Could not delete global P&L trades. Please retry.'); return; }
+        setPendingDeleteIds(null); setTradeSelection(null); setPnlTradeMenuId(null);
+        setToast(`${pendingDeleteIds.length} global trade${pendingDeleteIds.length === 1 ? '' : 's'} removed from P&L. Wallet unchanged.`);
+      } catch { setToast('Could not delete global P&L trades. Please retry.'); }
+      return;
+    }
     const deletion = prepareClosedTradeDeletion(orders, pendingDeleteIds);
     if (deletion.error || !deletion.removedOrders.length) return;
     const nextBalance = balance + deletion.balanceAdjustment;
@@ -3501,9 +3514,9 @@ export function TradingDashboard() {
             <div className="pnl-trade-list" ref={pnlTradeListRef} hidden={!pnlHistoryOnly && pnlTab !== "trades"}>
               {pnlDrill && <div className="pnl-drill-filter"><span>{pnlDrill.label} · {pnlDrilledTrades.length} exits</span><button onClick={() => { setPnlDrill(null); setTradeSelection(null); }}>Clear chart selection</button></div>}
               {!!visiblePnlTrades.length && selectingTrades && <div className={`pnl-selection-toolbar ${selectingTrades ? "is-selecting" : ""}`}>
-                <div><b>{selectedTradeIds.length} selected</b><small>Choose the records to remove</small></div>
+                <div><b>{selectedTradeIds.length} selected</b><small>Choose records from one market at a time. Selecting another market starts a new selection.</small></div>
                 <button type="button" onClick={() => { setTradeSelection(null); setPnlTradeMenuId(null); }}>Done</button>
-                {selectingTrades && pnlScope.asset !== "global" && <div className="pnl-selection-actions"><button type="button" onClick={() => setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.length === visiblePnlTrades.filter(trade => !isGlobalPnlTrade(trade)).length ? [] : visiblePnlTrades.filter(trade => !isGlobalPnlTrade(trade)).map((trade) => trade.id) })}>{selectedTradeIds.length === visiblePnlTrades.filter(trade => !isGlobalPnlTrade(trade)).length ? "Deselect all" : "Select Indian trades"}</button><button type="button" className="pnl-selection-delete" disabled={!selectedTradeIds.length} onClick={() => setPendingDeleteIds(selectedTradeIds)}><Trash2 size={15} /> Delete ({selectedTradeIds.length})</button></div>}
+                {selectingTrades && <div className="pnl-selection-actions"><button type="button" onClick={() => setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.length === selectablePnlTrades.length ? [] : selectablePnlTrades.map(trade => trade.id) })}>{selectedTradeIds.length === selectablePnlTrades.length ? 'Deselect all' : selectingGlobalTrades ? 'Select Global trades' : 'Select Indian trades'}</button><button type="button" className="pnl-selection-delete" disabled={!selectedTradeIds.length || globalTrading.busy && selectingGlobalTrades} onClick={() => setPendingDeleteIds(selectedTradeIds)}><Trash2 size={15} /> Delete ({selectedTradeIds.length})</button></div>}
               </div>}
               <div className="pnl-history-toolbar">
                 <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
@@ -3524,9 +3537,9 @@ export function TradingDashboard() {
                   .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
                   .filter((marker) => marker.time > 0);
                 return (
-                  <LongPressTradeRow onLongPress={() => { if (globalTrade) return; setTradeSelection({ scope: tradeSelectionScope, ids: selectedTradeIds.includes(trade.id) ? selectedTradeIds : [...selectedTradeIds, trade.id] }); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades && !globalTrade ? "checkbox" : "button"} aria-disabled={selectingTrades && globalTrade || undefined} tabIndex={selectingTrades && globalTrade ? -1 : 0} aria-checked={selectingTrades && !globalTrade ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades && globalTrade ? "Global trade · read-only history" : selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${tradeMoney(trade.netPnl)}` : `Open ${trade.symbol} entry and exit trade chart`} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? !globalTrade && toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) { if (!globalTrade) toggleTradeSelection(trade.id); } else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
-                    {selectingTrades && !globalTrade ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={pnlOutcome(trade.netPnl) === "profit" ? "win" : pnlOutcome(trade.netPnl) === "loss" ? "loss" : "flat"}>{pnlOutcome(trade.netPnl) === "profit" ? "WIN" : pnlOutcome(trade.netPnl) === "loss" ? "LOSS" : "FLAT"}</span>}
-                    <button type="button" className="stock-identity pnl-stock-chart-link" disabled={selectingTrades && globalTrade} aria-label={selectingTrades && globalTrade ? "Global trade · read-only history" : selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} price chart`} title={selectingTrades ? undefined : `Open ${trade.symbol} price chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) { if (!globalTrade) toggleTradeSelection(trade.id); } else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} size={36} /><span><b>{trade.symbol}<ChevronRight size={16} aria-hidden="true" /></b><small>{globalTrade ? "Global · USD" : "Indian · INR"} · {trade.product} · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small><em>Open price chart</em></span></button>
+                  <LongPressTradeRow onLongPress={() => { if (!selectedTradeIds.includes(trade.id)) toggleTradeSelection(trade.id); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${tradeMoney(trade.netPnl)}` : `Open ${trade.symbol} entry and exit trade chart`} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
+                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={pnlOutcome(trade.netPnl) === "profit" ? "win" : pnlOutcome(trade.netPnl) === "loss" ? "loss" : "flat"}>{pnlOutcome(trade.netPnl) === "profit" ? "WIN" : pnlOutcome(trade.netPnl) === "loss" ? "LOSS" : "FLAT"}</span>}
+                    <button type="button" className="stock-identity pnl-stock-chart-link" aria-label={selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} price chart`} title={selectingTrades ? undefined : `Open ${trade.symbol} price chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) toggleTradeSelection(trade.id); else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} size={36} /><span><b>{trade.symbol}<ChevronRight size={16} aria-hidden="true" /></b><small>{globalTrade ? "Global · USD" : "Indian · INR"} · {trade.product} · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small><em>{selectingTrades ? 'Select trade' : 'Open price chart'}</em></span></button>
                     <TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get(trade.id)} currency={globalTrade ? "USD" : "INR"} status={paperOrdersById.get(trade.id) ? paperOrderStatusLabel(paperOrdersById.get(trade.id)!) : "Complete"} />
                     {menuOpen && <TradeReviewDialog symbol={trade.symbol} theme={theme} onClose={() => setPnlTradeMenuId(null)}>
                     <div className="pnl-review-executions"><span>Entry: {trade.openedAt ? new Date(trade.openedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Exit: {trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Fees: {tradeMoney(trade.charges)} · included in net P&amp;L</span></div>
@@ -3558,14 +3571,14 @@ export function TradingDashboard() {
                         </div>
                       </div>
                     ) : <div className="positions-empty">Historical entry and exit candles are unavailable for this record.</div>}
-                    <div className="pnl-trade-actions">{trade.id.startsWith("global:") ? <small>Global exits stay in the dollar wallet history.</small> : <><small>Remove only an incorrect record.</small><button type="button" onClick={(event) => { event.stopPropagation(); setPnlTradeMenuId(null); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button></>}</div>
+                    <div className="pnl-trade-actions"><small>{globalTrade ? 'Remove from P&L only. Wallet history is retained.' : 'Remove only an incorrect record.'}</small><button type="button" onClick={(event) => { event.stopPropagation(); setPnlTradeMenuId(null); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button><button type="button" onClick={() => { setPnlTradeMenuId(null); setTradeSelection({ scope: tradeSelectionScope, ids: [trade.id] }); }}>Select multiple</button></div>
                     </TradeReviewDialog>}
                   </LongPressTradeRow>
                 );
               })}
               {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
             </div>
-            {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} onCancel={() => setPendingDeleteIds(null)} onConfirm={confirmClosedTradeDeletion} />}
+            {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} global={deletingGlobalTrades} busy={deletingGlobalTrades && globalTrading.busy} onCancel={() => { if (!deletingGlobalTrades || !globalTrading.busy) setPendingDeleteIds(null); }} onConfirm={() => void confirmClosedTradeDeletion()} />}
           </section>
         </div>
       )}
