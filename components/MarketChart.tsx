@@ -2225,6 +2225,14 @@ export function MarketChart({
           return;
         }
         const tool = normalizeTool(activeToolRef.current);
+        // A mouse places points at the pointer; only touch uses remote aim/confirm.
+        if (event.pointerType === "mouse" && tool && !CONTINUOUS_TOOLS.has(tool)) {
+          const hit = studyAt(event);
+          if (STUDY_LINE_TOOLS.has(tool) && hit) placeStudyPoint(tool, hit);
+          else { studyAimRef.current = null; commitOrEdit(event, pointerAnchor(event, true) ?? undefined); }
+          event.preventDefault(); event.stopPropagation();
+          return;
+        }
         if (!tool && event.pointerType === "touch") {
           touchPointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
           keepCursorAfterTouch = false;
@@ -2403,7 +2411,16 @@ export function MarketChart({
           if (hit > 0) event.stopPropagation();
         }
         if (tool && !CONTINUOUS_TOOLS.has(tool)) {
-          if (gesture?.pointerId === event.pointerId && gesture.moved) aim(event);
+          if (event.pointerType === "mouse") {
+            const hit = studyAt(event);
+            if (STUDY_LINE_TOOLS.has(tool) && hit) {
+              studyAimRef.current = hit;
+              const line = studyRenderer.current?.bundles.find(item => item.id === hit.studyId)?.series[0];
+              if (line) chart.setCrosshairPosition(hit.value, hit.time as UTCTimestamp, line);
+              refreshDrawingCrosshair();
+              setStudyCursor({ y: hit.y, text: formatStudyValue(hit.value), color: rsiCursorColor(hit.studyId) });
+            } else { studyAimRef.current = null; aim(event); }
+          } else if (gesture?.pointerId === event.pointerId && gesture.moved) aim(event);
           event.preventDefault(); event.stopPropagation(); return;
         }
         const draft = draftRef.current;
