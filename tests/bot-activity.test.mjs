@@ -1,13 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { deleteBotActivity, visibleBotActivity } from '../lib/bot-activity.ts';
+import { deleteBotActivity, deleteBotActivities, visibleBotActivity } from '../lib/bot-activity.ts';
 import { readGlobalAccount } from '../lib/global-order-engine.ts';
 import { botDailyStats } from '../lib/paper-bot-engine.ts';
 
 const now=1800000000000;
 const row=(id,botId,kind='OPEN')=>({id,botId,kind,symbol:'BTCUSD',at:now,contracts:1,price:100,pnl:0,fee:1,detail:'Paper trade'});
 const account=()=>({...readGlobalAccount(null),events:[row('bot-open','BTCUSD'),row('manual',undefined),row('bot-close','BTCUSD','CLOSE')]});
+
+test('bulk deletion is atomic, deduplicated, persisted and keeps accounting intact',()=>{
+  const original=account(), next=deleteBotActivities(original,['bot-open','bot-close','bot-open']);
+  assert.deepEqual(visibleBotActivity(next),[]);
+  assert.equal(next.revision,original.revision+1);
+  assert.equal(next.events,original.events);
+  assert.equal(next.wallet,original.wallet);
+  assert.deepEqual(botDailyStats(next,'BTCUSD',now),botDailyStats(original,'BTCUSD',now));
+  assert.deepEqual(visibleBotActivity(readGlobalAccount(JSON.stringify(next))),[]);
+  assert.equal(deleteBotActivities(next,['bot-open','bot-close']),next);
+  assert.equal(deleteBotActivities(original,[]),original);
+  for(const ids of [['bot-open','manual'],['bot-open','missing']])assert.throws(()=>deleteBotActivities(original,ids),/no longer available/);
+  assert.equal(original.deletedBotActivityIds?.length??0,0);
+});
 
 test('deletion persists and removes only the selected Bot activity row',()=>{
   const original=account(), next=deleteBotActivity(original,'bot-open');
