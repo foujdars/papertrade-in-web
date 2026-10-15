@@ -10,6 +10,7 @@ import { MarketMovers } from "./MarketMovers";
 import { EquityWatch } from "./EquityWatch";
 import { BulkDeals } from "./BulkDeals";
 import { SectorHeat } from "./SectorHeat";
+import { useDesktopBrowser } from './useDesktopBrowser';
 import { formatUsd } from '@/lib/global-order-engine';
 import { deferHomeReminder, homePreferenceKey, isHomeReminderHidden, normalizeHomePreferences, rememberHomeSearch, type HomePreferences } from '@/lib/home-preferences';
 import { CandleLoader } from "./CandleLoader";
@@ -94,12 +95,13 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock, onOpenInstrument, preferenceOwner='guest', recentSymbols=[], onClearRecent, commoditySessionLabel,
+  onOpenStock, onOpenInstrument, onDesktopNavigate, preferenceOwner='guest', recentSymbols=[], onClearRecent, commoditySessionLabel,
   realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   commoditySessionLabel?: string;
   onOpenInstrument?: (instrument: import('@/lib/market').Instrument) => void;
+  onDesktopNavigate?: (section: 'ipo' | 'news' | 'fundamentals' | 'watchlist') => void;
   realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
   onOpenRealised?:()=>void;
@@ -133,6 +135,11 @@ export function HomeWorkspace({
   onOpenStock: (symbol: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const desktop = useDesktopBrowser();
+  const [desktopTab, setDesktopTab] = useState('overview');
+  const desktopScroll = useRef<HTMLDivElement>(null);
+  const desktopTabs = [{ id: 'overview', label: 'Explore' }, { id: 'breadth', label: 'Breadth & sectors' }, { id: 'derivatives', label: 'F&O insights' }, { id: 'flows', label: 'Flows & deals' }];
+  const chooseDesktopTab = (tab: string) => { setDesktopTab(tab); desktopScroll.current?.scrollTo({ top: 0 }); };
   const [preview, setPreview] = useState<HomeStockOption | null>(null);
   const [quotes, setQuotes] = useState<Record<string, HomeQuote | null>>({});
   const [loading, setLoading] = useState(false);
@@ -323,8 +330,8 @@ export function HomeWorkspace({
   const loserLines = (shelf === "mcx" ? [] : board?.losers ?? []).map(quote => quoteLine(quote, seen)).filter((line): line is NonNullable<typeof line> => !!line).slice(0, 5);
 
   return (
-    <section className="home-workspace home-hub home-studio" data-market={activeMarket} aria-label="PaperTrade home">
-      <div className="home-dashboard-scroll">
+    <section className="home-workspace home-hub home-studio" data-market={activeMarket} data-desktop-tab={desktopTab} aria-label="PaperTrade home">
+      <div className="home-dashboard-scroll" ref={desktopScroll}>
         <h1 className="home-overview-title">{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
         <section className="home-hero">
           <div className="home-hero-copy">
@@ -398,9 +405,18 @@ export function HomeWorkspace({
         </section>}
 
 
+        {activeMarket === 'india' && <nav className="desktop-explore-tabs" role="tablist" aria-label="Market overview sections" onKeyDown={event => {
+          const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+          const current = buttons.indexOf(event.target as HTMLButtonElement);
+          if (current < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+          chooseDesktopTab(desktopTabs[next].id); buttons[next].focus();
+        }}>{desktopTabs.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={desktopTab === tab.id} tabIndex={desktopTab === tab.id ? 0 : -1} onClick={() => chooseDesktopTab(tab.id)}>{tab.label}</button>)}</nav>}
+
         {activeMarket === "india" && <div className="home-market-pair">
-          <MarketMovers onOpen={onOpenStock} />
-          <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />
+          <MarketMovers onOpen={onOpenStock} inline={desktop} />
+          {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
         </div>}
 
         <div className="home-main-grid home-main-grid-clean">
@@ -429,6 +445,12 @@ export function HomeWorkspace({
             {!globalPositions.length && <p className="home-global-empty">No global positions yet. Search an instrument above to practise in dollars.</p>}
           </section>}
 
+          {desktop && activeMarket === 'india' && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+          {activeMarket === 'india' && onDesktopNavigate && <section className="desktop-home-tools home-section" aria-label="Research and tools"><header><b>Research & tools</b></header><div>
+            <button onClick={() => onDesktopNavigate('fundamentals')}><Search size={17}/><span><b>Stock analysis</b><small>Explore your research data</small></span><ChevronRight size={16}/></button>
+            <button onClick={() => onDesktopNavigate('ipo')}><Plus size={17}/><span><b>IPO discovery</b><small>Open issues and allotments</small></span><ChevronRight size={16}/></button>
+            <button onClick={() => onDesktopNavigate('news')}><Bell size={17}/><span><b>Market news</b><small>Latest company headlines</small></span><ChevronRight size={16}/></button>
+          </div></section>}
         </div>
         {activeMarket === "india" ? <div className={`home-market-data${cards.market ? " has-derivatives" : ""}`}>
           <IndiaPulse showGauges={!cards.market}/>

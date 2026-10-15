@@ -2666,6 +2666,8 @@ body.resizing-option-charts iframe, body.resizing-option-charts canvas { pointer
 
 /* Utilities and navigation have separate compact rows, so neither crowds out tabs. */
 .desktop-nav-icon, .desktop-workspace-title { display: none; }
+.desktop-explore-tabs, .desktop-home-tools, .desktop-chart-rail, .desktop-nav-positions, .desktop-chart-watchlist-close { display: none; }
+.terminal-shell .main-nav .desktop-nav-positions { display: none; }
 @media (min-width: 941px) {
   .topbar { height: 73px; flex-basis: 73px; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 40px 32px; gap: 0 14px; padding: 0 14px; }
   .topbar > .brand { grid-column: 1; grid-row: 1; }

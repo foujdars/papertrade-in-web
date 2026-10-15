@@ -30,6 +30,11 @@ const surfaces = {
     }));
     await page.route('**/api/**', async route => {
       const url = new URL(route.request().url());
+      if (url.pathname === '/api/upstox/candles') {
+        const start = Date.parse(`${today}T09:15:00+05:30`) / 1000;
+        const candles = Array.from({ length: 76 }, (_, i) => { const open = 1300 + i * .5 + Math.sin(i / 6) * 5, close = open + (i % 3 ? 1 : -1); return { time: start + i * 300, open, close, high: Math.max(open,close) + 2, low: Math.min(open,close) - 2, volume: 100000 + i * 1000 }; });
+        return route.fulfill({ json: { ok: true, candles, fetchedAt: new Date().toISOString() } });
+      }
       // Populated market fixtures catch overflow that empty/loading cards cannot expose.
       if (url.pathname === '/api/market/india-pulse') {
         const session = Date.parse(`${today}T09:15:00+05:30`);
@@ -38,7 +43,11 @@ const surfaces = {
         return route.fulfill({ json: { ok: true, sessionLive: false, breadth: tape.at(-1), tape, flows, vix: { price: 14.2, change: -.6, changePercent: -4.05 }, vixCheckedAt: Date.now(), pcr: null } });
       }
       if (url.pathname === '/api/market/sector-heat') return route.fulfill({ json: { ok: true, sectors: ['Bank','PSU Bank','IT','Auto','Pharma','FMCG','Metal','Energy'].map((label,i) => ({ id: `sector${i}`, label, change: i % 2 ? .7 : -.8, watch: 'nifty50' })) } });
-      if (url.pathname === '/api/market/movers') return route.fulfill({ json: { ok: true, lists: { gainers: [{ symbol: 'RELIANCE', change: 2.45, price: 1322 }], losers: [{ symbol: 'ITC', change: -1.2, price: 410 }], highs: [] } } });
+      if (url.pathname === '/api/market/movers') {
+        const names = ['RELIANCE','HDFCBANK','TCS','INFY','ITC','TATAMOTORS','ICICIBANK','LT','MARUTI','SUNPHARMA'];
+        const gainers = names.map((symbol,i) => ({ symbol, name: `${symbol} Industries`, change: 5 - i * .3, price: 1322 + i * 90, volume: 1250000 + i * 43000 }));
+        return route.fulfill({ json: { ok: true, lists: { gainers, losers: gainers.map(row => ({ ...row, change: -row.change })), active: gainers, volume: gainers, high52: [], low52: [], upper: [], lower: [] } } });
+      }
       if (url.pathname === '/api/market/equity-watch') return route.fulfill({ json: { ok: true, rows: Array.from({ length: 20 }, (_,i) => ({ symbol: `EQ${i}`, name: 'Fixture', price: 120, change: i % 3 ? 1 : -1, volume: 10000 })) } });
       if (url.pathname === '/api/upstox/quotes') return route.fulfill({ json: { ok: true, quotes: Object.fromEntries([['NSE_INDEX|Nifty 50',22622.7],['NSE_INDEX|Nifty Bank',55316],['BSE_INDEX|SENSEX',72781.89]].map(([key,price]) => [key,{instrumentKey:key,lastPrice:price,previousClose:price+90,netChange:-90,changePercent:-.4,lastTradeAt:new Date().toISOString(),updatedAt:new Date().toISOString()}])) } });
       if (url.pathname === '/api/market/news') {
@@ -60,6 +69,7 @@ const surfaces = {
     await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:4317');
     await page.locator('.main-nav').waitFor();
     const open = async name => {
+      if (!await page.locator('.main-nav').isVisible()) await page.getByRole('button', { name: 'Open PaperTrade home', exact: true }).click();
       await page.locator('.main-nav button').filter({ hasText: new RegExp(`^${name}$`) }).click();
       await page.locator(surfaces[name]).waitFor();
     };
@@ -72,20 +82,46 @@ const surfaces = {
       for (const [name, selector] of Object.entries(surfaces)) {
         await open(name);
         const fits = await page.locator(selector).evaluate(el => {
-          const rect = el.getBoundingClientRect(), rail = document.querySelector('.main-nav').getBoundingClientRect();
-          return rect.left >= rail.right - 1 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1
+          const root = el.closest('.navigation-page-backdrop') || el;
+          const rect = root.getBoundingClientRect(), nav = document.querySelector('.main-nav').getBoundingClientRect();
+          return rect.left >= -1 && rect.top >= nav.bottom - 1 && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1
             && document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1
-            && el.scrollWidth <= el.clientWidth + 1;
+            && root.scrollWidth <= root.clientWidth + 1;
         });
-        assert.ok(fits, `${name} stays beside the rail and inside ${size.width} × ${size.height}`);
+        assert.ok(fits, `${name} stays below navigation and inside ${size.width} × ${size.height}`);
         if (name === 'Home') {
-          assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el => el.scrollHeight <= el.clientHeight + 1), 'Home overview fits without page scrolling');
-          const equityBounds = await page.locator('#equity-watch .home-breadth-preview').last().evaluate(el => ({ bottom: el.getBoundingClientRect().bottom, panel: el.closest('button').getBoundingClientRect().bottom }));
-          assert.ok(equityBounds.bottom <= equityBounds.panel + 1, `All equity preview rows are visible at ${size.width} × ${size.height}: ${JSON.stringify(equityBounds)}`);
-          assert.ok(await page.locator('.india-flow-detail').evaluate(el => el.getBoundingClientRect().bottom <= el.closest('.india-flows').getBoundingClientRect().bottom), 'Flow chart detail fits its panel');
+          await page.getByRole('tab', { name: 'Explore', exact: true }).click();
+          await page.locator('.desktop-stock-row').first().waitFor();
+          await page.getByRole('tab', { name: 'Losers', exact: true }).click();
+          assert.ok(await page.locator('.desktop-stock-row .negative').count(), 'Mover tabs change the displayed list');
+          await page.getByRole('tab', { name: 'Gainers', exact: true }).click();
+          assert.equal(await page.locator('.home-sector-heat').isVisible(), false, 'Explore avoids unrelated panels');
+          await page.getByRole('tab', { name: 'Breadth & sectors', exact: true }).click();
+          assert.ok(await page.locator('.home-sector-heat').isVisible(), 'Breadth tab exposes sectors');
+          assert.equal(await page.locator('.desktop-movers').isVisible(), false);
+          await page.getByRole('tab', { name: 'F&O insights', exact: true }).click();
+          assert.ok(await page.locator('.home-option-pulse').isVisible(), 'Options tools remain available');
+          await page.getByRole('tab', { name: 'Flows & deals', exact: true }).click();
           await page.getByRole('button', { name: 'Chart timeline, 1M', exact: true }).click();
           assert.ok(await page.getByRole('listbox', { name: 'Chart timeline' }).evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), 'Flow timeline choices fit the desktop window');
           await page.keyboard.press('Escape');
+          for (const tab of ['Explore','Breadth & sectors','F&O insights','Flows & deals']) {
+            await page.getByRole('tab', { name: tab, exact: true }).click();
+            const nested = await page.locator('.home-dashboard-scroll').evaluate(root => [...root.querySelectorAll('*')].filter(el => el instanceof HTMLElement && el.clientHeight && el.getBoundingClientRect().width && ['auto','scroll'].includes(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight + 2).map(el => el.className));
+            assert.deepEqual(nested, [], `${tab} uses only the main scroll at ${size.width}`);
+            if (size.width === 1440) await screenshot(`Home-${tab.replace(/[^a-z]/gi,'')}`);
+          }
+          await page.getByRole('tab', { name: 'Explore', exact: true }).click();
+        }
+        if (name === 'Charts') {
+          assert.equal(await page.locator('.order-ticket').isVisible(), false, 'Terminal opens with a full chart');
+          await page.getByRole('button', { name: 'Toggle paper trade ticket' }).click();
+          assert.ok(await page.locator('.order-ticket').isVisible(), 'Trade ticket can be opened');
+          assert.ok(await page.locator('.chart-controls').evaluate(el => el.scrollWidth <= el.clientWidth + 1), 'Chart toolbar fits with the order panel open');
+          await page.getByRole('button', { name: 'Toggle paper trade ticket' }).click();
+          await page.locator('.desktop-chart-rail').getByRole('button', { name: 'Watchlist', exact: true }).click();
+          assert.ok(await page.locator('.workspace.section-trade .watchlist-panel').isVisible(), 'Chart watchlist opens without leaving the terminal');
+          await page.getByRole('button', { name: 'Close chart watchlist' }).click();
         }
         if (name === 'IPOs') {
           const centered = await page.locator('.ipo-card-list').evaluate(el => {
@@ -110,8 +146,7 @@ const surfaces = {
     await page.locator('.ipo-timeline-disclosure summary').click();
     await page.waitForTimeout(200);
     assert.ok(await page.locator('.ipo-detail-studio').evaluate(el => el.querySelector('.ipo-timeline-disclosure').getBoundingClientRect().bottom <= el.querySelector('.ipo-registrar').getBoundingClientRect().top), 'Expanded timeline does not overlap the registrar panel');
-    await page.locator('.ipo-detail-studio').evaluate(el => el.scrollTop = el.scrollHeight);
-    assert.ok(await page.locator('.ipo-detail-studio').evaluate(el => el.scrollHeight <= el.clientHeight + 1 || el.scrollTop > 0), 'IPO detail fits or remains scrollable');
+    await page.locator('.ipo-discovery-panel').evaluate(el => el.scrollTop = el.scrollHeight);
     await page.locator('.ipo-detail-studio .ipo-registrar').scrollIntoViewIfNeeded();
     assert.ok(await page.locator('.ipo-detail-studio .ipo-registrar').evaluate(el => el.getBoundingClientRect().bottom <= innerHeight), 'Expanded IPO details are reachable');
     await screenshot('IPO-detail');
@@ -121,13 +156,13 @@ const surfaces = {
 
     await open('News');
     await page.locator('.news-list article').first().waitFor();
-    await page.locator('.news-list').evaluate(el => el.scrollTop = 500);
+    await page.locator('.news-workspace').evaluate(el => el.scrollTop = 500);
     await page.getByRole('button', { name: 'Positive', exact: true }).click();
-    assert.equal(await page.locator('.news-list').evaluate(el => el.scrollTop), 0, 'Filter resets the desktop news list');
+    assert.equal(await page.locator('.news-workspace').evaluate(el => el.scrollTop), 0, 'Filter resets the desktop news page');
     await page.getByRole('button', { name: 'All', exact: true }).click();
-    await page.locator('.news-list').evaluate(el => el.scrollTop = 500);
-    const anchor = await page.locator('.news-list').evaluate(el => {
-      const node = [...el.children].find(item => item.getBoundingClientRect().top >= el.getBoundingClientRect().top);
+    await page.locator('.news-workspace').evaluate(el => el.scrollTop = 500);
+    const anchor = await page.locator('.news-workspace').evaluate(el => {
+      const node = [...el.querySelector('.news-list').children].find(item => item.getBoundingClientRect().top >= el.getBoundingClientRect().top);
       return { id: node.dataset.newsId, top: node.getBoundingClientRect().top };
     });
     revision = 1;
@@ -138,12 +173,23 @@ const surfaces = {
     assert.ok(Math.abs(afterTop - anchor.top) < 8, 'Refreshing with new stories preserves desktop reading position');
 
     await open('Home');
+    await page.locator('.desktop-stock-row').first().click();
+    await page.locator('.workspace.section-trade').waitFor();
+    assert.match(await page.locator('.desktop-symbol-trigger').innerText(), /RELIANCE/, 'Stock table opens its existing chart');
+    await open('Home');
     await page.getByRole('button', { name: /Global markets/ }).click();
-    assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el => el.scrollHeight <= el.clientHeight + 1), 'Global overview fits without page scrolling');
-    assert.ok(await page.locator('.market-directory').evaluate(el => el.getBoundingClientRect().top >= document.querySelector('.home-main-grid').getBoundingClientRect().bottom), 'Global directory stays below portfolio');
+    assert.ok(await page.locator('.market-directory').evaluate(el => el.getBoundingClientRect().right <= document.querySelector('.home-main-grid').getBoundingClientRect().left), 'Global directory and portfolio have separate columns');
     await page.getByRole('button', { name: /Indian markets/ }).click();
     await page.locator('.theme-toggle').click();
     await screenshot('Home-dark');
+    const nativeStyles = await page.evaluate(() => {
+      const shell = document.querySelector('.terminal-shell'); shell.dataset.platform = 'android';
+      const read = () => ['.topbar','.main-nav','.home-dashboard-scroll'].map(selector => { const el = document.querySelector(selector), style = getComputedStyle(el), r = el.getBoundingClientRect(); return [selector,style.display,style.gridTemplateColumns,style.padding,r.x,r.y,r.width,r.height]; });
+      const before = read(), disabled = [];
+      for (const sheet of document.styleSheets) { try { if ([...sheet.cssRules].some(rule => rule.cssText.includes('desktop-explore-tabs') && rule.cssText.includes('[data-platform="web"]'))) { sheet.disabled = true; disabled.push(sheet); } } catch {} }
+      const after = read(); disabled.forEach(sheet => sheet.disabled = false); shell.dataset.platform = 'web'; return { before,after };
+    });
+    assert.deepEqual(nativeStyles.before,nativeStyles.after,'New desktop CSS does not style native app surfaces');
     // Atomic comparisons avoid quote updates or SVG animations between snapshots.
     for (const width of [390, 768, 940]) {
       await page.setViewportSize({ width, height: 844 });
@@ -164,6 +210,6 @@ const surfaces = {
     await page.locator('.main-nav').getByRole('button', { name: 'P&L', exact: true }).scrollIntoViewIfNeeded();
     assert.ok(await page.locator('.main-nav').getByRole('button', { name: 'P&L', exact: true }).evaluate(el => el.getBoundingClientRect().bottom <= innerHeight), 'Navigation remains reachable in a short window');
     assert.deepEqual(errors, []);
-    console.log('PASS: 36 desktop surfaces; Home fits; centred IPO loader; IPO list/details; news filters and fresh-story anchoring; three mobile widths unchanged; short-window navigation.');
+    console.log('PASS: desktop tabs and one main scroll, terminal ticket/watchlist, 36 surfaces, IPO loading/details, news anchoring, unchanged mobile widths and short-window navigation.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

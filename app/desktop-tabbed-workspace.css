@@ -1,0 +1,179 @@
+/* Browser desktop only. Native apps and widths up to 940px retain their existing presentation. */
+@media (min-width: 941px) {
+  .terminal-shell[data-platform="web"] { --desktop-rail: 0px; --desktop-header: 110px; --desktop-gap: 28px; }
+  .terminal-shell[data-platform="web"][data-theme="light"] { --surface: #fff; --soft: #f7f8fa; --line: #e8ebef; --purple: #008c73; --purple-soft: #eaf8f3; --ink: #414859; --muted: #828795; background: var(--surface); }
+  .terminal-shell[data-platform="web"] .topbar { width: 100%; height: var(--desktop-header); flex-basis: var(--desktop-header); margin: 0; padding: 0 28px; display: grid; grid-template-columns: auto minmax(0,1fr) auto; grid-template-rows: 62px 48px; gap: 0 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"] .topbar > .brand { position: static; grid-column: 1; grid-row: 1; width: auto; gap: 9px; color: var(--ink); font-size: 19px; }
+  .terminal-shell[data-platform="web"] .topbar > .brand .brand-mark { width: 30px; height: 32px; }
+  .terminal-shell[data-platform="web"] .topbar > .brand .brand-mark :is(img,svg) { width: 30px; height: 32px; }
+  .terminal-shell[data-platform="web"] .desktop-workspace-title { grid-column: 2; grid-row: 1; color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0; }
+  .terminal-shell[data-platform="web"] .top-actions { grid-column: 3; grid-row: 1; gap: 9px; }
+  .terminal-shell[data-platform="web"] .main-nav { --purple: inherit; position: static; inset: auto; grid-column: 1 / -1; grid-row: 2; display: flex; flex-direction: row; align-items: stretch; width: 100%; height: 48px; gap: 15px; padding: 0; margin: 0; background: transparent; border: 0; overflow: visible; }
+  .terminal-shell[data-platform="web"] .main-nav button { position: relative; display: flex; flex: 0 0 auto; min-height: 48px; padding: 0 7px; color: var(--muted); border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; font-size: 13px; font-weight: 550; }
+  .terminal-shell[data-platform="web"] .main-nav .desktop-nav-positions { display: flex; }
+  .terminal-shell[data-platform="web"] .main-nav :is(button:hover,.nav-active) { background: none; color: var(--ink); }
+  .terminal-shell[data-platform="web"] .main-nav .nav-active { border-bottom-color: var(--purple); font-weight: 650; }
+  .terminal-shell[data-platform="web"] .main-nav .desktop-nav-icon { display: none; }
+  .terminal-shell[data-platform="web"][data-section="trade"] { --desktop-header: 62px; }
+  .terminal-shell[data-platform="web"][data-section="trade"] .topbar { grid-template-rows: 62px; }
+  .terminal-shell[data-platform="web"][data-section="trade"] .main-nav { display: none; }
+
+  /* One page scroll, with a small number of visible sections per tab. */
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); grid-template-rows: 48px 58px 46px; grid-auto-rows: max-content; align-items: start; align-content: start; gap: 22px; width: 100%; max-width: 1640px; height: 100%; margin: 0 auto; padding: 22px 28px 40px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser { grid-column: 1 / 5; grid-row: 1; height: 48px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-hero { grid-column: 5 / 13; grid-row: 1; height: 48px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search { height: 48px; min-height: 48px; border-radius: 9px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search input { font-size: 13px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button b { font-size: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button small { font-size: 10px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-pulse-section { grid-column: 1 / -1; grid-row: 2; height: 58px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-grid { gap: 22px; height: 58px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { height: 58px; min-height: 0; display: grid; grid-template-columns: auto auto minmax(0,1fr); grid-template-rows: 1fr; align-items: center; gap: 10px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-name { font-size: 12px; letter-spacing: 0; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 17px; font-weight: 550; letter-spacing: -.3px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-change { font-size: 11px; gap: 3px; flex-wrap: wrap; }
+  .terminal-shell[data-platform="web"] .desktop-explore-tabs { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 24px; align-items: stretch; min-height: 46px; border-bottom: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"] .desktop-explore-tabs button { padding: 0 2px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-explore-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--purple); font-weight: 650; }
+  .terminal-shell[data-platform="web"] :is(.desktop-explore-tabs,.desktop-mover-tabs) button:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-pair { display: contents; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio { background: var(--surface); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-movers-slot { grid-column: 1 / 9; grid-row: 4; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio #equity-watch { grid-column: 9 / 13; grid-row: 5; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-main-grid { display: flex; flex-direction: column; gap: 22px; grid-column: 9 / 13; grid-row: 4; min-height: 0; height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section { border-radius: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-card { height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header { min-height: 48px; padding: 0 18px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header b { font-size: 13px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row { display: flex; flex-direction: column; gap: 0; padding: 0 18px 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > :is(button,.home-funds-used),
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > button:last-child { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > :last-child { border-bottom: 0; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 12px; text-transform: none; letter-spacing: 0; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row :is(b,strong) { font-size: 16px; line-height: 1.3; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-v2 { height: auto; min-height: 130px; padding: 16px 18px; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-copy { min-height: 24px; margin-bottom: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-previews { gap: 10px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-preview > b { font-size: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > em { font-size: 11px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools { display: block; grid-column: 9 / 13; grid-row: 6; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools > div { padding: 0 18px 8px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button { display: flex; align-items: center; width: 100%; gap: 12px; padding: 14px 0; border: 0; border-top: 1px solid var(--line); color: var(--ink); background: none; text-align: left; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button > span { flex: 1; display: grid; gap: 4px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button b { font-size: 12px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button small { color: var(--muted); font-size: 10px; }
+  .terminal-shell[data-platform="web"] .desktop-movers > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .terminal-shell[data-platform="web"] .desktop-movers h2 { margin: 0; color: var(--ink); font-size: 21px; font-weight: 600; letter-spacing: -.4px; }
+  .terminal-shell[data-platform="web"] .desktop-movers header :is(p,span) { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs button { min-height: 32px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 18px; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs button[aria-selected="true"] { background: var(--soft); color: var(--ink); border-color: var(--muted); }
+  .terminal-shell[data-platform="web"] .desktop-market-table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { display: grid; grid-template-columns: minmax(170px,1fr) 100px 90px 90px; gap: 12px; align-items: center; width: 100%; padding: 16px 18px; text-align: right; }
+  .terminal-shell[data-platform="web"] .desktop-market-table-head { background: var(--soft); color: var(--muted); font-size: 11px; }
+  .terminal-shell[data-platform="web"] .desktop-market-table-head > :first-child { text-align: left; }
+  .terminal-shell[data-platform="web"] .desktop-stock-row { min-height: 76px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 12px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-stock-row:hover { background: var(--soft); }
+  .terminal-shell[data-platform="web"] .desktop-stock-name { display: flex; align-items: center; gap: 12px; min-width: 0; text-align: left; }
+  .terminal-shell[data-platform="web"] .desktop-stock-name > span { display: grid; gap: 5px; min-width: 0; }
+  .terminal-shell[data-platform="web"] .desktop-stock-name b { font-size: 12px; }
+  .terminal-shell[data-platform="web"] .desktop-stock-name small { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .terminal-shell[data-platform="web"] .desktop-table-empty { padding: 36px 20px; color: var(--muted); font-size: 12px; }
+
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data { display: contents; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data > * { grid-column: auto; grid-row: auto; height: auto; min-height: 0; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data > .india-pulse-layout { grid-column: 1 / 9; grid-row: 4; display: grid; gap: 18px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data > .home-sector-heat { grid-column: 1 / 9; grid-row: 5 / 7; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-breadth-card { height: auto; display: block; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-ad { display: block; padding: 8px 18px 16px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-ad-chart { flex: none; max-height: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-heat { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; padding: 8px 18px 18px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-heat button { min-height: 65px; padding: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-heat button :is(b,strong) { font-size: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data > .home-derivatives { grid-column: 1 / -1; grid-row: 4 / 7; display: grid; gap: 18px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-derivatives .home-gift-card { min-height: 74px; padding: 12px 18px!important; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-gift-card :is(b,strong) { font-size: 14px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-option-pulse { min-height: 350px; padding: 18px!important; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-option-pulse > header { min-height: 38px!important; grid-template-columns: minmax(150px,240px) minmax(150px,240px) 38px; justify-content: start; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-option-pulse .modern-select-trigger { min-height: 36px; padding: 7px 10px; font-size: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-derivative-metrics { margin-top: 18px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-derivative-metrics :is(b,small) { font-size: 13px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-oi-empty { min-height: 170px; font-size: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flows-slot { grid-column: 1 / 9; grid-row: 4 / 7; height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flows { height: auto; min-height: 260px; padding: 18px; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flow-visual { display: block; flex: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flow-chart { max-height: none; flex: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flow-detail { padding: 8px 0; font-size: 11px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .india-flow-range-menu { top: calc(100% + 6px); bottom: auto; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-deal-slot { grid-column: 9 / 13; grid-row: 4; height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-deals-summary { height: auto; min-height: 180px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="overview"] :is(.home-market-data,.india-pulse-layout,.home-derivatives,.home-sector-heat,.india-flows-slot,.home-deal-slot) { display: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] :is(.home-portfolio-card,.home-movers-slot,.home-derivatives,.india-flows-slot,.home-deal-slot) { display: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] .home-main-grid { grid-row: 4 / 7; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] #equity-watch { grid-row: 4; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] .desktop-home-tools { grid-row: 5; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="derivatives"] :is(.home-main-grid,.home-market-pair,.home-movers-slot,#equity-watch,.desktop-home-tools,.india-pulse-layout,.home-sector-heat,.india-flows-slot,.home-deal-slot) { display: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="flows"] :is(.home-main-grid,.home-market-pair,.home-movers-slot,#equity-watch,.desktop-home-tools,.india-pulse-layout,.home-sector-heat,.home-derivatives) { display: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-market="global"] .home-dashboard-scroll { grid-template-rows: 48px auto; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-market="global"] .home-main-grid { grid-column: 9 / 13; grid-row: 2; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .market-directory { grid-column: 1 / 9; grid-row: 2; height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-account { overflow: visible; }
+
+  /* List/report screens each own their single main scroll region. */
+  .terminal-shell[data-platform="web"] :is(.news-workspace,.ipo-discovery-panel,.navigation-page-backdrop) { overflow-y: auto; padding: 24px 28px; background: var(--surface); }
+  .terminal-shell[data-platform="web"] .news-content { height: auto; min-height: 100%; grid-template-rows: 44px 40px 24px auto; }
+  .terminal-shell[data-platform="web"] :is(.news-header,.news-toolbar,.news-filters,.news-feed-status) { position: sticky; z-index: 5; align-self: start; background: var(--surface); }
+  .terminal-shell[data-platform="web"] :is(.news-header,.news-toolbar) { top: 0; min-height: 44px; }
+  .terminal-shell[data-platform="web"] .news-filters { top: 54px; min-height: 40px; }
+  .terminal-shell[data-platform="web"] .news-feed-status { top: 104px; min-height: 24px; }
+  .terminal-shell[data-platform="web"] .news-list { overflow: visible; height: auto; align-content: start; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .terminal-shell[data-platform="web"] .news-list article { padding: 22px; border-radius: 12px; }
+  .terminal-shell[data-platform="web"] .news-list h2 { font-size: 15px; }
+  .terminal-shell[data-platform="web"] .navigation-page { height: auto; min-height: 100%; overflow: visible; padding: 0; border: 0; border-radius: 0; }
+  .terminal-shell[data-platform="web"] .navigation-page .modal-head { top: 0; padding-block: 8px 16px; background: var(--surface); }
+  .terminal-shell[data-platform="web"] .ipo-workspace.ipo-studio { height: auto; min-height: 100%; overflow: visible; }
+  .terminal-shell[data-platform="web"] .ipo-studio > div:not([hidden]) { height: auto; min-height: 100%; display: flex; gap: 16px; }
+  .terminal-shell[data-platform="web"] .ipo-studio .ipo-card-list { overflow: visible; flex: none; grid-template-columns: repeat(auto-fill,minmax(min(310px,100%),1fr)); }
+  .terminal-shell[data-platform="web"] .ipo-studio .ipo-card-list > :is(.candle-loading,.ipo-empty) { min-height: calc(100dvh - 360px); }
+  .terminal-shell[data-platform="web"] .ipo-studio :is(.ipo-calendar,.ipo-detail-studio) { height: auto; min-height: 0; overflow: visible; }
+  .terminal-shell[data-platform="web"] .workspace.section-watchlist { min-height: 0; overflow-y: auto; display: block; }
+  .terminal-shell[data-platform="web"] .workspace.section-watchlist > .watchlist-panel { height: auto; overflow: visible; padding: 24px 28px; }
+  .terminal-shell[data-platform="web"] .workspace.section-watchlist .instrument-list { display: block; height: auto; overflow: visible; border: 1px solid var(--line); border-radius: 12px; }
+  .terminal-shell[data-platform="web"] .workspace.section-watchlist .instrument-row { min-height: 70px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 14px 20px; }
+
+  /* Terminal: chart first; optional order/watchlist panes open from the right rail. */
+  .terminal-shell[data-platform="web"] .workspace.section-trade { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 320px 70px; grid-template-rows: minmax(0,1fr); gap: 0; margin: 0; padding: 0; overflow: hidden; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade.order-panel-collapsed { grid-template-columns: minmax(0,1fr) 0 70px; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade .chart-area { grid-column: 1; grid-row: 1; border: 0; border-radius: 0; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade > .desktop-chart-rail { display: flex; grid-column: 3; grid-row: 1; flex-direction: column; align-items: stretch; padding: 8px 4px; gap: 5px; border-left: 1px solid var(--line); background: var(--surface); overflow-y: auto; scrollbar-width: thin; }
+  .terminal-shell[data-platform="web"] .desktop-chart-rail button { display: grid; justify-items: center; align-content: center; gap: 7px; min-height: 61px; padding: 8px 2px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 10px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-chart-rail button:hover,
+  .terminal-shell[data-platform="web"] .desktop-chart-rail :is([aria-pressed="true"],[aria-expanded="true"]) { color: var(--purple); background: var(--purple-soft); }
+  .terminal-shell[data-platform="web"] .workspace.section-trade .order-ticket { grid-column: 2; grid-row: 1; height: 100%; min-height: 0; padding: 18px; border: 0; border-left: 1px solid var(--line); border-radius: 0; overflow-y: auto; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade.order-panel-collapsed > .order-ticket { display: none; }
+  .terminal-shell[data-platform="web"] .desktop-order-panel-toggle { display: none; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade > .watchlist-panel.mobile-open { display: flex; position: absolute; top: 0; bottom: 0; left: auto; right: 70px; z-index: 35; width: 340px; max-width: calc(100% - 70px); height: 100%; flex-direction: column; gap: 10px; padding: 16px; border-left: 1px solid var(--line); background: var(--surface); overflow: hidden; box-shadow: -8px 0 24px #17233d10; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade .watchlist-panel.mobile-open .instrument-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .terminal-shell[data-platform="web"] .workspace.section-trade .watchlist-panel.mobile-open .desktop-chart-watchlist-close { display: grid; place-items: center; align-self: end; width: 30px; height: 30px; border: 0; background: var(--soft); color: var(--ink); }
+  .terminal-shell[data-platform="web"] .trade-cockpit .chart-controls { height: 46px; min-height: 46px; flex-basis: 46px; padding: 5px 12px; flex-wrap: nowrap; gap: 8px; border-bottom: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"] .trade-cockpit .desktop-chart-symbol { flex: 0 1 auto; min-width: 0; gap: 8px; }
+  .terminal-shell[data-platform="web"] .trade-cockpit .chart-symbol-search { width: 210px; max-width: 240px; flex-basis: 210px; background: none; }
+  .terminal-shell[data-platform="web"] .trade-cockpit .desktop-live-pnl { margin-left: auto; }
+  .terminal-shell[data-platform="web"] .trade-cockpit .chart-control-orders button { min-height: 32px; font-size: 11px; }
+  .terminal-shell[data-platform="web"] .chart-statusbar { min-height: 28px; }
+  @media (max-width: 1199px) {
+    .terminal-shell[data-platform="web"] .topbar { padding-inline: 20px; gap: 0 14px; }
+    .terminal-shell[data-platform="web"] .main-nav { gap: 10px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { gap: 18px; padding: 20px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { gap: 6px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 15px; }
+    .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns: minmax(130px,1fr) 80px 75px 75px; gap: 8px; padding-inline: 12px; }
+    .terminal-shell[data-platform="web"] .desktop-stock-name { gap: 8px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 11px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row :is(b,strong) { font-size: 14px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions { gap: 2px; }
+    .terminal-shell[data-platform="web"] .workspace.section-trade { grid-template-columns: minmax(0,1fr) 290px 64px; }
+    .terminal-shell[data-platform="web"] .workspace.section-trade.order-panel-collapsed { grid-template-columns: minmax(0,1fr) 0 64px; }
+    .terminal-shell[data-platform="web"] .workspace.section-trade > .watchlist-panel.mobile-open { right: 64px; }
+  }
+}
