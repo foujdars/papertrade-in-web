@@ -2912,16 +2912,17 @@ export function TradingDashboard() {
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}>Home</button>
-          <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}>Charts</button>
-          <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}>Holdings</button>
-          <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}>Orders</button>
-          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}>Watchlist</button>
-          <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}>News</button>
-          <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}>IPOs</button>
-          <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}>Analysis</button>
-          <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}>P&amp;L</button>
+          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}><Home className="desktop-nav-icon" size={16} aria-hidden="true"/>Home</button>
+          <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}><LineChart className="desktop-nav-icon" size={16} aria-hidden="true"/>Charts</button>
+          <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness className="desktop-nav-icon" size={16} aria-hidden="true"/>Holdings</button>
+          <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}><BookOpenCheck className="desktop-nav-icon" size={16} aria-hidden="true"/>Orders</button>
+          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}><Bookmark className="desktop-nav-icon" size={16} aria-hidden="true"/>Watchlist</button>
+          <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}><Newspaper className="desktop-nav-icon" size={16} aria-hidden="true"/>News</button>
+          <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket className="desktop-nav-icon" size={16} aria-hidden="true"/>IPOs</button>
+          <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><ChartNoAxesCombined className="desktop-nav-icon" size={16} aria-hidden="true"/>Analysis</button>
+          <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}><Activity className="desktop-nav-icon" size={16} aria-hidden="true"/>P&amp;L</button>
         </nav>
+        <span className="desktop-workspace-title">{activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
