@@ -7,10 +7,16 @@ export function visibleBotActivity(account: PerpAccount) {
 
 /** Remove an activity row without changing accounting or bot daily-limit events. */
 export function deleteBotActivity(account: PerpAccount, id: string): PerpAccount {
-  if (!account.events.some(event => event.id === id && event.botId)) throw new Error('This bot activity entry is no longer available.');
+  return deleteBotActivities(account, [id]);
+}
+
+/** Apply the whole selection atomically; never remove accounting events. */
+export function deleteBotActivities(account: PerpAccount, selectedIds: readonly string[]): PerpAccount {
+  if (!selectedIds.length) return account;
   const existing = new Set(account.events.filter(event => event.botId).map(event => event.id));
+  if (selectedIds.some(id => !existing.has(id))) throw new Error('This bot activity entry is no longer available.');
   const ids = new Set((account.deletedBotActivityIds ?? []).filter(value => existing.has(value)));
-  if (ids.has(id)) return account;
-  ids.add(id);
+  if (selectedIds.every(id => ids.has(id))) return account;
+  selectedIds.forEach(id => ids.add(id));
   return { ...account, deletedBotActivityIds: [...ids], revision: account.revision + 1 };
 }

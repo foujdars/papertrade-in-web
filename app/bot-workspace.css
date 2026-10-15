@@ -100,3 +100,7 @@
 .bot-activity .bot-activity-delete { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 40px; margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; color: #d14d67; background: var(--surface); font: inherit; cursor: pointer; }
 .bot-activity .bot-activity-delete:disabled { opacity: .5; cursor: default; }
 .bot-activity-note { color: var(--muted); font-size: 11px; }
+.bot-activity-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-block: 12px; font-size: 12px; }
+.bot-activity-actions label { display: inline-flex; align-items: center; gap: 6px; }
+.bot-activity li > input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; margin: 3px 0; accent-color: var(--purple); }
+.bot-activity li > div { flex: 1; }
