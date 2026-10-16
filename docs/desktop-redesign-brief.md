@@ -122,8 +122,7 @@ and are not loaded by the application.
 - All application changes are CSS within the desktop media boundary. No trades
   were executed during verification.
 
-The full multi-screen rollout, merge and deployment remain pending review of
-this representative screen.
+The approved palettes have now been extended across the app; see the rollout record below. Merge and deployment remain separate.
 
 ## Theme revision — modern neon / modern vibrant
 
@@ -177,3 +176,32 @@ The kit totals these distinct stage ceilings at $0.67, not $1.22. The free
 fixed-layout derivation `b12c0571-5b88-4743-a795-425f447b3527` and final LayerDoc
 alignment purchased nothing. Credentials, temporary design-kit state and
 account details are excluded from the repository.
+
+
+## App-wide theme rollout
+
+The shared `app/app-themes.css` now owns both approved palettes and aliases the
+existing workspace tokens. This extends the same colours to Home, charts and
+order tickets, watchlists, global markets/F&O, Holdings, Orders, Positions,
+P&L, News, IPOs, Analysis, Bot, notifications, menus and dialogs. Existing
+mobile and Android layouts inherit these tokens. Welcome/authentication and
+legal pages follow the saved preference through `DocumentTheme`; Android
+loading/offline pages use the matching palettes with the system preference.
+
+Chart canvas, grid, axis and crosshair colours now match the selected palette.
+Candle colours, indicators, calculations, prices, feeds, trading logic, API
+routes and stored `light`/`neon` preference values are unchanged. Presentation
+rules preserve buy/sell meanings and give filled actions readable labels.
+
+Validation: production build and diff whitespace checks passed. Playwright
+passed 52 surface checks (26 per theme), including main navigation, the open
+order ticket, all three Analysis tabs, Bot select dialog, wallet, broker settings,
+coach, notifications, positions, mobile Home, simulated Android Home styles,
+legal routes and persistence after reload. No page overflow or JavaScript
+errors occurred. Checked solid panel foreground/background pairs exceeded
+4.5:1; this is not a complete accessibility audit. Analysis was checked in its
+unauthenticated loading state. No authenticated orders, running bots, live
+broker credentials, populated research datasets or physical Android devices
+were tested. Existing selected tests retain their six documented baseline
+failures; no expectations were edited. Preview API failures were isolated to
+the browser test and no mock feed was added to the app.

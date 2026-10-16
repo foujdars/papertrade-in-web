@@ -120,38 +120,15 @@
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-account { overflow: visible; }
 
 
-  /* 12UI candidate C. Home is the review surface before expanding the system.
-     Keep app data and vector controls authoritative; no generated financial data. */
-  .terminal-shell[data-platform="web"][data-section="home"] {
-    /* Vibrant light: cobalt controls, bright surfaces, blue-tinted canvas. */
-    --desktop-home-canvas: #f1f5ff; --desktop-home-shadow: #3154d50a;
-    --desktop-home-on-accent: #fff; --desktop-home-gain: #007e5b; --desktop-home-loss: #be3150;
-    --desktop-home-active-shadow: 0 3px 12px #3154d51a;
-    --desktop-home-hover-shadow: 0 4px 16px #3154d512;
-    --desktop-home-accent-line: #b6c6ff;
-    --surface: #fff; --soft: #edf2ff; --line: #dce4f4; --ink: #1d2c4a;
-    --muted: #596c88; --purple: #3154d5; --purple-soft: #e7edff;
-    --studio-panel: var(--surface); --studio-raised: var(--soft);
-    --studio-border: var(--line); --studio-highlight: var(--purple-soft);
-  }
-  .terminal-shell[data-platform="web"][data-section="home"][data-theme="neon"] {
-    /* Modern neon: colour marks interaction; financial text stays unglowed. */
-    --desktop-home-canvas: #080f1c; --desktop-home-shadow: #00071224;
-    --desktop-home-on-accent: #06232f; --desktop-home-gain: #51dfb0; --desktop-home-loss: #ff8da5;
-    --desktop-home-active-shadow: 0 0 0 1px #34dcef12, 0 0 18px #34dcef14;
-    --desktop-home-hover-shadow: 0 0 16px #34dcef12;
-    --desktop-home-accent-line: #28667d;
-    --surface: #101c2e; --soft: #15283d; --line: #253c55; --ink: #e6f1ff;
-    --muted: #a2b8d2; --purple: #41dfef; --purple-soft: #0c3040;
-  }
-  .terminal-shell[data-platform="web"][data-section="home"] :is(.topbar,.home-hub) { color: var(--ink); }
-  .terminal-shell[data-platform="web"][data-section="home"] .topbar { padding-inline: 36px; background: var(--surface); }
-  .terminal-shell[data-platform="web"][data-section="home"] .main-nav { gap: 20px; }
-  .terminal-shell[data-platform="web"][data-section="home"] .main-nav button { padding-inline: 7px; font-size: 14px; font-weight: 600; }
-  .terminal-shell[data-platform="web"][data-section="home"] .main-nav .nav-active { color: var(--purple); border-bottom-color: var(--purple); }
-  .terminal-shell[data-platform="web"][data-section="home"] .top-actions :is(.icon-button,.suggestion-button,.download-button,.api-button) { width: 34px; min-width: 34px; height: 34px; min-height: 34px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); }
-  .terminal-shell[data-platform="web"][data-section="home"] .top-actions .funds-button { min-height: 34px; font-size: 12px; color: var(--ink); }
-  .terminal-shell[data-platform="web"][data-section="home"] .desktop-workspace-title { color: var(--muted); font-size: 13px; }
+  /* Shared desktop chrome; palette aliases live in app-themes.css. */
+  .terminal-shell[data-platform="web"] :is(.topbar,.home-hub) { color: var(--ink); }
+  .terminal-shell[data-platform="web"] .topbar { padding-inline: 36px; background: var(--surface); }
+  .terminal-shell[data-platform="web"] .main-nav { gap: 20px; }
+  .terminal-shell[data-platform="web"] .main-nav button { padding-inline: 7px; font-size: 14px; font-weight: 600; }
+  .terminal-shell[data-platform="web"] .main-nav .nav-active { color: var(--purple); border-bottom-color: var(--purple); }
+  .terminal-shell[data-platform="web"] .top-actions :is(.icon-button,.suggestion-button,.download-button,.api-button) { width: 34px; min-width: 34px; height: 34px; min-height: 34px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"] .top-actions .funds-button { min-height: 34px; font-size: 12px; color: var(--ink); }
+  .terminal-shell[data-platform="web"] .desktop-workspace-title { color: var(--muted); font-size: 13px; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button { padding: 8px 12px; gap: 10px; border-radius: 9px; background: var(--surface); color: var(--muted); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button.active { color: var(--purple); background: var(--purple-soft); border-color: var(--purple); box-shadow: var(--desktop-home-active-shadow); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button small { color: inherit; opacity: 1; }
@@ -168,11 +145,11 @@
   .terminal-shell[data-platform="web"] .home-hub.home-studio :is(.negative,.down) { color: var(--desktop-home-loss); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > .up { color: var(--desktop-home-gain); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > .down { color: var(--desktop-home-loss); }
-  .terminal-shell[data-platform="web"][data-section="home"] :is(button,input):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+  .terminal-shell[data-platform="web"] :is(button,input):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio :is(.home-index-card,.desktop-home-tools button,.home-market-card-v2):hover { border-color: var(--desktop-home-accent-line); background: var(--soft); box-shadow: var(--desktop-home-hover-shadow); }
   .terminal-shell[data-platform="web"] .desktop-mover-tabs button:hover:not([aria-selected="true"]) { background: var(--soft); color: var(--ink); border-color: var(--muted); }
-  .terminal-shell[data-platform="web"][data-section="home"] .topbar > .brand b { color: var(--purple); }
-  .terminal-shell[data-platform="web"][data-section="home"] .top-actions :is(.icon-button,.suggestion-button,.download-button,.api-button):hover { color: var(--purple); border-color: var(--desktop-home-accent-line); background: var(--purple-soft); }
+  .terminal-shell[data-platform="web"] .topbar > .brand b { color: var(--purple); }
+  .terminal-shell[data-platform="web"] .top-actions :is(.icon-button,.suggestion-button,.download-button,.api-button):hover { color: var(--purple); border-color: var(--desktop-home-accent-line); background: var(--purple-soft); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .desktop-mover-tabs button[aria-selected="true"] { box-shadow: var(--desktop-home-active-shadow); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search:focus-within { border-color: var(--purple); box-shadow: var(--desktop-home-active-shadow); }
 
@@ -228,7 +205,7 @@
   }
   @media (max-width: 1199px) {
     .terminal-shell[data-platform="web"] .topbar { padding-inline: 20px; gap: 0 14px; }
-    .terminal-shell[data-platform="web"] .main-nav, .terminal-shell[data-platform="web"][data-section="home"] .main-nav { gap: 8px; }
+    .terminal-shell[data-platform="web"] .main-nav, .terminal-shell[data-platform="web"] .main-nav { gap: 8px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { gap: 18px; padding: 20px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { gap: 6px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 15px; }
@@ -239,8 +216,8 @@
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions { gap: 4px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header { padding-inline: 14px; flex-wrap: wrap; gap: 2px 8px; padding-block: 8px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header b { font-size: 14px; }
-    .terminal-shell[data-platform="web"][data-section="home"] .topbar { padding-inline: 20px; }
-    .terminal-shell[data-platform="web"][data-section="home"] .main-nav button { font-size: 13px; }
+    .terminal-shell[data-platform="web"] .topbar { padding-inline: 20px; }
+    .terminal-shell[data-platform="web"] .main-nav button { font-size: 13px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade { grid-template-columns: minmax(0,1fr) 290px 64px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade.order-panel-collapsed { grid-template-columns: minmax(0,1fr) 0 64px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade > .watchlist-panel.mobile-open { right: 64px; }
