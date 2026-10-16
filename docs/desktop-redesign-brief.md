@@ -125,6 +125,44 @@ and are not loaded by the application.
 The full multi-screen rollout, merge and deployment remain pending review of
 this representative screen.
 
+## Theme revision — modern neon / modern vibrant
+
+Following review, the existing layout now has two distinct colour systems:
+
+| Token | Vibrant light | Modern neon dark |
+| --- | --- | --- |
+| Canvas | `#f1f5ff` | `#080f1c` |
+| Card surface | `#ffffff` | `#101c2e` |
+| Product accent | `#3154d5` cobalt | `#41dfef` electric cyan |
+| Primary text | `#1d2c4a` | `#e6f1ff` |
+| Secondary text | `#596c88` | `#a2b8d2` |
+| Gain text | `#007e5b` | `#51dfb0` |
+| Loss text | `#be3150` | `#ff8da5` |
+
+Neon glow is confined to selected controls and interaction states. Financial
+figures have no text glow. Light mode uses crisp white surfaces, cool blue
+backgrounds, and cobalt selected states. The existing `light`/`neon` preference
+values, layout, controls, and live data integration remain unchanged. This is a
+palette revision of the already selected 12UI layout; no new image generation
+or conversion was purchased, and the earlier alignment report refers to that
+layout rather than certifying these new colours.
+
+The refreshed preview images use the same browser-only public-row replay.
+Production build passed. Theme switching/persistence, privacy controls,
+keyboard section navigation, and 1024/1280/1440/1920 px layouts passed with no
+browser JavaScript errors. Existing mobile components remain intact at 390 px.
+The checked colour pairs exceed 4.5:1 in both themes:
+
+| Checked pair | Light contrast | Dark contrast |
+| --- | --- | --- |
+| Primary text / surface | 13.89:1 | 14.98:1 |
+| Secondary text / surface | 5.35:1 | 8.41:1 |
+| Selected control label / fill | 6.25:1 | 10.10:1 |
+| Gain text / surface | 5.08:1 | 10.21:1 |
+| Loss text / surface | 5.61:1 | 7.82:1 |
+
+These are selected colour-pair checks, not a full accessibility certification.
+
 ## 12UI spend ledger
 
 Stage ceilings are not confirmed charges. The 12UI kit records:
