@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { NativeViewportGuard } from "@/components/NativeViewportGuard";
+import { DocumentTheme } from "@/components/DocumentTheme";
 import "./globals.css";
 import "./home-derivatives.css";
 import "./motion.css";
@@ -48,6 +49,7 @@ import "./home-density.css";
 import "./desktop-workspace.css";
 import "./desktop-market-design.css";
 import "./desktop-tabbed-workspace.css";
+import "./app-themes.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
@@ -99,7 +101,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-IN">
-      <body><NativeViewportGuard />{children}</body>
+      <body><DocumentTheme /><NativeViewportGuard />{children}</body>
     </html>
   );
 }
