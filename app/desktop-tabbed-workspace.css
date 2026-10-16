@@ -19,66 +19,66 @@
   .terminal-shell[data-platform="web"][data-section="trade"] .main-nav { display: none; }
 
   /* One page scroll, with a small number of visible sections per tab. */
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); grid-template-rows: 48px 58px 46px; grid-auto-rows: max-content; align-items: start; align-content: start; gap: 22px; width: 100%; max-width: 1640px; height: 100%; margin: 0 auto; padding: 22px 28px 40px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser { grid-column: 1 / 5; grid-row: 1; height: 48px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-hero { grid-column: 5 / 13; grid-row: 1; height: 48px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search { height: 48px; min-height: 48px; border-radius: 9px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search input { font-size: 13px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button b { font-size: 12px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button small { font-size: 10px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-pulse-section { grid-column: 1 / -1; grid-row: 2; height: 58px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-grid { gap: 22px; height: 58px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { height: 58px; min-height: 0; display: grid; grid-template-columns: auto auto minmax(0,1fr); grid-template-rows: 1fr; align-items: center; gap: 10px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-name { font-size: 12px; letter-spacing: 0; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 17px; font-weight: 550; letter-spacing: -.3px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-change { font-size: 11px; gap: 3px; flex-wrap: wrap; }
-  .terminal-shell[data-platform="web"] .desktop-explore-tabs { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 24px; align-items: stretch; min-height: 46px; border-bottom: 1px solid var(--line); }
-  .terminal-shell[data-platform="web"] .desktop-explore-tabs button { padding: 0 2px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); grid-template-rows: 52px 64px 36px; grid-auto-rows: max-content; align-items: start; align-content: start; gap: 20px; width: 100%; max-width: 1640px; height: 100%; margin: 0 auto; padding: 24px 36px 40px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-gutter: stable; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser { grid-column: 1 / 5; grid-row: 1; height: 52px; gap: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-hero { grid-column: 5 / 13; grid-row: 1; height: 52px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search { height: 52px; min-height: 52px; padding: 0 16px; border-color: var(--line); border-radius: 9px; background: var(--surface); box-shadow: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search input { font-size: 14px; color: var(--ink); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button b { font-size: 13px; font-weight: 650; line-height: 1.4; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser button small { font-size: 11px; line-height: 1.5; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-pulse-section { grid-column: 1 / -1; grid-row: 2; height: 64px; border: 0; border-radius: 0; background: none; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-grid { gap: 20px; height: 64px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { height: 64px; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) auto auto; grid-template-rows: 1fr; align-items: center; gap: 12px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 2px 8px var(--desktop-home-shadow); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-name { min-width: 0; font-size: 13px; font-weight: 650; letter-spacing: 0; line-height: 1.4; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 18px; font-weight: 650; letter-spacing: -.3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-change { font-size: 12px; gap: 3px; flex-wrap: wrap; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+  .terminal-shell[data-platform="web"] .desktop-explore-tabs { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 28px; align-items: stretch; min-height: 36px; border-bottom: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"] .desktop-explore-tabs button { padding: 0 4px 11px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
   .terminal-shell[data-platform="web"] .desktop-explore-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--purple); font-weight: 650; }
   .terminal-shell[data-platform="web"] :is(.desktop-explore-tabs,.desktop-mover-tabs) button:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-pair { display: contents; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio { background: var(--surface); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio { --green: var(--desktop-home-gain); --red: var(--desktop-home-loss); background: var(--desktop-home-canvas,var(--surface)); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-movers-slot { grid-column: 1 / 9; grid-row: 4; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio #equity-watch { grid-column: 9 / 13; grid-row: 5; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-main-grid { display: flex; flex-direction: column; gap: 22px; grid-column: 9 / 13; grid-row: 4; min-height: 0; height: auto; overflow: visible; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section { border-radius: 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-main-grid { display: flex; flex-direction: column; gap: 16px; grid-column: 9 / 13; grid-row: 4; min-height: 0; height: auto; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section:not(.home-pulse-section) { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: 0 2px 8px var(--desktop-home-shadow); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-card { height: auto; overflow: visible; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header { min-height: 48px; padding: 0 18px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header b { font-size: 13px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row { display: flex; flex-direction: column; gap: 0; padding: 0 18px 12px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header { min-height: 56px; padding: 0 20px; border-bottom: 0; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header b { font-size: 15px; font-weight: 650; letter-spacing: -.25px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row { display: flex; flex-direction: column; gap: 0; padding: 0 20px 12px; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > :is(button,.home-funds-used),
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > button:last-child { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > :last-child { border-bottom: 0; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 12px; text-transform: none; letter-spacing: 0; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row :is(b,strong) { font-size: 16px; line-height: 1.3; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-v2 { height: auto; min-height: 130px; padding: 16px 18px; overflow: visible; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 13px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row :is(b,strong) { font-size: 17px; line-height: 1.4; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-v2 { height: auto; min-height: 140px; padding: 18px 20px; overflow: visible; border-color: var(--line); border-radius: 11px; background: var(--surface); box-shadow: 0 2px 8px var(--desktop-home-shadow); }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-copy { min-height: 24px; margin-bottom: 12px; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-previews { gap: 10px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-preview > b { font-size: 12px; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > em { font-size: 11px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-preview > b { font-size: 13px; font-weight: 600; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > em { font-size: 12px; }
   .terminal-shell[data-platform="web"] .desktop-home-tools { display: block; grid-column: 9 / 13; grid-row: 6; }
-  .terminal-shell[data-platform="web"] .desktop-home-tools > div { padding: 0 18px 8px; }
-  .terminal-shell[data-platform="web"] .desktop-home-tools button { display: flex; align-items: center; width: 100%; gap: 12px; padding: 14px 0; border: 0; border-top: 1px solid var(--line); color: var(--ink); background: none; text-align: left; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools > div { padding: 0 20px 8px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button { display: flex; align-items: center; width: 100%; gap: 12px; min-height: 68px; padding: 12px 0; border: 0; border-top: 1px solid var(--line); color: var(--ink); background: none; text-align: left; cursor: pointer; }
   .terminal-shell[data-platform="web"] .desktop-home-tools button > span { flex: 1; display: grid; gap: 4px; }
-  .terminal-shell[data-platform="web"] .desktop-home-tools button b { font-size: 12px; }
-  .terminal-shell[data-platform="web"] .desktop-home-tools button small { color: var(--muted); font-size: 10px; }
-  .terminal-shell[data-platform="web"] .desktop-movers > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-  .terminal-shell[data-platform="web"] .desktop-movers h2 { margin: 0; color: var(--ink); font-size: 21px; font-weight: 600; letter-spacing: -.4px; }
-  .terminal-shell[data-platform="web"] .desktop-movers header :is(p,span) { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
-  .terminal-shell[data-platform="web"] .desktop-mover-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-  .terminal-shell[data-platform="web"] .desktop-mover-tabs button { min-height: 32px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 18px; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
-  .terminal-shell[data-platform="web"] .desktop-mover-tabs button[aria-selected="true"] { background: var(--soft); color: var(--ink); border-color: var(--muted); }
-  .terminal-shell[data-platform="web"] .desktop-market-table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { display: grid; grid-template-columns: minmax(170px,1fr) 100px 90px 90px; gap: 12px; align-items: center; width: 100%; padding: 16px 18px; text-align: right; }
-  .terminal-shell[data-platform="web"] .desktop-market-table-head { background: var(--soft); color: var(--muted); font-size: 11px; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button b { font-size: 13px; font-weight: 600; }
+  .terminal-shell[data-platform="web"] .desktop-home-tools button small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .terminal-shell[data-platform="web"] .desktop-movers > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .terminal-shell[data-platform="web"] .desktop-movers h2 { margin: 0; color: var(--ink); font-size: 24px; line-height: 1.25; font-weight: 650; letter-spacing: -.6px; }
+  .terminal-shell[data-platform="web"] .desktop-movers header :is(p,span) { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs button { min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1.5; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs button[aria-selected="true"] { background: var(--purple); color: var(--desktop-home-on-accent,#fff); border-color: var(--purple); font-weight: 600; }
+  .terminal-shell[data-platform="web"] .desktop-market-table { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { display: grid; grid-template-columns: minmax(160px,1fr) 106px 100px 86px; gap: 12px; align-items: center; width: 100%; padding: 13px 16px; text-align: right; font-variant-numeric: tabular-nums; }
+  .terminal-shell[data-platform="web"] .desktop-market-table-head { background: var(--soft); color: var(--muted); font-size: 12px; line-height: 1.5; }
   .terminal-shell[data-platform="web"] .desktop-market-table-head > :first-child { text-align: left; }
-  .terminal-shell[data-platform="web"] .desktop-stock-row { min-height: 76px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 12px; cursor: pointer; }
+  .terminal-shell[data-platform="web"] .desktop-stock-row { min-height: 68px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 14px; line-height: 1.5; cursor: pointer; }
   .terminal-shell[data-platform="web"] .desktop-stock-row:hover { background: var(--soft); }
   .terminal-shell[data-platform="web"] .desktop-stock-name { display: flex; align-items: center; gap: 12px; min-width: 0; text-align: left; }
   .terminal-shell[data-platform="web"] .desktop-stock-name > span { display: grid; gap: 5px; min-width: 0; }
-  .terminal-shell[data-platform="web"] .desktop-stock-name b { font-size: 12px; }
-  .terminal-shell[data-platform="web"] .desktop-stock-name small { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .terminal-shell[data-platform="web"] .desktop-table-empty { padding: 36px 20px; color: var(--muted); font-size: 12px; }
+  .terminal-shell[data-platform="web"] .desktop-stock-name b { font-size: 14px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+  .terminal-shell[data-platform="web"] .desktop-stock-name small { font-size: 12px; line-height: 1.5; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .terminal-shell[data-platform="web"] .desktop-table-empty { display: grid; place-content: center; min-height: 220px; margin: 0; padding: 36px 20px; color: var(--muted); font-size: 14px; line-height: 1.6; text-align: center; }
 
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data { display: contents; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-data > * { grid-column: auto; grid-row: auto; height: auto; min-height: 0; overflow: visible; }
@@ -118,6 +118,50 @@
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-market="global"] .home-main-grid { grid-column: 9 / 13; grid-row: 2; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .market-directory { grid-column: 1 / 9; grid-row: 2; height: auto; overflow: visible; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-account { overflow: visible; }
+
+
+  /* 12UI candidate C. Home is the review surface before expanding the system.
+     Keep app data and vector controls authoritative; no generated financial data. */
+  .terminal-shell[data-platform="web"][data-section="home"] {
+    --desktop-home-canvas: #f6f8f9; --desktop-home-shadow: #263b4d04;
+    --desktop-home-on-accent: #fff; --desktop-home-gain: #00805f; --desktop-home-loss: #c3344b;
+    --surface: #fff; --soft: #f0f4f6; --line: #e0e7ec; --ink: #293f53;
+    --muted: #5d7285; --purple: #007c70; --purple-soft: #e6f4f0;
+    --studio-panel: var(--surface); --studio-raised: var(--soft);
+  }
+  .terminal-shell[data-platform="web"][data-section="home"][data-theme="neon"] {
+    --desktop-home-canvas: #101b25; --desktop-home-shadow: #0000000c;
+    --desktop-home-on-accent: #10231f; --desktop-home-gain: #63d5ad; --desktop-home-loss: #ff9aa9;
+    --surface: #172531; --soft: #1e303e; --line: #304454; --ink: #e3edf5;
+    --muted: #a8bbc9; --purple: #70cfc0; --purple-soft: #203d3a;
+  }
+  .terminal-shell[data-platform="web"][data-section="home"] :is(.topbar,.home-hub) { color: var(--ink); }
+  .terminal-shell[data-platform="web"][data-section="home"] .topbar { padding-inline: 36px; background: var(--surface); }
+  .terminal-shell[data-platform="web"][data-section="home"] .main-nav { gap: 20px; }
+  .terminal-shell[data-platform="web"][data-section="home"] .main-nav button { padding-inline: 7px; font-size: 14px; font-weight: 600; }
+  .terminal-shell[data-platform="web"][data-section="home"] .main-nav .nav-active { color: var(--ink); border-bottom-color: var(--purple); }
+  .terminal-shell[data-platform="web"][data-section="home"] .top-actions :is(.icon-button,.suggestion-button,.download-button,.api-button) { width: 34px; min-width: 34px; height: 34px; min-height: 34px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); }
+  .terminal-shell[data-platform="web"][data-section="home"] .top-actions .funds-button { min-height: 34px; font-size: 12px; color: var(--ink); }
+  .terminal-shell[data-platform="web"][data-section="home"] .desktop-workspace-title { color: var(--muted); font-size: 13px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button { padding: 8px 12px; gap: 10px; border-radius: 9px; background: var(--surface); color: var(--muted); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button.active { color: var(--purple); background: var(--purple-soft); border-color: var(--purple); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-chooser > button small { color: inherit; opacity: 1; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search > svg { color: var(--muted); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-global-search input::placeholder { color: var(--muted); opacity: 1; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-name > small { color: var(--muted); font-size: 10px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .desktop-movers { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: 0 2px 8px var(--desktop-home-shadow); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions { gap: 10px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions > button { min-height: 34px; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row > :is(button,.home-funds-used) { min-height: 41px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-market-card-copy b { font-size: 15px; font-weight: 650; letter-spacing: -.25px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts { justify-content: flex-start; gap: 6px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio :is(.positive,.up) { color: var(--desktop-home-gain); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio :is(.negative,.down) { color: var(--desktop-home-loss); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > .up { color: var(--desktop-home-gain); }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio .home-breadth-counts > .down { color: var(--desktop-home-loss); }
+  .terminal-shell[data-platform="web"][data-section="home"] :is(button,input):focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio :is(.home-index-card,.desktop-home-tools button,.home-market-card-v2):hover { border-color: var(--muted); background: var(--soft); }
+  .terminal-shell[data-platform="web"] .desktop-mover-tabs button:hover:not([aria-selected="true"]) { background: var(--soft); color: var(--ink); border-color: var(--muted); }
 
   /* List/report screens each own their single main scroll region. */
   .terminal-shell[data-platform="web"] :is(.news-workspace,.ipo-discovery-panel,.navigation-page-backdrop) { overflow-y: auto; padding: 24px 28px; background: var(--surface); }
@@ -161,17 +205,29 @@
   .terminal-shell[data-platform="web"] .trade-cockpit .desktop-live-pnl { margin-left: auto; }
   .terminal-shell[data-platform="web"] .trade-cockpit .chart-control-orders button { min-height: 32px; font-size: 11px; }
   .terminal-shell[data-platform="web"] .chart-statusbar { min-height: 28px; }
+  @media (max-width: 1350px) {
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 3px; padding: 9px 14px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-name { grid-column: 1; grid-row: 1 / 3; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { grid-column: 2; grid-row: 1; font-size: 16px; text-align: right; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > .home-index-change { grid-column: 2; grid-row: 2; font-size: 11px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .desktop-movers { padding: 16px; }
+    .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns: minmax(100px,1fr) 92px 80px 68px; gap: 8px; padding-inline: 12px; }
+  }
   @media (max-width: 1199px) {
     .terminal-shell[data-platform="web"] .topbar { padding-inline: 20px; gap: 0 14px; }
-    .terminal-shell[data-platform="web"] .main-nav { gap: 10px; }
+    .terminal-shell[data-platform="web"] .main-nav, .terminal-shell[data-platform="web"][data-section="home"] .main-nav { gap: 8px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-dashboard-scroll { gap: 18px; padding: 20px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card { gap: 6px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-index-card > b { font-size: 15px; }
     .terminal-shell[data-platform="web"] :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns: minmax(130px,1fr) 80px 75px 75px; gap: 8px; padding-inline: 12px; }
     .terminal-shell[data-platform="web"] .desktop-stock-name { gap: 8px; }
-    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 11px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row small { font-size: 12px; }
     .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-row :is(b,strong) { font-size: 14px; }
-    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions { gap: 2px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-portfolio-actions { gap: 4px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header { padding-inline: 14px; flex-wrap: wrap; gap: 2px 8px; padding-block: 8px; }
+    .terminal-shell[data-platform="web"] .home-hub.home-studio .home-section > header b { font-size: 14px; }
+    .terminal-shell[data-platform="web"][data-section="home"] .topbar { padding-inline: 20px; }
+    .terminal-shell[data-platform="web"][data-section="home"] .main-nav button { font-size: 13px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade { grid-template-columns: minmax(0,1fr) 290px 64px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade.order-panel-collapsed { grid-template-columns: minmax(0,1fr) 0 64px; }
     .terminal-shell[data-platform="web"] .workspace.section-trade > .watchlist-panel.mobile-open { right: 64px; }
