@@ -8,8 +8,8 @@ html[data-theme=neon] .pine-editor,body[data-theme=neon] .pine-editor,.pine-edit
 @media(max-width:700px){.pine-backdrop{padding:8px}.pine-editor{height:calc(100dvh - 16px);border-radius:10px}.pine-heading{padding:12px 14px}.pine-heading h2{font-size:17px}.pine-heading h2 small{font-size:8px}.pine-library{width:142px;padding:14px 8px}.pine-document{padding:12px;gap:6px}.pine-document button{font-size:10px;padding:8px}.pine-tabs{gap:15px;padding:0 12px}.pine-fields{padding:16px}.pine-fields>label{align-items:flex-start;flex-direction:column;gap:5px}.pine-footer{padding:10px;flex-wrap:wrap}.pine-footer>div{flex-wrap:wrap}.pine-footer button{font-size:11px;padding:6px 8px}.pine-diagnostics{padding:8px 12px}.pine-lines{width:30px;font-size:10px;padding-right:6px}.pine-code textarea{font-size:11px}}
 @media(max-width:480px){.pine-workspace{flex-direction:column}.pine-library{display:flex;gap:4px;align-items:center;width:100%;padding:5px 10px;border-right:0;border-bottom:1px solid #8883;overflow-x:auto;flex-shrink:0;max-height:76px}.pine-library h3,.pine-library p,.pine-library>.pine-import,.pine-library>button:last-child{display:none}.pine-library>button{width:auto;white-space:nowrap;font-size:10px;padding:6px;border:1px solid #8883}.pine-library>button span{display:none}.pine-saved-row{margin:0;border:1px solid #8883;border-radius:5px;font-size:10px}.pine-saved-row button:first-child{max-width:120px}.pine-main{min-height:0}.pine-document{padding:8px 12px}.pine-code{min-height:140px}.pine-footer>span{display:none}}
 
-/* Enhanced browser editor. The existing touch/native presentation stays above. */
-@media (min-width: 941px) and (hover: hover) and (pointer: fine) {
+/* Shared runtime workspace; editor input adapts to touch below. */
+@media (min-width: 0px) {
   .pine-backdrop[data-advanced="true"] {
     padding: 18px;
     background: #0008;
@@ -245,7 +245,7 @@ html[data-theme=neon] .pine-editor,body[data-theme=neon] .pine-editor,.pine-edit
   }
 }
 
-@media (min-width: 941px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 0px) {
   .pine-editor[data-advanced="true"] .pine-equity {
     margin: 20px 0;
     padding-block: 12px;
@@ -268,7 +268,7 @@ html[data-theme=neon] .pine-editor,body[data-theme=neon] .pine-editor,.pine-edit
     font-size: 9px;
   }
 }
-@media (min-width: 941px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 0px) {
   .pine-editor[data-advanced="true"] .pine-monaco-wrap { position: relative; }
   .pine-editor[data-advanced="true"] .pine-monaco-wrap > .pine-code-loading {
     position: absolute;
@@ -278,4 +278,55 @@ html[data-theme=neon] .pine-editor,body[data-theme=neon] .pine-editor,.pine-edit
     color: var(--pine-muted);
     background: var(--pine-panel);
   }
+}
+
+.pine-library-toggle {display:none;}
+@media (max-width:940px), (pointer:coarse) {
+ .pine-backdrop[data-advanced=true] {padding:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+ .pine-editor[data-advanced=true] {height:100%;width:100%;border-radius:0;}
+ .pine-editor[data-advanced=true] .pine-heading {padding:8px 12px;gap:8px;flex-shrink:0;}
+ .pine-editor[data-advanced=true] .pine-heading>div {flex:1;min-width:0;}
+ .pine-editor[data-advanced=true] .pine-heading h2 {font-size:16px;}
+ .pine-editor[data-advanced=true] .pine-heading h2 small {font-size:9px;display:inline-block;margin-left:4px;}
+ .pine-editor[data-advanced=true] button {min-height:44px;font-size:12px;}
+ .pine-editor[data-advanced=true] .pine-heading>button:last-child {min-width:44px;}
+ .pine-editor[data-advanced=true] .pine-library-toggle {display:block;}
+ .pine-editor[data-advanced=true] .pine-workspace {flex-direction:column;}
+ .pine-editor[data-advanced=true] .pine-library {display:none;width:100%;max-height:40dvh;padding:12px 16px;overflow:auto;border-right:0;border-bottom:1px solid var(--pine-line);}
+ .pine-editor[data-advanced=true][data-library-open=true] .pine-library {display:block;}
+ .pine-editor[data-advanced=true] .pine-library :is(h3,p,.pine-import),.pine-editor[data-advanced=true] .pine-library>button:last-child {display:block;}
+ .pine-editor[data-advanced=true] .pine-library>button {width:100%;text-align:left;}
+ .pine-editor[data-advanced=true] .pine-saved-row button:first-child {max-width:none;}
+ .pine-editor[data-advanced=true] .pine-main {min-height:0;}
+ .pine-editor[data-advanced=true] .pine-document {padding:8px 12px;gap:6px;flex-wrap:wrap;min-height:0;flex-shrink:0;}
+ .pine-editor[data-advanced=true] .pine-document label {flex-basis:100%;}
+ .pine-editor[data-advanced=true] .pine-document input {font-size:16px;min-height:36px;}
+ .pine-editor[data-advanced=true] .pine-document button {min-height:36px;padding:5px 10px;}
+ .pine-editor[data-advanced=true] .pine-tabs {gap:18px;padding-inline:12px;}
+ .pine-editor[data-advanced=true] .pine-tabs button {min-height:44px;}
+ .pine-editor[data-advanced=true] .pine-content {min-height:100px;}
+ .pine-editor[data-advanced=true] .pine-fields {padding:16px;}
+ .pine-editor[data-advanced=true] .pine-fields input,.pine-editor[data-advanced=true] .pine-fields select {font-size:16px;min-height:44px;}
+ .pine-editor[data-advanced=true] .pine-diagnostics {max-height:86px;overflow:auto;padding:8px 12px;flex-shrink:0;}
+ .pine-editor[data-advanced=true] .pine-footer {padding:8px 12px;min-height:60px;flex-shrink:0;}
+ .pine-editor[data-advanced=true] .pine-footer>span {display:none;}
+ .pine-editor[data-advanced=true] .pine-footer>div {display:flex;flex-wrap:wrap;gap:6px;}
+ .pine-editor[data-advanced=true] .pine-footer button {font-size:12px;padding:7px 10px;}
+ .pine-editor[data-advanced=true] .pine-test-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .pine-editor[data-advanced=true] .pine-revision {gap:10px;flex-wrap:wrap;}
+ .pine-touch-editor {height:100%;min-height:100px;display:flex;flex-direction:column;}
+ .pine-touch-tools {display:flex;gap:6px;padding:4px 10px;flex-shrink:0;border-bottom:1px solid var(--pine-line);}
+ .pine-touch-tools input {min-width:0;flex:1;font-size:16px;}
+ .pine-touch-tools button {padding:5px 8px;white-space:nowrap;}
+ .pine-touch-editor>textarea {width:100%;flex:1;min-height:60px;resize:none;border:0;border-radius:0;padding:12px;background:var(--pine-panel);color:var(--pine-text);font:16px/24px Consolas,monospace;tab-size:4;overscroll-behavior:contain;}
+ .pine-touch-editor>small {display:block;padding:4px 12px;font-size:10px;color:var(--pine-muted);border-top:1px solid var(--pine-line);}
+}
+
+@media (max-height:550px) and (max-width:940px) {
+ .pine-editor[data-advanced=true] .pine-heading {min-height:48px;padding-block:2px;}
+ .pine-editor[data-advanced=true] .pine-eyebrow,.pine-editor[data-advanced=true] .pine-heading h2 small {display:none;}
+ .pine-editor[data-advanced=true] .pine-document {padding-block:4px;flex-wrap:nowrap;}
+ .pine-editor[data-advanced=true] .pine-document label {flex-basis:0;min-width:0;}
+ .pine-editor[data-advanced=true] .pine-diagnostics {padding-block:4px;max-height:42px;}
+ .pine-editor[data-advanced=true] .pine-footer {padding-block:4px;min-height:52px;}
 }

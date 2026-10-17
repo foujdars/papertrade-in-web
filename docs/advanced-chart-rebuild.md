@@ -1,12 +1,12 @@
-# Desktop advanced chart rebuild
+# Advanced chart rebuild
 
 This is an independent implementation on Papertrade's Lightweight Charts engine, guided by public TradingView behavior observed with REA. It does not embed or redistribute the proprietary TradingView Advanced Charts library. Research provenance and limits are recorded in [chart-rebuild-rea.md](chart-rebuild-rea.md).
 
 ## Where to find it
 
-On a desktop browser, open a Trade/F&O chart or the dedicated chart workspace. The indicator strip now has **Settings**, **Data window**, and **Object tree** controls. **Functions → Templates** manages indicator templates. Select a Fibonacci retracement or regression drawing and open its settings for the additional controls. The existing **Pine Editor** button remains available in the strip and Functions menu.
+On desktop, mobile web or the native app, open a Trade/F&O chart or the dedicated chart workspace. The indicator strip now has **Settings**, **Data window**, and **Object tree** controls. **Functions → Templates** manages indicator templates. Select a Fibonacci retracement or regression drawing and open its settings for the additional controls. The existing **Pine Editor** button remains available in the strip and Functions menu.
 
-These additions require a fine-pointer desktop browser at least 941 CSS pixels wide. Narrow screens and Capacitor/native hosts keep their existing interface. Desktop appearance choices are restored when entering desktop mode and removed from the chart engine when leaving it; they do not overwrite mobile settings.
+These features are now available on desktop, touch devices and Capacitor/native hosts. Dialogs and the Data window adapt to the available space; explicit appearance choices persist across layouts on the same device. See [mobile-chart-tools.md](mobile-chart-tools.md) for touch editor behavior, native Back handling and validation.
 
 ## Implemented behavior
 
@@ -31,10 +31,10 @@ This branch builds on the PineTS/Monaco rebuild in PR #121, now merged into main
 - `npx tsc --noEmit` and focused lint on the new components/helpers.
 - `npm run build`: complete production build, including the isolated Pine runtime asset.
 - `node tests/browser/chart-settings.cjs`: actual dialog behavior, keyboard controls, templates, storage denial/recovery, object search and legacy view.
-- `node tests/browser/chart-appearance.cjs`: actual engine colors, scale/viewport preservation, comparison, live bracket margins, volume candles and mobile/native restoration.
-- `node tests/browser/chart-rebuild.cjs`: integrated chart settings, data inspector, historical hover, drawings, persistence, templates and responsive exclusions.
+- `node tests/browser/chart-appearance.cjs`: actual engine colors, scale/viewport preservation, comparison, live bracket margins, volume candles and cross-platform appearance persistence.
+- `node tests/browser/chart-rebuild.cjs`: integrated chart settings, data inspector, historical hover, drawings, persistence, templates and responsive layouts.
 - `node tests/browser/ray-alert-settings.cjs`: ray settings, exact-price alert creation, failure/cancel/reload, desktop and mobile layouts. Alert persistence/notification hooks use deterministic fixtures; live push delivery is outside this test.
-- `node tests/browser/pine-rebuild.cjs`: Monaco, isolated PineTS execution, studies/strategies, visuals, inputs, logs, live updates, errors, saved history and mobile/native preservation.
+- `node tests/browser/pine-rebuild.cjs`: Monaco, isolated PineTS execution, studies/strategies, visuals, inputs, logs, live updates, errors, saved history and mobile/native operation.
 
 Browser runners use Vite and Playwright Chromium. Set `PLAYWRIGHT_MODULE_PATH` to an installed compatible Playwright module if it is not on the normal module path. Test feeds are deterministic fixtures, not a certification of a live exchange connection.
 

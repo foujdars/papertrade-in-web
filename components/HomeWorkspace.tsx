@@ -7,6 +7,9 @@ import { MarketDirectory } from './MarketDirectory';
 import { IndiaPulse, IndiaFlows } from "./IndiaPulse";
 import { HomeDerivatives } from "./HomeDerivatives";
 import { MarketMovers } from "./MarketMovers";
+import { MarketDataStatus } from './MarketDataStatus';
+import { marketTimeLabel, type MarketDataStatus as MarketStatus } from '@/lib/market-data-status';
+import { startVisiblePolling } from '@/lib/visible-polling';
 import { EquityWatch } from "./EquityWatch";
 import { BulkDeals } from "./BulkDeals";
 import { SectorHeat } from "./SectorHeat";
@@ -155,7 +158,10 @@ export function HomeWorkspace({
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
   const [boards, setBoards] = useState<{ in: SearchBoard; us: SearchBoard; crypto: SearchBoard } | null>(null);
-  const [listQuotes, setListQuotes] = useState<Record<string, { price: number; change: number; volume: number }>>({});
+  const [boardMetadata,setBoardMetadata]=useState<Partial<Record<'in'|'us'|'crypto',MarketStatus>>>({});
+  const [boardsFailed,setBoardsFailed]=useState(false);
+  const [previewFailed,setPreviewFailed]=useState(false);
+  const [listQuotes, setListQuotes] = useState<Record<string, { price: number; change: number|null; volume: number; quoteAt:string }>>({});
   const sheetInput = useRef<HTMLInputElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const storageKey = homePreferenceKey(preferenceOwner);
@@ -193,15 +199,18 @@ export function HomeWorkspace({
         setPopular({ in: body.in, us: body.us, crypto: body.crypto, sources: { in: String(body.sources?.in ?? "fallback"), us: String(body.sources?.us ?? "fallback"), crypto: String(body.sources?.crypto ?? "fallback") } });
       })
       .catch(() => undefined);
-    fetch("/api/market/search-movers", { signal: controller.signal, cache: "no-store" })
-      .then(response => response.json())
-      .then(body => {
-        if (!body?.ok || !body.in || !body.us || !body.crypto) return;
-        setBoards({ in: body.in, us: body.us, crypto: body.crypto });
-      })
-      .catch(() => undefined);
     return () => { document.body.style.overflow = previous; controller.abort(); };
   }, [searchFocused]);
+  useEffect(()=>{
+    if(!searchFocused)return;
+    return startVisiblePolling(async signal=>{
+      const response=await fetch('/api/market/search-movers',{signal,cache:'no-store'});
+      const body=await response.json();
+      if(signal.aborted)return;
+      if(!response.ok||!body?.ok||!body.in||!body.us||!body.crypto){setBoardsFailed(true);return;}
+      setBoards({in:body.in,us:body.us,crypto:body.crypto});setBoardMetadata(body.metadata??{});setBoardsFailed(false);
+    },15_000,()=>setBoardsFailed(true));
+  },[searchFocused]);
   const updatePreferences = (next: HomePreferences) => {
     setPreferences(next);
     try { localStorage.setItem(storageKey, JSON.stringify(next)); }
@@ -251,36 +260,33 @@ export function HomeWorkspace({
     const digits = value >= 1 ? 2 : 4;
     return value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   };
-  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number; volume: number; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
+  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number|null; volume: number; quoteLabel?:string; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
     {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
     <span className="home-pair-name"><b>{line.symbol}</b><small>{line.name}</small><small className="home-pair-vol">{line.volume > 0 ? `Vol ${volumeLabel(line.volume)}` : "—"}</small></span>
-    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 ? (line.change < 0 ? "down" : "up") : ""}>{line.price > 0 ? `${line.change > 0 ? "+" : ""}${line.change.toFixed(2)}%` : "—"}</em></span>
+    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 && line.change!=null ? (line.change < 0 ? "down" : "up") : ""}>{line.price>0?quoteChangeText(line.change):"—"}</em>{line.quoteLabel&&<small className="market-quote-time">{line.quoteLabel}</small>}</span>
   </button>;
   const quoteLine = (quote: BoardQuote, seen: Set<string>) => {
     const stock = matchShelfInstrument(stockOptions, boardShelf, quote.symbol);
     const symbol = stock?.symbol ?? quote.symbol;
     if (seen.has(symbol)) return null;
     seen.add(symbol);
-    return { key: `${boardKey}:${symbol}`, symbol, name: stock?.name ?? quote.name, price: quote.price, change: quote.change, volume: quote.volume, stock };
+    return { key: `${boardKey}:${symbol}`, symbol, name: stock?.name ?? quote.name, price: quote.price, change: quote.change, volume: quote.volume, quoteLabel:quote.source==='tradingview'?'Delayed scanner quote':`${quote.delayed?'Delayed · ':''}${marketTimeLabel(quote.quoteAt)}`, stock };
   };
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
     if (!quoteKeys) { setLoading(false); return; }
-    const controller = new AbortController();
-    let disposed = false;
-    setLoading(true);
-    const timeout = window.setTimeout(() => controller.abort(), 10000);
-    const debounce = window.setTimeout(async () => {
+    setLoading(true);setPreviewFailed(false);
+    return startVisiblePolling(async signal=>{
       try {
-        const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`, { signal: controller.signal });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error("Quote unavailable");
-        if (!disposed) setQuotes((current) => ({ ...current, ...Object.fromEntries(quoteKeys.split(",").map((key) => [key, usableHomeQuote(payload.quotes?.[key])])) }));
-      } catch {
-        if (!disposed) setQuotes((current) => ({ ...current, ...Object.fromEntries(quoteKeys.split(",").map((key) => [key, null])) }));
-      } finally { if (!disposed) setLoading(false); window.clearTimeout(timeout); }
-    }, 250);
-    return () => { disposed = true; controller.abort(); window.clearTimeout(timeout); window.clearTimeout(debounce); };
+        const response=await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(quoteKeys)}`,{signal,cache:'no-store'});
+        const payload=await response.json();
+        if(signal.aborted)return;
+        if(!response.ok||!payload.ok)throw new Error('Quote unavailable');
+        const quote=usableHomeQuote(payload.quotes?.[quoteKeys]);
+        if(!quote)throw new Error('Quote unavailable');
+        setQuotes(current=>({...current,[quoteKeys]:quote}));setPreviewFailed(false);
+      } finally {if(!signal.aborted)setLoading(false);}
+    },10_000,()=>{setLoading(false);setPreviewFailed(true);});
   }, [quoteKeys, retry]);
   const previewQuote = preview?.instrumentKey ? quotes[preview.instrumentKey] : null;
   const searchQuoteKeys = useMemo(() => {
@@ -289,33 +295,28 @@ export function HomeWorkspace({
     return [...new Set(rows.map(stock => stock.instrumentKey).filter((key): key is string => Boolean(key)))].join(",");
   }, [search, searchFocused, shelfRows, shelf]);
   useEffect(() => {
-    if (!searchQuoteKeys) return;
-    const controller = new AbortController();
-    const keys = searchQuoteKeys.split(",");
-    const load = () => {
-      fetch(`/api/upstox/quotes?keys=${keys.map(encodeURIComponent).join(",")}`, { signal: controller.signal, cache: "no-store" })
-        .then(response => response.json())
-        .then(body => {
-          if (!body?.ok || !body.quotes) return;
-          setListQuotes(current => {
-            const next = { ...current };
-            for (const key of keys) {
-              const quote = body.quotes[key] as { lastPrice?: number; changePercent?: number; volume?: number } | undefined;
-              if (!quote || !(Number(quote.lastPrice) > 0)) continue;
-              next[key] = { price: Number(quote.lastPrice), change: Number.isFinite(Number(quote.changePercent)) ? Number(quote.changePercent) : 0, volume: Number(quote.volume) > 0 ? Number(quote.volume) : 0 };
-            }
-            return next;
-          });
-        })
-        .catch(() => undefined);
-    };
-    load();
-    const timer = window.setInterval(load, 20_000);
-    return () => { controller.abort(); window.clearInterval(timer); };
-  }, [searchQuoteKeys]);
+    if(!searchQuoteKeys)return;
+    const keys=searchQuoteKeys.split(',');
+    return startVisiblePolling(async signal=>{
+      const response=await fetch(`/api/upstox/quotes?keys=${keys.map(encodeURIComponent).join(',')}`,{signal,cache:'no-store'});
+      const body=await response.json();
+      if(signal.aborted||!response.ok||!body?.ok||!body.quotes)return;
+      setListQuotes(current=>{
+        const next={...current};
+        for(const key of keys){
+          const raw=body.quotes[key],quote=usableHomeQuote(raw);
+          if(!quote)continue;
+          const quoteAt=typeof raw.lastTradeAt==='string'?raw.lastTradeAt:'';
+          if(Date.parse(current[key]?.quoteAt??'')>Date.parse(quoteAt||'1970-01-01'))continue;
+          next[key]={price:quote.lastPrice,change:quote.changePercent,volume:Number.isFinite(raw.volume)&&raw.volume>0?raw.volume:0,quoteAt};
+        }
+        return next;
+      });
+    },15_000);
+  },[searchQuoteKeys]);
   const priced = (stock: HomeStockOption) => {
     const live = stock.instrumentKey ? listQuotes[stock.instrumentKey] : undefined;
-    return { price: live?.price || stock.price, change: live ? live.change : stock.changePercent, volume: live?.volume ?? 0 };
+    return { price: live?.price || stock.price, change: live ? live.change : Number.isFinite(stock.changePercent)?stock.changePercent:null, volume: live?.volume ?? 0, quoteLabel:live?marketTimeLabel(live.quoteAt):'Cached instrument quote' };
   };
   const seen = new Set<string>();
   const commodityRows = rankCommodityRows(shelfRows.popular, stock => priced(stock).volume);
@@ -355,6 +356,7 @@ export function HomeWorkspace({
                     <div className="home-search-tabs" role="tablist" aria-label="Market">
                       {([["all", "All"], ["in", "IN"], ["mcx", "MCX"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
                     </div>
+                    {!search.trim()&&shelf!=='mcx'&&<MarketDataStatus metadata={boardMetadata[boardKey]} failed={boardsFailed} now={now}/>}
                     <div className="home-search-sheet-list">
                       {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
                         {shelf === "mcx" && <div className="home-search-group"><b>{commoditySessionLabel ?? "MCX futures"}</b></div>}
@@ -471,7 +473,8 @@ export function HomeWorkspace({
         <section className="home-stock-preview" role="dialog" aria-modal="true" aria-label={`${preview.symbol} stock preview`} onClick={(event) => event.stopPropagation()}>
           <header><StockLogo symbol={preview.symbol} /><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
           <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{previewQuote ? formatInr(previewQuote.lastPrice) : loading ? <CandleLoader compact label="Loading quote" /> : "Quote unavailable"}</strong></span><b className={(previewQuote?.changePercent ?? 0) < 0 ? "negative" : "positive"}>{quoteChangeText(previewQuote?.changePercent)}</b></div>
-          {!loading && !previewQuote && <button onClick={() => setRetry((n) => n + 1)}>Retry quote</button>}
+          {previewFailed&&<p role="status">Refresh failed. The last available quote is shown.</p>}
+          {!loading && (!previewQuote||previewFailed) && <button onClick={() => setRetry((n) => n + 1)}>Retry quote</button>}
           <div className="home-stock-preview-tags">{preview.categories.length ? preview.categories.map((category) => <span key={category}>{category}</span>) : <span>ALL NSE</span>}</div>
           <p>Preview the stock first, then open its remembered chart setup when you are ready.</p>
           <div className="home-stock-preview-actions"><button onClick={onOpenWatchlist}><Layers3 size={16} /> Watchlists</button><button onClick={() => onOpenStock(preview.symbol)}><CandlestickChart size={16} /> Open chart <ArrowRight size={15} /></button></div>

@@ -1,4 +1,4 @@
-/* Mounted only in desktop browser charts. Unique classes leave legacy dialogs untouched. */
+/* Shared chart settings retain their storage and class names across platforms. */
 .desktop-chart-settings { --settings-bg:#fff; --settings-panel:#fff; --settings-text:#131722; --settings-muted:#787b86; --settings-border:#e0e3eb; --settings-hover:#f0f3fa; --settings-accent:#2962ff; width:min(760px,calc(100vw - 48px)); height:min(674px,calc(100dvh - 48px)); max-width:none; max-height:none; padding:0; margin:auto; border:1px solid var(--settings-border); border-radius:8px; color:var(--settings-text); background:var(--settings-bg); box-shadow:0 12px 48px #0003; font-family:Inter,Arial,sans-serif; overflow:hidden; }
 .desktop-chart-settings[data-theme="neon"] { --settings-bg:#1e222d; --settings-panel:#1e222d; --settings-text:#d1d4dc; --settings-muted:#9598a1; --settings-border:#363a45; --settings-hover:#2a2e39; color-scheme:dark; }
 .desktop-chart-settings[open] { display:flex; flex-direction:column; }
@@ -89,3 +89,63 @@
 .desktop-drawing-objects .drawing-object-actions button { width:29px; height:29px; border-radius:4px; }
 .desktop-object-footer { display:flex; gap:13px; align-items:center; padding:12px 20px; border-top:1px solid var(--line,#e0e3eb); color:var(--muted,#787b86); font-size:10px; }
 .desktop-object-footer > span:last-child { margin-left:auto; }
+
+@media (max-width:940px), (pointer:coarse) {
+ .desktop-chart-settings {width:min(760px,calc(100vw - 16px));height:min(740px,calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));border-radius:10px;}
+ .desktop-settings-header {padding:10px 14px;min-height:64px;}
+ .desktop-settings-header h2 {font-size:18px;}
+ .desktop-settings-header>button {width:44px;height:44px;}
+ .desktop-settings-body {display:flex;flex-direction:column;}
+ .desktop-settings-tabs {flex-direction:row;border-right:0;border-bottom:1px solid var(--settings-border);padding:4px 8px;overflow-x:auto;flex-shrink:0;}
+ .desktop-settings-tabs [role=tab] {min-height:44px;padding:0 11px;flex-shrink:0;gap:7px;}
+ .desktop-settings-tabs>small {display:none;}
+ .desktop-settings-content {padding:16px;flex:1;min-height:0;}
+ .desktop-settings-preview {grid-template-columns:minmax(0,1fr) 130px;padding:10px;gap:8px;}
+ .desktop-settings-preview>svg {width:130px;}
+ .desktop-settings-row {gap:10px;min-height:54px;}
+ .desktop-settings-row>div:first-child {min-width:70px;}
+ .desktop-settings-field select {min-width:126px;max-width:150px;height:44px;font-size:16px;}
+ .desktop-settings-color {height:44px;padding:0 4px;}
+ .desktop-settings-color input {width:28px;height:36px;}
+ .desktop-settings-color button {width:34px;height:42px;}
+ .desktop-settings-color span {width:43px;font-size:9px;}
+ .desktop-settings-number {height:44px;}
+ .desktop-settings-number input {height:42px;font-size:16px;}
+ .desktop-settings-toggle {min-height:36px;align-items:center;}
+ .desktop-settings-toggle input {width:22px;height:22px;}
+ .desktop-settings-toggle span {line-height:20px;}
+ .desktop-settings-notice {padding:7px 14px;line-height:1.4;}
+ .desktop-settings-footer {padding:8px 10px 10px;gap:4px;}
+ .desktop-settings-footer>div {gap:4px;}
+ .desktop-settings-footer button {min-height:44px;padding:0 12px;}
+ .desktop-settings-footer .desktop-settings-reset {padding-inline:4px;gap:4px;}
+ .desktop-settings-template-save input {font-size:16px;min-height:44px;}
+ .desktop-settings-template-save button,.desktop-settings-template-list button {min-height:44px;}
+ .desktop-drawing-objects {width:min(620px,calc(100vw - 16px));max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
+ .desktop-drawing-objects>header {padding:10px 12px;}
+ .desktop-object-filters {padding:10px 12px;gap:8px;flex-wrap:wrap;}
+ .desktop-object-filters>label {height:44px;flex-basis:150px;}
+ .desktop-object-filters input,.desktop-object-filters select {font-size:16px;}
+ .desktop-object-filters select {height:44px;max-width:none;flex:1;}
+ .desktop-object-bulk {padding:7px 12px;gap:6px;}
+ .desktop-object-bulk button {height:44px;}
+ .desktop-drawing-objects .drawing-object-row {padding:10px 12px;flex-wrap:wrap;gap:6px;}
+ .desktop-drawing-objects .drawing-object-actions {margin-left:auto;}
+ .desktop-drawing-objects .drawing-object-actions button {width:44px;height:44px;}
+ .desktop-object-footer {padding:10px 12px;flex-wrap:wrap;font-size:10px;}
+ .desktop-object-footer>span:last-child {margin-left:0;flex-basis:100%;}
+ .indicator-template-panel {padding:16px;}
+ .indicator-template-save input {font-size:16px;min-height:44px;}
+ .indicator-template-save button,.indicator-template-delete {min-height:44px;min-width:44px;}
+}
+@media (max-width:350px) {
+ .desktop-settings-row {flex-wrap:wrap;}
+ .desktop-settings-preview {grid-template-columns:1fr;}
+ .desktop-settings-preview>svg {grid-column:1;grid-row:auto;width:160px;}
+ .desktop-settings-footer button {padding-inline:9px;}
+}
+
+@media (max-width:940px), (pointer:coarse) {
+ .indicator-controls-panel {max-height:calc(100% - 100px);overflow:auto;overscroll-behavior:contain;}
+ .indicator-controls-panel .chart-function-grid button,.indicator-controls-panel .chart-scale-options button {min-height:44px;}
+}

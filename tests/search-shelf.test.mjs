@@ -80,9 +80,9 @@ test("search lists keep five recent names, then gainers and losers", () => {
   const rows = searchShelfRows({ shelf: "in", instruments: many, recent: many.map(item => item.symbol), popular, query: "" });
   assert.deepEqual(rows.recent.map(item => item.symbol), ["RELIANCE", "TCS", "INFY", "SBIN", "ITC"]);
   const board = splitBoard(boardQuotes({ data: [
-    { d: ["NVDA", 100, 2, 2500000, "NVIDIA"] },
-    { d: ["AAPL", 90, -1.5, 100000, "Apple"] },
-    { d: ["MSFT", 80, 0, 10, "Flat"] },
+    { d: ["NVDA", 100, 2, 2500000, "NVIDIA", 100 - 100 / 1.02] },
+    { d: ["AAPL", 90, -1.5, 100000, "Apple", 90 - 90 / 0.985] },
+    { d: ["MSFT", 80, 0, 10, "Flat", 0] },
   ] }, "us"));
   assert.deepEqual(board.gainers.map(row => row.symbol), ["NVDA"]);
   assert.deepEqual(board.losers.map(row => row.symbol), ["AAPL"]);

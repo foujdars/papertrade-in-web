@@ -562,7 +562,7 @@ export function MarketChart({
   onDrawingComplete?: () => void;
   onRemoveIndicator?: (id: string) => void;
   onChartTap?: () => void;
-  onPrice?: (value: number, timestampMs: number) => void;
+  onPrice?: (value: number, timestampMs: number, previousClose?: number, updatedAtMs?: number) => void;
   liveTick?: CandleTick;
   onFeedStatus: (status: FeedStatus) => void;
 }) {
@@ -605,7 +605,6 @@ export function MarketChart({
   const [dataWindowOpen,setDataWindowOpen]=useState(false);
   const [localObjectsOpen,setLocalObjectsOpen]=useState(false);
   const [dismissedObjectsToken,setDismissedObjectsToken]=useState<number|null>(null);
-  const desktopRestoreRef=useRef<{chart:IChartApi;options:Parameters<IChartApi['applyOptions']>[0];series:Record<string,unknown>;gridVisible:boolean;crosshairVisible:boolean}|null>(null);
   const desktopAppliedRef=useRef<{chart:IChartApi;settings:typeof desktopSettings}|null>(null);
   const [advancedPine, setAdvancedPine] = useState(false);
   const advancedPineRef = useRef(false);
@@ -617,25 +616,11 @@ export function MarketChart({
   const pineColorsRef = useRef<Map<number,string>>(new Map());
   const pinePreview = useRef<AbortController | null>(null);
   useEffect(() => {
-    const media=window.matchMedia(DESKTOP_CHART_MEDIA);
-    const shell=desktopChartHost(chartHost.current);
-    let initialized=false;
-    const update=()=>{
-      const advanced=media.matches && shell?.getAttribute('data-platform')==='web' && !Capacitor.isNativePlatform();
-      if(initialized && advanced===advancedPineRef.current)return;
-      initialized=true;
-      pinePreview.current?.abort();
-      pineJob.current?.controller.abort();
-      if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
-      pineJob.current=null;pineCache.current=null;pinePending.current=null;pineScope.current='';clearPineBarColors();
-      advancedPineRef.current=advanced;setAdvancedPine(advanced);
-      const saved=loadAppliedPineScript(advanced);
-      appliedPineRef.current=saved;setAppliedPine(saved);setPineStatus('');
-    };
-    update();media.addEventListener('change',update);
-    const observer=new MutationObserver(update);
-    if(shell)observer.observe(shell,{attributes:true,attributeFilter:['data-platform']});
-    return()=>{media.removeEventListener('change',update);observer.disconnect();pineJob.current?.controller.abort();if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);pinePreview.current?.abort();};
+    // Every chart uses the same isolated runtime and saved selection, including native apps.
+    advancedPineRef.current=true;setAdvancedPine(true);
+    const saved=loadAppliedPineScript(true);
+    appliedPineRef.current=saved;setAppliedPine(saved);setPineStatus('');
+    return()=>{pineJob.current?.controller.abort();if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);pinePreview.current?.abort();};
   }, []);
   useEffect(()=>{
     pineJob.current?.controller.abort();
@@ -853,7 +838,7 @@ export function MarketChart({
     dataRef.current = next;
     paintLastBar(next);
     setLatestCandle(next.at(-1));
-    if (publish) onPriceRef.current?.(tick.price, tick.timestampMs);
+    if (publish) onPriceRef.current?.(tick.price, tick.timestampMs, tick.previousClose, tick.updatedAtMs);
     if (!liveIndicatorTimerRef.current) {
       liveIndicatorTimerRef.current = window.setTimeout(() => {
         liveIndicatorTimerRef.current = 0;
@@ -1307,45 +1292,10 @@ export function MarketChart({
     });
   }
 
-  function desktopAppearanceEnabled() {
-    return window.matchMedia(DESKTOP_CHART_MEDIA).matches && desktopChartHost(chartHost.current)?.getAttribute('data-platform')==='web' && !Capacitor.isNativePlatform();
-  }
-
-  function applyDesktopAppearance(forceScaleMode=false) {
+  function applyChartAppearance(forceScaleMode=false) {
     const chart=chartApi.current,series=candleSeries.current;if(!chart||!series)return;
     const palette=currentCanvasPalette(),style=chartStyleRef.current;
     const drawingType=normalizeTool(activeToolRef.current),pointTool=!!drawingType&&!CONTINUOUS_TOOLS.has(drawingType);
-    // Media/host events fire before React has committed its new desktop gate.
-    // Read the actual host here so a resize can never reapply desktop colors to mobile.
-    if(!desktopAppearanceEnabled()){
-      const restore=desktopRestoreRef.current;
-      if(restore?.chart===chart){
-        const options={...restore.options,rightPriceScale:{...restore.options.rightPriceScale}};
-        if(compareForcedPercentRef.current)delete options.rightPriceScale.mode;
-        chart.applyOptions(options);series.applyOptions(restore.series);
-        gridVisibleRef.current=restore.gridVisible;crosshairVisibleRef.current=restore.crosshairVisible;
-        chart.applyOptions({
-          layout:{background:{type:ColorType.Solid,color:palette.background},textColor:palette.text},
-          grid:{vertLines:{visible:restore.gridVisible,color:palette.grid},horzLines:{visible:restore.gridVisible,color:palette.grid}},
-          crosshair:{vertLine:{visible:restore.crosshairVisible&&!pointTool,color:palette.crosshair,labelBackgroundColor:palette.crosshairLabel},horzLine:{visible:restore.crosshairVisible&&!pointTool,color:palette.crosshair,labelBackgroundColor:palette.crosshairLabel}},
-        });
-        const line=primaryLineColorRef.current;
-        series.applyOptions({priceLineColor:'#6657ee'});
-        if(series.seriesType()==='Candlestick')series.applyOptions({upColor:style==='hollow-candles'?marketTint('green',0):palette.up,downColor:palette.down,borderUpColor:palette.up,borderDownColor:palette.down,wickUpColor:palette.up,wickDownColor:palette.down});
-        else if(series.seriesType()==='Bar')series.applyOptions({upColor:palette.up,downColor:palette.down});
-        else if(series.seriesType()==='Line')series.applyOptions({color:line});
-        else if(series.seriesType()==='Area')series.applyOptions({lineColor:line,topColor:`${line}47`,bottomColor:`${line}0a`});
-        else if(series.seriesType()==='Baseline')series.applyOptions({topLineColor:MARKET_GREEN,topFillColor1:marketTint('green',.28),topFillColor2:marketTint('green',.04),bottomLineColor:MARKET_RED,bottomFillColor1:marketTint('red',.28),bottomFillColor2:marketTint('red',.04)});
-        desktopRestoreRef.current=null;
-      }
-      desktopAppliedRef.current=null;
-      return;
-    }
-    if(desktopRestoreRef.current?.chart!==chart){
-      const options=chart.options(),original=series.options();
-      const previous=desktopRestoreRef.current;
-      desktopRestoreRef.current={chart,gridVisible:previous?.gridVisible??gridVisibleRef.current,crosshairVisible:previous?.crosshairVisible??crosshairVisibleRef.current,options:{grid:JSON.parse(JSON.stringify(options.grid)),rightPriceScale:{mode:options.rightPriceScale.mode,autoScale:options.rightPriceScale.autoScale,invertScale:options.rightPriceScale.invertScale,scaleMargins:{...options.rightPriceScale.scaleMargins}},timeScale:{timeVisible:options.timeScale.timeVisible,secondsVisible:options.timeScale.secondsVisible,rightOffset:options.timeScale.rightOffset},crosshair:{vertLine:{visible:options.crosshair.vertLine.visible,style:options.crosshair.vertLine.style},horzLine:{visible:options.crosshair.horzLine.visible,style:options.crosshair.horzLine.style}}},series:{priceLineVisible:original.priceLineVisible,lastValueVisible:original.lastValueVisible,...('borderVisible' in original?{borderVisible:original.borderVisible,wickVisible:original.wickVisible}:{}),...('lineWidth' in original?{lineWidth:original.lineWidth}:{})}};
-    }
     const settings=desktopSettingsRef.current;
     const previous=desktopAppliedRef.current?.chart===chart?desktopAppliedRef.current.settings:null;
     const options=desktopChartOptions(settings,palette,CALENDAR_TIMEFRAMES.has(timeframe));
@@ -1373,8 +1323,8 @@ export function MarketChart({
 
   function themedStylePoint<T extends {color?:string}>(point:T,palette:ReturnType<typeof chartCanvasPalette>):T {
     if(!['high-low','columns'].includes(chartStyleRef.current))return point;
-    const colors=palette.desktop?resolveDesktopChartColors(desktopSettingsRef.current,palette):palette;
-    return palette.desktop&&point.color===MARKET_GREEN?{...point,color:colors.up}:palette.desktop&&point.color===MARKET_RED?{...point,color:colors.down}:point;
+    const colors=resolveDesktopChartColors(desktopSettingsRef.current,palette);
+    return point.color===MARKET_GREEN?{...point,color:colors.up}:point.color===MARKET_RED?{...point,color:colors.down}:point;
   }
 
   function pineStylePoint<T extends {color?:string;wickColor?:string;borderColor?:string}>(point:T,epoch:number,candle?:Candle,averageVolume?:number,volumeColors?:ReturnType<typeof resolveDesktopChartColors>):T {
@@ -1391,7 +1341,7 @@ export function MarketChart({
     const style = chartStyleRef.current;
     const palette=currentCanvasPalette();
     const averageVolume=style==='volume-candles'?averageCandleVolume(candles):undefined;
-    const volumeColors=style==='volume-candles'&&desktopAppearanceEnabled()?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
+    const volumeColors=style==='volume-candles'?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
     const points = styleSeriesData(candles, style, timeframe).map((point,index)=>pineStylePoint(themedStylePoint(point,palette),Number(candles[index]?.time),candles[index],averageVolume,volumeColors));
     series.setData(points as never);
     const source = prepareStyleCandles(candles, style);
@@ -1411,7 +1361,7 @@ export function MarketChart({
     const source = prepareStyleCandles(candles, style);
     const point = source.at(-1);
     if (!point) return;
-    const palette=currentCanvasPalette(),volumeColors=style==='volume-candles'&&desktopAppearanceEnabled()?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
+    const palette=currentCanvasPalette(),volumeColors=style==='volume-candles'?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
     series.update(pineStylePoint(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),palette),Number(point.time),point,style==='volume-candles'?averageCandleVolume(source):undefined,volumeColors) as never);
     if (hlcSeries.current && style === "hlc-area") {
       hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
@@ -1683,9 +1633,7 @@ export function MarketChart({
     const wasEnabled = orderToolEnabledRef.current;
     orderToolEnabledRef.current = enabled;
     const frozenRange = riskDragPriceRangeRef.current;
-    const preferredMargins=desktopAppearanceEnabled()
-      ? {top:desktopSettingsRef.current.scaleMarginTop/100,bottom:desktopSettingsRef.current.scaleMarginBottom/100}
-      : {top:.10,bottom:.10};
+    const preferredMargins={top:desktopSettingsRef.current.scaleMarginTop/100,bottom:desktopSettingsRef.current.scaleMarginBottom/100};
     priceScale?.applyOptions({
       autoScale: frozenRange ? false : undefined,
       scaleMargins: enabled
@@ -1746,7 +1694,7 @@ export function MarketChart({
       series?.applyOptions({priceLineColor:palette.desktop?palette.accent:"#6657ee"});
       if (series?.seriesType() === 'Candlestick') series.applyOptions({upColor: chartStyle === 'hollow-candles' ? marketTint('green',0) : palette.up, downColor:palette.down, borderUpColor:palette.up, borderDownColor:palette.down, wickUpColor:palette.up, wickDownColor:palette.down});
       else if (series?.seriesType() === 'Bar') series.applyOptions({upColor:palette.up,downColor:palette.down});
-      applyDesktopAppearance();
+      applyChartAppearance();
       paintPriceSeries();
     };
     refresh();
@@ -1757,7 +1705,7 @@ export function MarketChart({
     return () => {media.removeEventListener('change', refresh);observer.disconnect();};
   }, [chartTheme, chartStyle]);
 
-  useEffect(()=>{applyDesktopAppearance();paintPriceSeries();},[desktopTools,desktopSettings,chartGeneration,primaryLineColor,chartStyle]);
+  useEffect(()=>{applyChartAppearance();paintPriceSeries();},[desktopTools,desktopSettings,chartGeneration,primaryLineColor,chartStyle]);
 
   useEffect(() => {
     magnetRef.current = magnet;
@@ -2996,7 +2944,7 @@ export function MarketChart({
   useEffect(() => {
     const series = candleSeries.current;
     if (!series || !chartGeneration) return;
-    const color=desktopAppearanceEnabled()?desktopSettingsRef.current.lineColor??primaryLineColor:primaryLineColor;
+    const color=desktopSettingsRef.current.lineColor??primaryLineColor;
     if (series.seriesType() === "Line") series.applyOptions({ color });
     else if (series.seriesType() === "Area") series.applyOptions({ lineColor:color, topColor: `${color}47`, bottomColor: `${color}0a` });
   }, [primaryLineColor, chartGeneration]);
@@ -3150,7 +3098,7 @@ export function MarketChart({
         if (right.options().mode === PriceScaleMode.Percentage) right.applyOptions({ mode: PriceScaleMode.Normal });
         compareForcedPercentRef.current = false;
         candleSeries.current?.applyOptions({ baseLineStyle: LineStyle.Solid });
-        if(desktopAppearanceEnabled())applyDesktopAppearance(true);
+        applyChartAppearance(true);
       }
       chart.priceScale("left", 0).applyOptions({ visible: false });
       if (keys.length && mode === "pane") overlayCompared.forEach((_,index)=>chart.priceScale("right", comparePane+index).applyOptions({ mode: PriceScaleMode.Normal, autoScale: true }));
@@ -3614,7 +3562,7 @@ export function MarketChart({
         const response = await fetch(`/api/upstox/quotes?keys=${encodeURIComponent(instrument.instrumentKey)}`, { cache: "no-store", signal: current.signal });
         const payload = await response.json() as {
           ok?: boolean;
-          quotes?: Record<string, { lastPrice: number; lastTradeAt: string }>;
+          quotes?: Record<string, { lastPrice: number; lastTradeAt: string; previousClose: number; changeAvailable?: boolean; updatedAt: string }>;
           error?: { retryAfterSeconds?: number };
         };
         if (disposed || current.signal.aborted) return;
@@ -3623,7 +3571,7 @@ export function MarketChart({
           return;
         }
         const quote = payload.quotes?.[instrument.instrumentKey];
-        if (quote) acceptLiveTick({ instrumentKey: instrument.instrumentKey, price: quote.lastPrice, timestampMs: Date.parse(quote.lastTradeAt) }, true);
+        if (quote) acceptLiveTick({ instrumentKey: instrument.instrumentKey, price: quote.lastPrice, timestampMs: Date.parse(quote.lastTradeAt), previousClose: quote.changeAvailable !== false && quote.previousClose > 0 ? quote.previousClose : undefined, updatedAtMs: Date.parse(quote.updatedAt) }, true);
       } catch { retryAt = Date.now() + 10000; }
       finally { window.clearTimeout(deadline); request = null; }
     }
@@ -3679,7 +3627,7 @@ export function MarketChart({
   return (
     <div className="chart-stack lightweight-stack" data-desktop-tools={desktopTools} data-data-window={desktopTools&&dataWindowOpen} data-chart-theme={chartTheme}>
       {desktopTools&&dataWindowOpen&&<ChartDataWindow snapshot={chartDataSnapshot(dataRef.current,hoveredCandle?.scope===legendScope?hoveredCandle.time:null,(studyRenderer.current?.bundles??[]).map(bundle=>({id:bundle.id,title:bundle.id==='script'?appliedPine?.name??'Pine script':studyTitle(bundle.id,bundle.config),result:bundle.result})))} symbol={instrument.symbol} timeframe={timeframe} timezone={['NSE','BSE','MCX'].includes(instrument.exchange)?'Asia/Kolkata':'UTC'} hovered={hoveredCandle?.scope===legendScope&&hoveredCandle.time!=null} onClose={()=>setDataWindowOpen(false)}/>}
-      {desktopTools&&chartSettingsOpen&&<DesktopChartSettingsDialog onClose={()=>setChartSettingsOpen(false)} theme={chartTheme} symbol={instrument.symbol} chartStyle={chartStyle}/>}
+      {desktopTools&&chartSettingsOpen&&<DesktopChartSettingsDialog palette={currentCanvasPalette()} onClose={()=>setChartSettingsOpen(false)} theme={chartTheme} symbol={instrument.symbol} chartStyle={chartStyle}/>}
       <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={event => { if (event.pointerType !== 'touch') setPriceCursor(null); }}>
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 18 }}>

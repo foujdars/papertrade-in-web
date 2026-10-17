@@ -1,7 +1,7 @@
-@media (min-width:941px) and (hover:hover) and (pointer:fine) {
+@media (min-width:0px) {
  .chart-stack[data-desktop-tools="true"] {position:relative;container-type:inline-size;container-name:chart-workspace;--chart-data-bg:#fff;--chart-data-text:#131722;--chart-data-muted:#787b86;--chart-data-line:#e0e3eb;}
  .chart-stack[data-desktop-tools="true"][data-chart-theme="neon"] {--chart-data-bg:#0f0f0f;--chart-data-text:#d1d4dc;--chart-data-muted:#9598a1;--chart-data-line:#2e2e2e;}
- .chart-stack[data-desktop-tools="true"][data-data-window="true"]>.price-chart-wrap {width:calc(100% - 248px);min-width:0;}
+
  .desktop-chart-data {position:absolute;inset:0 0 0 auto;width:248px;border-left:1px solid var(--chart-data-line);background:var(--chart-data-bg);color:var(--chart-data-text);font:12px Inter,system-ui,sans-serif;display:flex;flex-direction:column;z-index:12;}
  .desktop-chart-data header {display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--chart-data-line);}
  .desktop-chart-data button {background:transparent;border:0;color:inherit;cursor:pointer;}
@@ -47,4 +47,45 @@
  .drawing-settings[data-desktop-advanced="true"] footer {border-top:1px solid var(--line,#e0e3eb);margin-top:12px;}
  .drawing-settings[data-desktop-advanced="true"] footer button {min-height:34px;padding:7px 16px;border-radius:4px;font-size:13px;}
  .drawing-settings[data-desktop-advanced="true"] footer button:last-child {background:#2962ff;border-color:#2962ff;}
+}
+
+@media (min-width:941px) and (hover:hover) and (pointer:fine) {
+ .chart-stack[data-desktop-tools="true"][data-data-window="true"]>.price-chart-wrap {width:calc(100% - 248px);min-width:0;}
+ @container chart-workspace (max-width:650px) { .chart-stack[data-data-window="true"]>.price-chart-wrap {width:100%;} }
+}
+@media (max-width:940px), (pointer:coarse) {
+ .chart-stack[data-desktop-tools="true"] {container-type:normal;}
+ .desktop-chart-data {inset:auto 0 0;width:100%;height:min(380px,55%);border-left:0;border-top:1px solid var(--chart-data-line);box-shadow:0 -5px 16px #0002;padding-bottom:env(safe-area-inset-bottom);}
+ .desktop-chart-data header {padding:3px 14px;min-height:48px;}
+ .desktop-chart-data header button {width:44px;height:44px;display:grid;place-items:center;}
+ .desktop-chart-data .chart-data-heading {min-height:44px;}
+ .chart-data-content {padding:12px 16px;overscroll-behavior:contain;}
+ .chart-data-content>dl {display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
+ .desktop-chart-tools {gap:4px;}
+ .terminal-shell .chart-statusbar .chart-indicator-strip .desktop-chart-tools button,
+ .desktop-chart-tools .indicator-strip-control {min-width:44px;min-height:44px;padding:7px 10px;font-size:12px;}
+ .chart-indicator-strip:has(.desktop-chart-tools) {max-width:100%;overflow-x:auto;}
+ .indicator-legend:has(.desktop-chart-tools) {max-height:100px;overflow:auto;}
+ .drawing-settings[data-desktop-advanced="true"] {width:min(520px,calc(100vw - 16px));max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:16px;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-settings-tabs {overflow-x:auto;flex-shrink:0;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-settings-tabs button {min-height:44px;flex-shrink:0;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels {padding:0;border:0;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels label {display:grid;grid-template-columns:54px minmax(0,1fr) 64px;gap:8px;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels input {width:100%;min-height:44px;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels button,
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels+div button {min-height:44px;padding:6px 8px;border:1px solid var(--line,#e0e3eb);border-radius:5px;background:transparent;color:inherit;}
+ .drawing-settings[data-desktop-advanced="true"] .drawing-fib-levels+div {display:flex;gap:8px;}
+ .drawing-settings[data-desktop-advanced="true"] input[type=checkbox] {width:22px;height:22px;margin:8px;}
+}
+
+/* The status bar now has a tools row; reserve its real height above order controls. */
+.terminal-shell[data-platform][data-section] .chart-statusbar:has(.desktop-chart-tools) {height:auto;min-height:0;flex:0 0 auto;grid-template-rows:24px minmax(28px,auto);row-gap:0;}
+.terminal-shell .chart-statusbar:has(.desktop-chart-tools) .chart-indicator-slot {min-height:28px;}
+@media (max-width:940px), (pointer:coarse) {
+ .terminal-shell[data-platform][data-section] .chart-statusbar:has(.desktop-chart-tools) {grid-template-rows:24px minmax(44px,auto);}
+ .terminal-shell .chart-statusbar:has(.desktop-chart-tools) .chart-indicator-slot {min-height:44px;}
+}
+
+@media (min-width:941px) and (hover:hover) and (pointer:fine) {
+ .terminal-shell .chart-body:has(.chart-stack[data-data-window="true"])>.chart-floating-favourite {right:328px;}
 }

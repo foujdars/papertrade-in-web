@@ -1,19 +1,8 @@
-import { derivePreviousClose, isSupportedChartInstrumentKey, UPSTOX_KEY_TO_SYMBOL, type NormalizedQuote } from "@/lib/upstox";
+import { isSupportedChartInstrumentKey, normalizeUpstoxQuote, type UpstoxQuote, type NormalizedQuote } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type UpstoxQuote = {
-  instrument_token?: string;
-  symbol?: string;
-  last_price?: number;
-  net_change?: number;
-  timestamp?: string;
-  last_trade_time?: string;
-  ohlc?: { open?: number; high?: number; low?: number; close?: number };
-  volume?: number;
-};
 
 type UpstoxQuotePayload = {
   status: string;
@@ -40,37 +29,10 @@ export async function GET(request: Request) {
     const quotes: Record<string, NormalizedQuote> = {};
 
     for (const quote of Object.values(payload.data ?? {})) {
-      const instrumentKey = quote.instrument_token ?? "";
-      const symbol = quote.symbol?.trim().toUpperCase() || UPSTOX_KEY_TO_SYMBOL[instrumentKey] || instrumentKey;
-      const lastPrice = Number(quote.last_price);
-      const fallbackClose = Number(quote.ohlc?.close);
-      const reportedNetChange = typeof quote.net_change === "number" ? quote.net_change : Number.NaN;
-      const netChange = Number.isFinite(reportedNetChange)
-        ? reportedNetChange
-        : lastPrice - fallbackClose;
-      const previousClose = derivePreviousClose(lastPrice, netChange, fallbackClose);
-      const lastTradeMilliseconds = quote.last_trade_time ? Number(quote.last_trade_time) : Number.NaN;
-      const lastTradeAt = Number.isFinite(lastTradeMilliseconds) && lastTradeMilliseconds > 0
-        ? new Date(lastTradeMilliseconds).toISOString()
-        : quote.timestamp ?? "";
-      if (!Number.isFinite(lastPrice) || lastPrice <= 0) continue;
-      const normalized = {
-        instrumentKey,
-        symbol,
-        lastPrice,
-        netChange,
-        changePercent: Number.isFinite(previousClose) && previousClose !== 0 ? (netChange / previousClose) * 100 : 0,
-        changeAvailable: Number.isFinite(reportedNetChange) || (Number.isFinite(fallbackClose) && fallbackClose > 0),
-        open: Number(quote.ohlc?.open) || lastPrice,
-        high: Number(quote.ohlc?.high) || lastPrice,
-        low: Number(quote.ohlc?.low) || lastPrice,
-        previousClose: Number.isFinite(previousClose) ? previousClose : lastPrice,
-        lastTradeAt,
-        updatedAt: quote.timestamp ?? new Date().toISOString(),
-        volume: Number(quote.volume) > 0 ? Number(quote.volume) : 0,
-      };
-      quotes[instrumentKey] = normalized;
-      quotes[symbol] = normalized;
+      const normalized = normalizeUpstoxQuote(quote);
+      if (!normalized || !keys.includes(normalized.instrumentKey)) continue;
+      quotes[normalized.instrumentKey] = normalized;
+      quotes[normalized.symbol] = normalized;
     }
 
     return Response.json(

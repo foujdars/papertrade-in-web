@@ -87,7 +87,7 @@ import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
-import { deriveNetChange, formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
+import { formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
 import { getNseMarketStatus, type NseSession } from "@/lib/market-hours";
 import { isMcx, mcxContractSession, indianInstrumentStatus, indianSquareOffMinute } from "@/lib/mcx";
 import {
@@ -108,7 +108,7 @@ import {
 } from "@/lib/paper-trading";
 import { buildClosedTrades, getOrderCharges, type ClosedTradeOutcome } from "@/lib/trade-analytics";
 import { calculateUpstoxTradingCharges } from "@/lib/trading-charges";
-import type { NormalizedQuote } from "@/lib/upstox";
+import { applyQuoteTick, isNormalizedQuoteFresh, mergeNormalizedQuote, type NormalizedQuote } from "@/lib/upstox";
 import { openUpstoxLiveFeed } from "@/lib/upstox-live-feed";
 import { exponentialBackoffMs } from "@/lib/reconnect-backoff";
 import { useAuth } from "@/components/AuthProvider";
@@ -1155,6 +1155,21 @@ export function TradingDashboard() {
   const volumeShockerWatch = useMemo(() => selectVolumeShockerWatch({ watchlist, customWatchlists, instruments: stockUniverse }), [customWatchlists, stockUniverse, watchlist]);
 
   useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let disposed = false;
+    let listener: { remove: () => Promise<void> } | undefined;
+    // WebViews do not consistently emit browser focus after an app resumes.
+    // Reuse the bounded/coalesced refresh path for every visible market panel.
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (!disposed && isActive) window.dispatchEvent(new Event("focus"));
+    }).then(handle => {
+      if (disposed) void handle.remove();
+      else listener = handle;
+    }).catch(() => undefined);
+    return () => { disposed = true; if (listener) void listener.remove(); };
+  }, []);
+
+  useEffect(() => {
     if (!paperDataReady || !isAndroidApp) return;
     const alerts = protections.flatMap((protection) => {
       const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
@@ -1198,31 +1213,13 @@ export function TradingDashboard() {
     };
   }, [isAndroidApp, paperDataReady]);
 
-  const applyRealtimeQuote = useCallback((instrument: Instrument, price: number, timestampMs = Date.now()) => {
-    if (!Number.isFinite(price) || price <= 0) return;
+  const applyRealtimeQuote = useCallback((instrument: Instrument, price: number, timestampMs: number, previousClose?: number, updatedAtMs?: number) => {
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
     const receivedAt = Date.now();
-    const updatedAt = new Date(timestampMs).toISOString();
     setMarketQuotes((current) => {
       const previous = current[instrument.instrumentKey] ?? current[instrument.symbol];
-      if (previous && Date.parse(previous.lastTradeAt) > timestampMs) return current;
-      const changeDivisor = 1 + instrument.change / 100;
-      const fallbackPreviousClose = instrument.price > 0 && Number.isFinite(instrument.change) && changeDivisor > 0
-        ? instrument.price / changeDivisor
-        : price;
-      const previousClose = previous?.previousClose > 0 ? previous.previousClose : fallbackPreviousClose;
-      const next: NormalizedQuote = {
-        instrumentKey: instrument.instrumentKey,
-        symbol: instrument.symbol,
-        lastPrice: price,
-        netChange: price - previousClose,
-        changePercent: previousClose > 0 ? ((price - previousClose) / previousClose) * 100 : 0,
-        open: previous?.open ?? price,
-        high: Math.max(previous?.high ?? price, price),
-        low: Math.min(previous?.low ?? price, price),
-        previousClose,
-        lastTradeAt: updatedAt,
-        updatedAt,
-      };
+      const next = applyQuoteTick(previous, instrument.instrumentKey, instrument.symbol, { price, timestampMs, previousClose, updatedAtMs });
+      if (!next || next === previous) return current;
       return { ...current, [instrument.instrumentKey]: next, [instrument.symbol]: next };
     });
     setMarketQuoteUpdatedAt((current) => ({
@@ -1231,8 +1228,8 @@ export function TradingDashboard() {
       [instrument.symbol]: receivedAt,
     }));
   }, []);
-  const handleChartPrice = useCallback((price: number, timestampMs: number) => {
-    applyRealtimeQuote(selected, price, timestampMs);
+  const handleChartPrice = useCallback((price: number, timestampMs: number, previousClose?: number, updatedAtMs?: number) => {
+    applyRealtimeQuote(selected, price, timestampMs, previousClose, updatedAtMs);
   }, [applyRealtimeQuote, selected]);
   const protectionFeedInstruments = useMemo(() => [...new Map(protections.flatMap((protection) => {
     const instrument = tradingUniverse.find((item) => item.symbol === protection.symbol);
@@ -1304,29 +1301,24 @@ export function TradingDashboard() {
 
   useEffect(() => {
     if (!deltaQuoteSymbols.length) return;
-    const controller = new AbortController();
-    let disposed = false;
-    let requestInFlight = false;
-
-    async function loadDeltaQuotes() {
-      if (requestInFlight || document.visibilityState === "hidden") return;
-      requestInFlight = true;
+    async function loadDeltaQuotes(signal: AbortSignal) {
       try {
         const entries = await Promise.all(deltaQuoteSymbols.split(",").map(async (symbol) => {
-          const response = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: controller.signal });
+          const response = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal });
           const payload = await response.json() as { ok?: boolean; quote?: PerpQuote };
           if (!response.ok || !payload.ok || !payload.quote) return null;
           return [symbol, quoteFromPerp(symbol, payload.quote)] as const;
         }));
-        if (disposed) return;
+        if (signal.aborted) return;
         const receivedAt = Date.now();
         setMarketQuotes((current) => {
           const next = { ...current };
           for (const entry of entries) {
             if (!entry) continue;
             const [symbol, quote] = entry;
-            next[quote.instrumentKey] = quote;
-            next[symbol] = quote;
+            const merged = mergeNormalizedQuote(current[quote.instrumentKey] ?? current[symbol], quote);
+            next[quote.instrumentKey] = merged;
+            next[symbol] = merged;
           }
           return next;
         });
@@ -1342,18 +1334,10 @@ export function TradingDashboard() {
         });
       } catch {
         // Keep the last verified quote visible while Delta is temporarily unavailable.
-      } finally {
-        requestInFlight = false;
       }
     }
 
-    void loadDeltaQuotes();
-    const interval = window.setInterval(() => void loadDeltaQuotes(), 5000);
-    return () => {
-      disposed = true;
-      controller.abort();
-      window.clearInterval(interval);
-    };
+    return startVisiblePolling(loadDeltaQuotes, 5_000);
   }, [deltaQuoteSymbols]);
 
   useEffect(() => {
@@ -1380,10 +1364,7 @@ export function TradingDashboard() {
           setMarketQuotes((current) => {
             const next = { ...current };
             for (const [key, quote] of Object.entries(payload.quotes ?? {})) {
-              const previousTime = Date.parse(current[key]?.lastTradeAt ?? "");
-              const incomingTime = Date.parse(quote.lastTradeAt ?? "");
-              if (Number.isFinite(previousTime) && (!Number.isFinite(incomingTime) || incomingTime < previousTime)) continue;
-              next[key] = quote;
+              next[key] = mergeNormalizedQuote(current[key], quote);
             }
             return next;
           });
@@ -1403,7 +1384,7 @@ export function TradingDashboard() {
       }
     }
 
-    return startVisiblePolling(loadWatchlistQuotes, homeOpen ? 5_000 : 20_000);
+    return startVisiblePolling(loadWatchlistQuotes, 5_000);
   }, [homeOpen, quoteKeys]);
 
   useEffect(() => {
@@ -1430,9 +1411,9 @@ export function TradingDashboard() {
         closeFeed = await openUpstoxLiveFeed({
           instrumentKeys: [...instrumentsByKey.keys()],
           signal: controller.signal,
-          onTick: ({ instrumentKey, price, timestampMs }) => {
+          onTick: ({ instrumentKey, price, timestampMs, previousClose, updatedAtMs }) => {
             const instrument = instrumentsByKey.get(instrumentKey);
-            if (instrument) applyRealtimeQuote(instrument, price, timestampMs);
+            if (instrument) applyRealtimeQuote(instrument, price, timestampMs, previousClose, updatedAtMs);
           },
           onDisconnect: scheduleReconnect,
         });
@@ -1675,7 +1656,7 @@ export function TradingDashboard() {
       if (instrument && !nativeTrigger && (!instrumentSession(instrument, clock).isOpen || (protection.product === "INTRADAY" && getNseMarketStatus(clock).minutesFromMidnight >= instrumentCutoff(instrument, clock)))) return;
       const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[protection.symbol] : marketQuotes[protection.symbol];
       const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : protection.symbol;
-      const quoteIsFresh = Boolean(nativeTrigger || (quote && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000));
+      const quoteIsFresh = Boolean(nativeTrigger || isNormalizedQuoteFresh(quote, marketQuoteUpdatedAt[quoteKey], clock.getTime()));
       const price = nativeTrigger?.triggeredPrice ?? quote?.lastPrice;
       const latestFill = orders.find((order) => order.symbol === protection.symbol && (order.product ?? "INTRADAY") === protection.product);
       const position = calculatePosition(orders, protection.symbol, price ?? latestFill?.price ?? Number.NaN, protection.product);
@@ -1799,9 +1780,10 @@ export function TradingDashboard() {
   const selectedQuoteKey = marketQuotes[selected.instrumentKey] ? selected.instrumentKey : selected.symbol;
   const selectedVenueLabel = instrumentVenueLabel(selected);
   const selectedIsWatchOnly = selected.instrumentKey.startsWith("TVC|") || selectedDeltaDatedFuture;
-  const selectedQuoteIsFresh = Boolean(selectedQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[selectedQuoteKey] ?? 0) <= 45_000);
+  const selectedQuoteIsFresh = Boolean(clock && isNormalizedQuoteFresh(selectedQuote, marketQuoteUpdatedAt[selectedQuoteKey], clock.getTime()));
   const verifiedLivePrice = selectedQuoteIsFresh ? selectedQuote?.lastPrice : undefined;
   const visibleLivePrice = verifiedLivePrice ?? 0;
+  const selectedChangeAvailable = selectedQuoteIsFresh && selectedQuote?.changeAvailable !== false && (selectedQuote?.previousClose ?? 0) > 0;
   const selectedChange = selectedQuoteIsFresh ? selectedQuote?.changePercent ?? 0 : 0;
   const selectedNetChange = selectedQuoteIsFresh ? selectedQuote?.netChange ?? 0 : 0;
   const selectedDayLow = selectedQuoteIsFresh ? selectedQuote?.low ?? 0 : 0;
@@ -1811,7 +1793,7 @@ export function TradingDashboard() {
     : 50;
   const topQuote = fnoTopInstrument ? marketQuotes[fnoTopInstrument.instrumentKey] ?? marketQuotes[fnoTopInstrument.symbol] : undefined;
   const topQuoteKey = fnoTopInstrument && marketQuotes[fnoTopInstrument.instrumentKey] ? fnoTopInstrument.instrumentKey : fnoTopInstrument?.symbol ?? "";
-  const topQuoteIsFresh = Boolean(topQuote && clock && clock.getTime() - (marketQuoteUpdatedAt[topQuoteKey] ?? 0) <= 45_000);
+  const topQuoteIsFresh = Boolean(clock && isNormalizedQuoteFresh(topQuote, marketQuoteUpdatedAt[topQuoteKey], clock.getTime()));
   const verifiedTopPrice = topQuoteIsFresh ? topQuote?.lastPrice ?? 0 : fnoTopInstrument?.price ?? 0;
   const verifiedTopChange = topQuoteIsFresh ? topQuote?.changePercent ?? 0 : 0;
   const orderEstimatePrice = verifiedLivePrice ?? selectedQuote?.lastPrice ?? selected.price;
@@ -1872,7 +1854,7 @@ export function TradingDashboard() {
     const instrument = tradingUniverse.find((item) => item.symbol === symbol);
     const quote = instrument ? marketQuotes[instrument.instrumentKey] ?? marketQuotes[symbol] : marketQuotes[symbol];
     const quoteKey = instrument && marketQuotes[instrument.instrumentKey] ? instrument.instrumentKey : symbol;
-    const quoteIsFresh = Boolean(quote && clock && clock.getTime() - (marketQuoteUpdatedAt[quoteKey] ?? 0) <= 45_000);
+    const quoteIsFresh = Boolean(clock && isNormalizedQuoteFresh(quote, marketQuoteUpdatedAt[quoteKey], clock.getTime()));
     const positionLivePrice = symbol === selected.symbol
       ? verifiedLivePrice ?? Number.NaN
       : quoteIsFresh ? quote?.lastPrice ?? Number.NaN : Number.NaN;
@@ -2995,15 +2977,16 @@ export function TradingDashboard() {
           {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
-              const price = quote?.lastPrice ?? item.price;
-              const change = quote?.changePercent ?? item.change;
-              const netChange = quote?.netChange ?? deriveNetChange(price, change);
+              const price = quote?.lastPrice ?? 0;
+              const changeAvailable = Boolean(quote && quote.changeAvailable !== false && quote.previousClose > 0);
+              const change = quote?.changePercent ?? 0;
+              const netChange = quote?.netChange ?? 0;
               const saved = customWatchlists.some((list) => list.symbols.includes(item.symbol));
               return (
                 <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
                   <StockLogo {...item} />
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
-                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? formatSignedMarketMove(netChange, change) : <CandleLoader compact label="Loading quote" />}</small></span>
+                  <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? changeAvailable ? formatSignedMarketMove(netChange, change) : "—" : <CandleLoader compact label="Loading quote" />}</small></span>
                   {activeCustomList?.symbols.includes(item.symbol) ? (
                     <button className="watchlist-star remove" onClick={(event) => { event.stopPropagation(); removeStockFromCustomWatchlist(activeCustomList.id, item.symbol); }} aria-label={`Remove ${item.symbol} from ${activeCustomList.name}`}><X size={15} /></button>
                   ) : (
@@ -3030,7 +3013,7 @@ export function TradingDashboard() {
                 <ChartSymbolControls {...chartSymbolControlProps}/>
               </div>
             </div>
-            <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedQuoteIsFresh ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>
+            <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedChangeAvailable ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : selectedQuoteIsFresh ? "Daily change unavailable" : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>
             <div className="trade-day-range">
               <header><span>DAY RANGE</span><b>{selectedQuoteIsFresh ? `${Math.round(selectedDayRangeProgress)}%` : "—"}</b></header>
               <div><i style={{ left: `${selectedDayRangeProgress}%` }} /></div>
@@ -3115,7 +3098,7 @@ export function TradingDashboard() {
                 onOrderToolExit={selectedGlobalPosition || selectedOptionPosition ? closeGlobalChartPosition : selectedPosition.quantity > 0 ? () => exitPosition(selectedPosition.quantity) : undefined}
                 onPrice={handleChartPrice}
                 liveTick={replayOnChart ? undefined : selectedGlobalQuote ? { instrumentKey: selected.instrumentKey, price: selectedGlobalQuote.last, timestampMs: selectedGlobalQuote.at }
-                  : selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
+                  : selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt), previousClose: selectedQuote.changeAvailable !== false ? selectedQuote.previousClose : undefined, updatedAtMs: Date.parse(selectedQuote.updatedAt) } : undefined}
                 onPriceAction={(price, mode, drawing) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode, drawing }); }}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
@@ -3233,11 +3216,13 @@ export function TradingDashboard() {
           option={selected}
           timeframe={timeframe}
           topPrice={verifiedTopPrice}
-          topTick={topQuote && fnoTopInstrument ? { instrumentKey: fnoTopInstrument.instrumentKey, price: topQuote.lastPrice, timestampMs: Date.parse(topQuote.lastTradeAt) } : undefined}
-          optionTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
+          topTick={topQuote && fnoTopInstrument ? { instrumentKey: fnoTopInstrument.instrumentKey, price: topQuote.lastPrice, timestampMs: Date.parse(topQuote.lastTradeAt), previousClose: topQuote.changeAvailable !== false ? topQuote.previousClose : undefined, updatedAtMs: Date.parse(topQuote.updatedAt) } : undefined}
+          optionTick={selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt), previousClose: selectedQuote.changeAvailable !== false ? selectedQuote.previousClose : undefined, updatedAtMs: Date.parse(selectedQuote.updatedAt) } : undefined}
           topChange={verifiedTopChange}
+          topChangeAvailable={topQuoteIsFresh && topQuote?.changeAvailable !== false && (topQuote?.previousClose ?? 0) > 0}
           optionPrice={verifiedLivePrice ?? selected.price}
           optionChange={selectedChange}
+          optionChangeAvailable={selectedChangeAvailable}
           splitPercent={optionSplitPercent}
           quantity={quantity}
           lotSize={quantityStep}
@@ -3280,7 +3265,7 @@ export function TradingDashboard() {
           const asOf=quote?.lastTradeAt||quote?.updatedAt,at=Date.parse(asOf??'');
           const available=quote&&Number.isFinite(quote.lastPrice)&&quote.lastPrice>0;
           const isFresh=Boolean(available&&clock&&Number.isFinite(at)&&at<=clock.getTime()+5000&&clock.getTime()-at<=90_000);
-          const hasChange=available&&Number.isFinite(quote.previousClose)&&quote.previousClose>0;
+          const hasChange=available&&quote.changeAvailable!==false&&Number.isFinite(quote.previousClose)&&quote.previousClose>0;
           return { symbol: item.symbol, label: item.label, price: available?quote.lastPrice:null, points: hasChange&&Number.isFinite(quote.netChange)?quote.netChange:null, changePercent: hasChange&&Number.isFinite(quote.changePercent)?quote.changePercent:null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live", asOf };
         })}
         feedLive={feedStatus.mode === "live"}

@@ -73,16 +73,16 @@ const output=path.resolve(process.env.PINE_QA_OUTPUT_DIR||'work/pine-browser-qa'
   await page.setViewportSize({width:390,height:844});
   await page.getByRole('button',{name:'Open Pine Editor',exact:true}).click();
   await dialog.getByLabel('Pine source code').waitFor();
-  assert.equal(await dialog.getAttribute('data-advanced'),'false');
+  assert.equal(await dialog.getAttribute('data-advanced'),'true');
   assert.equal(await dialog.locator('.monaco-editor').count(),0);
-  assert.equal(await page.evaluate(()=>window.qaRenderer.chart.panes()[0].getSeries().find(s=>s.seriesType()==='Candlestick')?.data().at(-1)?.color==='#ff00ff'),false);
+  assert.equal(await page.evaluate(()=>window.qaRenderer.chart.panes()[0].getSeries().find(s=>s.seriesType()==='Candlestick')?.data().at(-1)?.color==='#ff00ff'),true);
   assert.equal(await page.evaluate(()=>localStorage.getItem('papertrade-pine-active-v1')),null);
-  await page.screenshot({path:path.join(output,'pine-mobile-preserved.png')});
+  await page.screenshot({path:path.join(output,'pine-mobile-enabled.png')});
   await dialog.getByRole('button',{name:'Close Pine Editor',exact:true}).click();
   await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.qaPlatform('android'));
   await page.getByRole('button',{name:'Open Pine Editor',exact:true}).click();
-  assert.equal(await dialog.getAttribute('data-advanced'),'false');
+  assert.equal(await dialog.getAttribute('data-advanced'),'true');
   assert.deepEqual(errors,[]);
-  console.log('Desktop Pine: real Monaco, sandbox runtime, input changes, chart updates, strategy tester, visuals, logs, version history, errors, rapid ticks, bar colors, themes and mobile/native preservation passed.');
+  console.log('Desktop Pine: real Monaco, sandbox runtime, input changes, chart updates, strategy tester, visuals, logs, version history, errors, rapid ticks, bar colors, themes and mobile/native shared runtime passed.');
  }catch(error){const failed=browser.contexts()[0]?.pages()[0];console.error('Pine failure state:',await failed?.locator('.pine-editor').innerText().catch(()=>''));await failed?.screenshot({path:path.join(output,'pine-rebuild-debug.png')});console.error(error);throw error;}finally{await browser.close();await vite.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

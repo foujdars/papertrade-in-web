@@ -1,6 +1,6 @@
 import type { Candle } from "./market";
 
-export type CandleTick = { instrumentKey: string; price: number; timestampMs: number };
+export type CandleTick = { instrumentKey: string; price: number; timestampMs: number; previousClose?: number; updatedAtMs?: number };
 const IST = 19_800;
 export const LIVE_INTERVALS: Record<string, number> = {
   "1m": 60, "2m": 120, "3m": 180, "5m": 300, "10m": 600, "15m": 900,

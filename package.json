@@ -34,7 +34,8 @@
     "predev": "npm run build:pine",
     "prebuild": "npm run build:pine",
     "test:chart:advanced": "node --experimental-strip-types --test tests/desktop-chart-settings.test.mjs tests/desktop-volume-candles.test.mjs tests/indicator-templates.test.mjs tests/chart-data-window.test.mjs tests/drawing-settings-model.test.mjs tests/drawing-settings-runtime.test.mjs tests/chart-drawing-tools.test.mjs tests/advanced-chart-tools.test.mjs tests/drawing-presentation.test.mjs tests/price-ray-alerts.test.mjs",
-    "test:pine:advanced": "node --experimental-strip-types --test tests/pine-runtime.test.mjs tests/pine-visual-layer.test.mjs tests/pine-workspace-advanced.test.mjs tests/pine-market-data.test.mjs"
+    "test:pine:advanced": "node --experimental-strip-types --test tests/pine-runtime.test.mjs tests/pine-visual-layer.test.mjs tests/pine-workspace-advanced.test.mjs tests/pine-market-data.test.mjs",
+    "test:market-data": "node --experimental-strip-types --test tests/market-data-status.test.mjs tests/market-movers-freshness.test.mjs tests/market-movers.test.mjs tests/search-shelf.test.mjs tests/upstox-quotes.test.mjs tests/quote-route.test.mjs tests/live-feed-lifecycle.test.mjs tests/home-freshness.test.mjs tests/market-refresh.test.mjs tests/price-actions.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

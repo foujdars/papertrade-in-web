@@ -6,6 +6,8 @@ export type UpstoxLiveTick = {
   instrumentKey: string;
   price: number;
   timestampMs: number;
+  previousClose?: number;
+  updatedAtMs?: number;
 };
 
 type LiveFeedOptions = {
@@ -19,12 +21,12 @@ type LiveFeedOptions = {
 type FeedObject = {
   currentTs?: number;
   feeds?: Record<string, {
-    ltpc?: { ltp?: number; ltt?: number };
+    ltpc?: { ltp?: number; ltt?: number; cp?: number };
     fullFeed?: {
-      marketFF?: { ltpc?: { ltp?: number; ltt?: number } };
-      indexFF?: { ltpc?: { ltp?: number; ltt?: number } };
+      marketFF?: { ltpc?: { ltp?: number; ltt?: number; cp?: number } };
+      indexFF?: { ltpc?: { ltp?: number; ltt?: number; cp?: number } };
     };
-    firstLevelWithGreeks?: { ltpc?: { ltp?: number; ltt?: number } };
+    firstLevelWithGreeks?: { ltpc?: { ltp?: number; ltt?: number; cp?: number } };
   }>;
 };
 
@@ -52,12 +54,16 @@ function extractTick(payload: FeedObject, instrumentKey: string): UpstoxLiveTick
     ?? feed.fullFeed?.indexFF?.ltpc
     ?? feed.firstLevelWithGreeks?.ltpc;
   const price = Number(ltpc?.ltp);
-  const timestampMs = normalizeEpochMs(Number(ltpc?.ltt ?? payload.currentTs));
+  const timestampMs = normalizeEpochMs(Number(ltpc?.ltt));
+  const previousClose = Number(ltpc?.cp);
+  const updatedAtMs = normalizeEpochMs(Number(payload.currentTs));
   if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return null;
   return {
     instrumentKey,
     price,
     timestampMs,
+    ...(Number.isFinite(previousClose) && previousClose > 0 ? { previousClose } : {}),
+    ...(Number.isFinite(updatedAtMs) ? { updatedAtMs } : {}),
   };
 }
 

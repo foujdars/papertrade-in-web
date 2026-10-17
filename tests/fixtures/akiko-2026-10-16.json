@@ -1,0 +1,31 @@
+{
+  "instrumentKey": "NSE_EQ|INE0PMR01017",
+  "symbol": "AKIKO",
+  "exchange": "NSE",
+  "instrumentType": "SM",
+  "reportedAt": "2026-10-16T09:34:00+05:30",
+  "previousClose": 415.5,
+  "openingTrade": {
+    "time": "2026-10-16T09:17:00+05:30",
+    "price": 490,
+    "volume": 800
+  },
+  "lastTradeBeforeReport": {
+    "time": "2026-10-16T09:20:00+05:30",
+    "price": 455,
+    "volume": 800
+  },
+  "reportedMinute": {
+    "time": "2026-10-16T09:34:00+05:30",
+    "price": 455,
+    "volume": 0
+  },
+  "expectedOpeningPercent": 17.930204572803852,
+  "expectedReportedPercent": 9.506618531889298,
+  "evidence": "Retrieved 17 Oct 2026 from the deployed app broker-backed daily and one-minute history. Zero-volume 09:34 candle carries the 09:20 trade. The original scanner response was not retained; stale opening price is an inference.",
+  "sources": [
+    "https://www.papertrade.site/api/upstox/candles?instrumentKey=NSE_EQ%7CINE0PMR01017&timeframe=1m&date=2026-10-16",
+    "https://www.papertrade.site/api/upstox/candles?instrumentKey=NSE_EQ%7CINE0PMR01017&timeframe=1D",
+    "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
+  ]
+}

@@ -1,21 +1,13 @@
 "use client";
-import { useEffect, useState, type RefObject } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { DESKTOP_CHART_MEDIA } from './desktop-chart-theme';
+import { useSyncExternalStore, type RefObject } from 'react';
 
 export function desktopChartHost(host?:HTMLElement|null) {
   return host?.closest('.terminal-shell,.advanced-terminal') ?? document.querySelector('.terminal-shell,.advanced-terminal');
 }
-/** A browser viewport alone must never opt a native tablet into desktop tools. */
-export function useDesktopChartTools(host?:RefObject<HTMLElement|null>) {
-  const [enabled,setEnabled]=useState(false);
-  useEffect(()=>{
-    const media=window.matchMedia(DESKTOP_CHART_MEDIA),shell=desktopChartHost(host?.current);
-    const update=()=>setEnabled(media.matches&&shell?.getAttribute('data-platform')==='web'&&!Capacitor.isNativePlatform());
-    update();media.addEventListener('change',update);
-    const observer=new MutationObserver(update);
-    if(shell)observer.observe(shell,{attributes:true,attributeFilter:['data-platform']});
-    return()=>{media.removeEventListener('change',update);observer.disconnect();};
-  },[host]);
-  return enabled;
+const subscribe=()=>()=>{};
+/** Shared chart tools are available on web, touch devices and native shells.
+ * Keep the exported name and storage keys for existing chart integrations. */
+export function useDesktopChartTools(_host?:RefObject<HTMLElement|null>) {
+  void _host;
+  return useSyncExternalStore(subscribe,()=>true,()=>false);
 }

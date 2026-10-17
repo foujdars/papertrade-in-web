@@ -1,3 +1,4 @@
+import { mergeNormalizedQuote } from "../lib/upstox.ts";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -127,14 +128,15 @@ test('slow tape storage releases the current breadth within its two-second budge
   assert.equal(writes, 0, 'A timed-out history read cannot overwrite the saved session');
 });
 
-async function dashboardQuotes(t, homeOpen) {
+async function dashboardQuotes(t, homeOpen, delta = false) {
   const { readFile } = await import('node:fs/promises');
   const ts = (await import('typescript')).default;
   const text = await readFile('components/TradingDashboard.tsx','utf8');
   const source = ts.createSourceFile('TradingDashboard.tsx',text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-  let effect;
+  let effect, perpNormalizer;
   const visit = node => {
-    if (ts.isCallExpression(node) && node.expression.getText(source)==='useEffect' && node.arguments[0]?.getText(source).includes('async function loadWatchlistQuotes')) effect=node.arguments[0].getText(source);
+    if (ts.isCallExpression(node) && node.expression.getText(source)==='useEffect' && node.arguments[0]?.getText(source).includes(delta ? 'async function loadDeltaQuotes' : 'async function loadWatchlistQuotes')) effect=node.arguments[0].getText(source);
+    if (ts.isFunctionDeclaration(node) && node.name?.text === 'quoteFromPerp') perpNormalizer = node.getText(source);
     ts.forEachChild(node,visit);
   };
   visit(source); assert.ok(effect,'Run the real dashboard quote effect');
@@ -143,10 +145,10 @@ async function dashboardQuotes(t, homeOpen) {
     requests.push({url,options,resolve:(body,status=200)=>resolve(Response.json(body,{status}))});
     options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});
   }));
-  const js=ts.transpileModule(`const effect=${effect}; return effect();`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
-  const stop=new Function('quoteKeys','homeOpen','startVisiblePolling','setMarketQuotes','setMarketQuoteUpdatedAt','setToast',js)(
+  const js=ts.transpileModule(`${perpNormalizer}; const effect=${effect}; return effect();`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
+  const stop=new Function('quoteKeys','homeOpen','startVisiblePolling','setMarketQuotes','setMarketQuoteUpdatedAt','setToast','mergeNormalizedQuote','deltaQuoteSymbols',js)(
     'NSE_INDEX|Nifty 50,NSE_INDEX|Nifty Bank,BSE_INDEX|SENSEX',homeOpen,startVisiblePolling,
-    update=>state.quotes=update(state.quotes),update=>state.updated=update(state.updated),message=>state.toasts.push(message));
+    update=>state.quotes=update(state.quotes),update=>state.updated=update(state.updated),message=>state.toasts.push(message),mergeNormalizedQuote,'BTCUSD');
   return {...h,requests,state,stop};
 }
 
@@ -172,7 +174,7 @@ test('Home indices refresh every five seconds and broker rate limits are respect
 test('a stale REST snapshot cannot roll indices back and aborted requests cannot update the screen',async t=> {
   const h=await dashboardQuotes(t,false);
   try {
-    assert.deepEqual([...h.timers.values()],[20_000]);
+    assert.deepEqual([...h.timers.values()],[5_000]);
     h.state.quotes['NSE_INDEX|Nifty 50']={lastPrice:25100,lastTradeAt:'2026-10-12T05:01:00Z'};
     h.requests[0].resolve({ok:true,quotes:{'NSE_INDEX|Nifty 50':{lastPrice:25000,lastTradeAt:'2026-10-12T05:00:00Z'}}});await settle();
     assert.equal(h.state.quotes['NSE_INDEX|Nifty 50'].lastPrice,25100);
@@ -182,6 +184,50 @@ test('a stale REST snapshot cannot roll indices back and aborted requests cannot
     h.stop();h.requests[2].resolve({ok:true,quotes:{'NSE_INDEX|Nifty 50':{lastPrice:1,lastTradeAt:'2026-10-12T05:02:00Z'}}});await settle();
     assert.equal(h.state.quotes['NSE_INDEX|Nifty 50'].lastPrice,25100);
   } finally {h.stop();}
+});
+
+test('global quote polling times out, immediately resumes and rejects older responses', async t => {
+  const h = await dashboardQuotes(t, false, true);
+  try {
+    assert.equal(h.requests.length, 1);
+    assert.ok(h.requests[0].url.includes('BTCUSD'));
+    assert.ok(h.deadlines[0].ms <= 12_000);
+    h.deadlines[0].controller.abort(new DOMException('Timeout', 'TimeoutError'));
+    await settle();
+    h.window.dispatchEvent(new Event('focus'));
+    assert.equal(h.requests.length, 2, 'Native or browser resume cannot leave a stuck request blocking polling');
+    const at = Date.parse('2026-10-16T05:00:00Z');
+    h.requests[1].resolve({ ok: true, quote: { last: 100, change: 5, at } });
+    await settle();
+    assert.equal(h.state.quotes.BTCUSD.lastPrice, 100);
+    h.window.dispatchEvent(new Event('online'));
+    h.requests[2].resolve({ ok: true, quote: { last: 90, change: 2, at: at - 60_000 } });
+    await settle();
+    assert.equal(h.state.quotes.BTCUSD.lastPrice, 100);
+  } finally { h.stop(); }
+});
+
+test('native app resume refreshes market panels and releases its listener', async t => {
+  const { readFile } = await import('node:fs/promises');
+  const ts = (await import('typescript')).default;
+  const text = await readFile('components/TradingDashboard.tsx', 'utf8');
+  const source = ts.createSourceFile('TradingDashboard.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let effect;
+  const visit = node => {
+    if (ts.isCallExpression(node) && node.expression.getText(source) === 'useEffect' && node.arguments[0]?.getText(source).includes('Capacitor.isNativePlatform()') && node.arguments[0].getText(source).includes('dispatchEvent')) effect = node.arguments[0].getText(source);
+    ts.forEachChild(node, visit);
+  };
+  visit(source); assert.ok(effect);
+  const { window } = polling(t); let focus = 0, removed = 0, onState;
+  window.addEventListener('focus', () => focus++);
+  const js = ts.transpileModule(`const effect=${effect}; return effect();`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const stop = new Function('Capacitor', 'CapacitorApp', js)({ isNativePlatform: () => true }, { addListener: async (name, handler) => {
+    assert.equal(name, 'appStateChange'); onState = handler; return { remove: async () => { removed++; } };
+  } });
+  await settle(); onState({ isActive: false }); assert.equal(focus, 0);
+  onState({ isActive: true }); assert.equal(focus, 1);
+  stop(); await settle(); assert.equal(removed, 1);
+  onState({ isActive: true }); assert.equal(focus, 1);
 });
 
 
