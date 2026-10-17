@@ -683,7 +683,8 @@ export function MarketChart({
   const [avwapAnchor, setAvwapAnchor] = useState<number | null>(null);
   const avwapAnchorRef = useRef<number | null>(null);
   const avwapEnabledRef = useRef(false);
-  avwapEnabledRef.current = Boolean(indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden);
+  const avwapConfig = studySettings["anchored-vwap"];
+  avwapEnabledRef.current = Boolean(indicators["anchored-vwap"] && !avwapConfig?.hidden && (!avwapConfig?.timeframes.length || avwapConfig.timeframes.includes(timeframe)));
   avwapAnchorRef.current = avwapAnchor;
   const tapGestureRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null);
   const riskDragRef = useRef<"target" | "stopLoss" | null>(null);
@@ -3386,6 +3387,7 @@ export function MarketChart({
     }
     if (anchor == null) return;
     avwapAnchorRef.current = anchor;
+    overlay?.configure(studySettings["anchored-vwap"] ?? studyDefaults("anchored-vwap"));
     overlay?.update(candles, anchor);
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
@@ -3442,8 +3444,8 @@ export function MarketChart({
         {indicators.ema21 && !studySettings.ema21?.hidden && (!studySettings.ema21?.timeframes.length || studySettings.ema21.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && ["DELTA|BTCUSD", "DELTA|ETHUSD", "DELTA|XAUTUSD"].includes(instrument.instrumentKey) && <Ema21EntryMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
         {indicators.ema5 && !studySettings.ema5?.hidden && (!studySettings.ema5?.timeframes.length || studySettings.ema5.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && instrument.instrumentKey === "DELTA|BTCUSD" && <Ema5ReversalMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
         <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings.filter(line=>!line.hidden)} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} disabled={lockedDrawings} onSettings={id=>openDrawingSettings(id,true)} onAction={(id,action)=>drawingAction(id,true,action)} onDone={()=>{selectedStudyLineRef.current=null;setSelectedStudyLine(null);}} />
-        {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
-        {indicators["anchored-vwap"] && !studySettings["anchored-vwap"]?.hidden && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: 72 }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
+        {avwapEnabledRef.current && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
+        {avwapEnabledRef.current && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: 72 }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
         {!isReplay && feedMode === "loading" && !latestCandle && <div className="chart-candle-loading"><CandleLoader label="Loading chart candles" /></div>}
         {isReplay && replaySelecting && replayMarkerX !== null && <>

@@ -3,8 +3,10 @@ import type { Candle } from './market';
 import { computeStudy, type StudyResult } from './study-calculations';
 import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
 import { buildVolumeProfile } from './volume-profile';
+import { IchimokuCloud } from './ichimoku-cloud';
+import { macdHistogramColor } from './histogram-color';
 
-type Bundle={id:string;config:StudyConfig;signature:string;series:ISeriesApi<'Line'|'Histogram'>[];pane:number;result:StudyResult;primitive?:{update:(data:Candle[])=>void}};
+type Bundle={id:string;config:StudyConfig;signature:string;series:ISeriesApi<'Line'|'Histogram'>[];pane:number;result:StudyResult;primitive?:{update:(data:Candle[],result?:StudyResult)=>void}};
 const entryColorIndex=(name:string)=>({'EMA 5':0,'EMA 21':1,'EMA 50':2,VWAP:3,Long:4,Short:5})[name as 'EMA 5'|'EMA 21'|'EMA 50'|'VWAP'|'Long'|'Short']??0;
 class VisibleProfile implements ISeriesPrimitive<Time>{
  chart?:IChartApi;series?:ISeriesApi<'Line'>;request?:()=>void;data:Candle[]=[];config:StudyConfig;
@@ -57,6 +59,7 @@ export class ChartStudyRenderer {
      if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:oscillator?'#8054da66':'#8c849b80',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});series.push(s);
     }
     const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
+    if(d.id==='ichimoku'&&series[2]){const cloud=new IchimokuCloud(c);(series[2] as ISeriesApi<'Line'>).attachPrimitive(cloud);bundle.primitive=cloud;}
     if(d.id==='volume')this.chart.priceScale('volume',0).applyOptions({visible:false,autoScale:true,scaleMargins:{top:.79,bottom:0}});
     if(d.id==='rsi'){const label=/^#[\da-f]{6}/i.test(c.colors[0]||'')?c.colors[0].slice(0,7):'#8054da';series[0].applyOptions({priceLineColor:label});this.chart.priceScale('right',index).applyOptions({scaleMargins:{top:.1,bottom:.12},alignLabels:true});const bands=new OscillatorBands(c.inputs.lower??30,c.inputs.upper??70);(series[0] as ISeriesApi<'Line'>).attachPrimitive(bands);bundle.primitive=bands;}
     if(d.id==='vpvr'){series[0].applyOptions({visible:true,lastValueVisible:false,color:'transparent',autoscaleInfoProvider:()=>null});const primitive=new VisibleProfile(c);(series[0] as ISeriesApi<'Line'>).attachPrimitive(primitive);bundle.primitive=primitive;}
@@ -78,11 +81,12 @@ export class ChartStudyRenderer {
     let color=plot?.colors?.[i];
     if(b.id==='volume'&&k===0)color=b.config.colors[data[i].close>=data[i].open?0:1];
     else if(b.id==='supertrend')color=b.config.colors[data[i].close>=value?0:1];
+    else if(b.id==='macd'&&plot?.histogram)color=macdHistogramColor(value,plot.values[i-1],b.config.colors);
     else if(plot?.histogram&&b.id!=='chop-zone')color=b.config.colors[value>=0?0:1];
     if(color)color=color.slice(0,7)+alpha;
     return [{time:this.time(data[at].time),value,color}];
    });b.series[k].setData(points);
-  }b.primitive?.update(data);
+  }b.primitive?.update(data,b.result);
  }}
  fit(height:number){const panes=this.chart.panes(),lower=panes.length-1;if(!lower){panes[0]?.setHeight(height);return;}const roomy=this.bundles.some(b=>b.pane>0&&(b.id==='rsi'||b.id==='stochastic'||b.id==='stoch-rsi'||b.id==='mfi'));const h=Math.max(roomy?104:58,Math.min(roomy?136:120,Math.floor(height*(roomy?0.4:0.52)/lower)));panes[0]?.setHeight(Math.max(140,height-h*lower));for(let i=1;i<panes.length;i++)panes[i].setHeight(h);}
  // Hit-test rendered pixels, not just the nearest timestamp: empty chart space is not a study.

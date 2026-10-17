@@ -10,6 +10,8 @@ import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
 import { drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
 import { drawingTimeForFrame } from './drawing-anchor-time.ts';
+import { regressionChannel } from './regression-channel.ts';
+import { CHART_INTERVAL_SECONDS } from './chart-history.ts';
 const readableFont = () => "13px sans-serif";
 
 function initialPositionAnchors(type: string, entry: Anchor, source: VolumeCandle[]): Anchor[] {
@@ -168,7 +170,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           return logical===null?null:viewport.timeScale.logicalToCoordinate(logical as Logical);
         }}};
       };
-      if(!["long-position","short-position","price-range","fib-retracement","volume-profile","anchored-volume-profile","session-volume-profile",...EXTRA_DRAWING_TOOLS.map(t=>t.id)].includes(type)) {
+      if(!["regression-trend","long-position","short-position","price-range","fib-retracement","volume-profile","anchored-volume-profile","session-volume-profile",...EXTRA_DRAWING_TOOLS.map(t=>t.id)].includes(type)) {
         const nativeViews=item.paneViews.bind(item);
         // Preserve specialized shapes (arrowheads, channels, risk/reward, etc.)
         // while normalizing their canvas units and transparent label treatment.
@@ -442,6 +444,60 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
   }
   class AnchoredVolumeProfile extends VolumeProfile { readonly type="anchored-volume-profile"; readonly mode:ProfileMode="anchored"; clone(id:string){return new AnchoredVolumeProfile(id,[...this.anchors],this.style,this.options);} }
   class SessionVolumeProfile extends VolumeProfile { readonly type="session-volume-profile"; readonly mode:ProfileMode="session"; clone(id:string){return new SessionVolumeProfile(id,[...this.anchors],this.style,this.options);} }
+  class CandleRegression extends drawing.Drawing {
+    readonly type = 'regression-trend';
+    isValid() { return this.anchors.length >= 2; }
+    paneViews() { return labeledPaneViews(this); }
+    computeGeometry(viewport: Viewport): Geometry[] {
+      if (!this.isValid()) return [];
+      const source = candles();
+      const offset = (this.options as DrawingPresentation).anchorTimeOffset ?? axisOffset;
+      const time = (anchor: Anchor) => {
+        if (!frame) return Number(anchor.time);
+        const displayed=drawingTimeForFrame(Number(anchor.time), source.map(bar => bar.time), frame.timeframe, frame.calendarOffset, offset, axisOffset);
+        if (['1D','1W','1M','1Y'].includes(frame.timeframe)) return displayed;
+        // Intraday anchors belong to their containing candle when changing intervals.
+        let lo=0,hi=source.length;
+        while(lo<hi){const mid=(lo+hi)>>>1;if(source[mid].time<=displayed)lo=mid+1;else hi=mid;}
+        const containing=source[lo-1],seconds=CHART_INTERVAL_SECONDS[frame.timeframe]??0;
+        return containing&&displayed-containing.time<seconds?containing.time:displayed;
+      };
+      const result = regressionChannel(source, time(this.anchors[0]), time(this.anchors[1]));
+      if (!result) return [];
+      // Data times are already in the current chart's frame; do not transform them twice.
+      const x1 = viewport.timeScale.logicalToCoordinate(drawingLogicalAtTime(result.from, source.map(bar => bar.time)) as Logical);
+      const x2 = viewport.timeScale.logicalToCoordinate(drawingLogicalAtTime(result.to, source.map(bar => bar.time)) as Logical);
+      if (x1 === null || x2 === null) return [];
+      const geometry: Geometry[] = [];
+      for (const band of [0, 2, -2]) {
+        const y1 = viewport.priceScale.priceToCoordinate(result.start + band * result.deviation);
+        const y2 = viewport.priceScale.priceToCoordinate(result.end + band * result.deviation);
+        if (y1 !== null && y2 !== null) geometry.push({type:'line',start:{x:x1,y:y1},end:{x:x2,y:y2}});
+      }
+      if (this.style.showLabels !== false && geometry[0]?.type === 'line') geometry.push({type:'text',position:{x:x2,y:geometry[0].end.y-10},text:`r ${result.correlation.toFixed(3)} · ${result.count} bars`,align:'right'});
+      return geometry;
+    }
+    testHit(point: Point, viewport: Viewport) {
+      return this.computeGeometry(viewport).some(g => {
+        if (g.type !== 'line') return false;
+        const dx=g.end.x-g.start.x,dy=g.end.y-g.start.y;
+        const t=Math.max(0,Math.min(1,((point.x-g.start.x)*dx+(point.y-g.start.y)*dy)/(dx*dx+dy*dy||1)));
+        return Math.hypot(point.x-g.start.x-t*dx,point.y-g.start.y-t*dy)<7;
+      });
+    }
+    getControlPoints(viewport: Viewport) {
+      const middle=this.computeGeometry(viewport).find(g=>g.type==='line');
+      if (!middle || middle.type!=='line') return [];
+      const points=Number(this.anchors[0].time)<=Number(this.anchors[1].time)?[middle.start,middle.end]:[middle.end,middle.start];
+      return points.map((point,index)=>({...point,index,radius:5}));
+    }
+    updateAnchor(index: number, anchor: Anchor) {
+      // Only the time selects the regression sample; vertical movement cannot change fitted prices.
+      if(this.anchors[index])super.updateAnchor(index,{...anchor,price:this.anchors[index].price});
+    }
+    clone(id: string) { return new CandleRegression(id, this.anchors.map(a=>({...a})), {...this.style}, {...this.options}); }
+  }
+  registry.register({...registry.get('regression-trend')!,factory:(id,anchors,style,options)=>new CandleRegression(id,anchors,style,options)});
   class LabeledFibonacci extends drawing.FibRetracement {
     paneViews() { return labeledPaneViews(this); }
     computeGeometry(viewport: Viewport): Geometry[] {
