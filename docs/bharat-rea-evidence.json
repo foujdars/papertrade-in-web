@@ -1,0 +1,19 @@
+{
+  "reaVersion": "6.5.0",
+  "bypassedAccessControls": false,
+  "evidenceId": "ev_99bb88779661072c6647ffbd629875a872f2c3e90d343f61ccbbc0f9d42238c5",
+  "url": "https://www.investing.com/pro/propicks",
+  "actualFeatureControlsObserved": [],
+  "captureCompleteness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "report": "findings.md",
+  "currentHoldingsRecovered": false,
+  "observedDocument": "403",
+  "screenshot": "public-screenshot.png",
+  "proprietaryModelRecovered": false,
+  "nativeAnalysisApplicable": false
+}
