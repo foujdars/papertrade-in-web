@@ -29,7 +29,11 @@
     "android:open": "cap open android",
     "android:apk": "cd android && gradlew.bat assembleDebug",
     "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease",
-    "test:desktop-theme": "node --experimental-strip-types --test tests/desktop-chart-theme.test.mjs tests/desktop-chart-css.test.mjs tests/chart-style.test.mjs tests/chart-drawing-tools.test.mjs tests/advanced-chart-tools.test.mjs"
+    "test:desktop-theme": "node --experimental-strip-types --test tests/desktop-chart-theme.test.mjs tests/desktop-chart-css.test.mjs tests/chart-style.test.mjs tests/chart-drawing-tools.test.mjs tests/advanced-chart-tools.test.mjs",
+    "build:pine": "node scripts/build-pine-runtime.mjs",
+    "predev": "npm run build:pine",
+    "prebuild": "npm run build:pine",
+    "test:pine:advanced": "node --experimental-strip-types --test tests/pine-runtime.test.mjs tests/pine-visual-layer.test.mjs tests/pine-workspace-advanced.test.mjs tests/pine-market-data.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -43,7 +47,9 @@
     "lightweight-charts": "^5.2.0",
     "lightweight-charts-drawing": "^0.1.1",
     "lucide-react": "^1.27.0",
+    "monaco-editor": "0.55.1",
     "next": "^16.3.3",
+    "pinets": "0.11.1",
     "protobufjs": "^7.5.4",
     "react": "19.2.6",
     "react-dom": "19.2.6"
@@ -59,6 +65,7 @@
     "@vitejs/plugin-rsc": "0.5.26",
     "cross-env": "^10.1.0",
     "drizzle-kit": "0.31.10",
+    "esbuild": "0.28.0",
     "eslint": "9.39.4",
     "eslint-config-next": "^16.3.3",
     "react-server-dom-webpack": "19.2.6",
@@ -68,5 +75,6 @@
     "vite": "8.0.13",
     "wrangler": "4.92.0"
   },
-  "type": "module"
+  "type": "module",
+  "license": "AGPL-3.0-only"
 }
