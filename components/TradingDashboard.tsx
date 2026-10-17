@@ -6,6 +6,7 @@ import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
 import { NewsWorkspace } from "./NewsWorkspace";
 import { BotWorkspace } from "./BotWorkspace";
+import { AlgoTradingWorkspace } from "./AlgoTradingWorkspace";
 import dynamic from "next/dynamic";
 const FundamentalWorkspace = dynamic(() => import("./FundamentalWorkspace").then(module => module.FundamentalWorkspace));
 import { holdingPerformance } from "@/lib/holding-performance";
@@ -205,7 +206,7 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "bot" | "news";
+type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "bot" | "algo" | "news";
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
 type UiDensity = "comfortable" | "compact";
@@ -421,6 +422,7 @@ export function TradingDashboard() {
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [botOpen, setBotOpen] = useState(false);
+  const [algoOpen, setAlgoOpen] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [fundamentalsOpen, setFundamentalsOpen] = useState(false);
   const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey), deltaOptionSymbolFromInstrumentKey(selected.instrumentKey), botOpen);
@@ -592,7 +594,7 @@ export function TradingDashboard() {
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const [globalCandles, setGlobalCandles] = useState<Candle[] | undefined>();
   const globalCandleScopeRef = useRef("");
-  const activeNavigationSection: NavigationSection = newsOpen ? "news" : fundamentalsOpen
+  const activeNavigationSection: NavigationSection = algoOpen ? "algo" : newsOpen ? "news" : fundamentalsOpen
     ? "fundamentals"
     : botOpen
     ? "bot"
@@ -611,7 +613,7 @@ export function TradingDashboard() {
             : workspaceMode;
   const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
   const navigationSnapshot = useCallback(() => {
-    const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.fundamental-workspace', '.pnl-trade-list'];
+    const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.algo-workspace', '.fundamental-workspace', '.pnl-trade-list'];
     const scroll = Object.fromEntries(selectors.map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
     return { section: activeNavigationSection, group: marketsInitialGroup, scroll, instrument: selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey };
   }, [activeNavigationSection, marketsInitialGroup, selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey]);
@@ -706,6 +708,7 @@ export function TradingDashboard() {
     setMarketsOpen(false);
     setPnlOpen(false);
     setBotOpen(false);
+    setAlgoOpen(false);
     setNewsOpen(false);
     setFundamentalsOpen(false);
     setFnoListOpen(false);
@@ -961,7 +964,7 @@ export function TradingDashboard() {
       if (hasTransientBackLayer() || event.defaultPrevented) return;
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
-      setHomeOpen(false); setNewsOpen(false); setFundamentalsOpen(false); setBotOpen(false);
+      setHomeOpen(false); setNewsOpen(false); setFundamentalsOpen(false); setBotOpen(false); setAlgoOpen(false);
       setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setSelected(snapshot.instrument);
       setTimeframe(snapshot.timeframe);
@@ -2739,6 +2742,7 @@ export function TradingDashboard() {
   }
 
   function openNavigationSection(section: NavigationSection, remember = true) {
+    setAlgoOpen(section === "algo");
     setNewsOpen(section === "news");
     setBotOpen(section === "bot");
     setFundamentalsOpen(section === "fundamentals");
@@ -2924,7 +2928,7 @@ export function TradingDashboard() {
           <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><ChartNoAxesCombined className="desktop-nav-icon" size={16} aria-hidden="true"/>Analysis</button>
           <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}><Activity className="desktop-nav-icon" size={16} aria-hidden="true"/>P&amp;L</button>
         </nav>
-        <span className="desktop-workspace-title">{activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
+        <span className="desktop-workspace-title">{activeNavigationSection === "algo" ? "Algo Trading" : activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
@@ -2942,6 +2946,7 @@ export function TradingDashboard() {
               <HeaderPopover className="more-menu-panel" label="More options">
                 <header className="tools-menu-heading"><b>Tools & settings</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
                 <div className="tools-menu-features">
+                  <button aria-label="Algo Trading" onClick={() => { setMoreMenuOpen(false); openNavigationSection("algo"); }}><span className="tools-menu-icon"><Activity size={21} /></span><span><b>Algo Trading</b><small>Build, backtest & paper trade</small></span><ChevronRight size={18} /></button>
                   <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>
                   <button aria-label="Bot" onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><span className="tools-menu-icon"><Bot size={21} /></span><span><b>Trading bot</b><small>Strategies, controls & activity</small></span><ChevronRight size={18} /></button>
                 </div>
@@ -3328,7 +3333,7 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={activeNavigationSection !== "bot"} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={!["bot", "algo"].includes(activeNavigationSection)} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={["trade", "fno"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
         <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("watchlist"); }}><Bookmark size={19} /><span>Watchlist</span></button>
@@ -3356,6 +3361,7 @@ export function TradingDashboard() {
         setProduct("DELIVERY");
       }} />}
       {botOpen && <BotWorkspace trading={globalTrading} onClose={closeNavigationPage} onPnl={() => { openNavigationSection("pnl"); setPnlScope({ ...DEFAULT_PNL_SCOPE, asset: "global" }); }} />}
+      {algoOpen && <AlgoTradingWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={tradingUniverse} underlyings={fnoUnderlyings} onClose={closeNavigationPage} />}
       {replayInstrument && !replayOnChart && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={exitChartReplay} />}
       {coachOpen && <TradingCoach initialTab={coachTab} timeframe={timeframe} theme={theme} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onOpenInsights={() => { setCoachOpen(false); openNavigationSection("pnl"); setPnlTab("insights"); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}

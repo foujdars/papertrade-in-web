@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "investigation_date": "2026-10-18",
+  "timezone": "Asia/Kolkata",
+  "target": "https://algotest.in/",
+  "rea_cli_version": "6.5.0",
+  "scope": "Public web observation and selected inert client bundle analysis; no authenticated execution or real trades.",
+  "canonical_evidence_directory": "work/algotest-research (outside repository)",
+  "evidence": [
+    {
+      "kind": "browser-scenario",
+      "file": "landing-evidence.json",
+      "sha256": "6d8f701066e03b5cb810708672a914c6a3fac5c76e0e0409aa42a20a3cca7cef",
+      "evidence_id": "ev_9e0b004570070e65d59deea4b3ba8011d76dacca7a36c48e443c7ca5eff99e0d",
+      "summary": "Public landing workflow categories observed",
+      "start_url": {
+        "url": "https://algotest.in/",
+        "query": []
+      },
+      "final_url": {
+        "url": "https://algotest.in/",
+        "origin": "https://algotest.in",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": "completed",
+      "browser": {
+        "mode": "launch",
+        "process_ownership": "provider-owned",
+        "cleanup": "terminated-owned-process",
+        "product": "Chromium",
+        "version": "155.0.4283.45"
+      },
+      "accessibility_sha256": "5363020f02562edd96c3cdb106f55847f5b503b836a03ccea90325c853607999",
+      "screenshot_sha256": "622ae9c479d6a05e48211116b5d7075520b20c5049256ca7865d219e69545b93"
+    },
+    {
+      "kind": "browser-scenario",
+      "file": "forward-evidence.json",
+      "sha256": "1b323b543cb1d7286cd6a5cd1315cbd306431094ba29b97bff7a58bea1ac9d07",
+      "evidence_id": "ev_b2af79149f2c0c80db795fbc23ecd459300c854de5aaf8298ed22575e51a6b4d",
+      "summary": "Blank application shell; authenticated controls not established",
+      "start_url": {
+        "url": "https://algotest.in/forward-test",
+        "query": []
+      },
+      "final_url": {
+        "url": "https://algotest.in/forward-test",
+        "origin": "https://algotest.in",
+        "query_parameter_names": [],
+        "redacted": false
+      },
+      "status": "completed",
+      "browser": {
+        "mode": "launch",
+        "process_ownership": "provider-owned",
+        "cleanup": "terminated-owned-process",
+        "product": "Chromium",
+        "version": "155.0.4283.45"
+      },
+      "accessibility_sha256": "a510c89f8f4f9ab8d437bf2d1f8c9c7d75bfecd3b50714b310620555a18f4344",
+      "screenshot_sha256": "99db2a93b06fa1bf617f5c495e02dcf6c0b76961108491217e2cf4fed8699d35"
+    },
+    {
+      "kind": "browser-scenario",
+      "file": "backtest-evidence.json",
+      "sha256": "06f153dba0e9a4a4eac4c716827bdbe43ba8859ba93c45037b018bf5d8ef05e1",
+      "evidence_id": "ev_7b819e6347e97880958641252d7de0b2f462d1b74b02a24e069be2509961260e",
+      "summary": "Redirect to landing with redirect_to=/backtest; no backtest performed",
+      "start_url": {
+        "url": "https://algotest.in/backtest",
+        "query": []
+      },
+      "final_url": {
+        "url": "https://algotest.in/?redirect_to=%2Fbacktest",
+        "origin": "https://algotest.in",
+        "query_parameter_names": [
+          "redirect_to"
+        ],
+        "redacted": false
+      },
+      "status": "completed",
+      "browser": {
+        "mode": "launch",
+        "process_ownership": "provider-owned",
+        "cleanup": "terminated-owned-process",
+        "product": "Chromium",
+        "version": "155.0.4283.45"
+      },
+      "accessibility_sha256": "a510c89f8f4f9ab8d437bf2d1f8c9c7d75bfecd3b50714b310620555a18f4344",
+      "screenshot_sha256": "99db2a93b06fa1bf617f5c495e02dcf6c0b76961108491217e2cf4fed8699d35"
+    },
+    {
+      "kind": "static-javascript",
+      "file": "public-client-evidence.json",
+      "sha256": "858c6fd57d2e73d7ea6a1096a5c741df4272ff7c786aae20dfc4f1b1fa1c6535",
+      "evidence_id": "ev_e354ee0ce9ee08d775179eed46f7b704332323951ec4688bce78c6202e8f7de8",
+      "artifact_url": "https://algotest.in/_next/static/chunks/pages/index-b7e061db8e146f26.js",
+      "artifact_sha256": "25ec9b4a2e8dcc86490af0ef0507f607330e7b521b6b7f0bf616ed1f96be135d",
+      "root_artifact_sha256": "13a3599cedb7441ad537128f01d5ec8688fa68b72866ffcc27e0d4119dc382dc",
+      "statistics": {
+        "relevant_files": 1,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 37637,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 1,
+        "visited_ast_nodes": 6518,
+        "findings": 58,
+        "modules": 9,
+        "parse_failures": 0
+      },
+      "coverage": {
+        "status": "partial",
+        "truncated": false,
+        "omitted_count": null,
+        "limits": []
+      },
+      "limitations": [
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ],
+      "literal_route_candidates": [
+        "/backtest",
+        "/forward-test",
+        "/strategy-builder",
+        "/signals",
+        "/simulator"
+      ]
+    }
+  ],
+  "native_provider_check": {
+    "file": "ghidra-readiness.json",
+    "sha256": "775f61813fd232c7d26906549ad48eeb2f6edabf16919f1f17e34d0fbc5de103",
+    "configured": true,
+    "available": true,
+    "version": "12.1.4",
+    "checks": [
+      {
+        "name": "configuration",
+        "ok": true
+      },
+      {
+        "name": "platform",
+        "ok": true
+      },
+      {
+        "name": "architecture",
+        "ok": true
+      },
+      {
+        "name": "installation",
+        "ok": true
+      },
+      {
+        "name": "version",
+        "ok": true
+      },
+      {
+        "name": "headless",
+        "ok": true
+      },
+      {
+        "name": "native_decompiler",
+        "ok": true
+      },
+      {
+        "name": "java",
+        "ok": true
+      },
+      {
+        "name": "native_authority",
+        "ok": true
+      }
+    ],
+    "algotest_native_artifact_found": false,
+    "algotest_binary_decompiled": false,
+    "scope_limit": "Only the selected public HTML/JavaScript artifacts were inspected; not an exhaustive product asset inventory."
+  },
+  "sources": [
+    {
+      "url": "https://docs.algotest.in/Time-Based-Algo-Trading/how-to-backtest/intraday/",
+      "supports": "Public session, multi-leg configuration and risk controls"
+    },
+    {
+      "url": "https://docs.algotest.in/Signals-AI/Validating-Your-Strategy/Backtesting/",
+      "supports": "Signal/trade separation, backtest period, metrics and trade export"
+    },
+    {
+      "url": "https://docs.algotest.in/Time-Based-Algo-Trading/forward-test/",
+      "supports": "Activation, running MTM, manual intervention, closing and trade history"
+    }
+  ],
+  "excluded_claims": [
+    "Proprietary engine recovery",
+    "Native AlgoTest decompilation",
+    "Authenticated forward-test execution",
+    "AlgoTest historical options database access",
+    "Full algorithm or numerical parity",
+    "Broker orders or credential access"
+  ]
+}

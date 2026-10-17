@@ -54,6 +54,7 @@ import "./desktop-chart-settings.css";
 import "./desktop-chart-workspace.css";
 import "./indicator-templates.css";
 import "./market-data-status.css";
+import "./algo-trading.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
