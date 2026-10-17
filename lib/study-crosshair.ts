@@ -4,7 +4,7 @@ import type { IChartApi, ISeriesApi, MouseEventParams, Time } from 'lightweight-
 // coordinate or a nearby smoothing line. Pane coordinates are local to each pane.
 export function snapStudyCrosshair(
   chart: IChartApi,
-  series: ISeriesApi<'Line' | 'Histogram'> | undefined,
+  series: ISeriesApi<'Line' | 'Histogram' | 'Baseline'> | undefined,
   event: MouseEventParams<Time>,
 ): boolean {
   if (!series || !event.point || event.time === undefined ||

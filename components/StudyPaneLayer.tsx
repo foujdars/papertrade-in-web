@@ -5,7 +5,7 @@ import { DrawingActionBar } from "./DrawingActionBar";
 import { drawingTitle } from "@/lib/drawing-editing";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
-import { drawingVisibleOnTimeframe, studyLinePoints, drawingLineTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
+import { drawingVisibleOnTimeframe, studyLinePoints, drawingLineTextPosition, drawingTextVisible, studyPaneSeries, type StudyDrawing } from "@/lib/study-pane-drawings";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
@@ -49,7 +49,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
   for (const pane of chart.panes()) height += pane.getHeight();
   const point = (studyId: string, marker: StudyDrawing["a"]) => {
     const bundle = studyRenderer.current?.bundles.find((item) => item.id === studyId);
-    const series = bundle?.series[0] as ISeriesApi<"Line"> | undefined;
+    const series = studyPaneSeries(bundle) as ISeriesApi<"Line"> | undefined;
     const pane = bundle && chart.panes()[bundle.pane];
     if (!bundle || !series || !pane) return null;
     const x = chart.timeScale().timeToCoordinate(marker.time as UTCTimestamp);

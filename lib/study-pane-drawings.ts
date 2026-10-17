@@ -52,7 +52,11 @@ export function formatStudyValue(value: number) {
   return value.toFixed(4);
 }
 
-export function locateStudyPane(chart: { panes: () => Array<{ getHeight: () => number }> }, bundles: Array<{ id: string; pane: number; series: Array<{ coordinateToPrice: (y: number) => number | null }> }>, y: number) {
+export function studyPaneSeries<T>(bundle:{pane:number;series:T[];seriesPanes?:number[]}|null|undefined):T|undefined {
+  return bundle?.series[bundle.seriesPanes?.indexOf(bundle.pane)??0];
+}
+
+export function locateStudyPane(chart: { panes: () => Array<{ getHeight: () => number }> }, bundles: Array<{ id: string; pane: number; seriesPanes?:number[]; series: Array<{ coordinateToPrice: (y: number) => number | null }> }>, y: number) {
   let top = 0;
   const panes = chart.panes();
   let paneIndex = -1;
@@ -62,9 +66,9 @@ export function locateStudyPane(chart: { panes: () => Array<{ getHeight: () => n
     top += height;
   }
   if (paneIndex <= 0) return null;
-  const bundle = bundles.find((item) => item.pane === paneIndex && item.series[0]);
+  const bundle = bundles.find((item) => item.pane === paneIndex && studyPaneSeries(item));
   if (!bundle) return null;
-  const value = bundle.series[0].coordinateToPrice(y - top);
+  const value = studyPaneSeries(bundle)!.coordinateToPrice(y - top);
   if (value == null || !Number.isFinite(value)) return null;
   return { studyId: bundle.id, value, y };
 }

@@ -3,6 +3,8 @@ export type SavedPineScript = AppliedPineScript & { id: string; updatedAt: numbe
 export const PINE_STORAGE_KEY = 'papertrade-pine-workspace-v1';
 const ACTIVE_KEY = 'papertrade-pine-active-v1';
 const ADVANCED_ACTIVE_KEY = 'papertrade-pine-active-v2';
+export const PINE_DRAFT_KEY = 'papertrade-pine-draft-v1';
+export type PineDraft = AppliedPineScript & { selectedId: string; updatedAt: number };
 export const PINE_TEMPLATES = [
   { name: 'EMA crossover', source: `//@version=6
 indicator("EMA crossover", overlay=true)
@@ -67,6 +69,20 @@ export function saveAppliedPineScript(value: AppliedPineScript | null, advanced 
 }
 export function loadPineScripts(): SavedPineScript[] { try { const list: unknown=JSON.parse(storage()?.getItem(PINE_STORAGE_KEY) ?? '[]'); return Array.isArray(list) ? list.filter((v):v is SavedPineScript=>valid(v)&&'id' in v&&typeof v.id==='string'&&v.id.length<=100&&'updatedAt' in v&&typeof v.updatedAt==='number'&&Number.isFinite(v.updatedAt)).slice(0,30) : []; } catch { return []; } }
 export function savePineScripts(list: SavedPineScript[]): boolean { try { const target=storage(); if(!target || list.length>30 || !list.every(valid)) return false; target.setItem(PINE_STORAGE_KEY, JSON.stringify(list)); return true; } catch { return false; } }
+
+export function loadPineDraft(): PineDraft | null {
+ try {
+  const value: unknown=JSON.parse(storage()?.getItem(PINE_DRAFT_KEY)??'null');
+  return valid(value)&&'selectedId' in value&&typeof value.selectedId==='string'&&value.selectedId.length<=100&&'updatedAt' in value&&typeof value.updatedAt==='number'&&Number.isFinite(value.updatedAt)?value as PineDraft:null;
+ } catch { return null; }
+}
+export function savePineDraft(value: PineDraft): boolean {
+ try {
+  const target=storage();
+  if(!target||!valid(value)||typeof value.selectedId!=='string'||value.selectedId.length>100||!Number.isFinite(value.updatedAt))return false;
+  target.setItem(PINE_DRAFT_KEY,JSON.stringify(value));return true;
+ } catch { return false; }
+}
 
 
 export type PineRevision = SavedPineScript & { revisionId: string };

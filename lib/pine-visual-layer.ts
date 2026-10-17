@@ -7,7 +7,7 @@ export type PineVisualLine = { id?: string; x1: number; y1: number; x2: number; 
 export type PineVisualBox = { left: number; top: number; right: number; bottom: number; xloc?: string; extend?: string; bgcolor?: string; border_color?: string; border_width?: number; border_style?: string; text?: string; text_color?: string; text_size?: string | number };
 export type PineVisualLabel = PineVisualPoint & { text?: string; color?: string; textcolor?: string; size?: string | number; style?: string; yloc?: string };
 export type PineVisualShape = PineVisualPoint & { style?: string; location?: string; color?: string; text?: string; textcolor?: string; size?: string | number; char?: string };
-export type PineVisualFill = { a: (number | null)[]; b: (number | null)[]; colors: string[]; offset?: number };
+export type PineVisualFill = { a: (number | null)[]; b: (number | null)[]; colors: string[]; offset?: number; fillGaps?: boolean; gradients?: ({top:number;bottom:number;topColor:string;bottomColor:string}|null)[] };
 export type PineVisualCell = { text?: string; bgcolor?: string; text_color?: string; text_size?: string | number; text_halign?: string; width?: number; height?: number; _merged?: boolean; _merge_parent?: [number, number] | null };
 export type PineVisualTable = { position?: string; columns: number; rows: number; bgcolor?: string; border_color?: string; border_width?: number; frame_color?: string; frame_width?: number; cells: (PineVisualCell | null)[][]; merges?: { startCol: number; startRow: number; endCol: number; endRow: number }[] };
 export type PineVisualPolyline = { points: PineVisualPoint[]; curved?: boolean; closed?: boolean; color?: string; fill?: string; width?: number; style?: string };
@@ -36,20 +36,20 @@ export function extractPineBarColors(raw: readonly PineRawVisual[] = []): Map<nu
 export function pineVisualWarnings(raw: readonly PineRawVisual[] = []): string[] {
   const supported = new Set(['', 'line', 'style_line', 'style_linebr', 'style_stepline', 'style_stepline_diamond', 'style_steplinebr', 'histogram', 'style_histogram', 'columns', 'style_columns', 'circles', 'style_circles', 'cross', 'style_cross', 'area', 'style_area', 'style_areabr', 'hline', 'fill', 'background', 'barcolor', 'shape', 'char', 'drawing_line', 'drawing_box', 'label', 'table', 'linefill', 'drawing_polyline', 'bar', 'candle']);
   const warnings = raw.filter(p => !supported.has(String(p.options.style ?? ''))).map(p => `Visual style ${String(p.options.style)} is not rendered by the chart host.`);
-  if (raw.some(p => p.options.style === 'fill' && (p.options.top_color !== undefined || p.options.bottom_color !== undefined))) warnings.push('Gradient fill interpolation is not rendered; the chart uses the fill color when provided.');
-  if (raw.some(p => p.options.style === 'fill' && p.options.fillgaps === true)) warnings.push('Fill gaps remain visible; bridging unavailable source values is not rendered.');
   return [...new Set(warnings)];
 }
 
 /** Translate actual PineTS 0.11.1 serialized output. No evaluation or DOM insertion. */
-export function normalizePineVisuals(raw: readonly PineRawVisual[] = [], candles: Candle[] = []): PineVisualData {
+export function normalizePineVisuals(raw: readonly PineRawVisual[] = [], candles: Candle[] = [], forcedOverlay?: boolean): PineVisualData {
   const result: Required<PineVisualData> = { fills: [], backgrounds: [], lines: [], boxes: [], labels: [], shapes: [], tables: [], linefills: [], polylines: [], ohlc: [] };
   const times = new Map(candles.map((c, i) => [c.time, i]));
   const index = (t: number) => times.get(t / 1000) ?? times.get(t);
   const plots = new Map(raw.flatMap(p => [[p.key, p], [p.title ?? p.key, p]] as [string, PineRawVisual][]));
+  const routed = (options:Record<string,unknown>) => forcedOverlay===undefined || (options.force_overlay===true)===forcedOverlay;
   const series = (p?: PineRawVisual) => {
     const values: (number | null)[] = Array(candles.length).fill(null);
-    for (const d of p?.data ?? []) { const i = index(d.time); if (i !== undefined && finite(d.value)) values[i] = d.value; }
+    const offset=finite(p?.options.offset)?Math.trunc(clamp(p.options.offset,-1000,1000)):0;
+    for (const d of p?.data ?? []) { const i = index(d.time); if (i !== undefined && i+offset>=0 && i+offset<values.length && finite(d.value)) values[i+offset] = d.value; }
     return values;
   };
   for (const plot of raw.slice(0, 256)) {
@@ -57,19 +57,28 @@ export function normalizePineVisuals(raw: readonly PineRawVisual[] = [], candles
     const style = String(plot.options.style ?? '');
     if (style === 'fill') {
       const a = plots.get(String(plot.options.plot1)), b = plots.get(String(plot.options.plot2)); if (!a || !b) continue;
+      // A fill belongs to the scale of its source plots. Cross-pane fills have no
+      // coherent price projection and are therefore not painted across panes.
+      if(forcedOverlay!==undefined&&!!a.options.force_overlay!==!!b.options.force_overlay||!routed(a.options))continue;
       const colors = Array(candles.length).fill(color(plot.options.color));
-      for (const d of plot.data) { const i = index(d.time); if (i !== undefined) colors[i] = color(d.options?.color ?? plot.options.color); }
-      if (result.fills.length < PINE_VISUAL_LIMITS.fills) result.fills.push({ a: series(a), b: series(b), colors });
+      const gradients:PineVisualFill['gradients']=Array(candles.length).fill(null);
+      const gradient=(o:Record<string,unknown>)=>finite(o.top_value)&&finite(o.bottom_value)&&(o.top_color!==undefined||o.bottom_color!==undefined)?{top:o.top_value,bottom:o.bottom_value,topColor:color(o.top_color),bottomColor:color(o.bottom_color)}:null;
+      gradients.fill(gradient(plot.options));
+      for (const d of plot.data) { const i = index(d.time); if (i !== undefined){const o={...plot.options,...d.options};colors[i] = color(o.color);gradients[i]=gradient(o);} }
+      const showLast=finite(plot.options.show_last)?Math.max(0,Math.floor(plot.options.show_last)):candles.length;
+      const av=series(a),bv=series(b);for(let i=0;i<candles.length-showLast;i++){av[i]=null;bv[i]=null;}
+      if (result.fills.length < PINE_VISUAL_LIMITS.fills) result.fills.push({ a: av, b: bv, colors, fillGaps:plot.options.fillgaps!==false,gradients });
     } else if (style === 'bar' || style === 'candle') {
       for (const d of plot.data.slice(-20000)) {
         const i = index(d.time), v = d.value, o = { ...plot.options, ...d.options };
-        if (i === undefined || !Array.isArray(v) || v.length < 4 || !v.slice(0, 4).every(finite)) continue;
+        if (i === undefined || !routed(o) || !Array.isArray(v) || v.length < 4 || !v.slice(0, 4).every(finite)) continue;
         result.ohlc.push({ x: i + (finite(o.offset) ? clamp(o.offset, -1000, 1000) : 0), open: v[0], high: v[1], low: v[2], close: v[3], candle: style === 'candle', color: color(o.color, '#2962ff'), wickcolor: color(o.wickcolor ?? o.color, '#2962ff'), bordercolor: color(o.bordercolor ?? o.color, '#2962ff') });
       }
     } else if (['background', 'shape', 'char'].includes(style)) {
       for (const d of plot.data.slice(-20000)) {
         const i = index(d.time); if (i === undefined) continue;
         const o = { ...plot.options, ...d.options }, offset = finite(o.offset) ? clamp(o.offset, -1000, 1000) : 0;
+        if(!routed(o)||finite(o.show_last)&&i<candles.length-o.show_last)continue;
         if (style === 'background') { result.backgrounds.push({ x: i + offset, color: color(o.color) }); continue; }
         if (!d.value || typeof d.value === 'number' && !Number.isFinite(d.value) || result.shapes.length >= PINE_VISUAL_LIMITS.objects) continue;
         result.shapes.push({ x: i + offset, y: finite(d.value) ? d.value : candles[i].close, location: location(o.location), style: String(o.shape ?? 'circle').replace(/_/g, ''), char: style === 'char' ? text(o.char) : undefined, text: text(o.text), color: color(o.color, '#2962ff'), textcolor: color(o.textcolor, '#d1d4dc'), size: o.size as string | number | undefined });
@@ -77,7 +86,7 @@ export function normalizePineVisuals(raw: readonly PineRawVisual[] = [], candles
     } else if (['drawing_line', 'drawing_box', 'label', 'table', 'linefill', 'drawing_polyline'].includes(style)) {
       const snapshot = [...plot.data].reverse().find(d => Array.isArray(d.value));
       for (const value of (snapshot?.value as unknown[] ?? []).slice(-PINE_VISUAL_LIMITS.objects)) {
-        const v = object(value); if (v._deleted) continue;
+        const v = object(value); if (v._deleted || !routed({...plot.options,...v})) continue;
         if (style === 'drawing_line' && [v.x1, v.x2, v.y1, v.y2].every(finite)) result.lines.push({ ...v, xloc: xloc(v.xloc), extend: extend(v.extend), color: color(v.color, '#2962ff') } as PineVisualLine);
         if (style === 'drawing_box' && [v.left, v.right, v.top, v.bottom].every(finite)) result.boxes.push({ ...v, xloc: xloc(v.xloc), extend: extend(v.extend) } as PineVisualBox);
         if (style === 'label' && finite(v.x)) result.labels.push({ ...v, y: finite(v.y) ? v.y : NaN, xloc: xloc(v.xloc), yloc: location(v.yloc), color: color(v.color, '#2962ff'), textcolor: color(v.textcolor, '#ffffff') } as PineVisualLabel);
@@ -133,7 +142,16 @@ export class PineVisualLayer implements ISeriesPrimitive<Time> {
   autoscaleInfo(from: Logical, to: Logical) {
     const values: number[] = [];
     const visible = (x1: number, x2 = x1, loc?: string) => { const a = this.logical(x1, loc), b = this.logical(x2, loc); return a !== null && b !== null && Math.max(a, b) >= from && Math.min(a, b) <= to; };
-    for (const item of (this.data.lines ?? []).slice(-PINE_VISUAL_LIMITS.objects)) if (visible(item.x1, item.x2, item.xloc) || item.extend && !item.extend.includes('none')) values.push(item.y1, item.y2);
+    const lineRange=(item:PineVisualLine)=>{
+      const a=this.logical(item.x1,item.xloc),b=this.logical(item.x2,item.xloc);if(a===null||b===null)return;
+      if(a===b){if(a>=from&&a<=to)values.push(item.y1,item.y2);return;}
+      let low=Math.min((from-a)/(b-a),(to-a)/(b-a)),high=Math.max((from-a)/(b-a),(to-a)/(b-a));
+      if(!item.extend?.includes('left')&&!item.extend?.includes('both'))low=Math.max(0,low);
+      if(!item.extend?.includes('right')&&!item.extend?.includes('both'))high=Math.min(1,high);
+      if(low<=high)values.push(item.y1+low*(item.y2-item.y1),item.y1+high*(item.y2-item.y1));
+    };
+    for (const item of (this.data.lines ?? []).slice(-PINE_VISUAL_LIMITS.objects)) lineRange(item);
+    for(const fill of (this.data.linefills??[]).slice(-PINE_VISUAL_LIMITS.objects)){lineRange(fill.a);lineRange(fill.b);}
     for (const item of (this.data.boxes ?? []).slice(-PINE_VISUAL_LIMITS.objects)) if (visible(item.left, item.right, item.xloc)) values.push(item.top, item.bottom);
     for (const item of [...(this.data.labels ?? []), ...(this.data.shapes ?? [])].slice(-PINE_VISUAL_LIMITS.objects)) if (visible(item.x, item.x, item.xloc)) {
       const loc=('yloc' in item?item.yloc:undefined)??('location' in item?item.location:undefined)??'price';
@@ -141,7 +159,9 @@ export class PineVisualLayer implements ISeriesPrimitive<Time> {
       if(loc.includes('abovebar'))values.push(candle?.high??NaN);else if(loc.includes('belowbar'))values.push(candle?.low??NaN);else if(!loc.includes('top')&&!loc.includes('bottom'))values.push(item.y);
     }
     for (const item of (this.data.ohlc ?? []).slice(-20000)) if (visible(item.x)) values.push(item.high, item.low);
-    for (const item of (this.data.polylines ?? []).slice(-PINE_VISUAL_LIMITS.objects)) for (const p of item.points.slice(0, 1000)) if (visible(p.x, p.x, p.xloc)) values.push(p.y);
+    for (const item of (this.data.polylines ?? []).slice(-PINE_VISUAL_LIMITS.objects)) {
+      const points=item.points.slice(0,1000);for(let i=0;i<points.length;i++){const p=points[i];if(visible(p.x,p.x,p.xloc))values.push(p.y);const previous=points[i-1];if(previous&&previous.xloc===p.xloc)lineRange({x1:previous.x,y1:previous.y,x2:p.x,y2:p.y,xloc:p.xloc});}
+    }
     for (const fill of (this.data.fills ?? []).slice(0, PINE_VISUAL_LIMITS.fills)) for (let i=0;i<Math.min(this.candles.length,fill.a.length,fill.b.length);i++) if(visible(i+(fill.offset??0))) values.push(fill.a[i]??NaN,fill.b[i]??NaN);
     let minValue=Infinity,maxValue=-Infinity;for(const value of values)if(finite(value)){minValue=Math.min(minValue,value);maxValue=Math.max(maxValue,value);}
     return minValue===Infinity?null:{priceRange:{minValue,maxValue}};
@@ -206,12 +226,16 @@ export class PineVisualLayer implements ISeriesPrimitive<Time> {
     }
     for (const fill of (this.data.fills ?? []).slice(0, PINE_VISUAL_LIMITS.fills)) {
       const offset = fill.offset ?? 0;
-      for (let i = Math.max(0, from - offset); i < Math.min(fill.a.length - 1, fill.b.length - 1, to - offset); i++) {
-        const values = [fill.a[i], fill.b[i], fill.a[i + 1], fill.b[i + 1]];
-        if (!values.every(finite)) continue; // Never bridge an na gap.
-        const x1 = this.x(i + offset), x2 = this.x(i + 1 + offset), a1 = this.y(values[0]!), b1 = this.y(values[1]!), a2 = this.y(values[2]!), b2 = this.y(values[3]!);
+      let previous:number|null=null;
+      for (let i = 0; i < Math.min(fill.a.length, fill.b.length, to-offset+2); i++) {
+        if(!finite(fill.a[i])||!finite(fill.b[i])){if(!fill.fillGaps)previous=null;continue;}
+        const start=previous;previous=i;if(start===null||i+offset<from-1)continue;
+        const x1 = this.x(start + offset), x2 = this.x(i + offset), a1 = this.y(fill.a[start]!), b1 = this.y(fill.b[start]!), a2 = this.y(fill.a[i]!), b2 = this.y(fill.b[i]!);
         if ([x1, x2, a1, b1, a2, b2].some(v => v === null)) continue;
-        ctx.fillStyle = color(fill.colors[i] ?? fill.colors[0]); ctx.beginPath(); ctx.moveTo(x1!, a1!); ctx.lineTo(x2!, a2!); ctx.lineTo(x2!, b2!); ctx.lineTo(x1!, b1!); ctx.closePath(); ctx.fill();
+        const gradient=fill.gradients?.[start],top=gradient?this.y(gradient.top):null,bottom=gradient?this.y(gradient.bottom):null;
+        if(gradient&&top!==null&&bottom!==null&&top!==bottom){const paint=ctx.createLinearGradient(0,top,0,bottom);paint.addColorStop(0,color(gradient.topColor));paint.addColorStop(1,color(gradient.bottomColor));ctx.fillStyle=paint;}
+        else ctx.fillStyle = color(fill.colors[start] ?? fill.colors[0]);
+        ctx.beginPath(); ctx.moveTo(x1!, a1!); ctx.lineTo(x2!, a2!); ctx.lineTo(x2!, b2!); ctx.lineTo(x1!, b1!); ctx.closePath(); ctx.fill();
       }
     }
     for (const fill of (this.data.linefills ?? []).slice(-PINE_VISUAL_LIMITS.objects)) {

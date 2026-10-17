@@ -38,6 +38,7 @@ import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
 import { PineEditor } from "./PineEditor";
+import { DEFAULT_PINE_DOCK, PINE_DOCK_STORAGE_KEY, normalizePineDock, resizePineDock, type PineDockSettings } from '@/lib/pine-editor-layout';
 import { runPineScript } from "@/lib/pine-script";
 import type { AdvancedPineRun, PineRuntimeContext } from '@/lib/pine-runtime-types';
 import { extractPineBarColors } from '@/lib/pine-visual-layer';
@@ -46,7 +47,7 @@ import { createPineMarketData, pineTimeframe } from '@/lib/pine-market-data';
 import { loadAppliedPineScript, saveAppliedPineScript, type AppliedPineScript } from "@/lib/pine-workspace";
 import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
 import { snapStudyCrosshair } from "@/lib/study-crosshair";
-import { STUDY_LINE_TOOLS, formatStudyValue, locateStudyPane, studyLinePoints, type StudyDrawing } from "@/lib/study-pane-drawings";
+import { STUDY_LINE_TOOLS, formatStudyValue, locateStudyPane, studyLinePoints, studyPaneSeries, type StudyDrawing } from "@/lib/study-pane-drawings";
 import { STUDIES, studyDefaults, studyTitle } from "@/lib/indicator-catalog";
 import { useIndicatorSettings, restoreHiddenStudies } from "@/lib/indicator-settings";
 import { IndicatorSettings } from "./IndicatorSettings";
@@ -60,7 +61,7 @@ import { cachedChartCandles, prependChartCandles, candleBucket, candlesEqual, ne
 import { movingAverageWarmup } from '@/lib/indicator-discovery';
 import { comparisonRequest } from "@/lib/chart-compare";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import type {
   CandlestickData,
@@ -593,6 +594,23 @@ export function MarketChart({
   chartStyleRef.current = chartStyle;
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
   const [pineEditorOpen, setPineEditorOpen] = useState(false);
+  const [pineDockSettings,setPineDockSettings]=useState(DEFAULT_PINE_DOCK);
+  const [pineCanDock,setPineCanDock]=useState(false);
+  const pineWorkspace=useRef<HTMLDivElement>(null);
+  const pineResizePointer=useRef<number|null>(null);
+  useEffect(()=>{
+    const media=window.matchMedia(DESKTOP_CHART_MEDIA),refresh=()=>setPineCanDock(media.matches&&!Capacitor.isNativePlatform());refresh();media.addEventListener('change',refresh);
+    try{setPineDockSettings(normalizePineDock(JSON.parse(localStorage.getItem(PINE_DOCK_STORAGE_KEY)??'null')));}catch{/* A blocked store keeps the default layout. */}
+    return()=>media.removeEventListener('change',refresh);
+  },[]);
+  function changePineDock(update:(current:PineDockSettings)=>PineDockSettings){setPineDockSettings(current=>{const next=normalizePineDock(update(current));try{localStorage.setItem(PINE_DOCK_STORAGE_KEY,JSON.stringify(next));}catch{/* Layout still works without storage. */}return next;});}
+  const pineDock= pineEditorOpen&&pineCanDock?pineDockSettings.layout:undefined;
+  function resizePineEditor(event:ReactPointerEvent<HTMLDivElement>){
+    if(pineResizePointer.current!==event.pointerId||!pineDock||pineDock==='fullscreen')return;
+    const rect=pineWorkspace.current?.getBoundingClientRect();if(!rect)return;
+    const fraction=pineDock==='right'?(rect.right-event.clientX)/Math.max(1,rect.width):(rect.bottom-event.clientY)/Math.max(1,rect.height);
+    changePineDock(current=>resizePineDock(current,pineDock,fraction));
+  }
   const [appliedPine, setAppliedPine] = useState<AppliedPineScript | null>(null);
   const appliedPineRef = useRef<AppliedPineScript | null>(null);
   const [pineStatus, setPineStatus] = useState('');
@@ -1196,7 +1214,7 @@ export function MarketChart({
   }
   function pineRuntimeContext(): PineRuntimeContext {
     const india=['NSE','BSE','MCX'].includes(instrument.exchange);
-    return {symbol:`${instrument.exchange}:${instrument.symbol}`,timeframe:pineTimeframe(timeframe),
+    return {symbol:`${instrument.exchange}:${instrument.symbol}`,timeframe:pineTimeframe(timeframe),replay:replayCandles!==undefined,
       timezone:india?'Asia/Kolkata':'UTC',session:india?(instrument.exchange==='MCX'?'0900-2330':'0915-1530'):'0000-0000',
       tickSize:priceIncrement&&priceIncrement>0?priceIncrement:(india?.05:.01),currency:india?'INR':'USD',
       type:instrument.assetType==='OPTION'?'option':instrument.assetType==='FUTURE'?'futures':instrument.assetType==='INDEX'?'index':instrument.exchange==='DELTA'?'crypto':'stock',pointValue:instrument.assetType==='OPTION'||instrument.assetType==='FUTURE'?undefined:1};
@@ -2015,12 +2033,13 @@ export function MarketChart({
         const time = drawingTimeAtCoordinate(x);
         if (!located || time == null) return null;
         const bundle = studyRenderer.current?.bundles.find(item=>item.id===located.studyId);
-        if (magnetArmed() && bundle?.series[0]) {
+        const paneSeries=studyPaneSeries(bundle);
+        if (magnetArmed() && bundle && paneSeries) {
           const logical=chart.timeScale().coordinateToLogical(x);
-          const point=logical===null?undefined:bundle.series[0].dataByIndex(Math.round(Number(logical)));
+          const point=logical===null?undefined:paneSeries.dataByIndex(Math.round(Number(logical)));
           if(point && 'value' in point && typeof point.value==='number' && Number.isFinite(point.value)) {
             let top=0;for(let i=0;i<bundle.pane;i++)top+=chart.panes()[i].getHeight();
-            const sy=bundle.series[0].priceToCoordinate(point.value),sx=chart.timeScale().timeToCoordinate(point.time);
+            const sy=paneSeries.priceToCoordinate(point.value),sx=chart.timeScale().timeToCoordinate(point.time);
             if(sy!==null&&sx!==null)return {...located,time:Number(point.time),value:point.value,x:sx,y:top+sy};
           }
         }
@@ -2071,7 +2090,7 @@ export function MarketChart({
         for (const line of studyDrawingsRef.current) {
           if (line.hidden) continue;
           const bundle = renderer.bundles.find((item) => item.id === line.studyId);
-          const series = bundle?.series[0];
+          const series = studyPaneSeries(bundle);
           if (!bundle || !series) continue;
           let top = 0;
           for (let pane = 0; pane < bundle.pane; pane += 1) top += chart.panes()[pane]?.getHeight() ?? 0;
@@ -2108,8 +2127,8 @@ export function MarketChart({
       const rsiBundle = () => studyRenderer.current?.bundles.find((bundle) => bundle.id === "rsi");
       const setRsiLastVisible = (visible: boolean) => {
         const bundle = rsiBundle();
-        const line = bundle?.series[0];
-        if (!line || visible !== rsiLastHidden) return;
+        const line = studyPaneSeries(bundle);
+        if (!bundle || !line || visible !== rsiLastHidden) return;
         rsiLastHidden = !visible;
         line.applyOptions({ lastValueVisible: visible && bundle.config.showValue !== false });
       };
@@ -2131,9 +2150,9 @@ export function MarketChart({
       };
       const studyUnderCrosshair = (paneIndex: number | undefined, localY: number) => {
         if (paneIndex == null || paneIndex <= 0) return null;
-        const bundle = studyRenderer.current?.bundles.find((item) => item.pane === paneIndex && item.series[0]);
+        const bundle = studyRenderer.current?.bundles.find((item) => item.pane === paneIndex && studyPaneSeries(item));
         if (!bundle) return null;
-        const value = bundle.series[0].coordinateToPrice(localY);
+        const value = studyPaneSeries(bundle)!.coordinateToPrice(localY);
         if (value == null || !Number.isFinite(value)) return null;
         let top = 0;
         const panes = chart.panes();
@@ -2141,8 +2160,8 @@ export function MarketChart({
         return { studyId: bundle.id, value, y: top + localY };
       };
       const moveTrackedCursor = (point: { x: number; y: number; pane: number }) => {
-        const bundle = studyRenderer.current?.bundles.find(item => item.pane === point.pane && item.series[0]);
-        const line = point.pane === 0 ? series : bundle?.series[0];
+        const bundle = studyRenderer.current?.bundles.find(item => item.pane === point.pane && studyPaneSeries(item));
+        const line = point.pane === 0 ? series : studyPaneSeries(bundle);
         let top = 0;
         for (let i = 0; i < point.pane; i += 1) top += chart.panes()[i]?.getHeight() ?? 0;
         const time = chart.timeScale().coordinateToTime(point.x), raw = line?.coordinateToPrice(point.y - top);
@@ -2488,7 +2507,7 @@ export function MarketChart({
               const line=studyDrawingsRef.current.find(item=>item.id===hit)!;
               const bundle=studyRenderer.current?.bundles.find(item=>item.id===line.studyId);
               let top=0;for(let i=0;i<(bundle?.pane??0);i++)top+=chart.panes()[i].getHeight();
-              const distance=(key:'a'|'b')=>{const x=chart.timeScale().timeToCoordinate(line[key].time as UTCTimestamp),y=bundle?.series[0].priceToCoordinate(line[key].value);return x==null||y==null?Infinity:Math.hypot(x-study.x,top+y-study.y);};
+              const distance=(key:'a'|'b')=>{const x=chart.timeScale().timeToCoordinate(line[key].time as UTCTimestamp),y=studyPaneSeries(bundle)?.priceToCoordinate(line[key].value);return x==null||y==null?Infinity:Math.hypot(x-study.x,top+y-study.y);};
               studyEdit={pointerId:event.pointerId,original:line,start:{x:study.x,y:study.y,value:study.value},clientX:event.clientX,clientY:event.clientY,moved:false,anchor:wasSelected?(distance('a')<22?'a':distance('b')<22?'b':null):null};
               chart.applyOptions(chartInteractionOptions(false,preservePageScroll));host.setPointerCapture?.(event.pointerId);
             }
@@ -2551,7 +2570,7 @@ export function MarketChart({
             if(hit&&(!draft || hit.studyId===draft.studyId)) {
               studyAimRef.current=hit;
               const bundle=studyRenderer.current?.bundles.find(item=>item.id===hit.studyId);
-              if(bundle?.series[0])chart.setCrosshairPosition(hit.value,hit.time as UTCTimestamp,bundle.series[0]);
+              const paneSeries=studyPaneSeries(bundle);if(paneSeries)chart.setCrosshairPosition(hit.value,hit.time as UTCTimestamp,paneSeries);
               refreshDrawingCrosshair();
               setStudyCursor({y:hit.y,text:formatStudyValue(hit.value),color:rsiCursorColor(hit.studyId)});
               if(draft)setStudyDrawings([...studyDrawingsRef.current,{...draft,id:'draft',b:{time:hit.time,value:hit.value}}]);
@@ -3638,7 +3657,7 @@ export function MarketChart({
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "prior-levels", "anchored-vwap", "psbb"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
   return (
-    <div className="chart-stack lightweight-stack" data-desktop-tools={desktopTools} data-data-window={desktopTools&&dataWindowOpen} data-chart-theme={chartTheme}>
+    <div ref={pineWorkspace} className="chart-stack lightweight-stack" data-desktop-tools={desktopTools} data-data-window={desktopTools&&dataWindowOpen} data-chart-theme={chartTheme} data-pine-dock={pineDock} style={pineDock?{'--pine-dock-size':`${(pineDock==='right'?pineDockSettings.right:pineDockSettings.bottom)*100}%`} as CSSProperties:undefined}>
       {desktopTools&&dataWindowOpen&&<ChartDataWindow snapshot={chartDataSnapshot(dataRef.current,hoveredCandle?.scope===legendScope?hoveredCandle.time:null,(studyRenderer.current?.bundles??[]).map(bundle=>({id:bundle.id,title:bundle.id==='script'?appliedPine?.name??'Pine script':studyTitle(bundle.id,bundle.config),result:bundle.result})))} symbol={instrument.symbol} timeframe={timeframe} timezone={['NSE','BSE','MCX'].includes(instrument.exchange)?'Asia/Kolkata':'UTC'} hovered={hoveredCandle?.scope===legendScope&&hoveredCandle.time!=null} onClose={()=>setDataWindowOpen(false)}/>}
       {desktopTools&&chartSettingsOpen&&<DesktopChartSettingsDialog palette={currentCanvasPalette()} onClose={()=>setChartSettingsOpen(false)} theme={chartTheme} symbol={instrument.symbol} chartStyle={chartStyle}/>}
       <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={event => { if (event.pointerType !== 'touch') setPriceCursor(null); }}>
@@ -3662,7 +3681,6 @@ export function MarketChart({
           {onRemoveIndicator&&<button aria-label="Remove indicator" title="Remove" onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={15}/></button>}
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
-        {pineEditorOpen && <PineEditor key={`${advancedPine}:${instrument.instrumentKey}:${timeframe}`} advanced={advancedPine} onRun={previewAdvancedPine} onCancelRun={()=>pinePreview.current?.abort()} candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>{pinePreview.current?.abort();setPineEditorOpen(false);}} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {editingDrawing && <DrawingSettings advanced={desktopTools} bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
@@ -3840,6 +3858,13 @@ export function MarketChart({
           </div>
         )}
       </div>
+      {pineDock&&pineDock!=='fullscreen'&&<div className="chart-pine-resizer" role="separator" tabIndex={0} aria-label="Resize Pine Editor" aria-orientation={pineDock==='right'?'vertical':'horizontal'} aria-valuemin={25} aria-valuemax={75} aria-valuenow={Math.round(pineDockSettings[pineDock]*100)}
+        onPointerDown={event=>{event.preventDefault();pineResizePointer.current=event.pointerId;event.currentTarget.setPointerCapture(event.pointerId);}}
+        onPointerMove={resizePineEditor}
+        onPointerUp={event=>{resizePineEditor(event);pineResizePointer.current=null;event.currentTarget.releasePointerCapture(event.pointerId);}}
+        onPointerCancel={()=>{pineResizePointer.current=null;}}
+        onKeyDown={event=>{if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?.25:event.key==='End'?.75:pineDockSettings[pineDock]+(['ArrowLeft','ArrowUp'].includes(event.key)?.025:-.025);changePineDock(current=>resizePineDock(current,pineDock,next));}}/>}
+      {pineEditorOpen&&<div className="chart-pine-editor-host" data-docked={!!pineDock}><PineEditor key={`${advancedPine}:${instrument.instrumentKey}:${timeframe}`} advanced={advancedPine} presentation={pineDock?'docked':'overlay'} layout={pineDockSettings.layout} onLayoutChange={pineCanDock?layout=>changePineDock(current=>({...current,layout})):undefined} onRun={previewAdvancedPine} onCancelRun={()=>pinePreview.current?.abort()} candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>{pinePreview.current?.abort();setPineEditorOpen(false);}} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/></div>}
     </div>
   );
 }

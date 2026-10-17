@@ -7,7 +7,7 @@ const output=path.resolve(process.env.PINE_QA_OUTPUT_DIR||'work/pine-browser-qa'
   if(req.url?.startsWith('/api/')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,candles:[],quotes:{}}));return;}
   if(req.url!=='/')return next();
   const css=[...fs.readFileSync('app/layout.tsx','utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([,f])=>fs.readFileSync('app/'+f,'utf8')).join('\n').replace(/@import[^;]+;/g,'');
-  const html=await server.transformIndexHtml('/',`<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}.terminal-shell{display:block!important;height:100dvh}.price-chart-wrap,.price-chart,.chart-stack{height:700px!important}</style><div id="root"></div><script type="module" src="/tests/browser/pine-rebuild.fixture.jsx"></script>`);
+  const html=await server.transformIndexHtml('/',`<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}.terminal-shell{display:block!important;height:100dvh}.chart-stack{height:calc(100dvh - 28px)!important}.price-chart-wrap,.price-chart{height:100%!important}</style><div id="root"></div><script type="module" src="/tests/browser/pine-rebuild.fixture.jsx"></script>`);
   res.setHeader('Content-Type','text/html');res.end(html);
  });}}]});
  await vite.listen();
@@ -18,7 +18,7 @@ const output=path.resolve(process.env.PINE_QA_OUTPUT_DIR||'work/pine-browser-qa'
   await page.goto('http://127.0.0.1:3267');
   await page.waitForFunction(()=>window.qaRenderer?.data.length===160);
   await page.getByRole('button',{name:'Open Pine Editor',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Pine Editor',exact:true});
+  const dialog=page.locator('.pine-editor');
   await dialog.locator('.monaco-editor').waitFor();
   const setSource=async source=>{await dialog.locator('input[type="file"]').setInputFiles({name:'qa-script.pine',mimeType:'text/plain',buffer:Buffer.from(source,'utf8')});await dialog.getByRole('tab',{name:'Editor',exact:true}).click();await dialog.locator('.monaco-editor').waitFor();};
   await dialog.getByRole('button',{name:'Add to chart',exact:true}).click();
@@ -59,6 +59,7 @@ const output=path.resolve(process.env.PINE_QA_OUTPUT_DIR||'work/pine-browser-qa'
   await dialog.getByRole('tab',{name:'Logs',exact:true}).click();
   assert.match(await dialog.innerText(),/Compiled visuals/);
   await dialog.getByRole('tab',{name:'Editor',exact:true}).click();
+  await dialog.locator('.pine-code-loading').waitFor({state:'hidden'});
   await page.screenshot({path:path.join(output,'pine-rebuilt-editor-light.png')});
   await setSource('//@version=6\nindicator("Invalid")\nplot(');
   await dialog.getByRole('button',{name:'Compile',exact:true}).click();

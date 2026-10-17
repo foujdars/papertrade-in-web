@@ -89,3 +89,26 @@
 @media (min-width:941px) and (hover:hover) and (pointer:fine) {
  .terminal-shell .chart-body:has(.chart-stack[data-data-window="true"])>.chart-floating-favourite {right:328px;}
 }
+
+/* Docking keeps the chart mounted: edits, run results and crosshair inspection
+   share the same workspace instead of hiding the chart behind a modal. */
+.chart-pine-editor-host[data-docked="false"] {display:contents;}
+@media (min-width:941px) and (hover:hover) and (pointer:fine) {
+ .chart-stack[data-pine-dock] {position:relative;min-height:0;overflow:hidden;}
+ .chart-stack[data-pine-dock="bottom"] {display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 6px minmax(0,var(--pine-dock-size,44%));}
+ .chart-stack[data-pine-dock="right"] {display:grid;grid-template-columns:minmax(0,1fr) 6px minmax(0,var(--pine-dock-size,48%));grid-template-rows:minmax(0,1fr);}
+ .chart-stack[data-pine-dock]>.price-chart-wrap {grid-row:1;grid-column:1;min-width:0;min-height:0;width:100%;height:100%;}
+ .chart-stack[data-pine-dock]>.chart-pine-editor-host {min-width:0;min-height:0;overflow:hidden;background:var(--chart-data-bg,#fff);z-index:14;}
+ .chart-stack[data-pine-dock="bottom"]>.chart-pine-editor-host {grid-column:1;grid-row:3;}
+ .chart-stack[data-pine-dock="right"]>.chart-pine-editor-host {grid-column:3;grid-row:1;}
+ .chart-pine-resizer {position:relative;background:var(--chart-data-line,#e0e3eb);touch-action:none;z-index:15;outline:none;}
+ .chart-pine-resizer:hover,.chart-pine-resizer:focus-visible {background:#2962ff;}
+ .chart-pine-resizer::after {content:"";position:absolute;background:var(--chart-data-muted,#787b86);border-radius:2px;}
+ .chart-stack[data-pine-dock="bottom"]>.chart-pine-resizer {grid-column:1;grid-row:2;cursor:row-resize;}
+ .chart-stack[data-pine-dock="bottom"]>.chart-pine-resizer::after {height:2px;width:38px;left:calc(50% - 19px);top:2px;}
+ .chart-stack[data-pine-dock="right"]>.chart-pine-resizer {grid-column:2;grid-row:1;cursor:col-resize;}
+ .chart-stack[data-pine-dock="right"]>.chart-pine-resizer::after {width:2px;height:38px;top:calc(50% - 19px);left:2px;}
+ .chart-stack[data-pine-dock="fullscreen"]>.price-chart-wrap {visibility:hidden;pointer-events:none;}
+ .chart-stack[data-pine-dock="fullscreen"]>.chart-pine-editor-host {position:absolute;inset:0;}
+ .chart-stack[data-pine-dock]>.desktop-chart-data {z-index:17;box-shadow:-4px 0 14px #0002;}
+}

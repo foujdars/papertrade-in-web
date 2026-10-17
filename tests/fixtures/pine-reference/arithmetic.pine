@@ -1,0 +1,6 @@
+//@version=6
+indicator("Independent arithmetic reference")
+plot(ta.sma(close, 3), "SMA 3")
+plot(ta.ema(close, 3), "EMA 3")
+plot(close[1], "Previous close")
+plot(ta.rsi(close, 3), "RSI 3")

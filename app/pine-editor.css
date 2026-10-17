@@ -330,3 +330,84 @@ html[data-theme=neon] .pine-editor,body[data-theme=neon] .pine-editor,.pine-edit
  .pine-editor[data-advanced=true] .pine-diagnostics {padding-block:4px;max-height:42px;}
  .pine-editor[data-advanced=true] .pine-footer {padding-block:4px;min-height:52px;}
 }
+
+/* Chart-attached script workbench, measured against the public Pine editor controls. */
+.pine-editor[data-advanced=true][data-presentation=docked] {width:100%;height:100%;min-width:0;min-height:0;border:0;border-radius:0;box-shadow:none;}
+.pine-editor[data-advanced=true] .pine-compact-heading {padding:0 12px;min-height:35px;height:35px;gap:12px;flex-shrink:0;}
+.pine-editor[data-advanced=true] .pine-compact-heading h2 {font-size:12px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:7px;margin:0;}
+.pine-compact-heading h2>span {font-size:17px;color:#2962ff;}
+.pine-heading-context {font-size:10px;color:var(--pine-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pine-editor[data-advanced=true] .pine-layout-controls {display:flex;gap:2px;margin-left:auto;flex:none;}
+.pine-editor[data-advanced=true] .pine-layout-controls button {padding:3px 7px;min-width:28px;min-height:28px;font-size:15px;border:0;}
+.pine-editor[data-advanced=true] .pine-layout-controls button[aria-pressed=true] {background:#2962ff18;color:#2962ff;}
+.pine-actionbar {position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;min-height:44px;border-bottom:1px solid var(--pine-line);flex-shrink:0;background:var(--pine-panel);z-index:20;}
+.pine-script-title {display:flex;align-items:center;gap:4px;min-width:80px;flex:1;max-width:440px;}
+.pine-editor[data-advanced=true] .pine-script-title input {border:1px solid transparent;font-size:13px;font-weight:600;padding:4px;min-width:0;width:100%;height:29px;}
+.pine-editor[data-advanced=true] .pine-script-title input:hover {border-color:var(--pine-line);}
+.pine-editor[data-advanced=true] .pine-script-title input:focus {border-color:#2962ff;}
+.pine-editor[data-advanced=true] .pine-script-title button {border:0;font-size:16px;padding:2px 6px;min-height:28px;}
+.pine-unsaved {font-size:8px;color:#2962ff;flex:none;}
+.pine-script-actions {display:flex;gap:6px;flex:none;}
+.pine-editor[data-advanced=true] .pine-script-actions button {min-height:30px;padding:5px 11px;font-size:11px;white-space:nowrap;}
+.pine-editor[data-advanced=true] button.pine-primary {background:#2962ff;border-color:#2962ff;color:#fff;}
+.pine-script-menu {position:absolute;top:calc(100% - 2px);left:12px;width:256px;max-height:calc(100dvh - 150px);overflow:auto;background:var(--pine-panel);border:1px solid var(--pine-line);border-radius:5px;padding:6px;box-shadow:0 6px 20px #0003;z-index:50;}
+.pine-editor[data-advanced=true] .pine-script-menu button {width:100%;display:flex;align-items:center;justify-content:space-between;border:0;min-height:32px;padding:6px 10px;font-size:12px;text-align:left;}
+.pine-script-menu kbd {font:10px inherit;color:var(--pine-muted);}
+.pine-script-menu hr {border:0;border-top:1px solid var(--pine-line);margin:4px -6px;}
+.pine-editor[data-advanced=true] .pine-library {display:none;}
+.pine-editor[data-advanced=true][data-library-open=true] .pine-library {display:block;}
+.pine-editor[data-advanced=true] .pine-workbench-tools {display:flex;border-bottom:1px solid var(--pine-line);min-width:0;flex-shrink:0;}
+.pine-editor[data-advanced=true] .pine-tabs {min-width:0;flex:1;gap:18px;padding-inline:12px;border:0;}
+.pine-editor[data-advanced=true] .pine-tabs button {font-size:11px;min-height:34px;padding:6px 0;white-space:nowrap;}
+.pine-editor[data-advanced=true] .pine-tabs button[aria-selected=true] {border-bottom-color:#2962ff;color:#2962ff;}
+.pine-edit-actions {display:flex;align-items:center;gap:1px;padding:0 6px;border-left:1px solid var(--pine-line);flex-shrink:0;}
+.pine-editor[data-advanced=true] .pine-edit-actions button {padding:2px 6px;min-height:26px;min-width:26px;font-size:16px;border:0;}
+.pine-editor[data-advanced=true] .pine-diagnostics {min-height:26px;padding:5px 12px;max-height:70px;overflow:auto;border-color:var(--pine-line);font-size:10px;flex-shrink:0;}
+.pine-editor[data-advanced=true] .pine-diagnostics p {display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.pine-editor[data-advanced=true] .pine-diagnostics button {white-space:nowrap;padding:2px 6px;min-height:22px;font-size:10px;}
+.pine-statusbar {display:flex;align-items:center;gap:14px;padding:0 12px;min-height:26px;border-top:1px solid var(--pine-line);color:var(--pine-muted);font-size:10px;flex-shrink:0;white-space:nowrap;}
+.pine-draft-state {margin-right:auto;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.pine-statusbar a {color:#2962ff;text-decoration:none;}
+.pine-editor[data-advanced=true] .pine-statusbar button {border:0;border-radius:0;padding:3px 0;min-height:24px;font-size:10px;color:var(--pine-muted);}
+.pine-editor[data-advanced=true] .pine-monaco-wrap,.pine-editor[data-advanced=true] .pine-monaco {height:100%;min-height:80px;}
+.pine-editor[data-advanced=true][data-layout=right] .pine-actionbar {flex-wrap:wrap;}
+.pine-editor[data-advanced=true][data-layout=right] .pine-script-title {max-width:none;flex-basis:100%;}
+.pine-editor[data-advanced=true][data-layout=right] .pine-script-actions {margin-left:auto;}
+.pine-editor[data-advanced=true][data-layout=right] .pine-status-context,.pine-editor[data-advanced=true][data-layout=right] .pine-statusbar>span:last-of-type {display:none;}
+.pine-editor[data-advanced=true][data-layout=right] .pine-edit-actions button:nth-last-child(-n+2) {display:none;}
+@media(max-width:940px),(pointer:coarse) {
+ .pine-editor[data-advanced=true] .pine-compact-heading {min-height:44px;height:44px;padding:0 10px;}
+ .pine-editor[data-advanced=true] .pine-layout-controls button {min-height:40px;min-width:40px;}
+ .pine-editor[data-advanced=true] .pine-actionbar {padding:5px 10px;flex-wrap:wrap;gap:4px;}
+ .pine-editor[data-advanced=true] .pine-script-title {flex-basis:100%;max-width:none;}
+ .pine-editor[data-advanced=true] .pine-script-title input {font-size:16px;height:36px;}
+ .pine-editor[data-advanced=true] .pine-script-title button {min-width:40px;min-height:36px;}
+ .pine-editor[data-advanced=true] .pine-script-actions {width:100%;justify-content:flex-end;}
+ .pine-editor[data-advanced=true] .pine-script-actions button {min-height:38px;font-size:12px;}
+ .pine-editor[data-advanced=true] .pine-tabs {padding-inline:10px;gap:16px;}
+ .pine-editor[data-advanced=true] .pine-tabs button {min-height:40px;font-size:12px;}
+ .pine-editor[data-advanced=true] .pine-edit-actions {padding:0 4px;}
+ .pine-editor[data-advanced=true] .pine-edit-actions button {min-height:40px;min-width:36px;}
+ .pine-editor[data-advanced=true] .pine-edit-actions button:not(:first-child) {display:none;}
+ .pine-editor[data-advanced=true] .pine-statusbar {min-height:30px;padding:0 10px;gap:10px;}
+ .pine-status-context,.pine-statusbar>span:last-of-type {display:none;}
+ .pine-editor[data-advanced=true] .pine-statusbar button {min-height:30px;}
+ .pine-editor[data-advanced=true] .pine-diagnostics {padding:5px 10px;max-height:54px;}
+ .pine-editor[data-advanced=true] .pine-script-menu button {min-height:40px;font-size:13px;}
+ .pine-touch-tools {margin:0;}
+ .pine-touch-tools label {display:flex;align-items:center;gap:8px;flex:1;}
+ .pine-touch-tools input[type=number] {width:100%;}
+ .pine-touch-tools button {min-height:40px!important;}
+ .pine-touch-replace input {width:80px;}
+}
+@media(max-width:380px) {
+ .pine-statusbar>a {font-size:9px;}
+ .pine-statusbar .pine-draft-state {font-size:9px;}
+ .pine-heading-context {display:none;}
+}
+.pine-editor[data-advanced=true] .pine-heading>.pine-layout-controls {flex:0 0 auto;margin-left:auto;}
+.pine-editor[data-advanced=true] .pine-tabs button:not([aria-selected=true]) {border-bottom-color:transparent;}
+.pine-input-group {padding-top:12px;margin:18px 0 12px;border-top:1px solid var(--pine-line);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--pine-muted);}
+.pine-input-group:first-of-type {border-top:0;padding-top:0;}
+.pine-compact-heading h2>svg {color:#2962ff;}
+.pine-editor[data-advanced=true] :is(.pine-layout-controls,.pine-edit-actions,.pine-script-title) button {display:inline-flex;align-items:center;justify-content:center;}

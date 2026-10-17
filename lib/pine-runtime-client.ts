@@ -1,5 +1,5 @@
 import type { Candle } from './market';
-import type { AdvancedPineRun, PineRuntimeContext } from './pine-runtime-types';
+import type { AdvancedPineRun, PineRuntimeContext, PineMarketData } from './pine-runtime-types';
 import { executePineSandbox, type PineDataRequest } from './pine-sandbox';
 
 /** Only this client is imported by UI code. PineTS and generated JavaScript
@@ -11,7 +11,7 @@ export async function runPineInSandbox(
   inputs: Record<string, number | boolean | string> = {},
   context: PineRuntimeContext = {},
   signal?: AbortSignal,
-  requestData?: (request: PineDataRequest) => Promise<Candle[]>,
+  requestData?: (request: PineDataRequest) => Promise<PineMarketData>,
 ): Promise<AdvancedPineRun> {
   if (source.length > 50_000) throw new Error('Script exceeds 50,000 characters.');
   if (candles.length > 20_000) throw new Error('Use at most 20,000 candles per run.');

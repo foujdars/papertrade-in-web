@@ -8,7 +8,7 @@ function mockChart(){
  const all=[];
  const scale={getVisibleLogicalRange:()=>({from:0,to:4}),setVisibleLogicalRange(){}};
  const price={options:()=>({autoScale:true}),getVisibleRange:()=>null,applyOptions(){}};
- const chart={all,timeScale:()=>scale,priceScale:()=>price,removeSeries(s){for(const p of s.primitives)p.detached?.();all.splice(all.indexOf(s),1);},addSeries(type,options,pane){const s={options:()=>options,pane,points:[],levels:[],primitives:[],setData(v){this.points=v;},createPriceLine(v){this.levels.push(v);},attachPrimitive(p){this.primitives.push(p);p.attached?.({chart,series:this,requestUpdate(){}});},applyOptions(v){Object.assign(options,v);}};all.push(s);return s;}};
+ const chart={all,timeScale:()=>scale,priceScale:()=>price,removeSeries(s){all.splice(all.indexOf(s),1);},addSeries(type,options,pane){const s={options:()=>options,pane,points:[],levels:[],primitives:[],setData(v){this.points=v;},createPriceLine(v){this.levels.push(v);},attachPrimitive(p){this.primitives.push(p);p.attached?.({chart,series:this,requestUpdate(){}});},detachPrimitive(p){p.detached?.();this.primitives=this.primitives.filter(item=>item!==p);},applyOptions(v){Object.assign(options,v);}};all.push(s);return s;}};
  scale.timeToCoordinate=t=>(t-1700000000)/60*20;scale.logicalToCoordinate=i=>i*20;scale.coordinateToLogical=x=>x/20;
  return chart;
 }
@@ -64,4 +64,62 @@ test('hline-only advanced panes combine levels and outlying drawings, while scre
  const fillOnly={...screenOnly,visuals:[{key:'A',title:'A',options:{display:'none'},data:candles.map(c=>({time:c.time*1000,value:5}))},{key:'B',title:'B',options:{display:'none'},data:candles.map(c=>({time:c.time*1000,value:15}))},{key:'F',title:'Fill',options:{style:'fill',plot1:'A',plot2:'B',color:'#f00'},data:[]}]};
  r.sync({}, {}, '1m',candles,{result:fillOnly});
  assert.deepEqual(r.bundles[0].series[0].options().autoscaleInfoProvider().priceRange,{minValue:5,maxValue:15},'hidden source plots still provide fill-only price extents');
+});
+
+test('Pine area colors fill to histbase, steps keep their shape, and br styles preserve na gaps',()=>{
+ const chart=mockChart(),r=new ChartStudyRenderer(chart,t=>t),values=[10,NaN,30,...Array(22).fill(35)];
+ const plot=(name,style)=>({name,style,values,colors:values.map((_,i)=>i===0?'#2962ff80':'#f2364540'),histbase:7,width:2});
+ r.sync({}, {}, '1m',candles,{result:result({levels:[],plots:[plot('Area','area'),plot('Broken area','areabr'),plot('Steps','stepline'),plot('Broken line','linebr')]})});
+ const [area,brokenArea,steps,brokenLine]=r.bundles[0].series;
+ assert.deepEqual(area.options().baseValue,{type:'price',price:7});
+ assert.equal(area.options().topFillColor1,'#2962ff80');assert.equal(area.options().bottomFillColor2,'#2962ff80');
+ assert.deepEqual(area.options().autoscaleInfoProvider(()=>({priceRange:{minValue:10,maxValue:35}})),{priceRange:{minValue:7,maxValue:35}},'area includes the explicit histbase in its scale');
+ assert.equal(brokenArea.options().autoscaleInfoProvider,undefined,'areabr scales plotted values without the area baseline');
+ assert.equal(area.points[1].topLineColor,'#f2364540');assert.equal(area.points[1].bottomFillColor1,'#f2364540');
+ assert.equal(area.points.length,24);assert.equal(steps.points.length,24);
+ assert.equal(brokenArea.points.length,25);assert.equal(brokenLine.points.length,25);
+ assert.deepEqual(brokenLine.points[1],{time:candles[1].time});
+ assert.equal(steps.options().lineType,1,'Lightweight Charts WithSteps enum');
+});
+
+test('force_overlay sends plots and objects to main price scale without moving the oscillator pane',()=>{
+ const chart=mockChart(),r=new ChartStudyRenderer(chart,t=>t);
+ const plot=(name,value,forceOverlay)=>({name,values:candles.map(()=>value),forceOverlay});
+ const script=result({levels:[],plots:[plot('Oscillator',50,false),plot('Price EMA',110,true)],strategy:null,visuals:[
+  {key:'labels',options:{style:'label'},data:[{time:0,value:[{x:1,y:55,text:'Pane'},{x:1,y:110,text:'Price',force_overlay:true}]}]},
+  {key:'bg',options:{style:'background',force_overlay:true,color:'#2962ff20'},data:[{time:candles[0].time*1000,value:true}]}
+ ]});
+ r.sync({}, {},'1m',candles,{result:script});const bundle=r.bundles[0];
+ assert.equal(bundle.pane,1);assert.deepEqual(bundle.seriesPanes,[1,0]);
+ assert.deepEqual(bundle.pine.data.labels.map(v=>v.text),['Pane']);assert.deepEqual(bundle.pineOverlay.data.labels.map(v=>v.text),['Price']);
+ assert.equal(bundle.pine.data.backgrounds.length,0);assert.equal(bundle.pineOverlay.data.backgrounds.length,1);
+ const oldPane=bundle.pine,oldOverlay=bundle.pineOverlay;
+ r.sync({}, {},'1m',candles,{result:{...script,plots:[plot('Oscillator',20,false)],visuals:[]}});
+ assert.deepEqual(oldPane.data,{});assert.deepEqual(oldOverlay.data,{});assert.equal(oldOverlay.chart,undefined);
+ assert.equal(r.bundles[0].pineOverlay.data.labels.length,0,'recompile must remove old main-pane objects');
+});
+
+test('Pine crosses are drawn as crosses; histogram baseline, tracking and show_last reach chart series',()=>{
+ const chart=mockChart(),r=new ChartStudyRenderer(chart,t=>t);
+ r.sync({}, {},'1m',candles,{result:result({levels:[],visuals:[],strategy:null,plots:[
+  {name:'Cross',style:'cross',values:candles.map(()=>20),colors:candles.map(()=> '#f00'),points:true,width:3,showLast:2},
+  {name:'Histogram',style:'histogram',histogram:true,histbase:12,trackPrice:true,values:candles.map(()=>30)}
+ ]})});
+ const bundle=r.bundles[0],cross=bundle.series[0],histogram=bundle.series[1];
+ assert.equal(cross.options().lineVisible,false);assert.equal(cross.options().pointMarkersVisible,false);
+ assert.equal(cross.points.length,2);assert.deepEqual(bundle.pine.data.shapes.map(s=>[s.style,s.x]),[['cross',23],['cross',24]]);
+ assert.equal(histogram.options().base,12);assert.equal(histogram.options().priceLineVisible,true);
+});
+
+test('forced drawings alone scale the price pane without using transparent candle prices in script pane',()=>{
+ const chart=mockChart(),r=new ChartStudyRenderer(chart,t=>t);
+ r.sync({}, {},'1m',candles,{result:result({plots:[],levels:[],strategy:null,visuals:[{key:'boxes',options:{style:'drawing_box'},data:[{time:0,value:[{left:0,right:3,top:200,bottom:180,force_overlay:true}]}]}]})});
+ const bundle=r.bundles[0];assert.equal(bundle.series[0].options().autoscaleInfoProvider(),null);
+ assert.deepEqual(bundle.series[1].options().autoscaleInfoProvider(),{priceRange:{minValue:180,maxValue:200}});
+});
+
+test('Pine horizontal levels preserve their width and dash style',()=>{
+ const chart=mockChart(),r=new ChartStudyRenderer(chart,t=>t);
+ r.sync({}, {},'1m',candles,{result:result({plots:[],levels:[20,50],levelStyles:[{price:20,title:'Support',color:'#f00',width:3,style:'dotted'},{price:50,title:'Mid',color:'#00f',width:2,style:'solid'}]})});
+ assert.deepEqual(r.bundles[0].series[0].levels.map(l=>[l.price,l.lineWidth,l.lineStyle]),[[20,3,1],[50,2,0]]);
 });
