@@ -5,13 +5,13 @@ export const TECHNICAL_FRAMES = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "3
 export type TechnicalFrame = keyof typeof TECHNICAL_FRAMES;
 export const TECHNICAL_FAMILIES = { ema: "EMA", sma: "SMA", vwap: "Session VWAP", rsi: "RSI", macd: "MACD", supertrend: "Supertrend", bollinger: "Bollinger Bands", previousDay: "Previous-day levels", volume: "Volume", psbb: "PSBB divergence", price: "Price level" } as const;
 export type TechnicalFamily = keyof typeof TECHNICAL_FAMILIES;
-export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number; delivery?: "device" | "server" };
-export type TechnicalRule = TechnicalConfig & { id: string; revision: string; instrument: Instrument; createdAt: number; armedAt: number; expiresAt: number; status: "active" | "paused" | "completed" | "expired"; lastBar?: number; lastTriggeredAt?: number };
+export type TechnicalConfig = { family: TechnicalFamily; timeframe: TechnicalFrame; condition: string; period: number; slow: number; signal: number; threshold: number; multiplier: number; repeat: "once" | "repeat"; cooldown: number; days: number; delivery?: "device" | "server"; alertName?: string; message?: string };
+export type TechnicalRule = TechnicalConfig & { id: string; revision: string; instrument: Instrument; createdAt: number; armedAt: number; expiresAt: number; status: "active" | "paused" | "completed" | "expired"; lastBar?: number; lastTriggeredAt?: number; lastQuotePrice?: number; lastQuoteAt?: number };
 export type TechnicalEvent = { id: string; ruleId: string; instrument: Instrument; timeframe: TechnicalFrame; description: string; barTime: number; createdAt: number; price: number; detail: string; kind: "trigger" | "expired" };
 export type TechnicalStore = { version: 1; rules: TechnicalRule[]; events: TechnicalEvent[] };
 export const emptyTechnicalStore = (): TechnicalStore => ({ version: 1, rules: [], events: [] });
 export function technicalChoices(family: TechnicalFamily) {
-  if (family === "price") return [{ value: "above", label: "Price at or above" }, { value: "below", label: "Price at or below" }];
+  if (family === "price") return [{ value: "above", label: "Price at or above" }, { value: "below", label: "Price at or below" }, { value: "crossing", label: "Crossing" }, { value: "crossingUp", label: "Crossing up" }, { value: "crossingDown", label: "Crossing down" }];
   if (family === "volume") return [{ value: "spike", label: "Volume spike above average" }, { value: "dry", label: "Volume falls below average" }, { value: "bullish", label: "High-volume bullish close" }, { value: "bearish", label: "High-volume bearish close" }];
   if (family === "ema" || family === "sma") return [{ value: "priceUp", label: "Price crosses above" }, { value: "priceDown", label: "Price crosses below" }, { value: "averageUp", label: "Fast average crosses above slow" }, { value: "averageDown", label: "Fast average crosses below slow" }];
   if (family === "bollinger") return [{ value: "upperOut", label: "Close breaks above upper band" }, { value: "lowerOut", label: "Close breaks below lower band" }, { value: "upperIn", label: "Returns inside from above" }, { value: "lowerIn", label: "Returns inside from below" }];
@@ -32,8 +32,10 @@ export function technicalConfigError(c: TechnicalConfig): string | null {
   if (!technicalChoices(c.family).some(o => o.value === c.condition)) return "Choose a valid condition.";
   if (![c.period, c.slow, c.signal].every(n => Number.isInteger(n) && n >= 2 && n <= 200)) return "Periods must be whole numbers from 2 to 200.";
   if ((c.family === "macd" || c.condition.startsWith("average")) && c.slow <= c.period) return "The slow period must be greater than the fast period.";
+  if (c.alertName !== undefined && (typeof c.alertName !== "string" || c.alertName.length > 100 || /[\x00-\x1f\x7f]/.test(c.alertName))) return "Alert name must be at most 100 characters without control characters.";
+  if (c.message !== undefined && (typeof c.message !== "string" || c.message.length > 500 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(c.message))) return "Alert message must be at most 500 characters.";
   if (c.family === "price") {
-    if (c.delivery !== "server" || c.repeat !== "once" || c.timeframe !== "1m") return "Price monitoring uses the server, once only, with minute-level checks.";
+    if (c.delivery !== "server" || c.timeframe !== "1m") return "Price monitoring uses the server with minute-level quote checks.";
     if (!Number.isFinite(c.threshold) || c.threshold < .01 || c.threshold > 1e9 || Math.abs(c.threshold * 100 - Math.round(c.threshold * 100)) > .00001) return "Enter a positive alert price with at most two decimal places.";
   } else if (c.family === "psbb") {
     if (!["1m", "5m", "15m", "1H", "1D"].includes(c.timeframe)) return "PSBB divergence alerts use 1m, 5m, 15m, 1H or 1D.";
@@ -46,7 +48,7 @@ export function technicalConfigError(c: TechnicalConfig): string | null {
   return null;
 }
 export function technicalDescription(c: TechnicalConfig) {
-  if (c.family === "price") return `Price ${c.condition === "above" ? "at or above" : "at or below"} ₹${c.threshold.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (c.family === "price") return `Price ${technicalChoices("price").find(o => o.value === c.condition)?.label.replace(/^Price /, "").toLowerCase() ?? c.condition} ₹${c.threshold.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (c.family === "volume") return `Volume (${c.period} prior bars · ${c.multiplier}×) · ${technicalChoices(c.family).find(o => o.value === c.condition)?.label ?? ""}`;
   const name = TECHNICAL_FAMILIES[c.family];
   const parameters = ["ema", "sma"].includes(c.family) ? `${c.period}${c.condition.startsWith("average") ? ` / ${c.slow}` : ""}` : c.family === "rsi" || c.family === "psbb" ? `${c.period} · ${c.threshold}` : c.family === "macd" ? `${c.period}, ${c.slow}, ${c.signal}` : ["supertrend", "bollinger"].includes(c.family) ? `${c.period}, ${c.multiplier}` : "";
@@ -86,13 +88,24 @@ export function validTechnicalCandles(input: Candle[]) {
   return [...new Map(input.filter(c => c && [c.time, c.open, c.high, c.low, c.close, c.volume].every(Number.isFinite) && c.time > 0 && c.low > 0 && c.volume >= 0 && c.high >= Math.max(c.open, c.close, c.low) && c.low <= Math.min(c.open, c.close)).map(c => [c.time, c])).values()].sort((a, b) => a.time - b.time);
 }
 export type TechnicalEvaluation = { state: string; barTime?: number; end?: number; price?: number; hit?: boolean; detail?: string };
-/** Observed quote only: never infer an intraminute touch from a session high/low. */
+/** Observed quotes only: minute sampling may miss touches between checks. Never infer a touch from session high/low.
+ * Crossings need a persisted earlier observation; repeated above/below fire on entry, including first observed true.
+ * Cooldown consumes suppressed edges: a later poll staying true does not deliver a delayed notification. */
 export function evaluatePriceQuote(rule: TechnicalRule, quote: { lastPrice?: number; lastTradeAt?: string; updatedAt?: string } | undefined, now: number): TechnicalEvaluation {
   const time = Date.parse(quote?.lastTradeAt ?? quote?.updatedAt ?? ""), price = quote?.lastPrice;
   if (!Number.isFinite(time) || time > now || now - time >= 90000 || time <= rule.armedAt || !Number.isFinite(price) || price! <= 0) return { state: "Waiting for a fresh quote after this alert was armed" };
-  return { state: "Watching live quotes · minute-level checks", barTime: time / 1000, end: time / 1000, price,
-    hit: rule.condition === "above" ? price! >= rule.threshold : price! <= rule.threshold,
-    detail: "Fresh price observed by the server; not a candle-close condition" };
+  if (rule.lastQuoteAt !== undefined && time <= rule.lastQuoteAt) return { state: "Waiting for a newer observed quote" };
+  const previous = rule.lastQuotePrice, level = rule.threshold;
+  const hasPrevious = Number.isFinite(previous) && Number.isFinite(rule.lastQuoteAt) && rule.lastQuoteAt! > rule.armedAt;
+  // Touching the level counts as arriving; departing equality does not count again.
+  const up = hasPrevious && previous! < level && price! >= level;
+  const down = hasPrevious && previous! > level && price! <= level;
+  const matches = rule.condition === "above" ? price! >= level : price! <= level;
+  const previouslyMatches = hasPrevious && (rule.condition === "above" ? previous! >= level : previous! <= level);
+  const hit = rule.condition === "crossing" ? up || down : rule.condition === "crossingUp" ? up : rule.condition === "crossingDown" ? down : matches && (rule.repeat === "once" || !previouslyMatches);
+  return { state: "Watching live quotes · minute-level checks", barTime: time / 1000, end: time / 1000, price, hit,
+    detail: rule.message || "Fresh price observed by the server; not a candle-close condition" };
+
 }
 export function evaluateTechnical(rule: TechnicalConfig, raw: Candle[], daily: Candle[], nowMs: number): TechnicalEvaluation {
   if (rule.family === "price") return { state: "Price alerts require the server quote monitor" };
@@ -159,7 +172,7 @@ export function evaluateTechnical(rule: TechnicalConfig, raw: Candle[], daily: C
 /** Pure atomic transition: the persisted cursor prevents duplicate delivery across refreshes/tabs. */
 export function advanceTechnical(rule: TechnicalRule, evaluation: TechnicalEvaluation, now: number): { rule: TechnicalRule; event?: TechnicalEvent } {
   if (rule.status !== "active" || rule.expiresAt <= now || evaluation.barTime === undefined || evaluation.end === undefined || evaluation.price === undefined || (rule.lastBar ?? 0) >= evaluation.barTime) return { rule };
-  const next = { ...rule, lastBar: evaluation.barTime };
+  const next = { ...rule, lastBar: evaluation.barTime, ...(rule.family === "price" ? { lastQuotePrice: evaluation.price, lastQuoteAt: evaluation.end * 1000 } : {}) };
   if (!evaluation.hit || evaluation.end * 1000 <= rule.armedAt || now - evaluation.end * 1000 > 180000 || (rule.lastTriggeredAt && now - rule.lastTriggeredAt < rule.cooldown * 60000)) return { rule: next };
   const event: TechnicalEvent = { id: `technical:${rule.id}:${rule.revision}:${evaluation.barTime}`, ruleId: rule.id, instrument: rule.instrument, timeframe: rule.timeframe, description: technicalDescription(rule), barTime: evaluation.barTime, createdAt: now, price: evaluation.price, detail: evaluation.detail ?? "Confirmed at candle close", kind: "trigger" };
   return { rule: { ...next, status: rule.repeat === "once" ? "completed" : "active", lastTriggeredAt: now }, event };

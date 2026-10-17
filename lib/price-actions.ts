@@ -1,5 +1,6 @@
 import type { Instrument } from "./market";
-export type PriceRequest = { instrument: Instrument; price: number; mode?: "alert" | "order"; side?: "BUY" | "SELL"; orderType?: "Market" | "Limit" | "SL"; quantity?: number; product?: "DELIVERY" | "INTRADAY" };
+export type DrawingAlertSource = { id: string; type: "horizontal-ray" | "horizontal-line"; text?: string };
+export type PriceRequest = { instrument: Instrument; price: number; mode?: "alert" | "order"; drawing?: DrawingAlertSource; side?: "BUY" | "SELL"; orderType?: "Market" | "Limit" | "SL"; quantity?: number; product?: "DELIVERY" | "INTRADAY" };
 export type PriceTask = {
   id: string; instrument: Instrument; kind: "alert" | "order"; price: number;
   condition: "above" | "below"; side: "BUY" | "SELL"; orderType: "Market" | "Limit" | "SL";

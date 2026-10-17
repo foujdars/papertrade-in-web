@@ -5,7 +5,7 @@ import { DrawingActionBar } from "./DrawingActionBar";
 import { drawingTitle } from "@/lib/drawing-editing";
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import type { ChartStudyRenderer } from "@/lib/chart-study-renderer";
-import { studyLinePoints, drawingLineTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
+import { drawingVisibleOnTimeframe, studyLinePoints, drawingLineTextPosition, drawingTextVisible, type StudyDrawing } from "@/lib/study-pane-drawings";
 
 function paneTop(chart: IChartApi, index: number) {
   let top = 0;
@@ -13,7 +13,8 @@ function paneTop(chart: IChartApi, index: number) {
   return top;
 }
 
-export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selectedId, refreshRef, onAction, onDone, onSettings, disabled = false }: {
+export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selectedId, refreshRef, onAction, onDone, onSettings, timeframe, disabled = false }: {
+  timeframe?: string;
   chart: IChartApi | null;
   studyRenderer: MutableRefObject<ChartStudyRenderer | null>;
   drawings: StudyDrawing[];
@@ -57,7 +58,7 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
     return { x, y: y + paneTop(chart, bundle.pane), top: paneTop(chart, bundle.pane), paneHeight: pane.getHeight() };
   };
   let toolbar: { x: number; y: number } | null = null;
-  const selected = selectedId ? drawings.find((line) => line.id === selectedId) : undefined;
+  const selected = selectedId ? drawings.find((line) => line.id === selectedId && !line.hidden && drawingVisibleOnTimeframe(line.presentation,timeframe)) : undefined;
   if (selected) {
     const from = point(selected.studyId, selected.a);
     const to = point(selected.studyId, selected.b);
@@ -72,22 +73,23 @@ export function StudyPaneLayer({ chart, studyRenderer, drawings, cursor, selecte
     <svg className="chart-study-drawings" width={width} height={height} aria-hidden="true">
     {cursor && !cursor.color && <line className="chart-study-crosshair" x1={0} y1={cursor.y} x2={width} y2={cursor.y} />}
     {drawings.map((line) => {
+      if (line.hidden || !drawingVisibleOnTimeframe(line.presentation,timeframe)) return null;
       const from = point(line.studyId, line.a);
       const to = point(line.studyId, line.b);
       if (!from || !to) return null;
       const ends = studyLinePoints(line.tool, from.x, from.y, to.x, to.y, width, from.top, from.paneHeight, line.presentation);
       const selectedLine = line.id === selectedId;
       const label = drawingLineTextPosition(line.tool,from,to,width,line.presentation);
-      const text = line.presentation?.text && drawingTextVisible(line.tool, from, label, width, height) && <text x={label.x} y={label.y} textAnchor={label.anchor} fill={line.presentation?.color ?? "#8054da"} fontSize={12} style={{paintOrder:"stroke",stroke:"var(--surface,#fff)",strokeWidth:3,strokeLinejoin:"round"}}>{line.presentation.text}</text>;
+      const text = line.presentation?.textEnabled !== false && line.presentation?.text && drawingTextVisible(line.tool, from, label, width, height) && <text x={label.x} y={label.y} textAnchor={label.anchor} fill={line.presentation?.textColor ?? line.presentation?.color ?? "#8054da"} opacity={(line.presentation?.textOpacity ?? 100)/100} fontSize={line.presentation?.fontSize ?? 12} fontWeight={line.presentation?.bold ? "bold" : "normal"} fontStyle={line.presentation?.italic ? "italic" : "normal"} style={{paintOrder:"stroke",stroke:"var(--surface,#fff)",strokeWidth:3,strokeLinejoin:"round"}}>{line.presentation.text}</text>;
       const clip = `study-clip-${clipPrefix}-${line.id}`;
       const wrap = (shape: React.ReactNode) => <g key={line.id}><defs><clipPath id={clip}><rect x={0} y={from.top} width={width} height={from.paneHeight}/></clipPath></defs><g clipPath={`url(#${clip})`}>{shape}{text}{selectedLine && <>{[from,to].map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="white" stroke="#8054da"/>)}</>}</g></g>;
       if (!ends) {
         const x = line.presentation?.extendLeft ? 0 : Math.min(from.x, to.x);
         const right = line.presentation?.extendRight ? width : Math.max(from.x,to.x);
         const y = Math.min(from.y, to.y);
-        return wrap(<rect className={selectedLine ? "selected" : undefined} style={{stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
+        return wrap(<rect className={selectedLine ? "selected" : undefined} style={{opacity:(line.presentation?.opacity ?? 100)/100,stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x={x} y={y} width={right-x} height={Math.abs(to.y - from.y)} />);
       }
-      return wrap(<line className={selectedLine ? "selected" : undefined} style={{stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
+      return wrap(<line className={selectedLine ? "selected" : undefined} style={{opacity:(line.presentation?.opacity ?? 100)/100,stroke:line.presentation?.color,strokeWidth:line.presentation?.lineWidth,strokeDasharray:line.presentation?.lineDash?.join(" ")}} x1={ends.x1} y1={ends.y1} x2={ends.x2} y2={ends.y2} />);
     })}
     </svg>
     {cursor && <b className="chart-oscillator-tag" style={{ top: cursor.y, left: width, background: cursor.color, color: cursor.color ? "#fff" : undefined }}>{cursor.text}</b>}

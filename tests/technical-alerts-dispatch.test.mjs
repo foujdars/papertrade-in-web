@@ -185,3 +185,14 @@ test('delivery test honours expiry, opt-out and uncertain transport without blin
     assert.equal(state.sent.length,scenario==='failed'?1:0);
   }
 });
+
+
+test('server persists crossing baseline without notification then delivers one durable crossing',async t=>{
+ reset(t,{family:'price',threshold:105,condition:'crossingUp',timeframe:'1m',repeat:'repeat',alertName:'Breakout ray',message:'Review resistance'});
+ state.quotes[instrument.instrumentKey]={lastPrice:104,lastTradeAt:new Date(now-2000).toISOString()};
+ await dispatch();assert.equal(read().events.length,0);assert.equal(read().rules[0].lastQuotePrice,104);
+ state.quotes[instrument.instrumentKey]={lastPrice:105,lastTradeAt:new Date(now-1000).toISOString()};
+ await Promise.all([dispatch(),dispatch()]);assert.equal(read().events.length,1);assert.equal(state.sent.length,1);assert.equal(read().rules[0].status,'active');
+ await dispatch();assert.equal(state.sent.length,1);
+ assert.equal(state.sent[0].notice.title,'Breakout ray');assert.equal(state.sent[0].notice.body,'Review resistance');
+});

@@ -2,6 +2,7 @@
 import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
 
+import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { CandleLoader } from "./CandleLoader";
 import { Check, Trash2, Settings2, Eye, EyeOff, X } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
@@ -70,7 +71,7 @@ import { exponentialBackoffMs } from "@/lib/reconnect-backoff";
 import { ChartAlertLevels } from "@/components/ChartAlertLevels";
 import { SessionBoard } from "./SessionBoard";
 import { sessionIntervals } from "@/lib/market-sessions";
-import type { PriceTask } from "@/lib/price-actions";
+import type { DrawingAlertSource, PriceTask } from "@/lib/price-actions";
 import { formatCandleChange, selectCandleLegend } from "@/lib/candle-legend";
 import { applyCandleTick, reconcileLiveCandles, validCandleTick, liveCandleBucket, LIVE_INTERVALS as LIVE_TIMEFRAME_SECONDS, type CandleTick } from "@/lib/live-candles";
 
@@ -534,7 +535,7 @@ export function MarketChart({
   onReplayPlay?: () => void;
   replayPrompt?: boolean;
   onOrderSide?: (side: "BUY" | "SELL") => void;
-  onPriceAction?: (price: number, mode: "alert" | "order") => void;
+  onPriceAction?: (price: number, mode: "alert" | "order", drawing?: DrawingAlertSource) => void;
   priceTasks?: PriceTask[];
   onOrderToolChange?: (level: "target" | "stopLoss", value: number, committed: boolean) => void;
   onOrderToolClose?: () => void;
@@ -3419,7 +3420,7 @@ export function MarketChart({
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
-        {editingDrawing && <DrawingSettings key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
+        {editingDrawing && <DrawingSettings bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
           if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id&&!line.locked?{...line,presentation:value,...(points?{a:{time:points[0].time,value:points[0].value},b:{time:(points[1]??points[0]).time,value:(points[1]??points[0]).value}}:{})}:line));
           else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points){item.updateOptions({anchorTimeOffset:usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0} as Partial<DrawingOptions>);item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));}persistDrawings(true);}}
@@ -3443,7 +3444,7 @@ export function MarketChart({
         {indicators.psbb && !studySettings.psbb?.hidden && <PsbbMarks key={`${instrument.instrumentKey}:${timeframe}:psbb`} candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} config={studySettings.psbb} refreshRef={psbbRefreshRef} studyRenderer={studyRenderer} divergenceOnly />}
         {indicators.ema21 && !studySettings.ema21?.hidden && (!studySettings.ema21?.timeframes.length || studySettings.ema21.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && ["DELTA|BTCUSD", "DELTA|ETHUSD", "DELTA|XAUTUSD"].includes(instrument.instrumentKey) && <Ema21EntryMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
         {indicators.ema5 && !studySettings.ema5?.hidden && (!studySettings.ema5?.timeframes.length || studySettings.ema5.timeframes.includes(timeframe)) && (timeframe === "5m" || timeframe === "15m") && instrument.instrumentKey === "DELTA|BTCUSD" && <Ema5ReversalMarks candles={dataRef.current} chart={chartApi.current} series={candleSeries.current} timeframe={timeframe} />}
-        <StudyPaneLayer chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings.filter(line=>!line.hidden)} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} disabled={lockedDrawings} onSettings={id=>openDrawingSettings(id,true)} onAction={(id,action)=>drawingAction(id,true,action)} onDone={()=>{selectedStudyLineRef.current=null;setSelectedStudyLine(null);}} />
+        <StudyPaneLayer timeframe={timeframe} chart={chartApi.current} studyRenderer={studyRenderer} drawings={hiddenDrawings?[]:studyDrawings.filter(line=>!line.hidden)} cursor={studyCursor} selectedId={hiddenDrawings?null:selectedStudyLine} refreshRef={studyPaneRefreshRef} disabled={lockedDrawings} onSettings={id=>openDrawingSettings(id,true)} onAction={(id,action)=>drawingAction(id,true,action)} onDone={()=>{selectedStudyLineRef.current=null;setSelectedStudyLine(null);}} />
         {avwapEnabledRef.current && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Anchored VWAP needs traded volume</div>}
         {avwapEnabledRef.current && hoveredCandle?.scope === legendScope && hoveredCandle.time != null && <button type="button" className="chart-avwap-anchor" style={{ top: 72 }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); if (hoveredCandle.time != null) setAvwapAnchor(hoveredCandle.time); }}>Move VWAP here</button>}
         {chartStyle === "volume-footprint" && dataRef.current.length > 0 && !dataRef.current.some((candle) => candle.volume > 0) && <div className="chart-or-note">Volume footprint needs traded volume</div>}
@@ -3525,7 +3526,7 @@ export function MarketChart({
         {!isReplay && <SessionBoard variant="chip" hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
-        {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <DrawingActionBar title={drawingTitle(drawingManager.current?.getSelectedDrawing()?.type??'drawing')} locked={!!drawingManager.current?.getSelectedDrawing()?.options.locked} disabled={lockedDrawings} position={drawingActions} onSettings={()=>openDrawingSettings(selectedDrawingId,false)} onDuplicate={()=>drawingAction(selectedDrawingId,false,'duplicate')} onLock={()=>drawingAction(selectedDrawingId,false,'lock')} onHide={()=>drawingAction(selectedDrawingId,false,'hide')} onDelete={()=>drawingAction(selectedDrawingId,false,'delete')} onDone={()=>drawingManager.current?.deselectAll()} />}
+        {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <DrawingActionBar title={drawingTitle(drawingManager.current?.getSelectedDrawing()?.type??'drawing')} locked={!!drawingManager.current?.getSelectedDrawing()?.options.locked} disabled={lockedDrawings} position={drawingActions} onSettings={()=>openDrawingSettings(selectedDrawingId,false)} onAlert={!isReplay&&onPriceAction&&isSupportedNseInstrumentKey(instrument.instrumentKey)&&!instrument.instrumentKey.startsWith('MCX_FO|')&&['horizontal-ray','horizontal-line'].includes(drawingManager.current?.getSelectedDrawing()?.type??'')?()=>{const item=drawingManager.current?.getSelectedDrawing();const price=item?.anchors[0]?.price;if(item&&Number.isFinite(price)&&price!>0){drawingManager.current?.deselectAll();onPriceAction(price!,'alert',{id:item.id,type:item.type as DrawingAlertSource['type'],text:(item.options as DrawingPresentation).text});}}:undefined} onDuplicate={()=>drawingAction(selectedDrawingId,false,'duplicate')} onLock={()=>drawingAction(selectedDrawingId,false,'lock')} onHide={()=>drawingAction(selectedDrawingId,false,'hide')} onDelete={()=>drawingAction(selectedDrawingId,false,'delete')} onDone={()=>drawingManager.current?.deselectAll()} />}
         {!candlesOnly && onOrderSide && (
           <div className="chart-quick-order-buttons" aria-label="Paper trade controls">
             <button className={`chart-sell-button ${orderTool?.enabled && orderTool.side === "SELL" ? "active" : ""}`} onClick={() => onOrderSide("SELL")}><span>Sell</span><b>{latestCandle?.close.toFixed(2) ?? "—"}</b></button>

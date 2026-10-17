@@ -1,5 +1,36 @@
+import { CHART_INTERVAL_SECONDS } from "./chart-history.ts";
+
 export type StudyPoint = { time: number; value: number };
-export type DrawingPresentation = { text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean; anchorTimeOffset?: number };
+export type DrawingPresentation = { visibilityMode?: 'all' | 'selected'; opacity?: number; textEnabled?: boolean; textColor?: string; textOpacity?: number; fontSize?: number; bold?: boolean; italic?: boolean; timeframes?: string[]; text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean; anchorTimeOffset?: number };
+/** Preserve library options while validating persisted presentation settings. */
+export function sanitizeDrawingPresentation<T extends DrawingPresentation>(value: T): T {
+  const result = { ...value };
+  const numeric = { opacity: [0,100], textOpacity: [0,100], fontSize: [10,32], lineWidth: [1,8] } as const;
+  for (const key of Object.keys(numeric) as Array<keyof typeof numeric>) {
+    const number = value[key];
+    if (number === undefined) continue;
+    if (typeof number !== 'number' || !Number.isFinite(number)) { delete result[key]; continue; }
+    result[key] = Math.round(Math.max(numeric[key][0], Math.min(numeric[key][1], number)));
+  }
+  for (const key of ['textEnabled','bold','italic','extendLeft','extendRight','userHidden','showPriceLabel'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'boolean') delete result[key];
+  }
+  for (const key of ['color','textColor'] as const) {
+    if (value[key] !== undefined && (typeof value[key] !== 'string' || !/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value[key]!))) delete result[key];
+  }
+  if (value.text !== undefined) { if (typeof value.text === 'string') result.text = value.text.slice(0,1000); else delete result.text; }
+  if (value.timeframes !== undefined) result.timeframes = Array.isArray(value.timeframes) ? [...new Set(value.timeframes.filter((frame): frame is string => typeof frame === 'string' && Object.hasOwn(CHART_INTERVAL_SECONDS, frame)))] : [];
+  if (value.lineDash !== undefined) { if (Array.isArray(value.lineDash) && value.lineDash.length <= 8 && value.lineDash.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100)) result.lineDash = [...value.lineDash]; else delete result.lineDash; }
+  if (value.visibilityMode !== undefined && !['all','selected'].includes(value.visibilityMode)) delete result.visibilityMode;
+  if (value.direction !== undefined && !['left','right'].includes(value.direction)) delete result.direction;
+  if (value.textHorizontal !== undefined && !['left','center','right'].includes(value.textHorizontal)) delete result.textHorizontal;
+  if (value.textVertical !== undefined && !['above','middle','below'].includes(value.textVertical)) delete result.textVertical;
+  if (value.anchorTimeOffset !== undefined && !Number.isFinite(value.anchorTimeOffset)) delete result.anchorTimeOffset;
+  return result;
+}
+export function drawingVisibleOnTimeframe(options: DrawingPresentation = {}, timeframe?: string) {
+  return !options.userHidden && (!timeframe || (options.visibilityMode === 'all' ? true : options.visibilityMode === 'selected' ? !!options.timeframes?.includes(timeframe) : !options.timeframes?.length || options.timeframes.includes(timeframe)));
+}
 export type StudyDrawing = {
   id: string;
   studyId: string;

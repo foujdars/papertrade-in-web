@@ -1,7 +1,7 @@
-export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number; background?: string; anchored?: boolean };
-export type LabelBox = { x: number; y: number; width: number; height: number; fontSize: number; text: string; color?: string; background?: string };
+export type DrawingLabel = { text: string; x: number; y: number; align?: CanvasTextAlign; color?: string; fontSize?: number; background?: string; bold?: boolean; italic?: boolean; opacity?: number; anchored?: boolean };
+export type LabelBox = { bold?: boolean; italic?: boolean; opacity?: number; x: number; y: number; width: number; height: number; fontSize: number; text: string; color?: string; background?: string };
 /** CSS-pixel layout: labels never leave the plot or cover another label in this drawing. */
-export function layoutDrawingLabels(labels: DrawingLabel[], width: number, height: number, measure: (text: string, size: number) => number): LabelBox[] {
+export function layoutDrawingLabels(labels: DrawingLabel[], width: number, height: number, measure: (text: string, size: number, label?: DrawingLabel) => number): LabelBox[] {
   const placed: LabelBox[] = [], padding = 5, top = Math.min(48, height / 5);
   if (width < 24 || height < 24) return placed;
   for (const label of labels) {
@@ -9,16 +9,16 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
     // User text belongs to its chart point. Clip it instead of relocating it
     // to an edge or a collision-free row when the candle moves off-screen.
     if (label.anchored) {
-      const size = label.fontSize ?? 12, w = measure(label.text, size);
+      const size = label.fontSize ?? 12, w = measure(label.text, size, label);
       const offset = label.align === 'center' ? w / 2 : label.align === 'right' || label.align === 'end' ? w : 0;
       if(label.x < 0 || label.x > width || label.y < 0 || label.y > height) continue;
-      placed.push({text:label.text,x:label.x-offset,y:label.y-size,width:w,height:size+5,fontSize:size,color:label.color,background:label.background});
+      placed.push({text:label.text,x:label.x-offset,y:label.y-size,width:w,height:size+5,fontSize:size,color:label.color,background:label.background,bold:label.bold,italic:label.italic,opacity:label.opacity});
       continue;
     }
     const text = label.text.replaceAll("$", "₹");
     let size = label.fontSize ?? 12;
-    while (size > 10 && measure(text, size) > width - padding * 2) size--;
-    const w = Math.min(width - padding * 2, measure(text, size)), h = size + 5;
+    while (size > 10 && measure(text, size, label) > width - padding * 2) size--;
+    const w = Math.min(width - padding * 2, measure(text, size, label)), h = size + 5;
     const offset = label.align === "center" ? w / 2 : label.align === "right" || label.align === "end" ? w : 0;
     const preferred = Math.max(padding, Math.min(width - padding - w, label.x - offset));
     const originY = Math.max(top, Math.min(height - h - padding, label.y - size));
@@ -28,7 +28,7 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
         if (y < top || y + h > height - padding) continue;
         for (const x of [preferred, padding, width - padding - w]) {
           if (placed.some(b => x < b.x + b.width + 4 && x + w + 4 > b.x && y < b.y + b.height + 3 && y + h + 3 > b.y)) continue;
-          result = { text, x, y, width: w, height: h, fontSize: size, color: label.color }; break;
+          result = { text, x, y, width: w, height: h, fontSize: size, color: label.color,bold:label.bold,italic:label.italic,opacity:label.opacity }; break;
         }
         if (result) break;
       }
@@ -41,10 +41,11 @@ export function layoutDrawingLabels(labels: DrawingLabel[], width: number, heigh
 export function paintDrawingLabels(ctx: CanvasRenderingContext2D, labels: DrawingLabel[], width: number, height: number) {
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
-  const layout = layoutDrawingLabels(labels, width, height, (text, size) => { ctx.font = `${size}px sans-serif`; return ctx.measureText(text).width; });
+  const layout = layoutDrawingLabels(labels, width, height, (text, size, label) => { ctx.font = `${label?.italic ? "italic " : ""}${label?.bold ? "bold " : ""}${size}px sans-serif`; return ctx.measureText(text).width; });
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   for (const item of layout) {
-    ctx.font = `${item.fontSize}px sans-serif`; ctx.fillStyle = item.color ?? "#7851c9";
+    ctx.globalAlpha = (item.opacity ?? 100) / 100;
+    ctx.font = `${item.italic ? "italic " : ""}${item.bold ? "bold " : ""}${item.fontSize}px sans-serif`; ctx.fillStyle = item.color ?? "#7851c9";
     if (item.background) {
       ctx.strokeStyle = item.background; ctx.lineWidth = 3; ctx.lineJoin = "round";
       ctx.strokeText(item.text, item.x, item.y, item.width);

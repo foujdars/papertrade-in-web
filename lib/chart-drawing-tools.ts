@@ -8,7 +8,7 @@ import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
-import { drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
+import { sanitizeDrawingPresentation, drawingVisibleOnTimeframe, drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
 import { drawingTimeForFrame } from './drawing-anchor-time.ts';
 import { regressionChannel } from './regression-channel.ts';
 import { CHART_INTERVAL_SECONDS } from './chart-history.ts';
@@ -69,7 +69,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       // Explicit order-tool levels are included separately by MarketChart.
       item.autoscaleInfo = () => null;
       // Native factories only forward their known fields; retain our saved presentation too.
-      if (options) item.updateOptions(options);
+      if (options) item.updateOptions(sanitizeDrawingPresentation(options as DrawingPresentation));
       if (frame && (item.options as DrawingPresentation).anchorTimeOffset === undefined) item.updateOptions({anchorTimeOffset:axisOffset} as Partial<DrawingOptions>);
       if (type === 'vertical-line' && 'setVerticalLineOptions' in item && typeof item.setVerticalLineOptions === 'function') {
         // The native default prints raw Unix seconds. User text is rendered
@@ -85,7 +85,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       };
       syncNativeOptions();
       const updateOptions = item.updateOptions.bind(item);
-      item.updateOptions = options => { updateOptions(options); syncNativeOptions(); };
+      item.updateOptions = options => { updateOptions(sanitizeDrawingPresentation(options as DrawingPresentation)); syncNativeOptions(); };
       if (['horizontal-line','horizontal-ray','trend-line','ray','extended-line','arrow','rectangle'].includes(type)) {
         Object.assign(item, { priceAxisViews: () => item.anchors.filter((anchor, index, all) => all.findIndex(a => a.price === anchor.price) === index).map(anchor => ({
           coordinate: () => Number(item.getViewport()?.priceScale.priceToCoordinate(anchor.price) ?? -100),
@@ -99,7 +99,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           tickVisible: () => true,
           visible: () => {
             const viewport = item.getViewport();
-            if (!viewport || !item.options.visible || !item.isValid() || (item.options as DrawingPresentation).showPriceLabel === false) return false;
+            if (!viewport || !item.options.visible || !drawingVisibleOnTimeframe(item.options as DrawingPresentation, frame?.timeframe) || !item.isValid() || (item.options as DrawingPresentation).showPriceLabel === false) return false;
             const y = viewport.priceScale.priceToCoordinate(anchor.price);
             const x = viewport.timeScale.timeToCoordinate(anchor.time);
             if (y === null || y < 0 || y > viewport.height || x === null) return false;
@@ -119,6 +119,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       const originalGeometry = item.computeGeometry.bind(item);
       item.computeGeometry = (viewport) => {
         const presentation = item.options as DrawingOptions & DrawingPresentation;
+        if (!drawingVisibleOnTimeframe(presentation, frame?.timeframe)) return [];
         let geometry = originalGeometry(viewport);
         if (type === 'rectangle') geometry = geometry.map(shape => {
           if (shape.type !== 'rectangle') return shape;
@@ -126,7 +127,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           const right = presentation.extendRight ? viewport.width : shape.topLeft.x + shape.width;
           return { ...shape, topLeft: { ...shape.topLeft, x: left }, width: Math.max(0, right - left) };
         });
-        if (presentation.text) {
+        if (presentation.text && presentation.textEnabled !== false) {
           const points: Point[] = item.anchors.flatMap(anchor => {
             const candle = type === 'vertical-line' ? candles().find(bar=>bar.time===Number(anchor.time)) : undefined;
             const price = candle ? presentation.textVertical === 'below' ? candle.low : presentation.textVertical === 'middle' ? candle.close ?? (candle.high+candle.low)/2 : candle.high : anchor.price;
@@ -175,8 +176,9 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
         // Preserve specialized shapes (arrowheads, channels, risk/reward, etc.)
         // while normalizing their canvas units and transparent label treatment.
         item.paneViews=()=>nativeViews().map(view=>({zOrder:()=>view.zOrder?.()??"normal",renderer:()=>({draw:target=>target.useMediaCoordinateSpace(scope=>{
-          const viewport=item.getViewport();if(!viewport||!item.options.visible||!item.isValid())return;
+          const viewport=item.getViewport();if(!viewport||!item.options.visible||!drawingVisibleOnTimeframe(item.options as DrawingPresentation,frame?.timeframe)||!item.isValid())return;
           scope.context.save();scope.context.beginPath();scope.context.rect(0,0,viewport.width,viewport.height);scope.context.clip();
+          scope.context.globalAlpha = ((item.options as DrawingPresentation).opacity ?? 100) / 100;
           let labelBox=false;
           const labels: DrawingLabel[] = [];
           const baseTransform=scope.context.getTransform();
@@ -207,14 +209,22 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
           // Native renderers such as VerticalLine draw anchors directly and
           // ignore text in computeGeometry. Paint our text explicitly once.
           const text = (item.options as DrawingPresentation).text;
-          if (text && !labels.some(label => label.text === text)) {
+          if (text && (item.options as DrawingPresentation).textEnabled !== false && !labels.some(label => label.text === text)) {
             const label = item.computeGeometry(viewport).find(shape => shape.type === 'text' && shape.text === text);
-            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:item.style.lineColor,background:plotSize?.().dark?'#0c142b':'#ffffff',anchored:true});
+            if (label?.type === 'text') labels.push({text,x:label.position.x,y:label.position.y,align:label.align??'center',color:(item.options as DrawingPresentation).textColor ?? item.style.lineColor,fontSize:(item.options as DrawingPresentation).fontSize,bold:(item.options as DrawingPresentation).bold,italic:(item.options as DrawingPresentation).italic,opacity:(item.options as DrawingPresentation).textOpacity,background:plotSize?.().dark?'#0c142b':'#ffffff',anchored:true});
           }
+          scope.context.globalAlpha = 1;
           paintDrawingLabels(scope.context,labels,viewport.width,viewport.height);
           scope.context.restore();
         })})}));
       }
+      const nativeHitTest = item.hitTest.bind(item), nativeTestHit = item.testHit.bind(item), nativeControls = item.getControlPoints.bind(item);
+      const shown = () => drawingVisibleOnTimeframe(item.options as DrawingPresentation, frame?.timeframe);
+      const visiblePaneViews = item.paneViews.bind(item);
+      item.paneViews = () => shown() ? visiblePaneViews() : [];
+      item.hitTest = (x,y) => shown() ? nativeHitTest(x,y) : null;
+      item.testHit = (point,viewport) => shown() && nativeTestHit(point,viewport);
+      item.getControlPoints = viewport => shown() ? nativeControls(viewport) : [];
       return item;
     },
   };
