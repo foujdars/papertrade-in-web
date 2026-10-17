@@ -1,43 +1,46 @@
 .page {
-  --legal-ink: var(--app-ink);
-  --legal-muted: var(--app-muted);
-  --legal-line: var(--app-border);
+  --legal-ink: #172033;
+  --legal-muted: #65708a;
+  --legal-line: #e2e6f0;
   min-height: 100vh;
   padding: 32px 24px 0;
   color: var(--legal-ink);
-  background: var(--app-canvas);
+  background:
+    radial-gradient(circle at 10% 0%, #6d5df31a, transparent 30rem),
+    radial-gradient(circle at 95% 10%, #00bfa615, transparent 28rem),
+    #f7f8fc;
 }
 
 .shell { width: min(1040px, 100%); min-height: calc(100vh - 32px); display: flex; flex-direction: column; margin: 0 auto; }
 .brand { width: max-content; display: inline-flex; align-items: center; gap: 11px; color: inherit; font-size: 20px; font-weight: 850; text-decoration: none; }
-.brand strong { color: var(--app-accent); }
+.brand strong { color: #6857ef; }
 .legalLogo { width: 42px !important; height: 42px !important; flex: 0 0 42px; object-fit: contain; }
-.card { width: 100%; margin-top: 24px; padding: clamp(24px, 4vw, 48px); border: 1px solid var(--legal-line); border-radius: 22px; background: var(--app-surface); box-shadow: 0 24px 70px #1d274414; }
-.eyebrow { display: block; margin-bottom: 8px; color: var(--app-accent); font-size: 11px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+.card { width: 100%; margin-top: 24px; padding: clamp(24px, 4vw, 48px); border: 1px solid var(--legal-line); border-radius: 22px; background: #ffffffee; box-shadow: 0 24px 70px #1d274414; }
+.eyebrow { display: block; margin-bottom: 8px; color: #6959ed; font-size: 11px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
 .card h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); letter-spacing: -.04em; }
 .updated { margin: 10px 0 24px; color: var(--legal-muted); font-size: 12px; }
-.summary { padding: 16px 18px; border: 1px solid var(--app-border); border-radius: 14px; color: var(--app-accent); background: var(--app-accent-soft); font-weight: 650; line-height: 1.65; }
+.summary { padding: 16px 18px; border: 1px solid #58cbb15c; border-radius: 14px; color: #176b5c; background: #effcf8; font-weight: 650; line-height: 1.65; }
 .section { margin-top: 28px; }
 .section h2 { margin: 0 0 9px; font-size: 18px; }
 .section p, .section li { color: var(--legal-muted); font-size: 14px; line-height: 1.75; }
 .section ul { margin: 8px 0 0; padding-left: 20px; }
-.section a, .footer a { color: var(--app-accent); font-weight: 750; }
-.footer { width: 100%; min-height: 96px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-top: 28px; padding: 22px 26px; color: var(--app-ink); border: 1px solid var(--app-border); border-bottom: 0; border-radius: 18px 18px 0 0; background: var(--app-surface); box-shadow: 0 -10px 32px #172c2112; }
+.section a, .footer a { color: #5f4ee8; font-weight: 750; }
+.footer { width: 100%; min-height: 96px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-top: 28px; padding: 22px 26px; color: #f3fffb; border: 1px solid #8bc53f55; border-bottom: 0; border-radius: 18px 18px 0 0; background: #102f2b; box-shadow: 0 -10px 32px #172c2112; }
 .footer p { margin: 0; font-size: 13px; font-weight: 650; }
 .footerLinks { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.footerLinks a { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; color: var(--app-accent); border: 1px solid var(--app-border); border-radius: 999px; font-size: 13px; font-weight: 800; text-decoration: none; transition: background .18s ease, border-color .18s ease; }
-.footerLinks a:hover { border-color: var(--app-accent); background: var(--app-accent-soft); }
-.actionCard { margin-top: 22px; padding: 18px; border: 1px solid var(--legal-line); border-radius: 15px; background: var(--app-raised); }
+.footerLinks a { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; color: #d5ff78; border: 1px solid #9acd325f; border-radius: 999px; font-size: 13px; font-weight: 800; text-decoration: none; transition: background .18s ease, border-color .18s ease; }
+.footerLinks a:hover { border-color: #b8ef55; background: #b8ef5512; }
+.actionCard { margin-top: 22px; padding: 18px; border: 1px solid var(--legal-line); border-radius: 15px; background: #f9faff; }
 .actionCard b { display: block; margin-bottom: 6px; }
 .actionCard p { margin: 0 0 14px; color: var(--legal-muted); font-size: 13px; line-height: 1.6; }
 .button, .dangerButton, .secondaryButton { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 11px; padding: 0 18px; font: inherit; font-size: 13px; font-weight: 850; cursor: pointer; text-decoration: none; }
-.button { color: var(--app-on-accent); background: var(--app-accent); }
-.dangerButton { color: #fff; background: #b82845; }
-.secondaryButton { color: var(--app-muted); border: 1px solid var(--legal-line); background: var(--app-surface); }
+.button { color: #fff; background: linear-gradient(135deg, #6857ef, #00b99e); }
+.dangerButton { color: #fff; background: #e23d5b; }
+.secondaryButton { color: #5e687e; border: 1px solid var(--legal-line); background: #fff; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.confirmInput { width: 100%; height: 44px; margin: 12px 0; border: 1px solid var(--legal-line); border-radius: 10px; padding: 0 12px; color: var(--legal-ink); background: var(--app-surface); font: inherit; }
-.error { margin: 12px 0 0; color: var(--app-negative); font-size: 12px; }
-.success { padding: 18px; border: 1px solid var(--app-border); border-radius: 14px; color: var(--app-positive); background: var(--app-positive-soft); line-height: 1.65; }
+.confirmInput { width: 100%; height: 44px; margin: 12px 0; border: 1px solid var(--legal-line); border-radius: 10px; padding: 0 12px; color: var(--legal-ink); background: #fff; font: inherit; }
+.error { margin: 12px 0 0; color: #c62d4a; font-size: 12px; }
+.success { padding: 18px; border: 1px solid #43c5a45c; border-radius: 14px; color: #126d58; background: #edfcf7; line-height: 1.65; }
 
 @media (max-width: 600px) {
   .page { padding: 16px 12px 0; }
