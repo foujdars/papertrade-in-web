@@ -49,6 +49,7 @@ import "./desktop-workspace.css";
 import "./desktop-market-design.css";
 import "./desktop-tabbed-workspace.css";
 import "./pine-editor.css";
+import "./tradingview-desktop.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
