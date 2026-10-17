@@ -1,5 +1,6 @@
 import { LineSeries, HistogramSeries, MismatchDirection, type Logical, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
 import type { Candle } from './market';
+import type { PineScriptRun } from './pine-script';
 import { computeStudy, type StudyResult } from './study-calculations';
 import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
 import { buildVolumeProfile } from './volume-profile';
@@ -41,9 +42,10 @@ class OscillatorBands implements ISeriesPrimitive<Time>{
 export class ChartStudyRenderer {
  chart:IChartApi;bundles:Bundle[]=[];data:Candle[]=[];time:(epoch:number)=>Time;signature='';comparisons:Record<string,Candle[]>={};
  constructor(chart:IChartApi,time:(epoch:number)=>Time){this.chart=chart;this.time=time;}
- sync(enabled:Record<string,boolean>,settings:Record<string,StudyConfig>,timeframe:string,data:Candle[]){
+ sync(enabled:Record<string,boolean>,settings:Record<string,StudyConfig>,timeframe:string,data:Candle[],custom?:{result:PineScriptRun}){
   const selected=STUDIES.filter(s=>s.id!=='smc'&&s.id!=='patterns'&&s.id!=='opening-range'&&s.id!=='previous-day'&&s.id!=='prior-levels'&&s.id!=='anchored-vwap'&&s.id!=='psbb'&&enabled[s.id]&&!s.unavailable).map(s=>({definition:s,config:settings[s.id]??studyDefaults(s.id)})).filter(s=>!s.config.hidden&&(!s.config.timeframes.length||s.config.timeframes.includes(timeframe))).map(s=>({...s,result:computeStudy(s.definition.id,data,s.config,this.comparisons[s.config.comparisonKey??''])}));
-  const signature=JSON.stringify(selected.map(s=>[s.definition.id,s.config,s.result.plots.map(p=>[p.name,p.histogram,p.points]),s.result.range,s.result.levels]));
+  if(custom && !custom.result.error && (custom.result.plots.length || custom.result.levels.length)) selected.push({definition:{id:'script',name:custom.result.title,group:'Pine',overlay:custom.result.overlay,fields:[]},config:studyDefaults('script'),result:{plots:custom.result.plots,levels:custom.result.levels,levelStyles:custom.result.levelStyles,range:!custom.result.plots.length ? [Math.min(...custom.result.levels)-1,Math.max(...custom.result.levels)+1] : undefined}});
+  const signature=JSON.stringify(selected.map(s=>[s.definition.id,s.config,s.result.plots.map(p=>[p.name,p.histogram,p.points,p.width]),s.result.range,s.result.levels,s.result.levelStyles,s.definition.overlay,s.definition.name,s.definition.id==='script'?s.result.plots.map(p=>p.colors?.find(Boolean)):undefined]));
   if(signature!==this.signature){
    const range=this.chart.timeScale().getVisibleLogicalRange(),price=this.chart.priceScale('right'),auto=price.options().autoScale,priceRange=price.getVisibleRange();
    for(const b of [...this.bundles].reverse())for(const s of [...b.series].reverse())this.chart.removeSeries(s);
@@ -53,10 +55,10 @@ export class ChartStudyRenderer {
     // Preserve an empty pane/series when history is unavailable so later live data can fill it.
     const plots=result.plots.length?result.plots:[{name:d.name,values:[]}];
     for(let i=0;i<plots.length;i++){
-     const plot=plots[i],isVolume=d.id==='volume',color=(isVolume&&i===1?c.colors[2]:c.colors[(d.id==='entry'?entryColorIndex(plot.name):i)%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
+     const plot=plots[i],isVolume=d.id==='volume',color=d.id==='script'?(plot.colors?.find(Boolean)??c.colors[i%c.colors.length]):(isVolume&&i===1?c.colors[2]:c.colors[(d.id==='entry'?entryColorIndex(plot.name):i)%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
      const oscillator=d.id==='rsi';
-     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:(oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:(oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0),crosshairMarkerVisible:oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
-     if(i===0)for(const level of result.levels??[])s.createPriceLine({price:level,color:oscillator?'#8054da66':'#8c849b80',lineWidth:1,lineStyle:2,axisLabelVisible:false,title:''});series.push(s);
+     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:(d.id==='script'?Math.max(1,Math.min(4,plot.width??c.width)):oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:(oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0),crosshairMarkerVisible:oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
+     if(i===0)for(const level of result.levels??[]){const style=result.levelStyles?.find(item=>item.price===level);s.createPriceLine({price:level,color:style?.color??(oscillator?'#8054da66':'#8c849b80'),lineWidth:1,lineStyle:2,axisLabelVisible:false,title:style?.title??''});}series.push(s);
     }
     const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
     if(d.id==='ichimoku'&&series[2]){const cloud=new IchimokuCloud(c);(series[2] as ISeriesApi<'Line'>).attachPrimitive(cloud);bundle.primitive=cloud;}
@@ -70,7 +72,7 @@ export class ChartStudyRenderer {
   this.update(data,new Map(selected.map(s=>[s.definition.id,s.result])));
  }
  update(data:Candle[],results?:Map<string,StudyResult>){this.data=data;for(const b of this.bundles){
-  b.result=b.id==='script'?b.result:(results?.get(b.id)??computeStudy(b.id,data,b.config));
+  b.result=results?.get(b.id)??(b.id==='script'?b.result:computeStudy(b.id,data,b.config));
   for(let k=0;k<b.series.length;k++){
    const plot=b.id==='vpvr'?{name:'Profile anchor',values:data.map(c=>c.close)}:b.result.plots[k],offset=plot?.offset??0;
    // Displacements beyond loaded candles are not extrapolated through weekends/holidays.
@@ -82,8 +84,8 @@ export class ChartStudyRenderer {
     if(b.id==='volume'&&k===0)color=b.config.colors[data[i].close>=data[i].open?0:1];
     else if(b.id==='supertrend')color=b.config.colors[data[i].close>=value?0:1];
     else if(b.id==='macd'&&plot?.histogram)color=macdHistogramColor(value,plot.values[i-1],b.config.colors);
-    else if(plot?.histogram&&b.id!=='chop-zone')color=b.config.colors[value>=0?0:1];
-    if(color)color=color.slice(0,7)+alpha;
+    else if(plot?.histogram&&b.id!=='chop-zone'&&b.id!=='script')color=b.config.colors[value>=0?0:1];
+    if(color && b.id!=='script')color=color.slice(0,7)+alpha;
     return [{time:this.time(data[at].time),value,color}];
    });b.series[k].setData(points);
   }b.primitive?.update(data,b.result);
