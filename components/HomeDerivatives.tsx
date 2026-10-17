@@ -1,4 +1,6 @@
 "use client";
+import { MarketGauge } from "./MarketGauge";
+import { useDesktopBrowser } from "./useDesktopBrowser";
 import { useEffect, useMemo, useState } from 'react';
 import { ChartNoAxesCombined } from 'lucide-react';
 import { ModernSelect } from './ModernSelect';
@@ -17,6 +19,7 @@ const number = (n: number | null | undefined, compact = false) => typeof n === '
 const time = (iso: string) => new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock: (symbol: string) => void; onOpenInstrument?: (instrument: Instrument) => void }) {
+  const desktop=useDesktopBrowser();
   const [catalogue, setCatalogue] = useState<FnoUnderlying[]>(defaults);
   const [selected, setSelected] = useState(defaults[0].instrumentKey);
   const [expiry, setExpiry] = useState('');
@@ -109,6 +112,7 @@ export function HomeDerivatives({ onOpenStock, onOpenInstrument }: { onOpenStock
     <section className="home-section home-option-pulse" aria-label="Options open interest analysis">
       <header><ModernSelect label="Instrument" hideLabel ariaLabel="OI instrument" value={selected} choices={catalogue.map(r => ({ value: r.instrumentKey, label: r.symbol, description: r.name }))} onChange={key => { setSelected(key); setExpiry(''); setExpiries([]); setRows([]); setAsOf(''); setState('loading'); }}/><ModernSelect label="Expiry" hideLabel ariaLabel="OI expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(d => ({ value: d, label: d }))} onChange={value => { setExpiry(value); setRows([]); setAsOf(''); setState('loading'); }}/><button className="home-oi-open" onClick={() => onOpenStock(underlying.symbol)} aria-label={`Open ${underlying.symbol} chart`}><ChartNoAxesCombined size={18}/></button></header>
       <div className="home-derivative-metrics"><div className="home-risk-metric" data-tone={pcrTone}><small>PCR</small><b>{number(summary.pcr)}</b></div><div className="home-risk-metric" data-tone={band?.tone ?? "neutral"}><small>India VIX</small><span className="home-vix-value-row"><b>{number(vix?.price)}</b>{vix && <small className={vix.changePercent >= 0 ? 'positive' : 'negative'}>{vix.changePercent > 0 ? '+' : ''}{number(vix.changePercent)}%</small>}</span>{band && <small className="home-vix-band">{band.tone === "high" ? "Fear" : band.label}</small>}</div><div><small>Call OI</small><b>{number(summary.callOi,true)}</b></div><div><small>Put OI</small><b>{number(summary.putOi,true)}</b></div></div>
+      {desktop&&<div className="desktop-derivative-gauges"><span><b>India VIX · volatility</b><MarketGauge variant="vix" position={band?.position??null} label={vix?`India VIX ${vix.price.toFixed(2)} · ${band?.label}`:'India VIX unavailable'}/></span><span><b>Put / call open interest</b><MarketGauge variant="pcr" position={summary.putOi!=null&&summary.callOi!=null&&summary.putOi+summary.callOi>0?summary.putOi/(summary.putOi+summary.callOi)*100:null} label={`Put / call open interest for selected expiry. PCR ${number(summary.pcr)}`} putOi={number(summary.putOi,true)} callOi={number(summary.callOi,true)}/></span></div>}
       <div className="home-oi-tabs" role="tablist" aria-label="Open interest display"><button role="tab" aria-selected={!change} onClick={() => setChange(false)}>OI</button><button role="tab" aria-selected={change} onClick={() => setChange(true)}>Change in OI</button><small>{spot === null ? '' : `${underlying.symbol} ${number(spot)}`}</small></div>
       {state === 'ready' && chartAvailable ? <OpenInterestChart dense rows={visible} change={change} spot={spot} symbol={underlying.symbol} levels={levels}/> : <div className="home-oi-empty" role="status">{state === 'loading' ? 'Loading option chain…' : state === 'ready' ? `${change ? 'Change in OI' : 'OI'} unavailable for this chain.` : 'Option-chain data unavailable. Retrying automatically.'}</div>}
       <div className="home-oi-legend"><span><i className="call"/>Call {change ? `Δ ${number(summary.callChange,true)}` : 'OI'}</span><span><i className="put"/>Put {change ? `Δ ${number(summary.putChange,true)}` : 'OI'}</span></div>

@@ -1,4 +1,6 @@
 "use client";
+import { DesktopPercentGauge } from "./DesktopMarketVisuals";
+import { useDesktopBrowser } from "./useDesktopBrowser";
 import { ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -19,6 +21,7 @@ function percent(change: number) {
 }
 
 export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOpen: (symbol: string) => void; focusIndex?: string | null; focusTick?: number }) {
+  const desktop=useDesktopBrowser();
   const [index, setIndex] = useState<WatchIndexId>("nifty50");
   const [sort, setSort] = useState<WatchSort>("change");
   const [rows, setRows] = useState<WatchQuote[] | null>(null);
@@ -69,6 +72,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
     const falling = quotes?.filter(row => row.change < 0).length ?? 0;
     const total = quotes?.length ?? 0;
     return <span className="home-breadth-preview" key={label} aria-label={total ? `${label}: ${rising} rising, ${falling} falling, ${total - rising - falling} unchanged` : `${label}: awaiting quotes`}>
+      {desktop&&<DesktopPercentGauge value={total?rising/total*100:null} negative={total?falling/total*100:0} label={`${label} rising share`} detail={total?`${rising} rising · ${falling} falling · ${total-rising-falling} flat`:'Awaiting quotes'}/>}
       <b>{label}</b><span className="home-breadth-counts">{total ? <><em className="up">{rising} up</em><em className="down">{falling} down</em></> : <em>—</em>}</span>
     </span>;
   };

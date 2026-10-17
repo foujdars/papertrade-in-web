@@ -1,0 +1,42 @@
+/* These rules deliberately exclude mobile web and every native platform. */
+@media (min-width:941px) {
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-dashboard-scroll { grid-template-rows:48px 146px 46px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-pulse-section,.terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-grid { height:146px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-card { position:relative; height:146px; padding:12px 16px; grid-template-columns:1fr auto; grid-template-rows:auto auto 1fr; gap:5px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); overflow:hidden; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-card .home-index-name { grid-area:1/1; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-card > b { grid-area:2/1; font-size:24px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-card .home-index-change { grid-area:2/2; font-size:12px; align-self:center; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-index-card .desktop-price-line { grid-area:3/1/4/-1; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-price-line { display:grid; grid-template-columns:minmax(0,1fr); justify-content:stretch; justify-items:stretch; text-transform:none; letter-spacing:normal; align-content:center; gap:3px; width:100%; min-width:0; min-height:54px; color:var(--muted); font-variant-numeric:tabular-nums; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-price-line svg { display:block; width:100%; height:48px; overflow:visible; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-price-line path { fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-price-line small { font-size:10px; color:var(--muted); font-weight:400; white-space:nowrap; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-line-empty { font-size:11px; font-weight:400; color:var(--muted); }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns:minmax(140px,1fr) 88px 72px 72px minmax(120px,170px); gap:12px; padding:12px 16px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-stock-row .desktop-price-line small { white-space:normal; text-align:left; font-size:9px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-stock-row .desktop-price-line svg { height:38px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-market-table { overflow-x:auto; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge { display:flex; align-items:center; gap:10px; min-width:0; color:var(--ink); }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge svg { width:100px; height:66px; flex:none; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge path { fill:none; stroke-width:8; stroke-linecap:round; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-gauge-track { stroke:var(--line); }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge text { font-size:16px; font-weight:600; fill:currentColor; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge > span { display:grid; gap:4px; text-align:left; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge b { font-size:12px; font-weight:600; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-percent-gauge small { color:var(--muted); font-size:10px; line-height:1.4; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-breadth-preview { display:block; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-breadth-preview > :is(b,.home-breadth-counts) { display:none; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-portfolio-visuals { display:flex; align-items:center; gap:12px; padding:0 18px 16px; border-top:1px solid var(--line); }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-portfolio-visuals > span:last-child { display:none; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:10px 0; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges > span { display:grid; justify-items:center; gap:3px; min-width:0; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges svg { width:min(100%,190px); height:115px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges b { font-size:12px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-ad-chart { flex:none; width:100%; min-height:180px; height:210px!important; max-height:300px; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-breadth-card.is-expanded .india-ad-chart { height:300px!important; }
+ .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-flow-chart { width:100%; height:210px!important; }
+ @media (max-width:1200px) {
+  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns:minmax(115px,1fr) 82px 65px 65px 120px; gap:8px; min-width:520px; }
+  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .home-index-card > b { font-size:20px; }
+ }
+}
