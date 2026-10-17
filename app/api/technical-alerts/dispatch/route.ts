@@ -81,7 +81,7 @@ export async function GET(request: Request) {
           await db.runTransaction(async tx => {
             const saved = await tx.get(entry.ref), store = readServerTechnicalStore(saved.data()?.store), live = store.rules.find(r => r.id === rule.id && r.revision === rule.revision && r.status === "active");
             if (!live) return;
-            const result = expired ? { rule: { ...live, status: "expired" as const }, event: { id: `expired:${live.id}:${live.revision}`, ruleId: live.id, instrument: live.instrument, timeframe: live.timeframe, description: technicalDescription(live), barTime: 0, createdAt: now, price: 0, detail: "Server monitoring period ended", kind: "expired" as const } } : advanceTechnical(live, evaluation!, Date.now());
+            const result = expired ? { rule: { ...live, status: "expired" as const }, event: { id: `expired:${live.id}:${live.revision}`, ruleId: live.id, instrument: live.instrument, timeframe: live.timeframe, description: technicalDescription(live), barTime: 0, createdAt: now, price: 0, detail: "Server monitoring period ended", kind: "expired" as const } } : advanceTechnical(live, live.family === "price" ? evaluatePriceQuote(live, quotes[live.instrument.instrumentKey], Date.now()) : evaluation!, Date.now());
             const events = result.event ? [result.event, ...store.events.filter(e => e.id !== result.event!.id)].slice(0, 200) : store.events;
             const rules = store.rules.map(r => r.id === live.id ? result.rule : r);
             tx.set(entry.ref, { ...saved.data(), store: { ...store, rules, events }, active: rules.some(r => r.status === "active" && r.expiresAt > now), checkedAt: now, state: evaluation?.state ?? "Expired" });
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
           if (!prefs.trades || prefs.pausedUntil > Date.now() || Date.now() - target.lastActive > 90 * 86400000) continue;
           const event = queued.event;
           const isPrice = rule.family === "price";
-          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? priceHitTitle(event.instrument.symbol, event.price) : setupTitle(event.instrument.symbol, event.timeframe), body: isPrice ? "🔔 Your watched price has been reached. Tap to inspect the chart and your trade plan." : "📈 A setup matched your alert rule. Tap to review the chart before making your next move.", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
+          const notice: PushNotice = { id: event.id, kind: "trade", title: isPrice ? (rule.alertName?.trim() || priceHitTitle(event.instrument.symbol, event.price)) : setupTitle(event.instrument.symbol, event.timeframe), body: isPrice ? (rule.message?.trim() || "🔔 Your watched price has been reached. Tap to inspect the chart and your trade plan.") : "📈 A setup matched your alert rule. Tap to review the chart before making your next move.", url: `/?symbol=${encodeURIComponent(event.instrument.symbol)}&timeframe=${event.timeframe}`, silent: quietTime(Date.now()), expiresAt: queued.expiresAt };
           await sendPush(notice, { token: target.token }); delivered++;
         }
         await doc.ref.update({ status: delivered ? "sent" : "no-device", delivered }); sent += delivered;

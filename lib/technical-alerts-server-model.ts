@@ -17,7 +17,8 @@ export function applyTechnicalCommand(store: TechnicalStore, command: TechnicalC
   if (command.action === "delete") return { ...store, rules: store.rules.filter(r => r.id !== command.id) };
   if (command.action === "save") {
     if (!command.config || !command.instrument) throw new TechnicalRequestError("Indicator settings and symbol are required.");
-    const config = Object.fromEntries(Object.keys(defaultTechnicalConfig()).map(key => [key, command.config![key as keyof TechnicalConfig]])) as TechnicalConfig;
+    const config = Object.fromEntries([...Object.keys(defaultTechnicalConfig()), "alertName", "message"].filter(key => command.config![key as keyof TechnicalConfig] !== undefined).map(key => [key, command.config![key as keyof TechnicalConfig]])) as TechnicalConfig;
+    config.delivery = "server";
     const error = technicalConfigError(config); if (error) throw new TechnicalRequestError(error);
     const item = command.instrument;
     if (typeof item.instrumentKey !== "string" || !isSupportedNseInstrumentKey(item.instrumentKey) || typeof item.symbol !== "string" || !item.symbol.trim() || item.symbol.length > 100 || typeof item.name !== "string" || item.name.length > 200) throw new TechnicalRequestError("Invalid instrument.");
@@ -26,7 +27,7 @@ export function applyTechnicalCommand(store: TechnicalStore, command: TechnicalC
     rule = { ...config, delivery: "server", id: current?.id ?? newId, revision: newId, instrument, status: "active", createdAt: current?.createdAt ?? now, armedAt: now, expiresAt: now + config.days * 86400000 };
   } else {
     if (current!.expiresAt <= now || !["active", "paused"].includes(current!.status)) throw new TechnicalRequestError("Edit this completed or expired alert to rearm it.");
-    const { lastBar: _lastBar, ...rest } = current!;
+    const { lastBar: _lastBar, lastQuoteAt: _lastQuoteAt, lastQuotePrice: _lastQuotePrice, ...rest } = current!;
     rule = { ...rest, revision: newId, status: command.action === "pause" ? "paused" : "active", armedAt: now };
   }
   const limit = technicalLimitError(store.rules, rule); if (limit) throw new TechnicalRequestError(limit);

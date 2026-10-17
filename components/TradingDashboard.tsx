@@ -3116,7 +3116,7 @@ export function TradingDashboard() {
                 onPrice={handleChartPrice}
                 liveTick={replayOnChart ? undefined : selectedGlobalQuote ? { instrumentKey: selected.instrumentKey, price: selectedGlobalQuote.last, timestampMs: selectedGlobalQuote.at }
                   : selectedQuote ? { instrumentKey: selected.instrumentKey, price: selectedQuote.lastPrice, timestampMs: Date.parse(selectedQuote.lastTradeAt) } : undefined}
-                onPriceAction={(price, mode) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode }); }}
+                onPriceAction={(price, mode, drawing) => { if (selectedDeltaChartSymbol && mode === "order") openOrderSheet(side); else setPriceRequest({ instrument: selected, price, mode, drawing }); }}
                 priceTasks={priceTasks}
                 onDrawingComplete={() => setActiveTool("cursor")}
                 onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
@@ -3224,7 +3224,7 @@ export function TradingDashboard() {
         <FnoChartWorkspace
           priceActionsHostRef={setFnoPriceActionsHost}
           priceTasks={priceTasks}
-          onPriceAction={(instrument, price, mode) => setPriceRequest({ instrument, price, mode })}
+          onPriceAction={(instrument, price, mode, drawing) => setPriceRequest({ instrument, price, mode, drawing })}
           onReplay={setReplayInstrument}
           compareInstruments={tradingUniverse}
           topInstrument={fnoTopInstrument}

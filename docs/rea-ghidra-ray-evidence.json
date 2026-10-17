@@ -1,0 +1,30 @@
+{
+  "tools": {
+    "REA": "6.5.0",
+    "Ghidra": "12.1.4",
+    "Java": "Temurin 21.0.12.1+1"
+  },
+  "native": {
+    "overview_evidence_id": "ev_6c75e24953aa090d008546920c1d0b4ab0672ae2655e907019b723f8de091cec",
+    "function_evidence_id": "ev_968a6a107a192d816481609a6f70e5c59e6e960fe30434c08b377edb740f251b",
+    "artifact": "TradingView Desktop 3.4.1.8194 resources/app.asar.unpacked/native/tvdbridge.node",
+    "sha256": "d7f75cc9c0f87f1918e4263e4cd037f704465371fe60cd606eee0855d87cbc41",
+    "format": "PE x86_64",
+    "procedures": 2901,
+    "strings": 572,
+    "role": "V8/native desktop component bridge; does not establish chart or alert implementation",
+    "registration_export_address": "0x18000173a",
+    "registration_thunk_target": "0x180010ce0"
+  },
+  "web": {
+    "chart_overview_evidence_id": "ev_b51743de92f81d87b0e6b5f7fbd4e692da5e42ccccdb9954ea66a5e2bbd2ab50",
+    "horizontal_ray_menu_evidence_id": "ev_5b0df7411ea54afb670b004960b61b12334adc5a54e78f5642bbe336e82cc098",
+    "observed": "Live chart toolbar, Trend tools menu and Horizontal ray menu entry/selection. Settings/dialog capture attempts are incomplete due selector/navigation timeouts.",
+    "unresolved": "Full live TradingView drawing-properties and alert dialogs were not captured; their documented behavior was used as a reference."
+  },
+  "documentation": [
+    "https://www.tradingview.com/support/solutions/43000518121-horizontal-ray-drawing-tool/",
+    "https://www.tradingview.com/support/solutions/43000763312-learn-how-to-configure-alerts/"
+  ],
+  "implementation": "Independent Papertrade implementation using its existing drawing and server alert engines. No proprietary chart bundle or native code is redistributed."
+}

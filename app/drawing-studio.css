@@ -187,3 +187,27 @@ html, body { touch-action: pan-x pan-y; }
 .drawing-object-actions button:last-child { color: var(--red, #d83259); }
 .drawing-objects-empty { margin: 24px 16px; color: var(--muted, #667085); font-size: 13px; }
 @media (max-width: 380px) { .drawing-object-name { flex-basis: 100%; } .drawing-object-actions { margin-left: 20px; } }
+
+/* Extended drawing controls retain the existing chart-dialog language. */
+.drawing-settings .drawing-settings-tabs { overflow-x:auto; }
+.drawing-settings-tabs button { white-space:nowrap; }
+.drawing-text-format { display:flex; align-items:end; gap:8px; flex-wrap:wrap; }
+.drawing-text-format label { flex:1; min-width:100px; }
+.drawing-text-format > button { width:44px; min-height:44px; border:1px solid var(--line,#d7dce8); border-radius:8px; background:var(--surface,#fff); color:inherit; }
+.drawing-text-format > button[aria-pressed=true] { background:var(--purple-soft,#eee8ff); color:var(--purple,#753bce); }
+.drawing-visibility fieldset { border:1px solid var(--line,#d7dce8); border-radius:10px; margin:12px 0; padding:8px 12px; }
+.drawing-visibility fieldset > div { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.drawing-visibility p, .drawing-alert-note { font-size:12px; line-height:1.5; color:var(--muted,#667085); }
+.drawing-visibility fieldset label { display:flex; align-items:center; justify-content:space-between; min-width:0; }
+.drawing-alert-form { display:flex; flex-direction:column; gap:14px; }
+.drawing-alert-form nav { display:flex; flex:0 0 auto; gap:4px; padding:4px; border-radius:11px; background:var(--purple-soft,#f1edf8); }
+.drawing-alert-source, .drawing-alert-delivery { display:flex; align-items:start; gap:10px; }
+.drawing-alert-source h3 { margin:0 0 5px; }
+.drawing-alert-form [role=tabpanel] { display:flex; flex-direction:column; gap:12px; }
+.drawing-alert-form label { display:flex; flex-direction:column; gap:6px; }
+.drawing-alert-form input, .drawing-alert-form textarea, .technical-alert-form textarea { width:100%; box-sizing:border-box; border:1px solid var(--line,#d7dce8); border-radius:10px; padding:12px; color:var(--ink,#202537); background:var(--surface,#fff); font:inherit; }
+.drawing-alert-form textarea { resize:vertical; min-height:100px; }
+.drawing-alert-form p { margin:0; line-height:1.5; }
+.drawing-alert-form [role=alert] { color:var(--red,#d83259); }
+.drawing-alert-form button[type=submit] { display:flex; align-items:center; justify-content:center; gap:8px; }
+@media(max-width:360px) { .drawing-settings-tabs button { padding-inline:5px; font-size:12px; } .drawing-visibility fieldset > div { grid-template-columns:repeat(2,minmax(0,1fr)); } }

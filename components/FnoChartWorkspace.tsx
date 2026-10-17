@@ -14,7 +14,7 @@ import { formatInr, type Instrument } from "@/lib/market";
 import { usePersistentChartIndicators } from "@/lib/chart-indicator-preferences";
 import { useChartPreference } from "@/lib/chart-view-preferences";
 import type { CandleTick } from "@/lib/live-candles";
-import type { PriceTask } from "@/lib/price-actions";
+import type { DrawingAlertSource, PriceTask } from "@/lib/price-actions";
 
 const FNO_TIMEFRAME_GROUPS = [
   { label: "Minute", values: ["1m", "2m", "3m", "5m", "10m", "15m", "30m"] },
@@ -95,7 +95,7 @@ export function FnoChartWorkspace({
   onToggleOptionType: () => void;
   onQuantityChange: (quantity: number) => void;
   onOpenOrder: (side: "BUY" | "SELL", mode: "Market" | "Limit") => void;
-  onPriceAction?: (instrument: Instrument, price: number, mode: "alert" | "order") => void;
+  onPriceAction?: (instrument: Instrument, price: number, mode: "alert" | "order", drawing?: DrawingAlertSource) => void;
   ordersEnabled?: boolean;
   onFeedStatus: (status: FeedStatus) => void;
   orderTool?: ChartOrderTool;
@@ -178,7 +178,7 @@ export function FnoChartWorkspace({
               instrument={topInstrument}
               liveTick={topTick}
               priceTasks={priceTasks}
-              onPriceAction={onPriceAction ? (price, mode) => onPriceAction(topInstrument, price, mode) : undefined}
+              onPriceAction={onPriceAction ? (price, mode, drawing) => onPriceAction(topInstrument, price, mode, drawing) : undefined}
               onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
               timeframe={timeframe}
               activeTool={activeTool}
@@ -219,7 +219,7 @@ export function FnoChartWorkspace({
               instrument={option}
               liveTick={optionTick}
               priceTasks={priceTasks}
-              onPriceAction={onPriceAction ? (price, mode) => onPriceAction(option, price, mode) : undefined}
+              onPriceAction={onPriceAction ? (price, mode, drawing) => onPriceAction(option, price, mode, drawing) : undefined}
               onRemoveIndicator={id=>setIndicators(current=>({...current,[id]:false}))}
               timeframe={timeframe}
               activeTool={activeTool}

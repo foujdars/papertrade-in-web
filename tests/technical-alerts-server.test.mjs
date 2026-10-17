@@ -37,3 +37,17 @@ test('deleting a rule retains its event history', () => {
   const next = apply(store, { action: 'delete', id: 'id-1', revision: 'id-1' }, now, 'id-2');
   assert.equal(next.rules.length, 0); assert.equal(next.events.length, 1);
 });
+
+
+test('drawing alert metadata is retained and edit/resume clears quote baseline', () => {
+ const price={...config,family:'price',timeframe:'1m',condition:'crossingUp',repeat:'repeat',threshold:100,delivery:'server',alertName:'My ray',message:'Watch level'};
+ let store=apply(read(null),create({config:price}),now,'ray-1');
+ assert.equal(store.rules[0].alertName,'My ray');assert.equal(store.rules[0].message,'Watch level');
+ store.rules[0]={...store.rules[0],lastBar:123,lastQuoteAt:now+1000,lastQuotePrice:99};
+ store=apply(store,{action:'pause',id:'ray-1',revision:'ray-1'},now+2000,'pause-1');
+ store=apply(store,{action:'resume',id:'ray-1',revision:'pause-1'},now+3000,'resume-1');
+ assert.equal(store.rules[0].lastQuoteAt,undefined);assert.equal(store.rules[0].lastQuotePrice,undefined);assert.equal(store.rules[0].lastBar,undefined);
+ store.rules[0]={...store.rules[0],lastQuoteAt:now+4000,lastQuotePrice:99};
+ store=apply(store,create({id:'ray-1',revision:'resume-1',config:price}),now+5000,'edit-1');
+ assert.equal(store.rules[0].lastQuoteAt,undefined);assert.equal(store.rules[0].armedAt,now+5000);
+});
