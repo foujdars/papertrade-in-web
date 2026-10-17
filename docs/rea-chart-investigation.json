@@ -1,0 +1,39 @@
+{
+  "tool": "rea-agents",
+  "version": "6.5.0",
+  "evidence_id": "ev_3030cea4eff9f542126f84eae6fb4248478df915deea77b8f8c32ec750bd1ad7",
+  "target": "lightweight-charts-drawing@0.1.1",
+  "selected_source": "dist/lightweight-charts-drawing.es.js",
+  "artifact_sha256": "e7f920097890da3dd7342c6ea807666dc44dcb843f7713dd1d1d8da13f780794",
+  "source_sha256": "bdbc2147c8236c02034f7d37b6bc675e9fbfce5d59682eedb95b373d2bbd57e7",
+  "method": {
+    "name": "calculateRegression",
+    "node_id": "jsrg_node_b6778f06d1cd8a6d3fcdcfcbb55fe721dc702524700897db53e299605d67047f",
+    "source_range": {
+      "start": {
+        "line": 3900,
+        "column": 2
+      },
+      "end": {
+        "line": 3906,
+        "column": 3
+      }
+    }
+  },
+  "observation": "The packaged calculateRegression computes slope from two screen points and assigns width max(10, screen line length * 0.1). It does not fit candle closes.",
+  "replacement": "Least squares over selected candle closes by bar index, with bands at two population standard deviations of residuals.",
+  "evidence_type": "static syntax observation plus direct source inspection; replacement verified separately by unit and browser tests",
+  "coverage": {
+    "selected_files": 1,
+    "unselected_files": 5,
+    "parse_failures": 0,
+    "semantic_graph": "partial",
+    "node_limit_per_file": 20000
+  },
+  "limitations": [
+    "Static analysis did not execute the library.",
+    "Per-file semantic node limits resulted in partial graph coverage.",
+    "Only the selected source file was analyzed.",
+    "No proprietary TradingView bundle or native executable was analyzed; Ghidra was not used."
+  ]
+}
