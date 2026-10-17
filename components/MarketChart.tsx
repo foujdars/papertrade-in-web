@@ -28,6 +28,9 @@ import { createProfileDataClient } from "@/lib/profile-data-client";
 import { profilePeriod } from "@/lib/profile-range";
 import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordinates";
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
+import { PineEditor } from "./PineEditor";
+import { runPineScript } from "@/lib/pine-script";
+import { loadAppliedPineScript, saveAppliedPineScript, type AppliedPineScript } from "@/lib/pine-workspace";
 import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
 import { snapStudyCrosshair } from "@/lib/study-crosshair";
 import { STUDY_LINE_TOOLS, formatStudyValue, locateStudyPane, studyLinePoints, type StudyDrawing } from "@/lib/study-pane-drawings";
@@ -570,12 +573,24 @@ export function MarketChart({
   const chartStyleRef = useRef(chartStyle);
   chartStyleRef.current = chartStyle;
   const studySettingsRef = useRef(studySettings); studySettingsRef.current = studySettings;
+  const [pineEditorOpen, setPineEditorOpen] = useState(false);
+  const [appliedPine, setAppliedPine] = useState<AppliedPineScript | null>(null);
+  const appliedPineRef = useRef<AppliedPineScript | null>(null);
+  const [pineStatus, setPineStatus] = useState('');
+  useEffect(() => { const saved = loadAppliedPineScript(); appliedPineRef.current = saved; setAppliedPine(saved); }, []);
+  function applyPine(script: AppliedPineScript | null) {
+    appliedPineRef.current = script;
+    saveAppliedPineScript(script);
+    setAppliedPine(script);
+    setPineStatus('');
+  }
   const [editingStudy, setEditingStudy] = useState<string | null>(null);
   const [editingLine, setEditingLine] = useState<string | null>(null);
   const [selectedStudy, setSelectedStudy] = useState<string | null>(null);
   const lastStudyTap = useRef<{time:number;x:number;y:number}|null>(null);
   const activateStudyRef = useRef((id:string,x:number,y:number) => {});
   activateStudyRef.current = (id,x,y) => {
+    if (id === "script") { setPineEditorOpen(true); return; }
     setSelectedStudy(id);
   };
   useTransientBack(selectedStudy !== null, () => {setSelectedStudy(null);lastStudyTap.current=null;});
@@ -1126,7 +1141,13 @@ export function MarketChart({
     if (!studyRenderer.current) studyRenderer.current = new ChartStudyRenderer(chart, epoch => chartTimeFromEpoch(epoch, timeframe));
     const old = studyRenderer.current.signature;
     studyRenderer.current.comparisons=comparisonRef.current;
-    studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data);
+    const script = !candlesOnly ? appliedPineRef.current : null;
+    const pineResult = script ? runPineScript(script.source, data, script.inputs) : null;
+    const closedIndex = data.length - 2;
+    const triggered = pineResult?.alerts.filter(alert => closedIndex >= 0 && alert.values[closedIndex]).map(alert => alert.title) ?? [];
+    const status = pineResult?.error ? `Script error: ${pineResult.error}` : pineResult?.alerts.length ? `${triggered.length ? 'Closed bar: '+triggered.join(', ') : 'No condition on previous closed bar'} · chart open only` : '';
+    setPineStatus(previous => previous === status ? previous : status);
+    studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data, pineResult ? {result:pineResult} : undefined);
     if (compareModeRef.current === "pane" && compareSeries.current.size) {
       const comparePane = Math.max(1, ...studyRenderer.current.bundles.map((bundle) => bundle.pane + 1));
       overlayComparedRef.current.forEach((item,index) => compareSeries.current.get(item.instrumentKey)?.moveToPane(comparePane+index));
@@ -1412,7 +1433,7 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
     syncIndicators(indicators);
-  }, [indicators, studySettings, comparisonData]);
+  }, [indicators, studySettings, comparisonData, appliedPine, candlesOnly]);
 
   useEffect(() => {
     visibleBarsRef.current = visibleBars;
@@ -3393,7 +3414,9 @@ export function MarketChart({
   }, [indicators, studySettings, avwapAnchor, latestCandle, timeframe, chartGeneration, chartStyle]);
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
-  const indicatorLegend = (activeStudies.length || indicators.patterns) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+  const indicatorLegend = (activeStudies.length || indicators.patterns || !candlesOnly) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+    {!candlesOnly && <button type="button" className="indicator-strip-control" onClick={()=>setPineEditorOpen(true)} aria-label="Open Pine Editor" title="Write and run a Pine indicator">Pine Editor</button>}
+    {!candlesOnly && appliedPine && <><button type="button" className="indicator-strip-control" onClick={()=>setPineEditorOpen(true)} aria-label={`Edit Pine script ${appliedPine.name}`}><i style={{background:'#8054da'}}/>{appliedPine.name}</button><button type="button" className="indicator-strip-control" onClick={()=>applyPine(null)} aria-label="Remove Pine script" title="Remove Pine script"><X size={13}/></button>{pineStatus && <small role="status" style={{color:pineStatus.startsWith('Script error:')?'var(--red,#dc2626)':'var(--muted)'}}>{pineStatus}</small>}</>}
     {indicators.patterns && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => activateStudyRef.current("patterns", event.clientX, event.clientY)} aria-label="Candlestick pattern actions" title="Tap for function actions"><i style={{ background: "var(--purple, #8054d9)" }} />Patterns</button>}
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "prior-levels", "anchored-vwap", "psbb"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
@@ -3413,12 +3436,14 @@ export function MarketChart({
         {compareLabels.map((label) => <div key={label.key} className={`compare-axis-label ${label.side}`} style={{ top: label.y, color: label.color }} aria-label={`${label.text} comparison value`}>{label.text}</div>)}
         {volumeOverlay && <button type="button" className="volume-overlay-heading" style={{top:volumeOverlay.headingTop}} onClick={e=>activateStudyRef.current('volume',e.clientX,e.clientY)}><span>{studyTitle('volume',studySettings.volume??studyDefaults('volume'))}</span><b className="volume-overlay-value" style={{color:volumeOverlay.color}}>{new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(volumeOverlay.value)}</b></button>}
         {compareMode === "pane" && overlayCompared.map((item,index)=>comparePaneTops[item.instrumentKey] === undefined ? null : <div key={item.instrumentKey} className="compare-pane-heading" style={{top:comparePaneTops[item.instrumentKey]+5}}><span style={{color:item.color??compareColor(index)}}><button type="button" onClick={()=>setEditingLine(item.instrumentKey)} aria-label={`Change ${item.symbol} line color`}><i style={{background:item.color??compareColor(index)}}/>{item.symbol}</button><button type="button" onClick={()=>setComparedSymbols((current)=>current.filter((row)=>row.instrumentKey!==item.instrumentKey))} aria-label={`Remove ${item.symbol} from compare`}><X size={12}/></button></span></div>)}
-        {studySummaries.filter(s=>s.pane>0).map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+4}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
+        {studySummaries.filter(s=>s.pane>0&&s.id==='script').map(s=><div className="study-pane-heading" key={s.id} style={{top:s.top+4}}><button className="study-pane-title" onClick={()=>setPineEditorOpen(true)}>{appliedPine?.name ?? 'Pine script'}</button><button aria-label="Edit Pine script" onClick={()=>setPineEditorOpen(true)}><Settings2 size={13}/></button><button aria-label="Remove Pine script" onClick={()=>applyPine(null)}><X size={13}/></button></div>)}
+        {studySummaries.filter(s=>s.pane>0&&s.id!=='script').map(s=>{const c=studySettings[s.id]??studyDefaults(s.id);return <div className="study-pane-heading" key={s.id} style={{top:s.top+4}}><button className="study-pane-title" onClick={e=>activateStudyRef.current(s.id,e.clientX,e.clientY)} title="Tap for indicator actions">{studyTitle(s.id,c)}</button><button aria-label={'Hide '+studyTitle(s.id,c)} onClick={()=>setStudy(s.id,{...c,hidden:true})}><EyeOff size={13}/></button><button aria-label={'Settings for '+studyTitle(s.id,c)} onClick={()=>setEditingStudy(s.id)}><Settings2 size={13}/></button>{onRemoveIndicator&&<button aria-label={'Remove '+studyTitle(s.id,c)} onClick={()=>onRemoveIndicator(s.id)}><X size={13}/></button>}{s.message&&<small title={s.message}>{s.message}</small>}</div>;})}
         {selectedStudy&&<div className="study-quick-actions" role="group" aria-label="Indicator actions">
           <button aria-label="Indicator settings" title="Settings" onClick={()=>{setEditingStudy(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Settings2 size={16}/></button>
           {onRemoveIndicator&&<button aria-label="Remove indicator" title="Remove" onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={15}/></button>}
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
+        {pineEditorOpen && <PineEditor candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>setPineEditorOpen(false)} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {editingDrawing && <DrawingSettings bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
