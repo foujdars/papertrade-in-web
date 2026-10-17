@@ -23,10 +23,29 @@ const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/desktop-watchli
  if(u.pathname==='/api/upstox/candles')body={ok:true,candles:Array.from({length:60},(_,i)=>({time:Date.parse('2026-10-16T03:45:00Z')/1000+i*300,open:100,high:105,low:95,close:100+Math.sin(i/5)*3,volume:1000})),segments:['historical','intraday']};
  return route.fulfill({json:body});});
  await page.goto('http://127.0.0.1:3286/');await page.locator('.launch-disclaimer').waitFor({state:'hidden',timeout:40000});
+ await page.locator('.terminal-shell').evaluate(el=>el.dataset.motion='full');
+ const depthCard=page.locator('.home-index-card').first();
+ await depthCard.hover();await page.waitForTimeout(220);
+ assert.notEqual(await depthCard.evaluate(el=>getComputedStyle(el).transform),'none','Desktop cards lift on hover');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await depthCard.evaluate(el=>getComputedStyle(el).transform),'none','Reduced motion removes the card lift');
+ await page.emulateMedia({reducedMotion:'no-preference'});
  await page.locator('.main-nav').getByRole('button',{name:'Watchlist',exact:true}).click();
  const list=page.locator('.workspace.section-watchlist');await list.locator('.instrument-row').first().waitFor();
  const reliance=list.locator('.instrument-row').filter({has:page.locator('.instrument-name b').filter({hasText:/^RELIANCE$/})});
  await reliance.locator('.desktop-watchlist-trend svg').waitFor();
+ // Desktop depth must respect both the app motion preference and the OS preference.
+ await page.locator('.terminal-shell').evaluate(el=>el.dataset.motion='full');
+ await reliance.hover();
+ await page.waitForTimeout(220);
+ assert.notEqual(await reliance.evaluate(el=>getComputedStyle(el).boxShadow),'none','Hovered list rows have subtle depth');
+ assert.match(await reliance.evaluate(el=>getComputedStyle(el).transitionProperty),/box-shadow/);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.ok(!await reliance.evaluate(el=>getComputedStyle(el).transitionProperty.includes('box-shadow')),'OS reduced motion disables added transitions');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.locator('.terminal-shell').evaluate(el=>el.dataset.motion='reduced');
+ assert.ok(!await reliance.evaluate(el=>getComputedStyle(el).transitionProperty.includes('box-shadow')),'App reduced motion disables added transitions');
+ await page.locator('.terminal-shell').evaluate(el=>el.dataset.motion='full');
  assert.match(await reliance.locator('.desktop-watchlist-facts').textContent(),/Open98Day range95 – 105Prev\. close99Volume/);
  assert.equal(await page.locator('.desktop-price-line small').count(),0,'No session timestamps or guidance captions');
  for(const width of [1024,1440,1920]){
