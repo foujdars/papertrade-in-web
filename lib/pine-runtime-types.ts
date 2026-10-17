@@ -1,0 +1,10 @@
+import type { PineScriptRun } from './pine-script';
+import type { Candle } from './market';
+export type AdvancedPineInput={id:string;title:string;type:'int'|'float'|'bool'|'source'|'string'|'color'|'enum'|'price'|'time'|'session'|'symbol'|'timeframe'|'text_area';defaultValue:number|boolean|string;value:number|boolean|string;min?:number;max?:number;step?:number;options?:string[];group?:string;tooltip?:string};
+export type PineTrade={id:string;direction:'long'|'short';entryTime:number;entryPrice:number;exitTime:number;exitPrice:number;quantity:number;profit:number;commission:number};
+export type PineStrategyResult={initialCapital:number;currency?:string;netProfit:number;netProfitPercent:number;maxDrawdown:number;maxDrawdownPercent:number;winRate:number;profitFactor:number|null;trades:PineTrade[];equity:{time:number;value:number}[];openPosition?:{id:string;direction:'long'|'short';entryTime:number;entryPrice:number;quantity:number;unrealizedProfit:number}};
+export type PineRuntimeDrawing={id:string;type:'line'|'label'|'box';x1:number;y1:number;x2?:number;y2?:number;text?:string;color:string;background?:string};
+export type PineRuntimeFill={id:string;fromPlot:number;toPlot:number;colors:string[]};
+export type PineRawVisual={key:string;title:string;options:Record<string,unknown>;data:{time:number;value:unknown;options?:Record<string,unknown>}[];plot1?:string;plot2?:string};
+export type AdvancedPineRun=Omit<PineScriptRun,'inputs'>&{inputs:AdvancedPineInput[];strategy:PineStrategyResult|null;logs:{level:'info'|'warning'|'error';message:string;time:number;line?:number}[];warnings:string[];runtime:string;drawings:PineRuntimeDrawing[];fills:PineRuntimeFill[];visuals:PineRawVisual[]};
+export type PineRuntimeContext={symbol?:string;timeframe?:string;now?:number;deadlineMs?:number;operationBudget?:number;securityData?:Record<string,Candle[]>;timezone?:string;session?:string;tickSize?:number;currency?:string;baseCurrency?:string;type?:'stock'|'index'|'crypto'|'futures'|'option'|'forex';pointValue?:number};

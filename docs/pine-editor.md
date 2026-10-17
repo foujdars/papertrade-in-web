@@ -1,40 +1,48 @@
-# Pine-compatible indicator editor
+# Pine editor
 
-Open **Functions (ƒx) → Pine Editor**, or use **Pine Editor** in the chart indicator strip. Searching the Functions menu for “pine”, “script” or “editor” also finds it. In the two-chart F&O workspace, this menu opens the editor for the option chart. Pick a starter or paste a supported indicator, then **Compile** and **Add to chart**. `Ctrl/Cmd+Enter` applies; `Ctrl/Cmd+S` saves on this device. Editing or saving does not silently replace the chart's applied version. Failed compilation leaves the last successfully applied indicator intact. A runtime error after changing chart history removes stale custom plots and shows the error.
+Papertrade's desktop browser editor runs native Pine v5/v6 scripts through **PineTS 0.11.1**. Compatibility is experimental: this is an independent runtime, not TradingView's compiler, account service or publishing platform. See the [compatibility matrix](pine-runtime-compatibility.md) for verified behavior and exclusions.
 
-The editor provides named scripts (up to 30), local persistence, desktop `.pine` import/export, input controls, diagnostics, and condition previews. Templates include an EMA crossover, RSI, and volatility bands. One custom indicator is applied at a time alongside built-in studies. `overlay=true` draws on price; otherwise the script gets its own pane. Live updates, symbol/timeframe changes, and replay use the same visible candle data path as built-in indicators.
+## Open and use the editor
 
-## Compatibility contract
+Open **Functions (fx) → Pine Editor** or the chart's Pine Editor control. Search the Functions menu for “pine”, “script” or “editor”. In the two-chart F&O workspace this opens the option chart's editor.
 
-This independently implemented interpreter supports a bounded **Pine v5/v6 indicator subset**, not TradingView's complete language, compiler, cloud service, or editor. It parses expressions; it never evaluates source as JavaScript. Unsupported syntax/arguments report a source line.
+On a desktop browser, choose an indicator or strategy template, or import native `.pine` source beginning with `//@version=5` or `//@version=6`. **Compile** runs against loaded chart history and reports diagnostics. **Add to chart** applies the successful result. Ctrl/Cmd+Enter applies; Ctrl/Cmd+S saves locally. Editing or saving a draft does not silently replace the applied script. A failed draft run preserves the last applied result; errors when rerunning an applied script on changed chart data clear its stale custom output.
 
-| Area | Supported |
-| --- | --- |
-| Declaration | `indicator(title, shorttitle, overlay)`; optional `//@version=5` or `6` |
-| Inputs | Direct assignments to `input.int`, `input.float`, `input.bool`, `input.source`; titles, numeric bounds and step |
-| Values | OHLCV, `hl2`, `hlc3`, `ohlc4`, epoch-millisecond `time`, `bar_index`, numbers, strings, booleans, `na` |
-| Expressions | Arithmetic, comparisons, `and/or/not`, ternary, constant nonnegative history indexing, assignments |
-| Technical analysis | `ta.sma`, `ta.ema`, `ta.rma`, `ta.rsi`, `ta.atr`, `ta.stdev`, `ta.highest`, `ta.lowest`, `ta.crossover`, `ta.crossunder` |
-| Math | `math.abs/sqrt/log/log10/exp/floor/ceil/round/sin/cos`, two-argument `min/max/pow`, `na`, `nz` |
-| Display | `plot` title, color, width 1–4, line/histogram/columns/points, loaded-bar offset; numeric `hline` with title/color; named colors and `color.new` transparency |
-| Conditions | `alertcondition` title/message plus historical closed-candle counts and previous closed-bar status |
+The Monaco editor provides highlighting, completion, hover reference, folding, bracket matching, undo and find/replace. Runtime validation remains authoritative; completion suggestions are not a promise that every Pine namespace or argument works. Inputs, conditions, logs, strategy results and local version history appear in the editor's panels. Named scripts, `.pine` import/export and saved revisions stay on this device. One custom script is active per chart, alongside built-in indicators. `overlay=true` uses the price pane; other scripts use a separate pane.
 
-No strategies/orders/backtesting, `request.security`, loops, user-defined functions, arrays, imports, drawing objects, reassignment/`var`, or complete Pine type/execution semantics. Conditional expressions are evaluated as bounded series expressions. Plot columns use the chart's histogram renderer; circles/cross styles use point markers. Plot offsets only address loaded candles, with no future calendar extrapolation. Horizontal levels do not expose the full Pine style API.
+Strategies use PineTS's historical broker simulation and produce a trade ledger and sampled equity. They do not place live or paper orders. Fees, slippage, history and OHLC fill assumptions affect results. Net profit reports closed trades; equity can include open P/L. Conditions are chart previews, not saved server alerts or push subscriptions. The preview excludes the newest candle from its closed-bar count.
 
-Condition status is a **local preview** on this chart, not a saved server alert or push subscription. The newest candle is conservatively treated as forming and excluded from closed-candle counts, including when the exchange is closed. History length, data corrections, and the initial EMA seed can affect results. A script on replay cannot inspect unrevealed candles. No cross-platform parity certification is claimed.
+## Desktop, mobile and Android scope
 
-Bounds: 32,000 source characters, 20,000 loaded candles, 8 million interpreted work units, 64 expression nesting levels, rolling lengths up to 5,000, and 32 plots/levels/conditions each. Budget failures clear partial output. Inputs are validated before use; scripts have no file, network, JavaScript, or order-execution access.
+The advanced path is enabled only for a web terminal on a viewport at least 941px wide with hover and a fine pointer, and never for a native Capacitor platform. Narrow/mobile browsers and native Android keep the existing textarea editor and bounded indicator-only interpreter. They do not gain PineTS strategies, its broader language execution or Monaco from this change.
 
-## REA and Ghidra findings
+The active desktop selection has a separate storage key from the legacy mobile/native selection. The named-script library is shared local device storage, so an advanced script can still appear in a mobile script list; the legacy interpreter reports unsupported constructs rather than executing them as PineTS. Switching layout/platform cancels pending advanced runs and clears cached advanced visuals before loading the selection for that mode.
 
-Actual REA 6.5.0 analysis of three selected sources in official TradingView Desktop 3.4.1.8194 recovered Pine focus IPC (`setFocusPineEditor` → `tvd:focus-pine-editor`). Evidence `ev_e3a0a0de66caa0ac772010ebc51d698753f3fe69151607a7bbd2f5dc6e1f0b54`; 9,677 AST nodes visited, zero selected-file parse failures, 160 files outside that selected scope.
+## Data and execution boundary
 
-Actual REA public-browser capture opened Pine Editor and observed the default v6 indicator, editor textbox, Add to chart, Save, Publish, and docking controls. Evidence `ev_30de8044efd6c87b6e11606b7881cbe01d415d02f6c1af5c64983a1a8bb5f6f1`. The title menu exposed Save, Rename, Create new, docking, and disabled copy/history actions: `ev_6148633e1337545ec57858ef9e51e9d9d9914f1974b8f4f3ed71f31fc95d5a1d`. No TradingView account, saved script, compilation, or publication was used.
+Runs use supplied OHLCV history. Chart-symbol `request.security` data can use supported feed timeframes with lookahead off; additional timeframe fetching is disabled during replay. Other symbols, financial/economic data calls, remote libraries and arbitrary URLs are unavailable through the chart host. Even the legitimate non-repainting `expression[1]` with `barmerge.lookahead_on` pattern is rejected by this product's conservative gate. No full tick or repainting parity is promised.
 
-Prior actual REA/Ghidra native analysis is reused: overview `ev_6c75e24953aa090d008546920c1d0b4ab0672ae2655e907019b723f8de091cec`; registration decompilation `ev_968a6a107a192d816481609a6f70e5c59e6e960fe30434c08b377edb740f251b`. It establishes V8/native desktop bindings, not a recovered Pine compiler. No original Pine engine was recovered or incorporated. [TradingView's introduction](https://www.tradingview.com/pine-script-docs/en/v5/Introduction.html/) describes execution on its servers. Official [execution](https://www.tradingview.com/pine-script-docs/language/execution-model/), [inputs](https://www.tradingview.com/pine-script-docs/concepts/inputs/) and [plot](https://www.tradingview.com/pine-script-docs/concepts/plots/) documentation informed the compatibility boundary.
+PineTS transpiles source to JavaScript internally. That generated code executes in a worker owned by an opaque-origin sandboxed iframe, with direct network access blocked by CSP. A private channel supplies chart data and constrained host data requests. It does not execute in the authenticated app context. The native-source gate rejects JavaScript mode and direct host API names; this is a defense boundary, not a claim that parsing alone makes arbitrary generated code safe. Timeout, cancellation and sandbox tests cover the intended boundary.
 
-The 12ui design CLI was attempted and required a separate account sign-in; the implementation extends existing Papertrade styles. It does not claim a completed hosted design workflow.
+## License and source
 
-## Validation
+The repository owner approved using PineTS and publishing the application under **AGPL-3.0-only**. The desktop editor includes a public source/license link. See [source and licensing](source-and-licensing.md), [LICENSE](../LICENSE) and [third-party notices](../THIRD_PARTY_NOTICES.md). Monaco remains MIT-licensed. Deployed source must correspond to the running revision.
 
-`npm run test:pine` checks exact numerical fixtures, missing values, causality, parser rejection, budgets, persistence failure handling, templates, and renderer coexistence/update/error behavior. `tests/browser/pine-editor.cjs` mounts the real chart/editor against deterministic market data and verifies applying scripts, inputs, saving/reloading, diagnostics, live-result replacement, pane placement, removal, 320/390/768/1280 widths, and dark styling. Run with an installed Playwright browser. Build and TypeScript checks cover integration. No live orders or production data are changed by the tests.
+## REA and Ghidra evidence
+
+Actual REA public captures observed editor, docking and script-menu controls. The new Create new capture (`ev_75ff17a025258c32291f95610f904d6c26098dd118a8c89df854de0a60513a69`) shows Indicator, Strategy, Library and Built-in choices. Papertrade does not claim to implement the observed Library/cloud workflows. Prior real REA/Ghidra analysis establishes TradingView Desktop's Windows/V8 bridge, not a recovered Pine compiler. Exact evidence IDs and limitations are recorded in [the research report](pine-rebuild-rea.md).
+
+## Developer validation
+
+Build the offline worker with `npm run build:pine`; it is also run by the development/build hooks. Then run:
+
+```sh
+npm run test:pine
+npm run test:pine:advanced
+node tests/browser/pine-sandbox.cjs
+node tests/browser/pine-rebuild.cjs
+npx tsc --noEmit
+npm run build
+```
+
+Browser tests need Playwright and an installed Chromium browser. `PLAYWRIGHT_MODULE_PATH` can select an existing installation. Runtime tests cover numerical fixtures, state, causal prefixes, broker fills/costs, source rejection and bounded execution. Visual tests run actual PineTS scripts before checking normalization and canvas geometry. Browser fixtures cover real Monaco, sandbox isolation/cancellation, application behavior and mobile/native exclusions. Passing these fixtures is not a complete TradingView conformance certification.

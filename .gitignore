@@ -61,3 +61,6 @@ next-env.d.ts
 .gradle-local/
 android/.gradle-local/
 android/android/
+
+# Deterministic offline Pine runtime bundle, produced before dev/build
+/lib/generated/

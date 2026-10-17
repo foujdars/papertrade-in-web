@@ -32,6 +32,10 @@ import { drawingLogicalAtTime, drawingTimeAtLogical } from "@/lib/drawing-coordi
 import { EXTRA_DRAWING_TOOLS } from "@/lib/drawing-extras";
 import { PineEditor } from "./PineEditor";
 import { runPineScript } from "@/lib/pine-script";
+import type { AdvancedPineRun, PineRuntimeContext } from '@/lib/pine-runtime-types';
+import { extractPineBarColors } from '@/lib/pine-visual-layer';
+import { runPineInSandbox } from '@/lib/pine-runtime-client';
+import { createPineMarketData, pineTimeframe } from '@/lib/pine-market-data';
 import { loadAppliedPineScript, saveAppliedPineScript, type AppliedPineScript } from "@/lib/pine-workspace";
 import { ChartStudyRenderer } from "@/lib/chart-study-renderer";
 import { snapStudyCrosshair } from "@/lib/study-crosshair";
@@ -580,10 +584,53 @@ export function MarketChart({
   const [appliedPine, setAppliedPine] = useState<AppliedPineScript | null>(null);
   const appliedPineRef = useRef<AppliedPineScript | null>(null);
   const [pineStatus, setPineStatus] = useState('');
-  useEffect(() => { const saved = loadAppliedPineScript(); appliedPineRef.current = saved; setAppliedPine(saved); }, []);
+  const [advancedPine, setAdvancedPine] = useState(false);
+  const advancedPineRef = useRef(false);
+  type PineRequest = {scope:string;key:string;data:Candle[];script:AppliedPineScript;chart:IChartApi;context:PineRuntimeContext;instrument:Instrument;replay:boolean};
+  const pineJob = useRef<{scope:string;key:string;controller:AbortController;timer?:ReturnType<typeof setTimeout>} | null>(null);
+  const pineCache = useRef<{scope:string;key:string;times:number[];result:AdvancedPineRun} | null>(null);
+  const pinePending = useRef<PineRequest | null>(null);
+  const pineScope = useRef('');
+  const pineColorsRef = useRef<Map<number,string>>(new Map());
+  const pinePreview = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const media=window.matchMedia(DESKTOP_CHART_MEDIA);
+    const shell=chartHost.current?.closest('.terminal-shell');
+    let initialized=false;
+    const update=()=>{
+      const advanced=media.matches && shell?.getAttribute('data-platform')==='web' && !Capacitor.isNativePlatform();
+      if(initialized && advanced===advancedPineRef.current)return;
+      initialized=true;
+      pinePreview.current?.abort();
+      pineJob.current?.controller.abort();
+      if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
+      pineJob.current=null;pineCache.current=null;pinePending.current=null;pineScope.current='';clearPineBarColors();
+      advancedPineRef.current=advanced;setAdvancedPine(advanced);
+      const saved=loadAppliedPineScript(advanced);
+      appliedPineRef.current=saved;setAppliedPine(saved);setPineStatus('');
+    };
+    update();media.addEventListener('change',update);
+    const observer=new MutationObserver(update);
+    if(shell)observer.observe(shell,{attributes:true,attributeFilter:['data-platform']});
+    return()=>{media.removeEventListener('change',update);observer.disconnect();pineJob.current?.controller.abort();if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);pinePreview.current?.abort();};
+  }, []);
+  useEffect(()=>{
+    pineJob.current?.controller.abort();
+    if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
+    pineJob.current=null;pineCache.current=null;pinePending.current=null;pineScope.current='';clearPineBarColors();pinePreview.current?.abort();
+  },[instrument.instrumentKey,timeframe,replayCandles!==undefined,candlesOnly]);
+  async function previewAdvancedPine(source:string,inputs:AppliedPineScript['inputs']) {
+    pinePreview.current?.abort();const controller=new AbortController();pinePreview.current=controller;
+    return runPineInSandbox(source,dataRef.current.map(c=>({...c})),inputs,
+      pineRuntimeContext(),controller.signal,
+      createPineMarketData(instrument,controller.signal,replayCandles!==undefined));
+  }
   function applyPine(script: AppliedPineScript | null) {
     appliedPineRef.current = script;
-    saveAppliedPineScript(script);
+    saveAppliedPineScript(script,advancedPineRef.current);
+    pineJob.current?.controller.abort();
+    if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
+    pineJob.current=null;pineCache.current=null;pinePending.current=null;pineScope.current='';clearPineBarColors();
     setAppliedPine(script);
     setPineStatus('');
   }
@@ -1138,6 +1185,44 @@ export function MarketChart({
       window.requestAnimationFrame(()=>{if(chartApi.current===chart){refreshStudyHeaders();scheduleOverlayRefresh();}});
     } });
   }
+  function pineRuntimeContext(): PineRuntimeContext {
+    const india=['NSE','BSE','MCX'].includes(instrument.exchange);
+    return {symbol:`${instrument.exchange}:${instrument.symbol}`,timeframe:pineTimeframe(timeframe),
+      timezone:india?'Asia/Kolkata':'UTC',session:india?(instrument.exchange==='MCX'?'0900-2330':'0915-1530'):'0000-0000',
+      tickSize:priceIncrement&&priceIncrement>0?priceIncrement:(india?.05:.01),currency:india?'INR':'USD',
+      type:instrument.assetType==='OPTION'?'option':instrument.assetType==='FUTURE'?'futures':instrument.assetType==='INDEX'?'index':instrument.exchange==='DELTA'?'crypto':'stock',pointValue:instrument.assetType==='OPTION'||instrument.assetType==='FUTURE'?undefined:1};
+  }
+  function clearPineBarColors() {
+    if(!pineColorsRef.current.size)return;
+    pineColorsRef.current=new Map();
+    paintPriceSeries();
+  }
+  function startPineJob(request: PineRequest) {
+    const controller=new AbortController();
+    const job={scope:request.scope,key:request.key,controller,timer:undefined as ReturnType<typeof setTimeout>|undefined};
+    pineJob.current=job;
+    job.timer=setTimeout(()=>{
+      const latest=pinePending.current?.scope===job.scope?pinePending.current:request;
+      job.key=latest.key;
+      void runPineInSandbox(latest.script.source,latest.data,latest.script.inputs,latest.context,controller.signal,
+        createPineMarketData(latest.instrument,controller.signal,latest.replay))
+        .then(result=>finish(result))
+        .catch(error=>{
+          if(controller.signal.aborted)return;
+          finish({plots:[],levels:[],levelStyles:[],overlay:false,title:latest.script.name,inputs:[],alerts:[],
+            error:error instanceof Error?error.message:'Execution failed.',strategy:null,logs:[],warnings:[],runtime:'PineTS',drawings:[],fills:[],visuals:[]});
+        });
+      function finish(result:AdvancedPineRun) {
+        if(controller.signal.aborted||pineJob.current!==job||pineScope.current!==job.scope||chartApi.current!==latest.chart)return;
+        pineCache.current={scope:job.scope,key:latest.key,times:latest.data.map(c=>c.time),result};
+        pineJob.current=null;
+        pineColorsRef.current=result.error?new Map():extractPineBarColors(result.visuals);
+        paintPriceSeries();
+        const pending=pinePending.current;
+        syncIndicatorData(pending?.scope===job.scope?pending.data:dataRef.current);
+      }
+    },150);
+  }
   function syncIndicatorData(data = dataRef.current) {
     const chart = chartApi.current;
     if (!chart) return;
@@ -1145,10 +1230,38 @@ export function MarketChart({
     const old = studyRenderer.current.signature;
     studyRenderer.current.comparisons=comparisonRef.current;
     const script = !candlesOnly ? appliedPineRef.current : null;
-    const pineResult = script ? runPineScript(script.source, data, script.inputs) : null;
+    let pineResult: ReturnType<typeof runPineScript> | AdvancedPineRun | null = null;
+    if (script && advancedPineRef.current) {
+      const context=pineRuntimeContext();
+      const scope=JSON.stringify([instrument.instrumentKey,timeframe,script.source,script.inputs,replayCandles!==undefined,context]);
+      const key=JSON.stringify(data);
+      if(pineScope.current!==scope){
+        pineJob.current?.controller.abort();
+        if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
+        pineJob.current=null;pineCache.current=null;pinePending.current=null;
+        pineScope.current=scope;clearPineBarColors();
+      }
+      const snapshot=data.map(c=>({...c}));
+      const request:PineRequest={scope,key,data:snapshot,script,chart,context,instrument,replay:replayCandles!==undefined};
+      pinePending.current=request;
+      const cache=pineCache.current;
+      // Preserve completed values during ordinary quote updates. A changed history
+      // origin cannot reuse bar_index drawings or index-based plot arrays safely.
+      const compatible=cache?.scope===scope&&cache.times.length<=data.length&&cache.times.every((time,index)=>data[index]?.time===time);
+      if(compatible)pineResult=cache.result;
+      else if(pineColorsRef.current.size)clearPineBarColors();
+      if(cache?.key!==key&&!pineJob.current)startPineJob(request);
+    } else if(script) {
+      clearPineBarColors();
+      pineResult=runPineScript(script.source,data,script.inputs);
+    } else {
+      pineJob.current?.controller.abort();
+      if(pineJob.current?.timer)clearTimeout(pineJob.current.timer);
+      pineJob.current=null;pineCache.current=null;pinePending.current=null;pineScope.current='';clearPineBarColors();
+    }
     const closedIndex = data.length - 2;
     const triggered = pineResult?.alerts.filter(alert => closedIndex >= 0 && alert.values[closedIndex]).map(alert => alert.title) ?? [];
-    const status = pineResult?.error ? `Script error: ${pineResult.error}` : pineResult?.alerts.length ? `${triggered.length ? 'Closed bar: '+triggered.join(', ') : 'No condition on previous closed bar'} · chart open only` : '';
+    const status = pineResult?.error ? `Script error: ${pineResult.error}` : pineResult?.alerts.length ? `${triggered.length ? 'Closed bar: '+triggered.join(', ') : 'No condition on previous closed bar'} · chart open only` : script && advancedPineRef.current && pineJob.current ? (pineResult?'Updating Pine script…':'Running Pine script…') : '';
     setPineStatus(previous => previous === status ? previous : status);
     studyRenderer.current.sync(indicatorsRef.current, studySettingsRef.current, timeframe, data, pineResult ? {result:pineResult} : undefined);
     if (compareModeRef.current === "pane" && compareSeries.current.size) {
@@ -1177,12 +1290,17 @@ export function MarketChart({
     return palette.desktop&&point.color===MARKET_GREEN?{...point,color:palette.up}:palette.desktop&&point.color===MARKET_RED?{...point,color:palette.down}:point;
   }
 
+  function pineStylePoint<T extends {color?:string;wickColor?:string;borderColor?:string}>(point:T,epoch:number):T {
+    if(!advancedPineRef.current||!['candles','hollow-candles','volume-candles','bars'].includes(chartStyleRef.current))return point;
+    const color=pineColorsRef.current.get(epoch);
+    return color?{...point,color,wickColor:color,borderColor:color}:point;
+  }
   function paintPriceSeries(candles = dataRef.current) {
     const series = candleSeries.current;
     if (!series) return;
     const style = chartStyleRef.current;
     const palette=currentCanvasPalette();
-    const points = styleSeriesData(candles, style, timeframe).map(point=>themedStylePoint(point,palette));
+    const points = styleSeriesData(candles, style, timeframe).map((point,index)=>pineStylePoint(themedStylePoint(point,palette),Number(candles[index]?.time)));
     series.setData(points as never);
     const source = prepareStyleCandles(candles, style);
     if (hlcSeries.current && style === "hlc-area") {
@@ -1201,7 +1319,7 @@ export function MarketChart({
     const source = prepareStyleCandles(candles, style);
     const point = source.at(-1);
     if (!point) return;
-    series.update(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),currentCanvasPalette()) as never);
+    series.update(pineStylePoint(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),currentCanvasPalette()),Number(point.time)) as never);
     if (hlcSeries.current && style === "hlc-area") {
       hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
       hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
@@ -1451,7 +1569,7 @@ export function MarketChart({
   useEffect(() => {
     indicatorsRef.current = indicators;
     syncIndicators(indicators);
-  }, [indicators, studySettings, comparisonData, appliedPine, candlesOnly]);
+  }, [indicators, studySettings, comparisonData, appliedPine, candlesOnly, advancedPine]);
 
   useEffect(() => {
     visibleBarsRef.current = visibleBars;
@@ -3470,7 +3588,7 @@ export function MarketChart({
           {onRemoveIndicator&&<button aria-label="Remove indicator" title="Remove" onClick={()=>{onRemoveIndicator(selectedStudy);setSelectedStudy(null);lastStudyTap.current=null;}}><Trash2 size={15}/></button>}
           <button aria-label="Close indicator actions" title="Close" onClick={()=>{setSelectedStudy(null);lastStudyTap.current=null;}}><X size={16}/></button>
         </div>}
-        {pineEditorOpen && <PineEditor candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>setPineEditorOpen(false)} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/>}
+        {pineEditorOpen && <PineEditor key={`${advancedPine}:${instrument.instrumentKey}:${timeframe}`} advanced={advancedPine} onRun={previewAdvancedPine} onCancelRun={()=>pinePreview.current?.abort()} candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>{pinePreview.current?.abort();setPineEditorOpen(false);}} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
         {editingDrawing && <DrawingSettings bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
