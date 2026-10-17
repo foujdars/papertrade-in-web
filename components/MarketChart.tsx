@@ -2957,6 +2957,7 @@ export function MarketChart({
       return;
     }
     let frame = 0;
+    let intervalCache: { from: number; to: number; intervals: ReturnType<typeof sessionIntervals> } | null = null;
     const draw = () => {
       const chart = chartApi.current;
       const scale = chart?.timeScale();
@@ -2968,9 +2969,8 @@ export function MarketChart({
       const x1 = scale.timeToCoordinate(visible.from);
       const x2 = scale.timeToCoordinate(visible.to);
       if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || x1 == null || x2 == null) return;
-      // Session stripes stop being readable at this zoom and become expensive
-      // over years of history. Bring them back automatically when zooming in.
-      if (to - from > 14 * 86400) { setSessionShades([]); return; }
+      // Bound work over multi-year views; all intraday intervals share this renderer.
+      if (to - from > 366 * 86400) { setSessionShades([]); return; }
       const plotRight = chart.priceScale("right").width();
       const plotWidth = Math.max(0, width - plotRight);
       const step = /^(\d+)(m|h)$/i.exec(timeframe);
@@ -3011,7 +3011,12 @@ export function MarketChart({
         return x + ((epochSeconds - anchor.time) / barSeconds) * spacing;
       };
       const hidden = new Set(hiddenSessionShades);
-      const next = sessionIntervals((from - shift) * 1000, (to - shift) * 1000).flatMap((interval) => {
+      const periodFrom = Math.floor((from - shift) / 86400) * 86400 * 1000;
+      const periodTo = (Math.floor((to - shift) / 86400) + 1) * 86400 * 1000;
+      if (!intervalCache || intervalCache.from !== periodFrom || intervalCache.to !== periodTo) {
+        intervalCache = { from: periodFrom, to: periodTo, intervals: sessionIntervals(periodFrom, periodTo) };
+      }
+      const next = intervalCache.intervals.flatMap((interval) => {
         if (hidden.has(interval.id)) return [];
         const startX = at(interval.start / 1000);
         const endX = at(interval.end / 1000);
@@ -3019,7 +3024,7 @@ export function MarketChart({
         const left = Math.max(0, Math.min(startX, endX));
         const right = Math.min(plotWidth, Math.max(startX, endX));
         const band = right - left;
-        if (band < 2) return [];
+        if (band < .5) return [];
         const edges = [
           startX >= 4 && startX <= plotWidth - 4 ? { x: startX, label: edgeLabel(interval.start) } : null,
           endX >= 4 && endX <= plotWidth - 4 ? { x: endX, label: edgeLabel(interval.end) } : null,
@@ -3031,7 +3036,8 @@ export function MarketChart({
         if (edge.x-lastEdge < 44) return false;
         lastEdge = edge.x; return true;
       }));
-      setSessionShades(next.map(shade => ({ ...shade, edges: shade.edges.filter(edge => readableEdges.has(edge)) })));
+      const shades = next.map(shade => ({ ...shade, edges: shade.edges.filter(edge => readableEdges.has(edge)) }));
+      setSessionShades(current => JSON.stringify(current) === JSON.stringify(shades) ? current : shades);
     };
     const schedule = () => {
       window.cancelAnimationFrame(frame);
@@ -3769,7 +3775,7 @@ export function MarketChart({
             </div>
           )}
         </div>
-        {!isReplay && <SessionBoard variant="chip" intraday={!CALENDAR_TIMEFRAMES.has(timeframe)} hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
+        {!isReplay && <SessionBoard variant="chip" intraday={!CALENDAR_TIMEFRAMES.has(timeframe)} onEnableShade={id => setHiddenSessionShades(current => current.includes(id) ? current.filter(item => item !== id) : current)} hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <DrawingActionBar title={drawingTitle(drawingManager.current?.getSelectedDrawing()?.type??'drawing')} locked={!!drawingManager.current?.getSelectedDrawing()?.options.locked} disabled={lockedDrawings} position={drawingActions} onSettings={()=>openDrawingSettings(selectedDrawingId,false)} onAlert={!isReplay&&onPriceAction&&isSupportedNseInstrumentKey(instrument.instrumentKey)&&!instrument.instrumentKey.startsWith('MCX_FO|')&&['horizontal-ray','horizontal-line'].includes(drawingManager.current?.getSelectedDrawing()?.type??'')?()=>{const item=drawingManager.current?.getSelectedDrawing();const price=item?.anchors[0]?.price;if(item&&Number.isFinite(price)&&price!>0){drawingManager.current?.deselectAll();onPriceAction(price!,'alert',{id:item.id,type:item.type as DrawingAlertSource['type'],text:(item.options as DrawingPresentation).text});}}:undefined} onDuplicate={()=>drawingAction(selectedDrawingId,false,'duplicate')} onLock={()=>drawingAction(selectedDrawingId,false,'lock')} onHide={()=>drawingAction(selectedDrawingId,false,'hide')} onDelete={()=>drawingAction(selectedDrawingId,false,'delete')} onDone={()=>drawingManager.current?.deselectAll()} />}

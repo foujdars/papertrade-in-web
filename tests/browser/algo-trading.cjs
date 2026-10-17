@@ -10,6 +10,7 @@ const output = path.resolve(process.env.ALGO_QA_OUTPUT_DIR || 'work/algo-browser
     res.setHeader('Content-Type', 'text/html'); res.end(html);
   }); } }] });
   await vite.listen(); const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+  await browser.newPage();
   try {
     for (const [name, width, native, theme] of [['desktop', 1440, false, 'light'], ['mobile', 390, false, 'light'], ['small', 320, false, 'light'], ['tablet', 768, false, 'neon'], ['native', 390, true, 'neon']]) {
       const context = await browser.newContext({ viewport: { width, height: 1000 }, isMobile: width < 800, hasTouch: width < 800, reducedMotion: 'reduce' });
@@ -23,13 +24,26 @@ const output = path.resolve(process.env.ALGO_QA_OUTPUT_DIR || 'work/algo-browser
       await page.goto(`http://127.0.0.1:3290/?theme=${theme}${native ? '&native=1' : ''}`);
       await page.getByRole('heading', { name: 'Algo Trading', exact: true }).waitFor();
       await page.getByLabel('Strategy name', { exact: true }).fill('Browser QA strategy');
+      await page.getByRole('button',{name:'Entry time · IST',exact:true}).click();
+      await page.getByRole('dialog',{name:'Entry time · IST',exact:true}).waitFor();
+      await page.getByRole('button',{name:'Hour',exact:true}).click();
+      await page.keyboard.press('Escape');
+      assert.equal(await page.getByRole('dialog',{name:'Entry time · IST',exact:true}).count(),1,'Escape leaves the clock open');
+      await page.getByRole('button',{name:'Hour',exact:true}).click();
+      await page.getByRole('option',{name:'10',exact:true}).click();
+      await page.getByRole('button',{name:'Apply',exact:true}).click();
+      assert.match(await page.getByRole('button',{name:'Entry time · IST',exact:true}).textContent(),/10:/);
+      await page.getByRole('button',{name:'Trading date',exact:true}).click();
+      await page.getByRole('button',{name:'Next month',exact:true}).click();
+      await page.getByRole('button',{name:'Clear',exact:true}).click();
+      assert.equal(await page.locator('select,input[type="time"],input[type="date"]').count(),0);
       await page.getByRole('button', { name: 'Save strategy', exact: true }).click();
       await page.getByRole('tab', { name: /Saved strategies/ }).click();
       await page.getByRole('button', { name: 'Load strategy', exact: true }).click();
       assert.equal(await page.getByLabel('Strategy name', { exact: true }).inputValue(), 'Browser QA strategy');
       await page.getByRole('button', { name: 'Add leg', exact: true }).click();
       await page.getByRole('button', { name: 'Option contracts', exact: true }).click();
-      await page.getByLabel('Expiry', { exact: true }).selectOption('2026-10-22');
+      await page.getByRole('button', { name: 'Expiry', exact: true }).click(); await page.getByRole('option', { name: '2026-10-22', exact: true }).click();
       await page.getByRole('button', { name: 'Add 25000 call', exact: true }).click();
       assert.equal(await page.getByLabel('Units for leg 2', { exact: true }).inputValue(), '75');
       await page.getByRole('button', { name: 'Choose instrument for leg 2', exact: true }).click();
@@ -56,15 +70,15 @@ const output = path.resolve(process.env.ALGO_QA_OUTPUT_DIR || 'work/algo-browser
       await page.getByRole('row').filter({ hasText: 'NIFTY 22 OCT 25000 CE' }).getByRole('cell', { name: '75', exact: true }).waitFor();
       if (name === 'desktop') {
         await page.getByRole('tab', { name: 'Strategy builder', exact: true }).click();
-        await page.getByLabel('Entry rule', { exact: true }).selectOption('ema');
+        await page.getByRole('button', { name: 'Entry rule', exact: true }).click(); await page.getByRole('option', { name: 'EMA crossover', exact: true }).click();
         await page.getByLabel('Fast EMA', { exact: true }).fill('2');
         await page.getByLabel('Slow EMA', { exact: true }).fill('4');
-        await page.getByLabel('Price data', { exact: true }).selectOption('demo');
+        await page.getByRole('button', { name: 'Price data', exact: true }).click(); await page.getByRole('option', { name: 'Synthetic demo prices', exact: true }).click();
         await page.getByRole('button', { name: 'Run backtest', exact: true }).click();
         await page.getByRole('heading', { name: 'Equity curve', exact: true }).waitFor();
         await page.getByRole('heading', { name: 'Browser QA strategy', exact: true }).waitFor();
         await page.getByRole('tab', { name: 'Strategy builder', exact: true }).click();
-        await page.getByLabel('Entry rule', { exact: true }).selectOption('scheduled');
+        await page.getByRole('button', { name: 'Entry rule', exact: true }).click(); await page.getByRole('option', { name: 'Scheduled entry', exact: true }).click();
       }
       }
       await page.getByRole('tab', { name: 'Forward test', exact: true }).click();

@@ -99,3 +99,36 @@
   .terminal-shell .more-menu-panel,
   .terminal-shell .notification-center-panel { border-radius: 20px; }
 }
+
+/* Compact themed sheets shared by chart intervals and Algo Trading. */
+.terminal-shell .app-dialog.timeframe-sheet { position: fixed; inset: 0; margin: auto; width: min(520px,calc(100vw - 24px)); height: auto; max-height: min(740px,88dvh); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 24px 80px #0003; }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-groups { padding: 0 16px 20px; overflow: auto; }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-groups section > div { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-line { min-width: 0; min-height: 48px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-line.active { border-color: var(--purple); background: var(--purple-soft); color: var(--purple); }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-line > button:first-child { min-height: 48px; padding: 8px 32px 8px 10px; font-size: 13px; font-weight: 600; }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-star { right: 1px; width: 30px; color: var(--muted); }
+.terminal-shell .app-dialog.timeframe-sheet .timeframe-star.saved { color: var(--purple); }
+.terminal-shell .app-dialog.fno-timeframe-menu { position: fixed; inset: 0; margin: auto; width: min(520px,calc(100vw - 24px)); max-height: 88dvh; overflow: auto; border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+.terminal-shell .app-dialog.algo-picker { width: min(620px,calc(100vw - 24px)); max-height: 88dvh; border-radius: 20px; padding: 20px; }
+.app-dialog.algo-picker :is(input,button) { font: inherit; }
+.app-dialog.algo-picker input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); }
+.algo-fields .modern-select, .algo-actions .modern-select { width: 100%; }
+.modern-datetime-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); font: inherit; text-align: left; }
+.modern-datetime-dialog { width: min(360px,calc(100vw - 24px)); max-height: 88dvh; border: 1px solid var(--line); border-radius: 20px; padding: 20px; overflow: auto; }
+.modern-datetime-dialog header,.modern-datetime-dialog nav,.modern-datetime-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.modern-datetime-dialog h3 { margin: 0; font-size: 18px; }
+.modern-datetime-dialog button { color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-height: 40px; padding: 8px 10px; font: inherit; cursor: pointer; }
+.modern-datetime-dialog footer { margin: 18px 0 0; justify-content: flex-end; }
+.modern-datetime-dialog footer button:last-child { background: var(--purple); color: white; border-color: var(--purple); }
+.modern-datetime-dialog button:disabled { opacity: .4; cursor: default; }
+.modern-clock-fields { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: end; margin-bottom: 12px; }
+.modern-clock-fields > span { padding-bottom: 12px; }
+.modern-calendar-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; text-align: center; }
+.modern-calendar-grid small { padding-block: 8px; color: var(--muted); }
+.modern-calendar-grid button { padding: 4px; border-color: transparent; }
+.modern-calendar-grid button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); border-color: var(--purple); }
+@media(max-width:600px) {
+ .terminal-shell .app-dialog.timeframe-sheet,.terminal-shell .app-dialog.algo-picker,.terminal-shell .app-dialog.fno-timeframe-menu,.modern-datetime-dialog { margin: auto auto 0; width: 100%; max-width: none; border-radius: 20px 20px 0 0; padding-bottom: max(20px,env(safe-area-inset-bottom)); box-sizing: border-box; }
+ .terminal-shell .app-dialog.timeframe-sheet .timeframe-line > button:first-child { font-size: 12px; padding-left: 7px; }
+}
