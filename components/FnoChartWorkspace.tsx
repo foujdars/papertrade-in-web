@@ -38,8 +38,10 @@ export function FnoChartWorkspace({
   topTick,
   optionTick,
   topChange,
+  topChangeAvailable = true,
   optionPrice,
   optionChange,
+  optionChangeAvailable = true,
   splitPercent,
   quantity,
   lotSize,
@@ -78,8 +80,10 @@ export function FnoChartWorkspace({
   topTick?: CandleTick;
   optionTick?: CandleTick;
   topChange: number;
+  topChangeAvailable?: boolean;
   optionPrice: number;
   optionChange: number;
+  optionChangeAvailable?: boolean;
   splitPercent: number;
   quantity: number;
   lotSize: number;
@@ -165,7 +169,7 @@ export function FnoChartWorkspace({
               <button className="fno-instrument-switch" disabled={!canToggleFuture} onClick={(event) => { event.stopPropagation(); onToggleTopMode(); }}>
                 <StockLogo {...topInstrument} size={24} /><b>{underlyingSymbol}</b><span>{topMode === "FUTURE" ? "Fut" : "Spot"}</span>{canToggleFuture && <ChevronsUpDown size={13} />}
               </button>
-              <span>{topPrice > 0 ? topPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={topChange >= 0 ? "positive" : "negative"}>{signedPercent(topChange)}</i></span>
+              <span>{topPrice > 0 ? topPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={topChangeAvailable ? topChange >= 0 ? "positive" : "negative" : ""} aria-label={topChangeAvailable ? undefined : "Daily change unavailable"}>{topChangeAvailable ? signedPercent(topChange) : "—"}</i></span>
             </div>
             <button className="fno-symbol-list-link" onClick={(event) => { event.stopPropagation(); onOpenSymbols(); }} aria-label="Open indices and F&O symbols"><ListFilter size={15} /></button>
             <button type="button" className="chart-replay-link" onClick={() => onReplay(topInstrument)} aria-label={`Bar replay for ${topInstrument.symbol}`} title="Bar replay"><StepBack size={17} /></button>
@@ -208,7 +212,7 @@ export function FnoChartWorkspace({
               <button className="fno-instrument-switch" disabled={optionSwitching} onClick={(event) => { event.stopPropagation(); onToggleOptionType(); }}>
                 <StockLogo {...option} size={24} /><b>{optionLabel}</b><span>{option.optionType === "CE" ? "Call" : "Put"}</span><ChevronsUpDown size={13} />
               </button>
-              <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChange >= 0 ? "positive" : "negative"}>{signedPercent(optionChange)}</i></span>
+              <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChangeAvailable ? optionChange >= 0 ? "positive" : "negative" : ""} aria-label={optionChangeAvailable ? undefined : "Daily change unavailable"}>{optionChangeAvailable ? signedPercent(optionChange) : "—"}</i></span>
             </div>
             <button type="button" className="chart-replay-link" onClick={() => onReplay(option)} aria-label={`Bar replay for ${option.symbol}`} title="Bar replay"><StepBack size={17} /></button>
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>

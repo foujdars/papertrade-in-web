@@ -57,3 +57,18 @@ test('feed timestamps are preserved and missing/invalid dates never become fresh
  for(const ltt of [undefined,0,-1,'invalid',1789610400,1789610400000,1789610400000000])h.sockets[0].frame({feeds:{TEST:{ltpc:{ltp:123,ltt}}}});
  await new Promise(resolve=>setImmediate(resolve));assert.equal(ticks.length,3);assert.ok(ticks.every(tick=>tick.timestampMs===1789610400000));close();
 });
+
+
+test('stream CP and observation time survive all supported LTPC feed shapes', async () => {
+  const h = harness(); const ticks = [];
+  const close = await h.open({ instrumentKey: 'TEST', signal: new AbortController().signal, onTick: tick => ticks.push(tick), onDisconnect() {} });
+  const ltpc = { ltp: 109, ltt: 1789610400000, cp: 100 };
+  for (const feed of [{ ltpc }, { fullFeed: { marketFF: { ltpc } } }, { fullFeed: { indexFF: { ltpc } } }, { firstLevelWithGreeks: { ltpc } }]) {
+    h.sockets[0].frame({ currentTs: 1789610401000, feeds: { TEST: feed } });
+  }
+  h.sockets[0].frame({ currentTs: 1789610401000, feeds: { TEST: { ltpc: { ltp: 109, cp: 100 } } } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ticks.length, 4, 'Current feed time must not invent a last-trade timestamp');
+  assert.ok(ticks.every(tick => tick.previousClose === 100 && tick.updatedAtMs === 1789610401000 && tick.timestampMs === 1789610400000));
+  close();
+});

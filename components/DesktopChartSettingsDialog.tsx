@@ -7,6 +7,7 @@ import { chartStyleLabel, type ChartStyleId } from "@/lib/chart-style";
 import { DEFAULT_DESKTOP_CHART_SETTINGS, MAX_CHART_TEMPLATES, normalizeDesktopChartSettings, resolveDesktopChartColors, type DesktopChartSettings } from "@/lib/desktop-chart-settings";
 import { useChartAppearanceTemplates, useDesktopChartSettings } from "@/lib/desktop-chart-preferences";
 import { ChartDialogPortal } from "./ChartDialogPortal";
+import { useTouchChart } from "@/lib/use-touch-chart";
 import { useTransientBack } from "./useTransientBack";
 
 const TABS = [
@@ -28,16 +29,18 @@ function Color({ label, value, fallback, onChange }: { label: string; value: str
   return <div className="desktop-settings-color"><label title={label}><input type="color" aria-label={label} value={value ?? fallback} onChange={(event) => onChange(event.target.value)} /><span>{value?.toUpperCase() ?? "Auto"}</span></label><button type="button" title={`Reset ${label.toLowerCase()} to automatic`} aria-label={`Reset ${label.toLowerCase()}`} disabled={value === null} onClick={() => onChange(null)}><RotateCcw size={12} /></button></div>;
 }
 
-export function DesktopChartSettingsDialog({ onClose, theme = "light", symbol = "Chart", chartStyle = "candles" }: {
+export function DesktopChartSettingsDialog({ onClose, theme = "light", symbol = "Chart", chartStyle = "candles", palette }: {
   onClose: () => void;
   theme?: "light" | "neon";
   symbol?: string;
   chartStyle?: ChartStyleId;
+  palette?: ReturnType<typeof chartCanvasPalette>;
 }) {
-  return <ChartDialogPortal><SettingsDialog onClose={onClose} theme={theme} symbol={symbol} chartStyle={chartStyle} /></ChartDialogPortal>;
+  return <ChartDialogPortal><SettingsDialog palette={palette ?? chartCanvasPalette(theme, { mediaMatches: true, platform: "web", section: "trade", native: false })} onClose={onClose} theme={theme} symbol={symbol} chartStyle={chartStyle} /></ChartDialogPortal>;
 }
 
-function SettingsDialog({ onClose, theme, symbol, chartStyle }: Required<Parameters<typeof DesktopChartSettingsDialog>[0]>) {
+function SettingsDialog({ onClose, theme, symbol, chartStyle, palette }: Required<Parameters<typeof DesktopChartSettingsDialog>[0]>) {
+  const touch=useTouchChart();
   const [settings, setSettings, settingsPersistence] = useDesktopChartSettings();
   const [templates, setTemplates, templatesPersistence] = useChartAppearanceTemplates();
   const [draft, setDraft] = useState<DesktopChartSettings>(() => ({ ...settings }));
@@ -47,7 +50,6 @@ function SettingsDialog({ onClose, theme, symbol, chartStyle }: Required<Paramet
   const dialog = useRef<HTMLDialogElement>(null);
   const prefix = useId();
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
-  const palette = chartCanvasPalette(theme, { mediaMatches: true, platform: "web", section: "trade", native: false });
   const colors = resolveDesktopChartColors(draft, palette);
   const sameName = templates.find((item) => item.name.toLocaleLowerCase() === templateName.trim().toLocaleLowerCase());
   const unsaved = [settingsPersistence === "session-only" ? "chart settings" : "", templatesPersistence === "session-only" ? "templates" : ""].filter(Boolean).join(" and ");
@@ -84,12 +86,12 @@ function SettingsDialog({ onClose, theme, symbol, chartStyle }: Required<Paramet
   return <dialog ref={dialog} className="desktop-chart-settings" data-theme={theme} aria-labelledby={`${prefix}-title`} onCancel={(event) => { event.preventDefault(); onClose(); }} onKeyDown={(event) => event.stopPropagation()} onPointerDown={(event) => { event.stopPropagation(); if (event.target === dialog.current) { const rect = dialog.current.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose(); } }}>
     <header className="desktop-settings-header"><div><h2 id={`${prefix}-title`}>Chart settings</h2><span>{symbol} <ChevronRight size={12} /> {chartStyleLabel(chartStyle)}</span></div><button type="button" aria-label="Close chart settings" onClick={onClose}><X size={20} /></button></header>
     <div className="desktop-settings-body">
-      <nav role="tablist" aria-label="Chart settings sections" aria-orientation="vertical" className="desktop-settings-tabs" onKeyDown={(event) => {
+      <nav role="tablist" aria-label="Chart settings sections" aria-orientation={touch ? "horizontal" : "vertical"} className="desktop-settings-tabs" onKeyDown={(event) => {
         const index = TABS.findIndex((item) => item.id === tab);
-        const next = event.key === "ArrowDown" ? (index + 1) % TABS.length : event.key === "ArrowUp" ? (index + TABS.length - 1) % TABS.length : event.key === "Home" ? 0 : event.key === "End" ? TABS.length - 1 : -1;
+        const next = (event.key === "ArrowDown" || event.key === "ArrowRight") ? (index + 1) % TABS.length : (event.key === "ArrowUp" || event.key === "ArrowLeft") ? (index + TABS.length - 1) % TABS.length : event.key === "Home" ? 0 : event.key === "End" ? TABS.length - 1 : -1;
         if (next < 0) return;
         event.preventDefault(); setTab(TABS[next].id); document.getElementById(`${prefix}-tab-${TABS[next].id}`)?.focus();
-      }}>{TABS.map(({ id, label, icon: Icon }) => <button type="button" role="tab" id={`${prefix}-tab-${id}`} aria-controls={`${prefix}-panel-${id}`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} key={id} onClick={() => setTab(id)}><Icon size={18} /><span>{label}</span></button>)}<small>DESKTOP WORKSPACE</small></nav>
+      }}>{TABS.map(({ id, label, icon: Icon }) => <button type="button" role="tab" id={`${prefix}-tab-${id}`} aria-controls={`${prefix}-panel-${id}`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} key={id} onClick={() => setTab(id)}><Icon size={18} /><span>{label}</span></button>)}<small>CHART WORKSPACE</small></nav>
       <div className="desktop-settings-content" role="tabpanel" id={`${prefix}-panel-${tab}`} aria-labelledby={`${prefix}-tab-${tab}`} tabIndex={0}>
         {tab === "symbol" && <>
           <div className="desktop-settings-preview" style={{ background: colors.background, color: colors.text }} aria-label="Candle color preview"><span>Candle appearance</span><svg viewBox="0 0 160 58" role="img" aria-label="Preview of up and down candles">{[0, 1, 2, 3, 4, 5].map((index) => { const up = index % 3 !== 1, x = 12 + index * 26, y = 12 + (index % 3) * 5; return <g key={index}>{draft.wickVisible && <line x1={x + 5} x2={x + 5} y1={y - 7} y2={y + 30} stroke={up ? colors.wickUp : colors.wickDown} />}<rect x={x} y={y} width="10" height="21" fill={up ? colors.up : colors.down} stroke={draft.borderVisible ? up ? colors.borderUp : colors.borderDown : "none"} /></g>; })}</svg><small>Preview · Apply to update chart</small></div>
@@ -142,7 +144,7 @@ function SettingsDialog({ onClose, theme, symbol, chartStyle }: Required<Paramet
         </>}
       </div>
     </div>
-    <div className={`desktop-settings-notice${unsaved ? " is-storage-error" : ""}`} role={unsaved ? "alert" : "status"}>{unsaved ? `Could not save ${unsaved}. Changes are available for this session only. ${settingsPersistence === "session-only" ? "Select Apply to retry chart settings. " : ""}${templatesPersistence === "session-only" ? "Retry saving from Templates." : ""}` : notice ? <><Check size={13} />{notice}</> : dirty ? "Unapplied changes" : "Settings apply to desktop charts and are saved on this device."}</div>
+    <div className={`desktop-settings-notice${unsaved ? " is-storage-error" : ""}`} role={unsaved ? "alert" : "status"}>{unsaved ? `Could not save ${unsaved}. Changes are available for this session only. ${settingsPersistence === "session-only" ? "Select Apply to retry chart settings. " : ""}${templatesPersistence === "session-only" ? "Retry saving from Templates." : ""}` : notice ? <><Check size={13} />{notice}</> : dirty ? "Unapplied changes" : "Settings apply to charts and are saved on this device."}</div>
     <footer className="desktop-settings-footer"><button type="button" className="desktop-settings-reset" onClick={() => { setDraft({ ...DEFAULT_DESKTOP_CHART_SETTINGS }); setNotice("Defaults loaded. Apply to update the chart."); }}><RotateCcw size={14} />Defaults</button><div><button type="button" onClick={onClose}>Cancel</button><button type="button" disabled={!dirty && settingsPersistence === "saved"} onClick={() => apply(false)}>Apply</button><button type="button" className="desktop-settings-confirm" onClick={() => apply(true)}>OK</button></div></footer>
   </dialog>;
 }

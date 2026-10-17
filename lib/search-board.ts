@@ -4,14 +4,24 @@ export type BoardQuote = {
   price: number;
   change: number;
   volume: number;
+  source?: "tradingview" | "upstox";
+  quoteAt?: string | null;
+  delayed?: boolean;
+  exchange?: string;
 };
 
 export type SearchBoard = { gainers: BoardQuote[]; losers: BoardQuote[] };
+export type BoardMetadata = {
+  fetchedAt: string | null;
+  status: "delayed" | "stale" | "unavailable";
+  source: "tradingview";
+  warning: string | null;
+};
 
 export const US_BOARD = ["NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "AMD", "PLTR", "INTC", "MU", "COIN", "MSTR", "HOOD", "TSM", "SPY", "QQQ"];
 export const CRYPTO_BOARD = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE", "ADA", "LINK", "AVAX", "SUI", "LTC", "BCH", "DOT", "TRX"];
 
-const COLUMNS = ["name", "close", "change", "volume", "description"];
+const COLUMNS = ["name", "close", "change", "volume", "description", "change_abs"];
 
 export function americaBoardScan() {
   return {
@@ -42,6 +52,12 @@ export function cryptoBoardScan() {
   };
 }
 
+function quoteNumber(value: unknown): number | null {
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 export function boardQuotes(payload: unknown, market: "us" | "crypto"): BoardQuote[] {
   const data = (payload as { data?: unknown })?.data;
   if (!Array.isArray(data)) return [];
@@ -51,12 +67,14 @@ export function boardQuotes(payload: unknown, market: "us" | "crypto"): BoardQuo
     if (!Array.isArray(cells)) continue;
     const raw = String(cells[0] ?? "").trim().toUpperCase();
     const symbol = market === "crypto" ? raw.replace(/USDT$/, "") : raw;
-    const price = Number(cells[1]);
-    const change = Number(cells[2]);
-    const volume = Number(cells[3]);
-    if (!/^[A-Z0-9]{1,12}$/.test(symbol) || !Number.isFinite(price) || !Number.isFinite(change)) continue;
+    const price = quoteNumber(cells[1]);
+    const changeAbs = quoteNumber(cells[5]);
+    const previousClose = price !== null && changeAbs !== null ? price - changeAbs : null;
+    const change = previousClose !== null && previousClose > 0 && changeAbs !== null ? (changeAbs / previousClose) * 100 : null;
+    const volume = quoteNumber(cells[3]);
+    if (!/^[A-Z0-9]{1,12}$/.test(symbol) || price === null || price <= 0 || change === null) continue;
     const description = typeof cells[4] === "string" ? cells[4].trim() : "";
-    rows.push({ symbol, name: description || symbol, price, change, volume: Number.isFinite(volume) ? volume : 0 });
+    rows.push({ symbol, name: description || symbol, price, change, volume: volume !== null && volume >= 0 ? volume : 0, source: "tradingview", quoteAt: null, delayed: true });
   }
   return rows;
 }

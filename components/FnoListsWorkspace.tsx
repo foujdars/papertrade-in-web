@@ -71,6 +71,7 @@ export function FnoListsWorkspace({
       <div className="market-discovery-list">
         {filtered.map((item) => {
           const quote = quotes[item.instrumentKey] ?? quotes[item.symbol];
+          const changeAvailable = Boolean(quote && quote.changeAvailable !== false && quote.previousClose > 0);
           const starred = starredSymbols.has(item.symbol);
           return (
             <div key={item.instrumentKey} className={`trend-stock-row fno-symbol-row ${item.underlyingType === "INDEX" ? "index-row" : ""}`} role="button" tabIndex={0} onClick={() => onSelect(item)} onKeyDown={(event) => {
@@ -82,7 +83,7 @@ export function FnoListsWorkspace({
             }} aria-label={`Open ${item.symbol} chart`}>
               {item.underlyingType === "EQUITY" && <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} />}
               <span className="fno-symbol-identity"><b>{item.symbol}</b><small>{item.name} · NSE</small>{item.underlyingType === "EQUITY" && item.futureContracts > 0 && <button type="button" className="fno-future-link" onClick={(event) => { event.stopPropagation(); onFutureSelect(item); }}>Trade future · {item.futures?.[0]?.expiry}</button>}</span>
-              <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{quote ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : <CandleLoader compact label="Loading quote" />}</small></span>
+              <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{changeAvailable ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : quote ? "—" : <CandleLoader compact label="Loading quote" />}</small></span>
               <button type="button" className={`watchlist-star ${starred ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); onStar(item); }} aria-label={`${starred ? "Manage" : "Add"} ${item.symbol} custom watchlists`}><Star size={16} fill={starred ? "currentColor" : "none"} /></button>
             </div>
           );

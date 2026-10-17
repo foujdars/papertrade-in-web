@@ -73,7 +73,7 @@ test("the mover scans ask NSE for gainers, losers, activity, volume, 52-week and
 test("home renders the mover board from the NSE scan route", async () => {
   const [home, route, view, lib] = await Promise.all([
     readFile(new URL("../components/HomeWorkspace.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/market/movers/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/market-movers-server.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/MarketMovers.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/market-movers.ts", import.meta.url), "utf8"),
   ]);
@@ -92,21 +92,26 @@ test("home renders the mover board from the NSE scan route", async () => {
   assert.doesNotMatch(view, /Sample stock/);
 });
 
-test('Home requests only the two summary lists; opening movers still provides every category', async t => {
+test('Home requests summary gainers, losers and 52-week highs; expanded movers reuse that snapshot', async t => {
   const { build } = await import('esbuild');
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (_url, options) => {
     const scan = JSON.parse(options.body); calls.push(scan);
-    return Response.json({ data: [{ s: 'NSE:TEST', d: ['TEST',110,scan.sort.sortOrder==='asc'?-10:10,10,1000,3,110,40,110,100,2.5e9,'Test Ltd'] }] });
+    return Response.json({ data: [{ s: 'NSE:TEST', d: ['TEST',110,scan.sort.sortOrder==='asc'?-10:10,scan.sort.sortOrder==='asc'?-10:10,1000,3,110,40,110,100,2.5e9,'Test Ltd'] }] });
   });
-  const built = await build({ entryPoints:['app/api/market/movers/route.ts'],bundle:true,write:false,platform:'node',format:'esm' });
+  const built = await build({ entryPoints:['app/api/market/movers/route.ts'],bundle:true,write:false,platform:'node',format:'esm', plugins: [{name:'server-only',setup(b){
+    b.onResolve({filter:/^server-only$/},()=>({path:'server-only',namespace:'empty'}));
+    b.onLoad({filter:/.*/,namespace:'empty'},()=>({contents:''}));
+    b.onResolve({filter:/upstox-server$/},()=>({path:'upstox-server',namespace:'broker'}));
+    b.onLoad({filter:/.*/,namespace:'broker'},()=>({contents:'export const isUpstoxConfigured=()=>false; export const upstoxFetch=async()=>{throw new Error("Unavailable");};'}));
+  }}] });
   const route = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`);
   const summary = await route.GET(new Request('https://papertrade.test/api/market/movers?summary=1'));
   const body = await summary.json();
-  assert.equal(calls.length,2);assert.deepEqual(Object.keys(body.lists).sort(),['gainers','losers']);
+  assert.equal(calls.length,3);assert.deepEqual(Object.keys(body.lists).sort(),['gainers','high52','losers']);
   assert.equal(summary.headers.get('cache-control'),'no-store');
   const full = await (await route.GET(new Request('https://papertrade.test/api/market/movers'))).json();
-  assert.equal(calls.length,10);assert.equal(Object.keys(full.lists).length,8);
+  assert.equal(calls.length,8);assert.equal(Object.keys(full.lists).length,8);
   await route.GET(new Request('https://papertrade.test/api/market/movers?summary=1'));
-  assert.equal(calls.length,10,'Concurrent views keep separate cached response shapes');
+  assert.equal(calls.length,8,'Summary and expanded views share the same per-tab snapshot');
 });
