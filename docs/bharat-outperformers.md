@@ -65,3 +65,7 @@ The three strategy cards open independently scoped screens. Switching strategy d
 The optional `Market Capitalization` Screener CSV/JSON field is interpreted in INR crore; recognized CSV aliases include `Market Capitalization (Rs. Cr.)` and `Mar Cap Rs.Cr.`. Existing imports without it keep working for the other screens. [Screener's own results](https://www.screener.in/screens/401431/search/) label market cap in Rs.Cr. Reimport a dataset containing this field to enable size screening of older records. Original fundamental gate/completeness requirements remain unchanged.
 
 No screenshot returns, 2019–2026 history, five-year performance, proprietary model or automatic monthly rebalance is fabricated. All displayed comparisons come from the current scan's available prices.
+
+## Empty eligibility and refreshing data
+
+Generate remains clickable when no companies qualify. It opens a qualification report without requesting market prices. The screen offers Refresh fundamentals to signed-in users; this reloads and reparses the latest server CSV even when its version matches a browser-cached import. It preserves uniquely matched review decisions/notes and the selected strategy. A refreshed source date is shown as unknown unless supplied, rather than carrying an old date onto new data. Failed refreshes keep existing research. If the server file has no market-cap column or no companies pass the strategy criteria, the screen continues to explain the exclusions.
