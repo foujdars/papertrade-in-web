@@ -1,7 +1,7 @@
 import { CHART_INTERVAL_SECONDS } from "./chart-history.ts";
 
 export type StudyPoint = { time: number; value: number };
-export type DrawingPresentation = { visibilityMode?: 'all' | 'selected'; opacity?: number; textEnabled?: boolean; textColor?: string; textOpacity?: number; fontSize?: number; bold?: boolean; italic?: boolean; timeframes?: string[]; text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean; anchorTimeOffset?: number };
+export type DrawingPresentation = { levels?:number[]; reverseDirection?:boolean; extendLines?:boolean; fibLabels?:'ratio'|'percent'|'none'; fibShowPrices?:boolean; regressionDeviation?:number; regressionShowStats?:boolean; visibilityMode?: 'all' | 'selected'; opacity?: number; textEnabled?: boolean; textColor?: string; textOpacity?: number; fontSize?: number; bold?: boolean; italic?: boolean; timeframes?: string[]; text?: string; textVertical?: 'above' | 'middle' | 'below'; textHorizontal?: 'left' | 'center' | 'right'; extendLeft?: boolean; extendRight?: boolean; color?: string; lineWidth?: number; lineDash?: number[]; direction?: 'left' | 'right'; userHidden?: boolean; showPriceLabel?: boolean; anchorTimeOffset?: number };
 /** Preserve library options while validating persisted presentation settings. */
 export function sanitizeDrawingPresentation<T extends DrawingPresentation>(value: T): T {
   const result = { ...value };

@@ -72,6 +72,8 @@ export function AdvancedChartWorkspace({
   initialSymbol: string;
   initialTimeframe: string;
 }) {
+  const [platform,setPlatform]=useState("web");
+  useEffect(()=>setPlatform(Capacitor.getPlatform()),[]);
   const [instrument, setInstrument] = useState<Instrument>(() => getInitialInstrument(initialSymbol));
   const [availableInstruments, setAvailableInstruments] = useState<Instrument[]>(instruments);
   const [timeframe, setTimeframe] = useState(timeframes.includes(initialTimeframe as typeof timeframes[number]) ? initialTimeframe : "5m");
@@ -323,7 +325,7 @@ export function AdvancedChartWorkspace({
   }
 
   return (
-    <main className="advanced-terminal">
+    <main className="advanced-terminal" data-platform={platform} data-section="trade">
       {replayOpen && <BarReplayDialog instrument={instrument} timeframe={timeframe} theme="light" onClose={() => setReplayOpen(false)} />}
       <header className="advanced-topbar">
         <Link href={`/?symbol=${instrument.symbol}&timeframe=${timeframe}`} onClick={(event) => { event.preventDefault(); window.history.back(); }} className="advanced-back" aria-label="Back to trading dashboard"><ArrowLeft size={19} /></Link>
