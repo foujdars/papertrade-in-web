@@ -8,6 +8,13 @@ let current=EMPTY,rawCache:string|null|undefined;
 function read(){if(typeof window==='undefined')return EMPTY;try{const raw=localStorage.getItem(KEY);if(raw!==rawCache){const value=JSON.parse(raw??'{}');current={settings:Object.fromEntries(STUDIES.filter(s=>value.settings?.[s.id]).map(s=>[s.id,normalizeStudy(s.id,value.settings[s.id])])),favorites:Array.isArray(value.favorites)?STUDIES.filter(s=>value.favorites.includes(s.id)).map(s=>s.id):EMPTY.favorites};rawCache=raw;}}catch{}return current;}
 function subscribe(cb:()=>void){window.addEventListener(EVENT,cb);window.addEventListener('storage',cb);return()=>{window.removeEventListener(EVENT,cb);window.removeEventListener('storage',cb);};}
 function write(next:IndicatorPreferences){current=next;try{rawCache=JSON.stringify(next);localStorage.setItem(KEY,rawCache);}catch{}window.dispatchEvent(new Event(EVENT));}
+/** Persist all selected configurations once, then notify once. A failed write changes no live settings. */
+export function applyStudySettings(configs:Record<string,StudyConfig>):boolean{
+ if(typeof window==='undefined')return false;
+ const old=read(),updates=Object.fromEntries(STUDIES.filter(s=>!s.unavailable&&Object.hasOwn(configs,s.id)).map(s=>[s.id,normalizeStudy(s.id,configs[s.id])]));
+ const next={...old,settings:{...old.settings,...updates}};
+ try{const raw=JSON.stringify(next);window.localStorage.setItem(KEY,raw);current=next;rawCache=raw;window.dispatchEvent(new Event(EVENT));return true;}catch{return false;}
+}
 /** Restore explicitly hidden, selected studies; removed studies and timeframe filters stay unchanged. */
 export function restoreHiddenStudies(enabled:Record<string,boolean>){
  const old=read(),settings={...old.settings};let changed=false;

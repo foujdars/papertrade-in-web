@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {chartDataSnapshot} from '../lib/chart-data-window.ts';
+const candles=[{time:10,open:10,high:12,low:9,close:11,volume:20},{time:20,open:11,high:14,low:10,close:13,volume:40},{time:30,open:13,high:14,low:12,close:12,volume:30}];
+test('data window reports exact candle, previous-close change and latest fallback',()=>{const selected=chartDataSnapshot(candles,20,[]);assert.equal(selected.candle,candles[1]);assert.equal(selected.change,2);assert.equal(selected.changePercent,2/11*100);assert.equal(chartDataSnapshot(candles,null,[]).candle,candles[2]);assert.equal(chartDataSnapshot(candles,10,[]).change,null);assert.equal(chartDataSnapshot(candles,15,[]),null);assert.equal(chartDataSnapshot([],null,[]),null);});
+test('displaced indicators inspect the rendered candle, keep warmup empty and preserve colors',()=>{const studies=[{id:'cloud',title:'Cloud',result:{plots:[{name:'Leading',values:[100,101,102],offset:1,colors:['#ff0000','#00ff00','#0000ff']},{name:'Warmup',values:[NaN,NaN,2]}],levels:[]}}];const selected=chartDataSnapshot(candles,20,studies);assert.deepEqual(selected.groups[0].rows,[{name:'Leading',value:100,color:'#ff0000'},{name:'Warmup',value:null,color:undefined}]);assert.equal(chartDataSnapshot(candles,10,studies).groups[0].rows[0].value,null);});

@@ -3,10 +3,17 @@ import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
 import { Capacitor } from '@capacitor/core';
 import { chartCanvasPalette, DESKTOP_CHART_MEDIA } from '@/lib/desktop-chart-theme';
+import { desktopChartHost, useDesktopChartTools } from '@/lib/use-desktop-chart-tools';
+import { useDesktopChartSettings } from '@/lib/desktop-chart-preferences';
+import { desktopChartOptions, desktopSeriesOptions, resolveDesktopChartColors } from '@/lib/desktop-chart-settings';
+import { averageCandleVolume, desktopVolumeCandleColors } from '@/lib/desktop-volume-candles';
+import { DesktopChartSettingsDialog } from './DesktopChartSettingsDialog';
+import { ChartDataWindow } from './ChartDataWindow';
+import { chartDataSnapshot } from '@/lib/chart-data-window';
 
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { CandleLoader } from "./CandleLoader";
-import { Check, Trash2, Settings2, Eye, EyeOff, X } from "lucide-react";
+import { Check, Trash2, Settings2, Eye, EyeOff, X, TableProperties, ListTree } from "lucide-react";
 import { SmcLearner } from "./SmcLearner";
 import { CandlePatterns } from "./CandlePatterns";
 import { OpeningRange } from "./OpeningRange";
@@ -209,6 +216,8 @@ export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
 };
 
 export type ChartAction =
+  | "chart-settings"
+  | "data-window"
   | "pine-editor"
   | "drawing-list"
   | "fit"
@@ -574,6 +583,9 @@ export function MarketChart({
   }, [indicators.psbb, studySettings.rsi, setStudy]);
   const [chartStyle] = useChartPreference("chartStyle");
   const [primaryLineColor, setPrimaryLineColor] = useChartPreference("primaryLineColor");
+  const primaryLineColorRef=useRef(primaryLineColor);
+  const chartThemeRef=useRef(chartTheme);
+  useEffect(()=>{primaryLineColorRef.current=primaryLineColor;chartThemeRef.current=chartTheme;},[primaryLineColor,chartTheme]);
   const [comparedSymbols, setComparedSymbols] = useChartPreference("comparedSymbols");
   const [compareMode] = useChartPreference("compareMode");
   const [hiddenSessionShades, setHiddenSessionShades] = useChartPreference("hiddenSessionShades");
@@ -584,6 +596,17 @@ export function MarketChart({
   const [appliedPine, setAppliedPine] = useState<AppliedPineScript | null>(null);
   const appliedPineRef = useRef<AppliedPineScript | null>(null);
   const [pineStatus, setPineStatus] = useState('');
+  const chartHost = useRef<HTMLDivElement>(null);
+  const desktopTools = useDesktopChartTools(chartHost);
+  const desktopToolsRef = useRef(false);desktopToolsRef.current=desktopTools;
+  const [desktopSettings,setDesktopSettings]=useDesktopChartSettings();
+  const desktopSettingsRef=useRef(desktopSettings);desktopSettingsRef.current=desktopSettings;
+  const [chartSettingsOpen,setChartSettingsOpen]=useState(false);
+  const [dataWindowOpen,setDataWindowOpen]=useState(false);
+  const [localObjectsOpen,setLocalObjectsOpen]=useState(false);
+  const [dismissedObjectsToken,setDismissedObjectsToken]=useState<number|null>(null);
+  const desktopRestoreRef=useRef<{chart:IChartApi;options:Parameters<IChartApi['applyOptions']>[0];series:Record<string,unknown>;gridVisible:boolean;crosshairVisible:boolean}|null>(null);
+  const desktopAppliedRef=useRef<{chart:IChartApi;settings:typeof desktopSettings}|null>(null);
   const [advancedPine, setAdvancedPine] = useState(false);
   const advancedPineRef = useRef(false);
   type PineRequest = {scope:string;key:string;data:Candle[];script:AppliedPineScript;chart:IChartApi;context:PineRuntimeContext;instrument:Instrument;replay:boolean};
@@ -595,7 +618,7 @@ export function MarketChart({
   const pinePreview = useRef<AbortController | null>(null);
   useEffect(() => {
     const media=window.matchMedia(DESKTOP_CHART_MEDIA);
-    const shell=chartHost.current?.closest('.terminal-shell');
+    const shell=desktopChartHost(chartHost.current);
     let initialized=false;
     const update=()=>{
       const advanced=media.matches && shell?.getAttribute('data-platform')==='web' && !Capacitor.isNativePlatform();
@@ -678,7 +701,6 @@ export function MarketChart({
   const replayFocusRef = useRef<{ time: number | null; mode: "pick" | "play" | null }>({ time: null, mode: null });
   const replayDrag = useRef<{ id: number; x: number; moved: boolean; original: number | null } | null>(null);
   const [replayMarkerX, setReplayMarkerX] = useState<number | null>(null);
-  const chartHost = useRef<HTMLDivElement>(null);
   const [priceCursor, setPriceCursor] = useState<{ scope: string; anchor: Anchor; y: number; width: number; precision: number } | null>(null);
   const drawingCrosshairRef = useRef<HTMLDivElement>(null);
   const chartApi = useRef<IChartApi | null>(null);
@@ -788,8 +810,8 @@ export function MarketChart({
   const rememberStudyDrawingsRef = useRef<(next: StudyDrawing[]) => void>(() => {});
   const cancelInProgressRef = useRef<() => void>(() => {});
   const studyPaneRefreshRef = useRef<(() => void) | null>(null);
-  const objectsOpen = chartAction?.type === "drawing-list" && (!chartAction.instrumentKey || chartAction.instrumentKey === instrument.instrumentKey) && (!chartAction.timeframe || chartAction.timeframe === timeframe);
-  const closeObjects = () => onDrawingListClose?.();
+  const objectsOpen = localObjectsOpen || chartAction?.token !== dismissedObjectsToken && chartAction?.type === "drawing-list" && (!chartAction.instrumentKey || chartAction.instrumentKey === instrument.instrumentKey) && (!chartAction.timeframe || chartAction.timeframe === timeframe);
+  const closeObjects = () => {setLocalObjectsOpen(false);setDismissedObjectsToken(chartAction?.token??null);onDrawingListClose?.();};
   const [, setObjectsRevision] = useState(0);
   const drawingTapRef = useRef<{id:string;time:number}|null>(null);
   useEffect(() => { setEditingDrawing(null); }, [instrument.instrumentKey,timeframe]);
@@ -1277,20 +1299,88 @@ export function MarketChart({
   }
 
   function currentCanvasPalette() {
-    return chartCanvasPalette(chartTheme, {
+    return chartCanvasPalette(chartThemeRef.current, {
       mediaMatches: window.matchMedia(DESKTOP_CHART_MEDIA).matches,
-      platform: chartHost.current?.closest('.terminal-shell')?.getAttribute('data-platform'),
-      section: chartHost.current?.closest('.terminal-shell')?.getAttribute('data-section'),
+      platform: desktopChartHost(chartHost.current)?.getAttribute('data-platform'),
+      section: desktopChartHost(chartHost.current)?.getAttribute('data-section'),
       native: Capacitor.isNativePlatform(),
     });
   }
 
-  function themedStylePoint<T extends {color?:string}>(point:T,palette:ReturnType<typeof chartCanvasPalette>):T {
-    if(!['high-low','columns'].includes(chartStyleRef.current))return point;
-    return palette.desktop&&point.color===MARKET_GREEN?{...point,color:palette.up}:palette.desktop&&point.color===MARKET_RED?{...point,color:palette.down}:point;
+  function desktopAppearanceEnabled() {
+    return window.matchMedia(DESKTOP_CHART_MEDIA).matches && desktopChartHost(chartHost.current)?.getAttribute('data-platform')==='web' && !Capacitor.isNativePlatform();
   }
 
-  function pineStylePoint<T extends {color?:string;wickColor?:string;borderColor?:string}>(point:T,epoch:number):T {
+  function applyDesktopAppearance(forceScaleMode=false) {
+    const chart=chartApi.current,series=candleSeries.current;if(!chart||!series)return;
+    const palette=currentCanvasPalette(),style=chartStyleRef.current;
+    const drawingType=normalizeTool(activeToolRef.current),pointTool=!!drawingType&&!CONTINUOUS_TOOLS.has(drawingType);
+    // Media/host events fire before React has committed its new desktop gate.
+    // Read the actual host here so a resize can never reapply desktop colors to mobile.
+    if(!desktopAppearanceEnabled()){
+      const restore=desktopRestoreRef.current;
+      if(restore?.chart===chart){
+        const options={...restore.options,rightPriceScale:{...restore.options.rightPriceScale}};
+        if(compareForcedPercentRef.current)delete options.rightPriceScale.mode;
+        chart.applyOptions(options);series.applyOptions(restore.series);
+        gridVisibleRef.current=restore.gridVisible;crosshairVisibleRef.current=restore.crosshairVisible;
+        chart.applyOptions({
+          layout:{background:{type:ColorType.Solid,color:palette.background},textColor:palette.text},
+          grid:{vertLines:{visible:restore.gridVisible,color:palette.grid},horzLines:{visible:restore.gridVisible,color:palette.grid}},
+          crosshair:{vertLine:{visible:restore.crosshairVisible&&!pointTool,color:palette.crosshair,labelBackgroundColor:palette.crosshairLabel},horzLine:{visible:restore.crosshairVisible&&!pointTool,color:palette.crosshair,labelBackgroundColor:palette.crosshairLabel}},
+        });
+        const line=primaryLineColorRef.current;
+        series.applyOptions({priceLineColor:'#6657ee'});
+        if(series.seriesType()==='Candlestick')series.applyOptions({upColor:style==='hollow-candles'?marketTint('green',0):palette.up,downColor:palette.down,borderUpColor:palette.up,borderDownColor:palette.down,wickUpColor:palette.up,wickDownColor:palette.down});
+        else if(series.seriesType()==='Bar')series.applyOptions({upColor:palette.up,downColor:palette.down});
+        else if(series.seriesType()==='Line')series.applyOptions({color:line});
+        else if(series.seriesType()==='Area')series.applyOptions({lineColor:line,topColor:`${line}47`,bottomColor:`${line}0a`});
+        else if(series.seriesType()==='Baseline')series.applyOptions({topLineColor:MARKET_GREEN,topFillColor1:marketTint('green',.28),topFillColor2:marketTint('green',.04),bottomLineColor:MARKET_RED,bottomFillColor1:marketTint('red',.28),bottomFillColor2:marketTint('red',.04)});
+        desktopRestoreRef.current=null;
+      }
+      desktopAppliedRef.current=null;
+      return;
+    }
+    if(desktopRestoreRef.current?.chart!==chart){
+      const options=chart.options(),original=series.options();
+      const previous=desktopRestoreRef.current;
+      desktopRestoreRef.current={chart,gridVisible:previous?.gridVisible??gridVisibleRef.current,crosshairVisible:previous?.crosshairVisible??crosshairVisibleRef.current,options:{grid:JSON.parse(JSON.stringify(options.grid)),rightPriceScale:{mode:options.rightPriceScale.mode,autoScale:options.rightPriceScale.autoScale,invertScale:options.rightPriceScale.invertScale,scaleMargins:{...options.rightPriceScale.scaleMargins}},timeScale:{timeVisible:options.timeScale.timeVisible,secondsVisible:options.timeScale.secondsVisible,rightOffset:options.timeScale.rightOffset},crosshair:{vertLine:{visible:options.crosshair.vertLine.visible,style:options.crosshair.vertLine.style},horzLine:{visible:options.crosshair.horzLine.visible,style:options.crosshair.horzLine.style}}},series:{priceLineVisible:original.priceLineVisible,lastValueVisible:original.lastValueVisible,...('borderVisible' in original?{borderVisible:original.borderVisible,wickVisible:original.wickVisible}:{}),...('lineWidth' in original?{lineWidth:original.lineWidth}:{})}};
+    }
+    const settings=desktopSettingsRef.current;
+    const previous=desktopAppliedRef.current?.chart===chart?desktopAppliedRef.current.settings:null;
+    const options=desktopChartOptions(settings,palette,CALENDAR_TIMEFRAMES.has(timeframe));
+    // Appearance changes must preserve a user's scroll position and manual price zoom.
+    // Only explicit changes to these preferences reconfigure the viewport.
+    if(previous&&options.timeScale&&previous.rightOffset===settings.rightOffset)delete options.timeScale.rightOffset;
+    if(previous&&options.rightPriceScale){
+      if(previous.autoScale===settings.autoScale)delete options.rightPriceScale.autoScale;
+      if(previous.invertScale===settings.invertScale)delete options.rightPriceScale.invertScale;
+      if(!forceScaleMode&&previous.scaleMode===settings.scaleMode)delete options.rightPriceScale.mode;
+      if(previous.scaleMarginTop===settings.scaleMarginTop&&previous.scaleMarginBottom===settings.scaleMarginBottom)delete options.rightPriceScale.scaleMargins;
+    }
+    if(orderToolRef.current?.enabled&&options.rightPriceScale?.scaleMargins)options.rightPriceScale.scaleMargins={top:Math.max(.24,settings.scaleMarginTop/100),bottom:Math.max(.15,settings.scaleMarginBottom/100)};
+    if(riskDragPriceRangeRef.current&&options.rightPriceScale)options.rightPriceScale.autoScale=false;
+    // A comparison in percentage mode owns the main scale until it is removed.
+    if(compareForcedPercentRef.current&&options.rightPriceScale)delete options.rightPriceScale.mode;
+    if(pointTool&&options.crosshair){if(options.crosshair.vertLine)options.crosshair.vertLine.visible=false;if(options.crosshair.horzLine)options.crosshair.horzLine.visible=false;}
+    chart.applyOptions(options);
+    gridVisibleRef.current=settings.horizontalGrid||settings.verticalGrid;crosshairVisibleRef.current=settings.crosshairVisible;
+    if(!settings.crosshairVisible)setPriceCursor(null);
+    series.applyOptions(desktopSeriesOptions(settings,palette,styleSeriesKind(style),primaryLineColorRef.current));
+    if(style==='hollow-candles')series.applyOptions({upColor:'rgba(0,0,0,0)'});
+    desktopAppliedRef.current={chart,settings:{...settings}};
+  }
+
+  function themedStylePoint<T extends {color?:string}>(point:T,palette:ReturnType<typeof chartCanvasPalette>):T {
+    if(!['high-low','columns'].includes(chartStyleRef.current))return point;
+    const colors=palette.desktop?resolveDesktopChartColors(desktopSettingsRef.current,palette):palette;
+    return palette.desktop&&point.color===MARKET_GREEN?{...point,color:colors.up}:palette.desktop&&point.color===MARKET_RED?{...point,color:colors.down}:point;
+  }
+
+  function pineStylePoint<T extends {color?:string;wickColor?:string;borderColor?:string}>(point:T,epoch:number,candle?:Candle,averageVolume?:number,volumeColors?:ReturnType<typeof resolveDesktopChartColors>):T {
+    if(volumeColors&&candle&&averageVolume!==undefined){
+      point={...point,...desktopVolumeCandleColors(candle,averageVolume,volumeColors)};
+    }
     if(!advancedPineRef.current||!['candles','hollow-candles','volume-candles','bars'].includes(chartStyleRef.current))return point;
     const color=pineColorsRef.current.get(epoch);
     return color?{...point,color,wickColor:color,borderColor:color}:point;
@@ -1300,7 +1390,9 @@ export function MarketChart({
     if (!series) return;
     const style = chartStyleRef.current;
     const palette=currentCanvasPalette();
-    const points = styleSeriesData(candles, style, timeframe).map((point,index)=>pineStylePoint(themedStylePoint(point,palette),Number(candles[index]?.time)));
+    const averageVolume=style==='volume-candles'?averageCandleVolume(candles):undefined;
+    const volumeColors=style==='volume-candles'&&desktopAppearanceEnabled()?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
+    const points = styleSeriesData(candles, style, timeframe).map((point,index)=>pineStylePoint(themedStylePoint(point,palette),Number(candles[index]?.time),candles[index],averageVolume,volumeColors));
     series.setData(points as never);
     const source = prepareStyleCandles(candles, style);
     if (hlcSeries.current && style === "hlc-area") {
@@ -1319,7 +1411,8 @@ export function MarketChart({
     const source = prepareStyleCandles(candles, style);
     const point = source.at(-1);
     if (!point) return;
-    series.update(pineStylePoint(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),currentCanvasPalette()),Number(point.time)) as never);
+    const palette=currentCanvasPalette(),volumeColors=style==='volume-candles'&&desktopAppearanceEnabled()?resolveDesktopChartColors(desktopSettingsRef.current,palette):undefined;
+    series.update(pineStylePoint(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),palette),Number(point.time),point,style==='volume-candles'?averageCandleVolume(source):undefined,volumeColors) as never);
     if (hlcSeries.current && style === "hlc-area") {
       hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
       hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
@@ -1590,11 +1683,14 @@ export function MarketChart({
     const wasEnabled = orderToolEnabledRef.current;
     orderToolEnabledRef.current = enabled;
     const frozenRange = riskDragPriceRangeRef.current;
+    const preferredMargins=desktopAppearanceEnabled()
+      ? {top:desktopSettingsRef.current.scaleMarginTop/100,bottom:desktopSettingsRef.current.scaleMarginBottom/100}
+      : {top:.10,bottom:.10};
     priceScale?.applyOptions({
       autoScale: frozenRange ? false : undefined,
       scaleMargins: enabled
-        ? { top: 0.24, bottom: 0.15 }
-        : { top: 0.10, bottom: 0.10 },
+        ? { top: Math.max(.24,preferredMargins.top), bottom: Math.max(.15,preferredMargins.bottom) }
+        : preferredMargins,
     });
     if (!enabled) {
       riskDragPriceRangeRef.current = null;
@@ -1650,15 +1746,18 @@ export function MarketChart({
       series?.applyOptions({priceLineColor:palette.desktop?palette.accent:"#6657ee"});
       if (series?.seriesType() === 'Candlestick') series.applyOptions({upColor: chartStyle === 'hollow-candles' ? marketTint('green',0) : palette.up, downColor:palette.down, borderUpColor:palette.up, borderDownColor:palette.down, wickUpColor:palette.up, wickDownColor:palette.down});
       else if (series?.seriesType() === 'Bar') series.applyOptions({upColor:palette.up,downColor:palette.down});
+      applyDesktopAppearance();
       paintPriceSeries();
     };
     refresh();
     media.addEventListener('change', refresh);
-    const shell=chartHost.current?.closest('.terminal-shell');
+    const shell=desktopChartHost(chartHost.current);
     const observer=new MutationObserver(refresh);
     if(shell)observer.observe(shell,{attributes:true,attributeFilter:['data-platform','data-section']});
     return () => {media.removeEventListener('change', refresh);observer.disconnect();};
   }, [chartTheme, chartStyle]);
+
+  useEffect(()=>{applyDesktopAppearance();paintPriceSeries();},[desktopTools,desktopSettings,chartGeneration,primaryLineColor,chartStyle]);
 
   useEffect(() => {
     magnetRef.current = magnet;
@@ -1694,7 +1793,7 @@ export function MarketChart({
     const centerPrice = chart ? candleSeries.current?.coordinateToPrice((chart.panes()[0]?.getHeight() ?? 0) / 2) : null;
     drawingAimRef.current = pointTool ? lastCrosshairAnchorRef.current ?? (centerTime !== null && centerPrice != null ? { time: centerTime, price: centerPrice } : null) : null;
     if (!studyAimRef.current && drawingAimRef.current && candleSeries.current) chart?.setCrosshairPosition(drawingAimRef.current.price, drawingAimRef.current.time, candleSeries.current);
-    chart?.applyOptions({crosshair:{vertLine:{visible:!pointTool},horzLine:{visible:!pointTool}}});
+    chart?.applyOptions({crosshair:{vertLine:{visible:!pointTool&&(!desktopToolsRef.current||desktopSettingsRef.current.crosshairVisible)},horzLine:{visible:!pointTool&&(!desktopToolsRef.current||desktopSettingsRef.current.crosshairVisible)}}});
     refreshDrawingCrosshair();
     const hint = definition ? `${definition.label} · drag crosshair, tap anywhere to confirm` : drawingType ? "Drag crosshair · tap anywhere to confirm" : "";
     const hintTimer = window.setTimeout(() => setPlacementHint(hint), 0);
@@ -1714,6 +1813,11 @@ export function MarketChart({
   }, [hiddenDrawings]);
 
   useEffect(() => {
+    if(chartAction?.type === 'chart-settings'||chartAction?.type==='data-window'){
+      if(desktopToolsRef.current&&(!chartAction.instrumentKey||chartAction.instrumentKey===instrument.instrumentKey)&&(!chartAction.timeframe||chartAction.timeframe===timeframe)){
+        if(chartAction.type==='chart-settings')setChartSettingsOpen(true);else setDataWindowOpen(value=>!value);
+      }return;
+    }
     if(chartAction?.type === "pine-editor") {
       if((!chartAction.instrumentKey || chartAction.instrumentKey===instrument.instrumentKey) && (!chartAction.timeframe || chartAction.timeframe===timeframe)) setPineEditorOpen(true);
       return;
@@ -1756,6 +1860,10 @@ export function MarketChart({
         URL.revokeObjectURL(url);
       }, "image/png"));
     }
+    if (chartAction.type === "toggle-grid" && desktopToolsRef.current) {setDesktopSettings(current=>({...current,verticalGrid:!current.verticalGrid,horizontalGrid:!current.verticalGrid}));return;}
+    if (chartAction.type === "toggle-crosshair" && desktopToolsRef.current) {setDesktopSettings(current=>({...current,crosshairVisible:!current.crosshairVisible}));return;}
+    if (chartAction.type.startsWith('scale-')&&desktopToolsRef.current) {const mode=chartAction.type.slice(6);if(['normal','log','percent','indexed'].includes(mode))setDesktopSettings(current=>({...current,scaleMode:mode as typeof current.scaleMode}));return;}
+    if (['fit','reset','live'].includes(chartAction.type)&&desktopToolsRef.current&&!desktopSettingsRef.current.autoScale)setDesktopSettings(current=>({...current,autoScale:true}));
     if (chartAction.type === "toggle-grid") {
       gridVisibleRef.current = !gridVisibleRef.current;
       const palette = currentCanvasPalette();
@@ -2888,8 +2996,9 @@ export function MarketChart({
   useEffect(() => {
     const series = candleSeries.current;
     if (!series || !chartGeneration) return;
-    if (series.seriesType() === "Line") series.applyOptions({ color: primaryLineColor });
-    else if (series.seriesType() === "Area") series.applyOptions({ lineColor: primaryLineColor, topColor: `${primaryLineColor}47`, bottomColor: `${primaryLineColor}0a` });
+    const color=desktopAppearanceEnabled()?desktopSettingsRef.current.lineColor??primaryLineColor:primaryLineColor;
+    if (series.seriesType() === "Line") series.applyOptions({ color });
+    else if (series.seriesType() === "Area") series.applyOptions({ lineColor:color, topColor: `${color}47`, bottomColor: `${color}0a` });
   }, [primaryLineColor, chartGeneration]);
 
   useEffect(() => {
@@ -3041,6 +3150,7 @@ export function MarketChart({
         if (right.options().mode === PriceScaleMode.Percentage) right.applyOptions({ mode: PriceScaleMode.Normal });
         compareForcedPercentRef.current = false;
         candleSeries.current?.applyOptions({ baseLineStyle: LineStyle.Solid });
+        if(desktopAppearanceEnabled())applyDesktopAppearance(true);
       }
       chart.priceScale("left", 0).applyOptions({ visible: false });
       if (keys.length && mode === "pane") overlayCompared.forEach((_,index)=>chart.priceScale("right", comparePane+index).applyOptions({ mode: PriceScaleMode.Normal, autoScale: true }));
@@ -3560,13 +3670,16 @@ export function MarketChart({
 
   const activeStudies = STUDIES.filter(s => s.id !== "smc" && s.id !== "patterns" && indicators[s.id]);
   const indicatorLegend = (activeStudies.length || indicators.patterns || !candlesOnly) ? <div className={indicatorHost !== undefined ? "chart-indicator-strip" : "indicator-legend lightweight-indicator-legend"}>
+    {desktopTools&&!candlesOnly&&<span className="desktop-chart-tools"><button type="button" className="indicator-strip-control" aria-label="Chart settings" title="Chart settings" onClick={()=>setChartSettingsOpen(true)}><Settings2 size={14}/>Settings</button><button type="button" className="indicator-strip-control" aria-label="Data window" aria-pressed={dataWindowOpen} title="Inspect candle data" onClick={()=>setDataWindowOpen(value=>!value)}><TableProperties size={14}/></button><button type="button" className="indicator-strip-control" aria-label="Object tree" title="Manage chart drawings" onClick={()=>setLocalObjectsOpen(true)}><ListTree size={14}/></button></span>}
     {!candlesOnly && <button type="button" className="indicator-strip-control" onClick={()=>setPineEditorOpen(true)} aria-label="Open Pine Editor" title="Write and run a Pine indicator">Pine Editor</button>}
     {!candlesOnly && appliedPine && <><button type="button" className="indicator-strip-control" onClick={()=>setPineEditorOpen(true)} aria-label={`Edit Pine script ${appliedPine.name}`}><i style={{background:'#8054da'}}/>{appliedPine.name}</button><button type="button" className="indicator-strip-control" onClick={()=>applyPine(null)} aria-label="Remove Pine script" title="Remove Pine script"><X size={13}/></button>{pineStatus && <small role="status" style={{color:pineStatus.startsWith('Script error:')?'var(--red,#dc2626)':'var(--muted)'}}>{pineStatus}</small>}</>}
     {indicators.patterns && <button type="button" className="indicator-strip-control chart-pattern-chip" onClick={(event) => activateStudyRef.current("patterns", event.clientX, event.clientY)} aria-label="Candlestick pattern actions" title="Tap for function actions"><i style={{ background: "var(--purple, #8054d9)" }} />Patterns</button>}
     {activeStudies.map(s => { const c = studySettings[s.id] ?? studyDefaults(s.id); const latest = studySummaries.find(v => v.id === s.id); return <button key={s.id} className="indicator-strip-control" style={{opacity:c.hidden ? .5 : 1}} onClick={e => activateStudyRef.current(s.id,e.clientX,e.clientY)} aria-label={'Indicator actions for '+s.name} title="Tap for indicator actions"><i style={{background:c.colors[0]}}/>{studyTitle(s.id,c)}{!["opening-range", "previous-day", "prior-levels", "anchored-vwap", "psbb"].includes(s.id) && <b>{latest?.value?.toFixed(2) ?? "—"}</b>}</button>; })}
   </div> : null;
   return (
-    <div className="chart-stack lightweight-stack">
+    <div className="chart-stack lightweight-stack" data-desktop-tools={desktopTools} data-data-window={desktopTools&&dataWindowOpen} data-chart-theme={chartTheme}>
+      {desktopTools&&dataWindowOpen&&<ChartDataWindow snapshot={chartDataSnapshot(dataRef.current,hoveredCandle?.scope===legendScope?hoveredCandle.time:null,(studyRenderer.current?.bundles??[]).map(bundle=>({id:bundle.id,title:bundle.id==='script'?appliedPine?.name??'Pine script':studyTitle(bundle.id,bundle.config),result:bundle.result})))} symbol={instrument.symbol} timeframe={timeframe} timezone={['NSE','BSE','MCX'].includes(instrument.exchange)?'Asia/Kolkata':'UTC'} hovered={hoveredCandle?.scope===legendScope&&hoveredCandle.time!=null} onClose={()=>setDataWindowOpen(false)}/>}
+      {desktopTools&&chartSettingsOpen&&<DesktopChartSettingsDialog onClose={()=>setChartSettingsOpen(false)} theme={chartTheme} symbol={instrument.symbol} chartStyle={chartStyle}/>}
       <div className="price-chart-wrap lightweight-chart-wrap" onPointerLeave={event => { if (event.pointerType !== 'touch') setPriceCursor(null); }}>
         <div ref={chartHost} className="price-chart lightweight-chart" aria-label="Interactive TradingView Lightweight Charts candlestick chart" />
         {priceCursor?.scope === `${instrument.instrumentKey}:${timeframe}` && !normalizeTool(activeTool) && !hiddenDrawings && !lockedDrawings && !candlesOnly && <div className="chart-price-plus" style={{ top: priceCursor.y, width: priceCursor.width + 18 }}>
@@ -3590,13 +3703,21 @@ export function MarketChart({
         </div>}
         {pineEditorOpen && <PineEditor key={`${advancedPine}:${instrument.instrumentKey}:${timeframe}`} advanced={advancedPine} onRun={previewAdvancedPine} onCancelRun={()=>pinePreview.current?.abort()} candles={dataRef.current} applied={appliedPine} onApply={applyPine} onClose={()=>{pinePreview.current?.abort();setPineEditorOpen(false);}} symbol={instrument.symbol} timeframe={timeframe} theme={chartTheme}/>}
         {editingStudy&&<IndicatorSettings key={editingStudy} id={editingStudy} onClose={()=>setEditingStudy(null)}/>}
-        {editingDrawing && <DrawingSettings bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
+        {editingDrawing && <DrawingSettings advanced={desktopTools} bars={dataRef.current.map(c=>Number(chartTimeFromEpoch(Number(c.time),timeframe)))} key={editingDrawing.id} tool={editingDrawing.tool} study={editingDrawing.study} value={editingDrawing.value} coordinates={editingDrawing.coordinates} coordinateOffset={CALENDAR_TIMEFRAMES.has(timeframe)?IST_OFFSET_SECONDS:0} onClose={()=>setEditingDrawing(null)} onApply={(value,points)=>{
           if (lockedRef.current) return;
           if(editingDrawing.study) rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>line.id===editingDrawing.id&&!line.locked?{...line,presentation:value,...(points?{a:{time:points[0].time,value:points[0].value},b:{time:(points[1]??points[0]).time,value:(points[1]??points[0]).value}}:{})}:line));
           else {const item=drawingManager.current?.getAllDrawings().find(line=>line.id===editingDrawing.id);if(item&&!item.options.locked){const {color,lineWidth,lineDash,...options}=value;item.updateOptions(options);item.updateStyle({lineColor:color??item.style.lineColor,lineWidth:lineWidth??item.style.lineWidth,lineDash:lineDash??item.style.lineDash});if(points){item.updateOptions({anchorTimeOffset:usesIntradayAxisShift(timeframe)?IST_OFFSET_SECONDS:0} as Partial<DrawingOptions>);item.setAnchors(points.map(point=>({time:point.time as UTCTimestamp,price:point.value})));}persistDrawings(true);}}
           scheduleOverlayRefresh();
         }} />}
-        {objectsOpen && <DrawingObjects disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={closeObjects} onAction={(item:DrawingObject,action)=>{
+        {objectsOpen && <DrawingObjects advanced={desktopTools} disabled={lockedDrawings} items={[...(drawingManager.current?.getAllDrawings()??[]).map(item=>({id:item.id,study:false,title:drawingTitle(item.type),text:(item.options as DrawingPresentation).text,color:item.style.lineColor,locked:!!item.options.locked,hidden:!!(item.options as DrawingPresentation).userHidden})),...studyDrawings.filter(line=>line.id!=='draft').map(line=>({id:line.id,study:true,title:drawingTitle(line.tool),text:line.presentation?.text,color:line.presentation?.color??'#6657ee',locked:!!line.locked,hidden:!!line.hidden}))]} onClose={closeObjects} onBatchAction={(items,action)=>{
+          if(lockedRef.current)return;
+          const hidden=action==='hide',lock=action==='lock',visibility=action==='hide'||action==='show';
+          const priceIds=new Set(items.filter(item=>!item.study).map(item=>item.id));
+          const studyIds=new Set(items.filter(item=>item.study).map(item=>item.id));
+          if(priceIds.size){for(const drawing of drawingManager.current?.getAllDrawings()??[]){if(priceIds.has(drawing.id))drawing.updateOptions(visibility?{userHidden:hidden,visible:!hiddenRef.current&&!hidden} as Partial<DrawingOptions>:{locked:lock});}persistDrawings(true);}
+          if(studyIds.size)rememberStudyDrawingsRef.current(studyDrawingsRef.current.map(line=>studyIds.has(line.id)?{...line,...(visibility?{hidden}:{locked:lock})}:line));
+          scheduleOverlayRefresh();
+        }} onAction={(item:DrawingObject,action)=>{
           if(action==='select'){if(item.hidden)drawingAction(item.id,item.study,'hide');if(item.study){drawingManager.current?.deselectAll();selectedStudyLineRef.current=item.id;setSelectedStudyLine(item.id);}else{selectedStudyLineRef.current=null;setSelectedStudyLine(null);drawingManager.current?.selectDrawing(item.id);}closeObjects();scheduleOverlayRefresh();}
           else if(action==='settings'){closeObjects();openDrawingSettings(item.id,item.study);}
           else drawingAction(item.id,item.study,action);

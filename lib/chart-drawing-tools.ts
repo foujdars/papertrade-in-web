@@ -1,5 +1,5 @@
 import { MARKET_GREEN, MARKET_RED, marketTint } from "./market-colours.ts";
-import type { Anchor, ControlPoint, DrawingOptions, DrawingStyle, Geometry, Point, Viewport } from "lightweight-charts-drawing";
+import type { Anchor, ControlPoint, DrawingOptions, DrawingStyle, FibRetracementOptions, Geometry, Point, Viewport } from "lightweight-charts-drawing";
 import type { IPrimitivePaneView, Logical } from "lightweight-charts";
 import { buildVolumeProfile, volumeValueArea, type VolumeCandle } from "./volume-profile.ts";
 import { istSessionStart } from "./profile-range.ts";
@@ -8,10 +8,11 @@ import type { ProfileData } from "./profile-data-client.ts";
 import { drawingLogicalAtTime } from "./drawing-coordinates.ts";
 import { EXTRA_DRAWING_TOOLS } from "./drawing-extras.ts";
 import { paintDrawingLabels, type DrawingLabel } from "./drawing-label-layout.ts";
-import { sanitizeDrawingPresentation, drawingVisibleOnTimeframe, drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
+import { drawingVisibleOnTimeframe, drawingLineTextPosition, drawingTextVisible, type DrawingPresentation } from './study-pane-drawings.ts';
 import { drawingTimeForFrame } from './drawing-anchor-time.ts';
 import { regressionChannel } from './regression-channel.ts';
 import { CHART_INTERVAL_SECONDS } from './chart-history.ts';
+import { sanitizeAdvancedDrawingPresentation, formatFibonacciLabel, extendedDrawingLine, type AdvancedDrawingPresentation } from './drawing-editing.ts';
 const readableFont = () => "13px sans-serif";
 
 function initialPositionAnchors(type: string, entry: Anchor, source: VolumeCandle[]): Anchor[] {
@@ -60,7 +61,10 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     get(type: string) { return entries.get(type); },
     getAll() { return [...entries.values()]; },
     createDrawing(type: string, id: string, anchors?: Anchor[], style?: Partial<DrawingStyle>, options?: Partial<DrawingOptions>) {
-      const item=entries.get(type)?.factory(id, anchors, style, options) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
+      // Validate before construction: native constructors retain their own option
+      // copies, so merging sanitized fields afterwards cannot remove bad values.
+      const safeOptions=options?sanitizeAdvancedDrawingPresentation(options as AdvancedDrawingPresentation):undefined;
+      const item=entries.get(type)?.factory(id, anchors, style, safeOptions) as InstanceType<typeof drawing.Drawing> | undefined;if(!item)return null;
       // Drawings are annotations, not market prices. The upstream primitive
       // contributes every anchor to autoscaling, including hidden drawings and
       // old off-screen levels saved for one instrument. That can flatten only
@@ -69,7 +73,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       // Explicit order-tool levels are included separately by MarketChart.
       item.autoscaleInfo = () => null;
       // Native factories only forward their known fields; retain our saved presentation too.
-      if (options) item.updateOptions(sanitizeDrawingPresentation(options as DrawingPresentation));
+      if (safeOptions) item.updateOptions(safeOptions);
       if (frame && (item.options as DrawingPresentation).anchorTimeOffset === undefined) item.updateOptions({anchorTimeOffset:axisOffset} as Partial<DrawingOptions>);
       if (type === 'vertical-line' && 'setVerticalLineOptions' in item && typeof item.setVerticalLineOptions === 'function') {
         // The native default prints raw Unix seconds. User text is rendered
@@ -85,7 +89,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       };
       syncNativeOptions();
       const updateOptions = item.updateOptions.bind(item);
-      item.updateOptions = options => { updateOptions(sanitizeDrawingPresentation(options as DrawingPresentation)); syncNativeOptions(); };
+      item.updateOptions = options => { updateOptions(sanitizeAdvancedDrawingPresentation(options as AdvancedDrawingPresentation)); syncNativeOptions(); };
       if (['horizontal-line','horizontal-ray','trend-line','ray','extended-line','arrow','rectangle'].includes(type)) {
         Object.assign(item, { priceAxisViews: () => item.anchors.filter((anchor, index, all) => all.findIndex(a => a.price === anchor.price) === index).map(anchor => ({
           coordinate: () => Number(item.getViewport()?.priceScale.priceToCoordinate(anchor.price) ?? -100),
@@ -195,7 +199,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
               if(key==="roundRect")return (...args:Parameters<CanvasRenderingContext2D["roundRect"]>)=>{labelBox=true;ctx.roundRect(...args);};
               if(key==="fill")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.fill,ctx,args);};
               if(key==="stroke")return (...args:unknown[])=>{if(!labelBox)Reflect.apply(ctx.stroke,ctx,args);};
-              if(key==="fillText")return (text:string,x:number,y:number,maxWidth?:number)=>{
+              if(key==="fillText")return (text:string,x:number,y:number)=>{
                 // Our annotation is painted once below, from its anchor geometry.
                 if (text === (item.options as DrawingPresentation).text) return;
                 const point=baseTransform.inverse().multiply(ctx.getTransform()).transformPoint({x,y});
@@ -235,13 +239,16 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     const size=plotSize?.()??viewport;
     ctx.save();ctx.beginPath();ctx.rect(0,0,size.width,size.height);ctx.clip();
     ctx.strokeStyle=item.style.lineColor;ctx.lineWidth=item.style.lineWidth;ctx.setLineDash(item.style.lineDash??[]);
+    const presentation=item.options as DrawingPresentation;
+    ctx.globalAlpha=(presentation.opacity??100)/100;
     const labels: DrawingLabel[] = [];
     for(const geometry of item.computeGeometry(viewport)) {
       if(geometry.type==="line"){ctx.beginPath();ctx.moveTo(geometry.start.x,geometry.start.y);ctx.lineTo(geometry.end.x,geometry.end.y);ctx.stroke();}
       if(geometry.type==="text") {
-        labels.push({text:geometry.text,x:geometry.position.x,y:geometry.position.y,align:geometry.align??"left",color:geometry.color??(plotSize?.().dark?"#c4a2ff":item.style.lineColor),fontSize:geometry.font?parseInt(geometry.font):12,anchored:geometry.text===(item.options as DrawingPresentation).text,background:geometry.text===(item.options as DrawingPresentation).text?(plotSize?.().dark?'#0c142b':'#ffffff'):undefined});
+        labels.push({text:geometry.text,x:geometry.position.x,y:geometry.position.y,align:geometry.align??"left",bold:presentation.bold,italic:presentation.italic,opacity:presentation.textOpacity,color:presentation.textColor??geometry.color??(plotSize?.().dark?"#c4a2ff":item.style.lineColor),fontSize:presentation.fontSize??(geometry.font?parseInt(geometry.font):12),anchored:geometry.text===(item.options as DrawingPresentation).text,background:geometry.text===(item.options as DrawingPresentation).text?(plotSize?.().dark?'#0c142b':'#ffffff'):undefined});
       }
     }
+    ctx.globalAlpha=1;
     paintDrawingLabels(ctx,labels,size.width,size.height);
     if(["selected","editing","hovered"].includes(item.state)) {
       ctx.setLineDash([]);ctx.lineWidth=1.5;
@@ -458,7 +465,8 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
     readonly type = 'regression-trend';
     isValid() { return this.anchors.length >= 2; }
     paneViews() { return labeledPaneViews(this); }
-    computeGeometry(viewport: Viewport): Geometry[] {
+    computeGeometry(viewport: Viewport): Geometry[] { return this.channelGeometry(viewport); }
+    private channelGeometry(viewport:Viewport,extensions=true):Geometry[] {
       if (!this.isValid()) return [];
       const source = candles();
       const offset = (this.options as DrawingPresentation).anchorTimeOffset ?? axisOffset;
@@ -479,12 +487,14 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       const x2 = viewport.timeScale.logicalToCoordinate(drawingLogicalAtTime(result.to, source.map(bar => bar.time)) as Logical);
       if (x1 === null || x2 === null) return [];
       const geometry: Geometry[] = [];
-      for (const band of [0, 2, -2]) {
+      const options=this.options as AdvancedDrawingPresentation;
+      const deviation=options.regressionDeviation??2;
+      for (const band of deviation===0?[0]:[0,deviation,-deviation]) {
         const y1 = viewport.priceScale.priceToCoordinate(result.start + band * result.deviation);
         const y2 = viewport.priceScale.priceToCoordinate(result.end + band * result.deviation);
-        if (y1 !== null && y2 !== null) geometry.push({type:'line',start:{x:x1,y:y1},end:{x:x2,y:y2}});
+        if (y1 !== null && y2 !== null) geometry.push({type:'line',...extendedDrawingLine({x:x1,y:y1},{x:x2,y:y2},viewport.width,extensions&&!!options.extendLeft,extensions&&!!options.extendRight)});
       }
-      if (this.style.showLabels !== false && geometry[0]?.type === 'line') geometry.push({type:'text',position:{x:x2,y:geometry[0].end.y-10},text:`r ${result.correlation.toFixed(3)} · ${result.count} bars`,align:'right'});
+      if (this.style.showLabels !== false && options.regressionShowStats!==false && geometry[0]?.type === 'line') geometry.push({type:'text',position:{x:geometry[0].end.x,y:geometry[0].end.y-10},text:`r ${result.correlation.toFixed(3)} · ${result.count} bars`,align:'right'});
       return geometry;
     }
     testHit(point: Point, viewport: Viewport) {
@@ -496,7 +506,7 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
       });
     }
     getControlPoints(viewport: Viewport) {
-      const middle=this.computeGeometry(viewport).find(g=>g.type==='line');
+      const middle=this.channelGeometry(viewport,false).find(g=>g.type==='line');
       if (!middle || middle.type!=='line') return [];
       const points=Number(this.anchors[0].time)<=Number(this.anchors[1].time)?[middle.start,middle.end]:[middle.end,middle.start];
       return points.map((point,index)=>({...point,index,radius:5}));
@@ -509,21 +519,41 @@ export function createChartDrawingRegistry(drawing: typeof import("lightweight-c
   }
   registry.register({...registry.get('regression-trend')!,factory:(id,anchors,style,options)=>new CandleRegression(id,anchors,style,options)});
   class LabeledFibonacci extends drawing.FibRetracement {
+    updateOptions(options:Partial<DrawingOptions>){
+      const safe=sanitizeAdvancedDrawingPresentation(options as AdvancedDrawingPresentation);
+      super.updateOptions(safe);
+      if(this.fibOptions)super.setFibOptions(safe);
+    }
+    setFibOptions(options:Partial<FibRetracementOptions>){
+      const safe=sanitizeAdvancedDrawingPresentation(options as AdvancedDrawingPresentation);
+      super.setFibOptions(safe);
+      super.updateOptions(safe);
+    }
     paneViews() { return labeledPaneViews(this); }
     computeGeometry(viewport: Viewport): Geometry[] {
-      const geometry=super.computeGeometry(viewport);
-      if(!this.isValid())return geometry;
+      if(!this.isValid())return [];
       const a=this.anchorToPixel(this.anchors[0],viewport),b=this.anchorToPixel(this.anchors[1],viewport);
-      if(!a||!b)return geometry;
+      if(!a||!b)return [];
+      const options=this.options as AdvancedDrawingPresentation;
+      const extendLeft=options.extendLeft??this.fibOptions.extendLines??false;
+      const extendRight=options.extendRight??this.fibOptions.extendLines??false;
+      const start=extendLeft?0:Math.min(a.x,b.x),end=extendRight?viewport.width:Math.max(a.x,b.x);
+      const geometry:Geometry[]=[];
       for(const level of this.fibOptions.levels??[]) {
-        const y=viewport.priceScale.priceToCoordinate(this.getPriceAtLevel(level));
-        if(y===null||y<0||y>viewport.height)continue;
-        geometry.push({type:"text",position:{x:Math.max(4,Math.min((plotSize?.().width??viewport.width)-42,Math.max(a.x,b.x)+4)),y:y-3},text:String(level),font:readableFont(),color:plotSize?.().dark?"#c4a2ff":this.style.lineColor});
+        const price=this.getPriceAtLevel(level),y=viewport.priceScale.priceToCoordinate(price);
+        if(y===null)continue;
+        geometry.push({type:'line',start:{x:start,y},end:{x:end,y}});
+        if(y<0||y>viewport.height||this.style.showLabels===false)continue;
+        const label=formatFibonacciLabel(level,price,options,plotSize?.().formatPrice);
+        if(label)geometry.push({type:'text',position:{x:Math.max(4,Math.min((plotSize?.().width??viewport.width)-42,end+4)),y:y-3},text:label,font:readableFont(),color:plotSize?.().dark?'#c4a2ff':this.style.lineColor});
       }
       return geometry;
     }
-    toJSON() { return {...super.toJSON(), options:{...this.options,...this.fibOptions}}; }
-    clone(id:string) { return new LabeledFibonacci(id,[...this.anchors],this.style,this.fibOptions); }
+    testHit(point:Point,viewport:Viewport){
+      return this.computeGeometry(viewport).some(shape=>shape.type==='line'&&point.x>=Math.min(shape.start.x,shape.end.x)&&point.x<=Math.max(shape.start.x,shape.end.x)&&Math.abs(point.y-shape.start.y)<=5);
+    }
+    toJSON() { return {...super.toJSON(), options:{...this.fibOptions,...this.options}}; }
+    clone(id:string) { return new LabeledFibonacci(id,this.anchors.map(anchor=>({...anchor})),{...this.style},{...this.fibOptions,...this.options,levels:[...(this.fibOptions.levels??[])]}); }
   }
   registry.register({...registry.get("fib-retracement")!,factory:(id,anchors,style,options)=>new LabeledFibonacci(id,anchors,style,options)});
   for(const type of ["long-position","short-position"])registry.register({...registry.get(type)!,requiredAnchors:1,factory:(id,anchors,style,options)=>new PositionDrawing(type,id,anchors??[],style,options)});
