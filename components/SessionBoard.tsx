@@ -5,7 +5,7 @@ import { useTransientBack } from "./useTransientBack";
 import { sessionBoard } from "@/lib/market-sessions";
 import { NOTIFICATION_SETTINGS_EVENT, readNotificationPreferences, saveNotificationPreferences } from "@/lib/notification-preferences";
 
-export function SessionBoard({ variant = "home", hiddenShades = [], onToggleShade }: { variant?: "home" | "chip"; hiddenShades?: string[]; onToggleShade?: (id: string) => void }) {
+export function SessionBoard({ variant = "home", intraday = true, hiddenShades = [], onToggleShade }: { variant?: "home" | "chip"; intraday?: boolean; hiddenShades?: string[]; onToggleShade?: (id: string) => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [alerts, setAlerts] = useState(true);
   const [timesOpen, setTimesOpen] = useState(false);
@@ -42,10 +42,12 @@ export function SessionBoard({ variant = "home", hiddenShades = [], onToggleShad
               key={item.id}
               type="button"
               className={`chart-session-chip${item.open ? " is-open" : ""}${shown ? "" : " shades-off"}`}
-              aria-pressed={shown}
-              aria-label={`${shown ? "Hide" : "Show"} ${item.name} session shade, ${item.period} IST${item.open ? ", live" : ""}`}
+              aria-pressed={intraday ? shown : undefined}
+              aria-disabled={!intraday}
+              title={intraday ? `${item.name} session · ${item.period} IST` : "Session shading is available on intraday timeframes (for example 5m or 1h)."}
+              aria-label={!intraday ? `${item.name} session shading requires an intraday timeframe` : `${shown ? "Hide" : "Show"} ${item.name} session shade, ${item.period} IST${item.open ? ", live" : ""}`}
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => { event.stopPropagation(); onToggleShade?.(item.id); }}
+              onClick={(event) => { event.stopPropagation(); if (intraday) onToggleShade?.(item.id); }}
             >
               {shortName[item.id] ?? item.name}
             </button>

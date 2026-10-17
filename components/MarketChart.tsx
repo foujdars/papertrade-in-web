@@ -694,6 +694,7 @@ export function MarketChart({
   const compareSeries = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const profileOverlay = useRef<ChartProfileOverlay | null>(null);
   const [chartGeneration, setChartGeneration] = useState(0);
+  const sessionShadeRefreshRef = useRef<(() => void) | null>(null);
   const [sessionShades, setSessionShades] = useState<Array<{ key: string; left: number; width: number; color: string; edges: Array<{ x: number; label: string }> }>>([]);
   const studyRenderer = useRef<ChartStudyRenderer | null>(null);
   const drawingManager = useRef<DrawingManager | null>(null);
@@ -932,6 +933,7 @@ export function MarketChart({
   }
 
   function scheduleOverlayRefresh() {
+    sessionShadeRefreshRef.current?.();
     if (typeof window === "undefined" || overlayFrameRef.current) return;
     overlayFrameRef.current = window.requestAnimationFrame(() => {
       overlayFrameRef.current = 0;
@@ -2960,7 +2962,7 @@ export function MarketChart({
       const scale = chart?.timeScale();
       const visible = scale?.getVisibleRange();
       const width = chartHost.current?.clientWidth ?? 0;
-      if (!chart || !scale || !visible || width < 2) return;
+      if (!chart || !scale || !visible || width < 2) { setSessionShades([]); return; }
       const from = timeToTimestamp(visible.from);
       const to = timeToTimestamp(visible.to);
       const x1 = scale.timeToCoordinate(visible.from);
@@ -3035,6 +3037,9 @@ export function MarketChart({
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(draw);
     };
+    sessionShadeRefreshRef.current = schedule;
+    const observer = new ResizeObserver(schedule);
+    if (chartHost.current) observer.observe(chartHost.current);
     const scale = chartApi.current?.timeScale();
     scale?.subscribeVisibleLogicalRangeChange(schedule);
     const timer = window.setInterval(schedule, 60_000);
@@ -3042,6 +3047,8 @@ export function MarketChart({
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearInterval(timer);
+      observer.disconnect();
+      if (sessionShadeRefreshRef.current === schedule) sessionShadeRefreshRef.current = null;
       scale?.unsubscribeVisibleLogicalRangeChange(schedule);
     };
   }, [chartGeneration, timeframe, hiddenSessionShades]);
@@ -3762,7 +3769,7 @@ export function MarketChart({
             </div>
           )}
         </div>
-        {!isReplay && <SessionBoard variant="chip" hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
+        {!isReplay && <SessionBoard variant="chip" intraday={!CALENDAR_TIMEFRAMES.has(timeframe)} hiddenShades={hiddenSessionShades} onToggleShade={(id) => setHiddenSessionShades((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} />}
         {indicatorHost !== undefined ? indicatorHost && createPortal(indicatorLegend, indicatorHost) : indicatorLegend}
         <div ref={drawingCrosshairRef} className="drawing-crosshair" hidden aria-hidden="true"><i /><b /><span /></div>
         {!hiddenDrawings && selectedDrawingId && drawingActions && !placementHint && <DrawingActionBar title={drawingTitle(drawingManager.current?.getSelectedDrawing()?.type??'drawing')} locked={!!drawingManager.current?.getSelectedDrawing()?.options.locked} disabled={lockedDrawings} position={drawingActions} onSettings={()=>openDrawingSettings(selectedDrawingId,false)} onAlert={!isReplay&&onPriceAction&&isSupportedNseInstrumentKey(instrument.instrumentKey)&&!instrument.instrumentKey.startsWith('MCX_FO|')&&['horizontal-ray','horizontal-line'].includes(drawingManager.current?.getSelectedDrawing()?.type??'')?()=>{const item=drawingManager.current?.getSelectedDrawing();const price=item?.anchors[0]?.price;if(item&&Number.isFinite(price)&&price!>0){drawingManager.current?.deselectAll();onPriceAction(price!,'alert',{id:item.id,type:item.type as DrawingAlertSource['type'],text:(item.options as DrawingPresentation).text});}}:undefined} onDuplicate={()=>drawingAction(selectedDrawingId,false,'duplicate')} onLock={()=>drawingAction(selectedDrawingId,false,'lock')} onHide={()=>drawingAction(selectedDrawingId,false,'hide')} onDelete={()=>drawingAction(selectedDrawingId,false,'delete')} onDone={()=>drawingManager.current?.deselectAll()} />}
