@@ -1,0 +1,69 @@
+{
+  "publicEditorEvidenceId": "ev_30de8044efd6c87b6e11606b7881cbe01d415d02f6c1af5c64983a1a8bb5f6f1",
+  "selectedSources": {
+    "requested_paths": [
+      "preload/platform-preload.js",
+      "preload/target-tvd-host-preload.js",
+      "app/1892.js"
+    ],
+    "unselected_files": 160
+  },
+  "observedEditorControls": [
+    "Untitled script",
+    "Add to chart",
+    "Save script",
+    "Publish script",
+    "More",
+    "Move overlay to split-view",
+    "Collapse panel",
+    "Close",
+    "Editor content",
+    "Line 1, Col 1"
+  ],
+  "ghidraEvidenceReused": [
+    "rea-ghidra-native-overview.json",
+    "rea-ghidra-native-registration.json"
+  ],
+  "staticEvidenceId": "ev_e3a0a0de66caa0ac772010ebc51d698753f3fe69151607a7bbd2f5dc6e1f0b54",
+  "observedTitleMenu": [
+    "Save script Ctrl+S",
+    "Make a copy disabled",
+    "Rename",
+    "Version history disabled",
+    "Move script to bottom",
+    "Create new"
+  ],
+  "officialDocs": [
+    "https://www.tradingview.com/pine-script-docs/en/v5/Introduction.html/",
+    "https://tradingview.com/pine-script-docs/primer/first-indicator/"
+  ],
+  "statistics": {
+    "relevant_files": 166,
+    "nested_asar_containers": 0,
+    "text_bytes_read": 58342,
+    "invalid_utf8_files": 0,
+    "parsed_javascript_files": 3,
+    "visited_ast_nodes": 9677,
+    "findings": 127,
+    "modules": 38,
+    "parse_failures": 0
+  },
+  "desktopBoundary": "TVD.setFocusPineEditor -> electron.ipcRenderer.send(tvd:focus-pine-editor)",
+  "publicEditorCompleteness": {
+    "status": "complete",
+    "equality_eligible": true,
+    "missing_sections": [],
+    "truncated_sections": []
+  },
+  "limits": [
+    "Selected static source analysis excludes 160 inventoried files",
+    "No original Pine compiler recovered",
+    "Native evidence establishes desktop bridge only",
+    "No script compiled saved or published",
+    "Public editor observed in fresh logged-out session"
+  ],
+  "compilerRecovered": false,
+  "reaVersion": "6.5.0",
+  "titleMenuEvidenceId": "ev_6148633e1337545ec57858ef9e51e9d9d9914f1974b8f4f3ed71f31fc95d5a1d",
+  "rootArtifactSha256": "a70a18bfd8f1db8d113993709d8294344545a29b3ccf7f7c3436667907023906"
+}
