@@ -276,7 +276,7 @@ export function FnoChartWorkspace({
           </section>
         </>
       )}
-      {indicatorMenuOpen && <ChartFunctionMenu indicators={indicators} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1 }))} onClose={() => setIndicatorMenuOpen(false)} />}
+      {indicatorMenuOpen && <ChartFunctionMenu indicators={indicators} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1, ...(type === "pine-editor" ? {instrumentKey:option.instrumentKey,timeframe} : {}) }))} onClose={() => setIndicatorMenuOpen(false)} />}
       {styleMenuOpen && <ChartStyleMenu onClose={() => setStyleMenuOpen(false)} />}
       {compareOpen && <CompareSymbolPicker instruments={compareInstruments?.length ? compareInstruments : [topInstrument, option]} currentKey={topInstrument.instrumentKey} onClose={() => setCompareOpen(false)} />}
       {drawingMenuOpen && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setDrawingMenuOpen(false)} />}

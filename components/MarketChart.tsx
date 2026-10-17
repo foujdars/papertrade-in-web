@@ -203,6 +203,7 @@ export const DEFAULT_CHART_INDICATORS: ChartIndicators = {
 };
 
 export type ChartAction =
+  | "pine-editor"
   | "drawing-list"
   | "fit"
   | "reset"
@@ -1575,6 +1576,10 @@ export function MarketChart({
   }, [hiddenDrawings]);
 
   useEffect(() => {
+    if(chartAction?.type === "pine-editor") {
+      if((!chartAction.instrumentKey || chartAction.instrumentKey===instrument.instrumentKey) && (!chartAction.timeframe || chartAction.timeframe===timeframe)) setPineEditorOpen(true);
+      return;
+    }
     const chart = chartApi.current;
     if (!chartAction || chartAction.type === "drawing-list" || !chart) return;
     if (chartAction.type === "fit") {
@@ -1635,7 +1640,7 @@ export function MarketChart({
         if (mode !== undefined) chart.priceScale("right").applyOptions({ mode });
       });
     }
-  }, [chartAction, instrument.symbol, timeframe]);
+  }, [chartAction, instrument.symbol, instrument.instrumentKey, timeframe]);
 
   useEffect(() => {
     if (!chartHost.current) return;
