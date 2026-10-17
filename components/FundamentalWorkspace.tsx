@@ -12,6 +12,7 @@ import { AppDialog } from "./AppDialog";
 import { ModernSelect } from "./ModernSelect";
 import { FundamentalPeers } from "./FundamentalPeers";
 import { TopStocks } from "./TopStocks";
+import { preserveFundamentalReviews } from "@/lib/fundamental-refresh";
 import { BharatOutperformers } from "./BharatOutperformers";
 import type { ResearchOrderDraft } from "@/lib/stock-discovery";
 import "./fundamental-workspace.css";
@@ -37,6 +38,7 @@ type ImportOptions = {
   sourceVersion?: string;
   dataAsOf?: string;
   automatic?: boolean;
+  refresh?: boolean;
 };
 
 export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate, onOpenChart }: Props) {
@@ -111,16 +113,35 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
       if (!payload.results.some(result => result.name !== "Company 1" && (result.nseCode || result.bseCode))) throw new Error("Use a Screener export containing Name and NSE Code or BSE Code columns.");
       const dated = {
         ...payload,
+        results: options.refresh ? preserveFundamentalReviews(payload.results, run?.results ?? []) : payload.results,
         sourceVersion: options.sourceVersion,
-        dataAsOf: (options.dataAsOf ?? dataAsOf) || undefined,
+        dataAsOf: (options.dataAsOf ?? (options.refresh ? "" : dataAsOf)) || undefined,
       };
       let next: ScreeningRunPayload = dated;
       try { next = await saveLocalRun(ownerId, dated, file); setNotice("Research saved on this browser for this account."); }
       catch { setNotice("Analysis is ready, but browser storage could not save it. Reviews may be lost when you leave this tab."); }
       if (options.automatic) setNotice("Latest fundamental data loaded automatically from the server.");
-      setRun(next); setDataAsOf(next.dataAsOf ?? ""); setSelectedId(next.results[0].id); setReviewOpen(false); setView("screen"); setSearch(""); setStatus("all"); setIndustry("all"); setPage(0);
+      setRun(next); setDataAsOf(next.dataAsOf ?? ""); setSelectedId(next.results[0].id); setReviewOpen(false); if (!options.refresh) setView("screen"); setSearch(""); setStatus("all"); setIndustry("all"); setPage(0);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not import this CSV."); }
     finally { setBusy(false); importing.current = false; }
+  }
+
+  async function refreshFundamentals() {
+    if(importing.current || busy)return;
+    setBusy(true);setError("");
+    try {
+      const client=getSupabaseBrowserClient();
+      const session=(await client?.auth.getSession())?.data.session;
+      if(!session)throw new Error("Sign in to refresh the fundamental dataset. Your saved research is unchanged.");
+      const headers={Authorization:`Bearer ${session.access_token}`};
+      const response=await fetch("/api/fundamentals/latest",{headers,cache:"no-store",signal:AbortSignal.timeout(25000)});
+      if(!response.ok)throw new Error("The latest fundamental dataset could not be downloaded. Please try again.");
+      const csv=await response.text();
+      let manifest:RemoteFundamentalManifest|null=null;
+      try{const metadata=await fetch("/api/fundamentals/manifest",{headers,cache:"no-store",signal:AbortSignal.timeout(10000)});if(metadata.ok)manifest=await metadata.json() as RemoteFundamentalManifest;}catch{/* A missing manifest does not prevent re-reading the dataset. */}
+      await importCsv(new File([csv],"latest.csv",{type:"text/csv"}),{refresh:true,sourceVersion:manifest?.version,dataAsOf:manifest?.dataAsOf});
+    } catch(caught){setError(caught instanceof Error?caught.message:"Could not refresh fundamentals.");}
+    finally{setBusy(false);}
   }
 
   useEffect(() => {
@@ -187,7 +208,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
         <nav className="fa-tabs" aria-label="Fundamental analysis sections">{VIEWS.map(tab => <button key={tab.id} aria-pressed={view === tab.id} onClick={() => { setView(tab.id); setPage(0); setReviewOpen(false); }}>{tab.label}</button>)}</nav>
       </div>
       {error && <p className="fa-message fa-error" role="alert">{error}</p>}
-      {notice && view === "screen" && <p className="fa-message" role="status">{notice}</p>}
+      {notice && (view === "screen" || view === "bharat") && <p className="fa-message" role="status">{notice}</p>}
       {loading ? <p role="status">Loading saved research…</p> : <>
         {run && view === "screen" && <nav className="fa-run-summary" aria-label="Company lists">{summaries.map(summary => <button type="button" key={summary.status}
           aria-label={`${summary.count} ${summary.label}`} aria-pressed={status === summary.status} aria-controls={drawerId}
@@ -198,7 +219,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
           {run.missingColumns.length > 0 && <details className="fa-missing"><summary>{run.missingColumns.length} screening columns missing · missing values fail their gates</summary><p>{run.missingColumns.join(" · ")}</p></details>}
           <div hidden={view !== "peers"}><FundamentalPeers key={`${run.importedAt}:${peerAnchor}`} run={run} instruments={instruments} anchorId={peerAnchor || selectedId} onInspect={inspect} onOpenChart={openChart} /></div>
           <div hidden={view !== "rank"}><TopStocks key={run.importedAt} run={run} instruments={instruments} balance={balance} onInspect={inspect} onCompare={compare} onOpenChart={onOpenChart} onSimulate={onSimulate} /></div>
-          <div hidden={view !== "bharat"}><BharatOutperformers key={run.importedAt} run={run} instruments={instruments} onInspect={inspect} onOpenChart={onOpenChart} /></div>
+          <div hidden={view !== "bharat"}><BharatOutperformers run={run} instruments={instruments} onInspect={inspect} onOpenChart={onOpenChart} onRefreshFundamentals={refreshFundamentals} refreshing={busy} /></div>
           {reviewOpen && selected && <AppDialog className="fa-review-dialog" labelledBy={`${drawerId}-review`} returnFocus={stockTrigger} onClose={() => setReviewOpen(false)}><header className="fa-review-dialog-head"><h2 id={`${drawerId}-review`}>{selected.nseCode || selected.bseCode || selected.name} analysis</h2><button aria-label="Close company analysis" onClick={() => setReviewOpen(false)}><X size={20} /></button></header><CompanyReview key={`${run.id ?? run.importedAt}:${selected.id}`} result={selected} instruments={instruments} onOpenChart={openChart} onSave={saveReview} />{notice && <p role="status">{notice}</p>}</AppDialog>}
 
         </>}
