@@ -1,6 +1,6 @@
 # Horizontal ray settings and drawing alerts
 
-Built on main after the #111 revert (#113). This does not reintroduce the reverted theme or include the separate #112 changes.
+Built on main after the #111 revert (#113), then integrated with the subsequently merged #112 chart improvements. This does not reintroduce the reverted theme.
 
 ## Drawing settings
 
