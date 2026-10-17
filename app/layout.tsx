@@ -53,6 +53,7 @@ import "./tradingview-desktop.css";
 import "./desktop-chart-settings.css";
 import "./desktop-chart-workspace.css";
 import "./desktop-data-visuals.css";
+import "./desktop-layout-cleanup.css";
 import "./indicator-templates.css";
 import "./market-data-status.css";
 import "./algo-trading.css";

@@ -2908,7 +2908,7 @@ export function TradingDashboard() {
   };
   return (
     <StockLogoProvider instruments={tradingUniverse}>
-    <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-section={activeNavigationSection}>
+    <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-desktop-cleanup={desktopBrowser ? "true" : undefined} data-section={desktopBrowser && positionsOpen ? "positions" : activeNavigationSection}>
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
       <SessionOpenAlerts />
       <PaperTradeToneListener />
@@ -2917,25 +2917,25 @@ export function TradingDashboard() {
       <header className="topbar">
         <Brand onClick={() => openNavigationSection("home")} />
         <nav className="main-nav" aria-label="Main navigation">
-          <button className={activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}><Home className="desktop-nav-icon" size={16} aria-hidden="true"/>Home</button>
-          <button className={["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}><LineChart className="desktop-nav-icon" size={16} aria-hidden="true"/>Charts</button>
-          <button className={activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness className="desktop-nav-icon" size={16} aria-hidden="true"/>Holdings</button>
-          <button className="desktop-nav-positions" onClick={() => setPositionsOpen(true)}>Positions</button>
-          <button className={activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}><BookOpenCheck className="desktop-nav-icon" size={16} aria-hidden="true"/>Orders</button>
-          <button className={marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}><Bookmark className="desktop-nav-icon" size={16} aria-hidden="true"/>Watchlist</button>
-          <button className={activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}><Newspaper className="desktop-nav-icon" size={16} aria-hidden="true"/>News</button>
-          <button className={activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket className="desktop-nav-icon" size={16} aria-hidden="true"/>IPOs</button>
-          <button className={activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><ChartNoAxesCombined className="desktop-nav-icon" size={16} aria-hidden="true"/>Analysis</button>
-          <button className={activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}><Activity className="desktop-nav-icon" size={16} aria-hidden="true"/>P&amp;L</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "home" ? "nav-active" : ""} onClick={() => openNavigationSection("home")}><Home className="desktop-nav-icon" size={16} aria-hidden="true"/>Home</button>
+          <button className={!(desktopBrowser && positionsOpen) && ["trade", "fno"].includes(activeNavigationSection) ? "nav-active" : ""} onClick={() => openNavigationSection("trade")}><LineChart className="desktop-nav-icon" size={16} aria-hidden="true"/>Charts</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "holdings" ? "nav-active" : ""} onClick={() => openNavigationSection("holdings")}><BriefcaseBusiness className="desktop-nav-icon" size={16} aria-hidden="true"/>Holdings</button>
+          <button className={`desktop-nav-positions${desktopBrowser && positionsOpen ? " nav-active" : ""}`} aria-current={desktopBrowser && positionsOpen ? "page" : undefined} onClick={() => setPositionsOpen(true)}>Positions</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "orders" ? "nav-active" : ""} onClick={() => openNavigationSection("orders")}><BookOpenCheck className="desktop-nav-icon" size={16} aria-hidden="true"/>Orders</button>
+          <button className={!(desktopBrowser && positionsOpen) && marketNavigationActive ? "nav-active" : ""} onClick={() => openNavigationSection("watchlist")}><Bookmark className="desktop-nav-icon" size={16} aria-hidden="true"/>Watchlist</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "news" ? "nav-active" : ""} onClick={() => openNavigationSection("news")}><Newspaper className="desktop-nav-icon" size={16} aria-hidden="true"/>News</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "ipo" ? "nav-active" : ""} onClick={() => openNavigationSection("ipo")}><Rocket className="desktop-nav-icon" size={16} aria-hidden="true"/>IPOs</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><ChartNoAxesCombined className="desktop-nav-icon" size={16} aria-hidden="true"/>Analysis</button>
+          <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}><Activity className="desktop-nav-icon" size={16} aria-hidden="true"/>P&amp;L</button>
         </nav>
-        <span className="desktop-workspace-title">{activeNavigationSection === "algo" ? "Algo Trading" : activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
+        <span className="desktop-workspace-title">{desktopBrowser && positionsOpen ? "Open positions" : activeNavigationSection === "algo" ? "Algo Trading" : activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
           </div>
-          <button className="funds-button" onClick={() => openFunds(selectedDeltaChartSymbol && activeNavigationSection === "trade" ? "USD" : "INR")} title="Add practice cash to the selected market wallet"><WalletCards size={16} /> {selectedDeltaChartSymbol && activeNavigationSection === "trade" ? globalTrading.account ? formatUsd(globalTrading.account.wallet) : "USD wallet" : formatInr(balance)}</button>
+          <button className="funds-button" aria-label={desktopBrowser ? "Practice wallet" : undefined} onClick={() => desktopBrowser ? openHeaderWallet() : openFunds(selectedDeltaChartSymbol && activeNavigationSection === "trade" ? "USD" : "INR")} title={desktopBrowser ? "Manage practice wallets" : "Add practice cash to the selected market wallet"}><WalletCards size={16} /> {desktopBrowser ? "Wallet" : selectedDeltaChartSymbol && activeNavigationSection === "trade" ? globalTrading.account ? formatUsd(globalTrading.account.wallet) : "USD wallet" : formatInr(balance)}</button>
           {!isAndroidApp && <button className="download-button" onClick={() => setDownloadOpen(true)} title="Get the mobile app"><Download size={16} /> Get app</button>}
-          {!isAndroidApp && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
+          {!isAndroidApp && !desktopBrowser && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
           <NotificationCenter open={notificationsOpen} setOpen={setNotificationsOpen} />
           <button type="button" className="icon-button header-coach-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }} aria-label="Open trading coach" title="Trading coach"><Target size={19} /></button>
@@ -2944,20 +2944,20 @@ export function TradingDashboard() {
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <HeaderPopover className="more-menu-panel" label="More options">
-                <header className="tools-menu-heading"><b>Tools & settings</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
+                <header className="tools-menu-heading"><b>{desktopBrowser ? "Trading tools" : "Tools & settings"}</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
                 <div className="tools-menu-features">
                   <button aria-label="Algo Trading" onClick={() => { setMoreMenuOpen(false); openNavigationSection("algo"); }}><span className="tools-menu-icon"><Activity size={21} /></span><span><b>Algo Trading</b><small>Build, backtest & paper trade</small></span><ChevronRight size={18} /></button>
-                  <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>
+                  {!desktopBrowser && <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>}
                   <button aria-label="Bot" onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><span className="tools-menu-icon"><Bot size={21} /></span><span><b>Trading bot</b><small>Strategies, controls & activity</small></span><ChevronRight size={18} /></button>
                 </div>
-                <div className="tools-menu-secondary">
+                {!desktopBrowser && <div className="tools-menu-secondary">
                   <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={18}/><span>Wallet</span></button>
                   <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
-                </div>
+                </div>}
               </HeaderPopover>
             </>}
           </div>
-          <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>
+          {!desktopBrowser && <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>}
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => { setAccountDeleteArmed(false); setAccountDeleteError(""); setAccountOpen(value => !value); }} aria-expanded={accountOpen} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
         </div>
@@ -3414,8 +3414,8 @@ export function TradingDashboard() {
         </div>
       )}
       {positionsOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPositionsOpen(false)}>
-          <section className="modal positions-modal" role="dialog" aria-modal="true" aria-label="Open positions" onMouseDown={(event) => event.stopPropagation()}>
+        <div className={desktopBrowser ? "navigation-page-backdrop desktop-positions-page" : "modal-backdrop"} role="presentation" onMouseDown={() => { if (!desktopBrowser) setPositionsOpen(false); }}>
+          <section className={desktopBrowser ? "modal navigation-page positions-modal" : "modal positions-modal"} role={desktopBrowser ? "region" : "dialog"} aria-modal={desktopBrowser ? undefined : true} aria-label="Open positions" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head"><div><span className="eyebrow">Paper portfolio</span><h2>Open positions</h2></div><button className="icon-button" onClick={() => setPositionsOpen(false)} aria-label="Close positions"><X size={20} /></button></div>
             <div className="positions-summary"><span>{openPositions.length} open</span><div><small>Live P&amp;L</small><b className={totalOpenPnl >= 0 ? "positive" : "negative"}>{totalOpenPnl >= 0 ? "+" : ""}{formatInr(totalOpenPnl)}</b></div></div>
             {!!openPositions.length && <p className="positions-help">Tap a position to view its chart. Use Exit to close it at the current live price.</p>}

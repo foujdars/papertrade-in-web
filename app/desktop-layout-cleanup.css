@@ -1,0 +1,30 @@
+/* Desktop website only; native apps and mobile web retain their existing layout. */
+@media(min-width:941px) {
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-discovery-panel { padding:24px 32px 40px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-workspace.ipo-studio { max-width:1440px; margin:0 auto; padding:0 0 32px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio > div:not([hidden]) { display:grid; grid-template-columns:minmax(300px,1fr) auto; align-content:start; align-items:center; gap:20px 24px; min-height:0; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio > div:not([hidden]) > * { grid-column:1/-1; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio > div:not([hidden]) > .ipo-view-tabs { grid-column:1; width:min(100%,390px); margin:0; padding:3px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-view-tabs button { min-height:38px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio > div:not([hidden]) > .ipo-discovery-controls { grid-column:2; display:flex; align-items:center; gap:10px; margin:0; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-board-tabs { width:230px; flex:0 0 230px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-discovery-controls .modern-select { width:160px; flex-basis:160px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-status-chips { padding:0; gap:10px; overflow:visible; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-status-chips button { flex:0 0 auto; min-width:115px; min-height:38px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-card-list { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:24px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-compact-card { min-width:0; margin:0; padding:22px; border-radius:14px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-compact-card > header { margin-bottom:16px; gap:14px; }
+ .terminal-shell[data-desktop-cleanup="true"] .ipo-compact-card .ipo-card-facts { margin-block:14px; padding:14px; gap:14px; }
+ .terminal-shell[data-desktop-cleanup="true"] .home-dashboard-scroll,.terminal-shell[data-desktop-cleanup="true"] .news-list { gap:24px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page { z-index:90; background:var(--surface); padding:24px 32px 40px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page .positions-modal { width:100%; max-width:1440px; height:auto; min-height:100%; margin:0 auto; padding:0; border:0; border-radius:0; box-shadow:none; display:flex; flex-direction:column; overflow:visible; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page .positions-summary { margin:8px 0 20px; padding:18px 22px; border:1px solid var(--line); border-radius:12px; background:var(--soft); }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page .positions-list { width:100%; flex:1; overflow:visible; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page .position-row { min-height:82px; padding:14px 18px; margin-bottom:12px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page .positions-empty { min-height:320px; }
+ @media(max-width:1100px) {
+  .terminal-shell[data-desktop-cleanup="true"] .ipo-discovery-panel,.terminal-shell[data-desktop-cleanup="true"] .desktop-positions-page { padding-inline:20px; }
+  .terminal-shell[data-desktop-cleanup="true"] .ipo-studio > div:not([hidden]) { grid-template-columns:minmax(240px,1fr) auto; gap:18px; }
+  .terminal-shell[data-desktop-cleanup="true"] .ipo-studio .ipo-board-tabs { width:190px; flex-basis:190px; }
+ }
+}
