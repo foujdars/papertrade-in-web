@@ -37,7 +37,7 @@ function samePixels(a,b,label){const left=PNG.sync.read(a),right=PNG.sync.read(b
  await page.waitForFunction(()=>document.querySelectorAll('.home-index-card .desktop-price-line svg').length===3);
  assert.ok(await page.locator('.desktop-stock-row .desktop-price-line svg').count()>0);
  const dimensions=await page.locator('.home-index-card').first().evaluate(el=>({card:el.getBoundingClientRect().width,span:el.querySelector('.desktop-price-line').getBoundingClientRect().width,svg:el.querySelector('.desktop-price-line svg').getBoundingClientRect().width,display:getComputedStyle(el.querySelector('.desktop-price-line')).display}));assert.ok(dimensions.svg>dimensions.card*.75,'Price line fills its card');
- assert.ok(await page.getByText('History unavailable',{exact:true}).count()>0,'Unknown history is never invented');
+ assert.ok(await page.getByLabel('History unavailable',{exact:true}).count()>0,'Unknown history is never invented');
  for(const theme of ['light','neon']){
  if(theme==='neon')await page.getByRole('button',{name:'Theme',exact:true}).click();
  assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Desktop fits the viewport');

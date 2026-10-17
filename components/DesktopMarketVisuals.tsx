@@ -4,6 +4,7 @@ import { useDesktopBrowser } from './useDesktopBrowser';
 import { startVisiblePolling } from '@/lib/visible-polling';
 import { loadDesktopHistory } from '@/lib/desktop-history-loader';
 import { priceLineGeometry, type PricePoint } from '@/lib/desktop-price-history';
+import type { NormalizedQuote } from "@/lib/upstox";
 import { MARKET_GREEN, MARKET_RED } from '@/lib/market-colours';
 
 /** Mounts/fetches only on visible desktop-web cards; never renders a simulated path. */
@@ -30,12 +31,12 @@ export function DesktopPriceLine({instrumentKey,label,reference,referenceAt}:{in
  const geometry=priceLineGeometry(points,sameSession?reference:undefined);
  const basis=sameSession&&reference!=null?'previous close':'first observed close';
  const date=last?new Date(last.time*1000).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
- return <span ref={host} className="desktop-price-line" title={geometry?`${label} · observed 5-minute closes · green/red versus ${basis} · latest session ${date} IST${failed?' · refresh unavailable':''}`:undefined}>
+ return <span ref={host} className="desktop-price-line" title={geometry?`${label} · ${date} IST${failed?' · delayed':''}`:undefined}>
  {geometry?<><svg viewBox="0 0 180 54" preserveAspectRatio="none" role="img" aria-label={`${label}: latest-session price history, green above ${basis}, red below. Last candle ${date} IST.`}>
  <defs><clipPath id={`${id}-up`}><rect x="0" y="0" width="180" height={geometry.baselineY}/></clipPath><clipPath id={`${id}-down`}><rect x="0" y={geometry.baselineY} width="180" height={54-geometry.baselineY}/></clipPath></defs>
  <line x1="0" x2="180" y1={geometry.baselineY} y2={geometry.baselineY} stroke="currentColor" strokeOpacity=".25" strokeDasharray="3 3"/>
  {geometry.flat?<path d={geometry.path} stroke="currentColor"/>:<><path d={geometry.path} clipPath={`url(#${id}-up)`} stroke={MARKET_GREEN}/><path d={geometry.path} clipPath={`url(#${id}-down)`} stroke={MARKET_RED}/></>}
- <circle cx={geometry.lastX} cy={geometry.lastY} r="2" fill={geometry.flat?"currentColor":geometry.up?MARKET_GREEN:MARKET_RED}/></svg><small>Latest session · {date}{failed?' · delayed':''}</small></>:<span className="desktop-line-empty">{!instrumentKey||failed?'History unavailable':points.length?'Waiting for more candles':'Loading price history…'}</span>}
+ <circle cx={geometry.lastX} cy={geometry.lastY} r="2" fill={geometry.flat?"currentColor":geometry.up?MARKET_GREEN:MARKET_RED}/></svg></>:<span className="desktop-line-empty" aria-label={!instrumentKey||failed?"History unavailable":"Loading price history"}>—</span>}
  </span>;
 }
 
@@ -48,4 +49,14 @@ export function DesktopPercentGauge({value,label,detail,inverse=false,negative=0
  <path d="M12 62 A48 48 0 0 1 108 62" className="desktop-gauge-track"/>
  {valid&&<>{negative>0&&negative<=100-p&&<path d="M12 62 A48 48 0 0 1 108 62" pathLength="100" strokeDasharray={`${negative} 100`} strokeDashoffset={-(100-negative)} stroke={MARKET_RED} className="desktop-gauge-value"/>}<path d="M12 62 A48 48 0 0 1 108 62" pathLength="100" strokeDasharray={`${p} 100`} stroke={inverse?MARKET_RED:MARKET_GREEN} className="desktop-gauge-value"/></>}
  <text x="60" y="48" textAnchor="middle">{valid?`${Math.round(p)}%`:'—'}</text></svg><span><b>{label}</b>{detail&&<small>{detail}</small>}</span></span>;
+}
+
+export function DesktopWatchlistFacts({quote}:{quote:NormalizedQuote|undefined}) {
+ const number=(value:number|undefined)=>typeof value==='number'&&Number.isFinite(value)&&value>0?value.toLocaleString('en-IN',{maximumFractionDigits:2}):'—';
+ return <span className="desktop-watchlist-facts">
+  <span><small>Open</small><b>{number(quote?.open)}</b></span>
+  <span><small>Day range</small><b>{quote&&quote.low>0&&quote.high>0?`${number(quote.low)} – ${number(quote.high)}`:'—'}</b></span>
+  <span><small>Prev. close</small><b>{number(quote?.previousClose)}</b></span>
+  <span><small>Volume</small><b>{quote?.volume&&quote.volume>0?quote.volume.toLocaleString('en-IN',{notation:'compact',maximumFractionDigits:2}):'—'}</b></span>
+ </span>;
 }

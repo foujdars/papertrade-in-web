@@ -1,4 +1,5 @@
 "use client";
+import { DesktopPriceLine, DesktopWatchlistFacts } from "./DesktopMarketVisuals";
 import { useHeaderPanels } from "./useHeaderPanels";
 import { useDesktopBrowser } from './useDesktopBrowser';
 import { HeaderPopover } from "./HeaderPopover";
@@ -2991,6 +2992,10 @@ export function TradingDashboard() {
                 <div key={item.symbol} className={`instrument-row ${selected.symbol === item.symbol ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => chooseTradeInstrument(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseTradeInstrument(item); }}>
                   <StockLogo {...item} />
                   <span className="instrument-name"><b>{item.symbol}</b><small>{item.name}</small></span>
+                  {desktopBrowser && activeNavigationSection === "watchlist" && <>
+                    <span className="desktop-watchlist-trend"><DesktopPriceLine instrumentKey={item.instrumentKey} label={item.symbol} reference={quote?.previousClose} referenceAt={quote?.updatedAt}/></span>
+                    <DesktopWatchlistFacts quote={quote}/>
+                  </>}
                   <span className="instrument-price"><b>{price > 0 ? price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</b><small className={`market-move-line ${price > 0 ? change >= 0 ? "positive" : "negative" : ""}`}>{price > 0 ? changeAvailable ? formatSignedMarketMove(netChange, change) : "—" : <CandleLoader compact label="Loading quote" />}</small></span>
                   {activeCustomList?.symbols.includes(item.symbol) ? (
                     <button className="watchlist-star remove" onClick={(event) => { event.stopPropagation(); removeStockFromCustomWatchlist(activeCustomList.id, item.symbol); }} aria-label={`Remove ${item.symbol} from ${activeCustomList.name}`}><X size={15} /></button>
