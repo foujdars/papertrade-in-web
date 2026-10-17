@@ -1,6 +1,6 @@
 # Bharat Market Outperformers
 
-Open **Analysis → Bharat Outperformers → Generate basket**. Requires the existing fundamental research dataset and a working daily-price connection. A scan reads data only; it never places an order.
+Open **Analysis → Bharat Strategies → Generate basket**. Requires the existing fundamental research dataset and a working daily-price connection. A scan reads data only; it never places an order.
 
 ## Delivered workflow
 
@@ -54,3 +54,14 @@ REA browser capture was the appropriate available tool. Ghidra/Hopper analyze re
 - Production build, TypeScript, focused lint and whitespace checks.
 
 Test screenshots illustrate the UI with synthetic data; they are not market recommendations or live performance evidence. This feature remains a draft until reviewed and merged.
+
+## Additional strategy screens
+
+The three strategy cards open independently scoped screens. Switching strategy discards pending/old scan state, so results are never relabelled as another basket. Each uses the same strict daily-history, liquidity, benchmark, retrospective and exclusion rules.
+
+- **Bharat Bargains:** up to 15 picks. Requires positive P/E below a positive industry P/E, positive PEG ≤1.5, and ROE/ROCE ≥15%. Score is 45% valuation, 35% quality, 10% balance sheet and 10% risk. This is relative-value screening, not an intrinsic-value calculation.
+- **Bharat Small Cap Gems:** up to 20 picks. Requires imported market capitalization ₹500–5,000 crore and three-year sales/profit growth ≥10%. Score is 40% growth, 25% quality, 20% momentum and 15% risk. This is an explicit Papertrade size band, not an official small-cap classification. Missing market cap fails eligibility; there is no price/volume substitute.
+
+The optional `Market Capitalization` Screener CSV/JSON field is interpreted in INR crore; recognized CSV aliases include `Market Capitalization (Rs. Cr.)` and `Mar Cap Rs.Cr.`. Existing imports without it keep working for the other screens. [Screener's own results](https://www.screener.in/screens/401431/search/) label market cap in Rs.Cr. Reimport a dataset containing this field to enable size screening of older records. Original fundamental gate/completeness requirements remain unchanged.
+
+No screenshot returns, 2019–2026 history, five-year performance, proprietary model or automatic monthly rebalance is fabricated. All displayed comparisons come from the current scan's available prices.

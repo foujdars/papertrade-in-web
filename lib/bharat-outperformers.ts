@@ -1,4 +1,5 @@
 import type { Candle } from './market';
+import {BHARAT_STRATEGIES,bharatStrategyRule,type BharatStrategy} from './bharat-strategies.ts';
 import { analyseDiscovery, indiaDay, researchCandles, type DiscoveryStock } from './stock-discovery.ts';
 
 export const BHARAT_PERIODS = ['1M','3M','6M','1Y','Max'] as const;
@@ -12,8 +13,10 @@ const clamp=(n:number)=>Math.max(0,Math.min(100,n));
 const mean=(values:number[])=>values.reduce((a,b)=>a+b,0)/values.length;
 
 /** Snapshot ranking only: no historical selection, rebalancing or proprietary AI model is implied. */
-export function buildBharatPicks(stocks:DiscoveryStock[],benchmark:Candle[],options:{now?:number;minTurnover?:number;industryCap?:number;limit?:number}={}) {
- const now=options.now??Date.now(),minTurnover=options.minTurnover??10000000,industryCap=options.industryCap??4,limit=options.limit??20;
+export function buildBharatPicks(stocks:DiscoveryStock[],benchmark:Candle[],options:{now?:number;minTurnover?:number;industryCap?:number;limit?:number;strategy?:BharatStrategy}={}) {
+ const strategy=options.strategy??'outperformers',definition=BHARAT_STRATEGIES.find(s=>s.id===strategy);
+ if(!definition)throw new Error('Unknown Bharat strategy');
+ const now=options.now??Date.now(),minTurnover=options.minTurnover??10000000,industryCap=options.industryCap??4,limit=Math.min(options.limit??definition.limit,definition.limit);
  if(!Number.isFinite(now)||!Number.isFinite(minTurnover)||minTurnover<0||!Number.isInteger(industryCap)||industryCap<1||industryCap>20||!Number.isInteger(limit)||limit<1||limit>20)throw new Error('Invalid Bharat selection options');
  const excluded:{name:string;reason:string}[]=[],seen=new Set<string>();
  const cleaned:DiscoveryStock[]=[];
@@ -24,6 +27,7 @@ export function buildBharatPicks(stocks:DiscoveryStock[],benchmark:Candle[],opti
   else if(stock.result.isFinancial)reason='Financial business needs a separate sector model';
   else if(stock.result.gateStatus!=='review'||stock.result.decision==='rejected')reason='Did not pass fundamental research gates';
   else if(!Number.isFinite(stock.fundamentals.coverage)||stock.fundamentals.coverage<70)reason='Less than 70% fundamental scoring coverage';
+  else if(strategy!=='outperformers'&&bharatStrategyRule(stock.result,strategy))reason=bharatStrategyRule(stock.result,strategy)!;
   else if(!Number.isFinite(stock.fundamentals.total)||stock.fundamentals.total<0||stock.fundamentals.total>100)reason='Invalid fundamental score';
   if(reason){excluded.push({name,reason});continue;}
   seen.add(key);
@@ -44,8 +48,10 @@ export function buildBharatPicks(stocks:DiscoveryStock[],benchmark:Candle[],opti
  });
  const ranked=scored.map(stock=>{
   const momentumScore=scored.length<2?50:(scored.filter(s=>s.momentum<stock.momentum).length+(scored.filter(s=>s.momentum===stock.momentum).length-1)/2)/(scored.length-1)*100;
-  const score=stock.fundamentals.total*.45+momentumScore*.35+stock.trend*.1+stock.riskScore*.1;
+  const score=strategy==='bargains'?stock.fundamentals.valuation*.45+stock.fundamentals.quality*.35+stock.fundamentals.balance*.1+stock.riskScore*.1:strategy==='smallcap'?stock.fundamentals.growth*.4+stock.fundamentals.quality*.25+momentumScore*.2+stock.riskScore*.15:stock.fundamentals.total*.45+momentumScore*.35+stock.trend*.1+stock.riskScore*.1;
   const reasons=[`Fundamentals ${stock.fundamentals.total.toFixed(1)}/100 · ${stock.fundamentals.coverage.toFixed(0)}% data coverage`,`63-session price return ${stock.momentum>=0?'+':''}${stock.momentum.toFixed(1)}% · momentum rank ${momentumScore.toFixed(0)}/100`,`Trend ${stock.trend.toFixed(0)}/100 · ${stock.entry>mean(stock.candles.slice(-50).map(c=>c.close))?'above':'below'} 50-session average`,`Daily ATR ${stock.atrPercent.toFixed(2)}% · risk score ${stock.riskScore.toFixed(0)}/100`];
+  if(strategy==='bargains')reasons.unshift(`P/E ${stock.result.metrics.pe?.toFixed(1)} vs industry ${stock.result.metrics.industryPe?.toFixed(1)} · PEG ${stock.result.metrics.peg?.toFixed(2)} · relative value, not intrinsic value`);
+  if(strategy==='smallcap')reasons.unshift(`Market cap ₹${stock.result.metrics.marketCapCr?.toLocaleString('en-IN')} Cr · 3Y sales growth ${stock.result.metrics.sales3?.toFixed(1)}% · profit growth ${stock.result.metrics.profit3?.toFixed(1)}%`);
   return {...stock,momentumScore,score,reasons};
  }).sort((a,b)=>b.score-a.score||a.instrument.instrumentKey.localeCompare(b.instrument.instrumentKey));
  const counts=new Map<string,number>(),picks:BharatPick[]=[];
@@ -54,7 +60,7 @@ export function buildBharatPicks(stocks:DiscoveryStock[],benchmark:Candle[],opti
   if(picks.length>=limit){excluded.push({name:stock.result.name,reason:`Outside top ${limit} after scoring and diversification`});continue;}
   counts.set(industry,count+1);picks.push({...stock,rank:picks.length+1});
  }
- return {picks,eligible:ranked.length,excluded,asOf,diversificationOmissions:ranked.length-picks.length,methodology:BHARAT_METHODOLOGY,label:BHARAT_RETROSPECTIVE_LABEL,comparison:compareBharatBasket(picks,benchmark,'1Y',100000,now)};
+ return {picks,eligible:ranked.length,excluded,asOf,diversificationOmissions:ranked.length-picks.length,methodology:strategy==='outperformers'?BHARAT_METHODOLOGY:definition.method+' Common requirements: at least 70% fundamental coverage, passed screening gates, completed prices, ₹1 crore median daily traded value and up to four picks per industry. Ranking covers the selected scan pool. '+BHARAT_COMPARISON_NOTE,label:BHARAT_RETROSPECTIVE_LABEL,comparison:compareBharatBasket(picks,benchmark,'1Y',100000,now)};
 }
 
 /** Equal initial rupee allocation, fixed fractional shares and no subsequent rebalancing.

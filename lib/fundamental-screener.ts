@@ -11,6 +11,8 @@ export type RuleCheck = {
 };
 
 export type StockMetrics = {
+  /** Screener market capitalization in INR crore; optional for older imports. */
+  marketCapCr?: number | null;
   currentPrice: number | null;
   pledged: number | null;
   roe: number | null;
@@ -147,6 +149,7 @@ const aliasMap = {
   nseCode: ["nsecode", "nse", "nsesymbol"],
   bseCode: ["bsecode", "bse", "bsecodevalue"],
   industry: ["industry", "industryname", "sector"],
+  marketCapCr: ["marketcapitalization", "marketcapitalisation", "marketcap", "marcap", "marketcapcr", "marketcapitalizationcr"],
   currentPrice: ["currentprice", "cmp", "cmprs"],
   pledged: ["pledgedpercentage", "pledged", "pledgedpercent"],
   roe: ["returnonequity", "roe"],
@@ -214,6 +217,7 @@ export const recommendedColumns = [
   "Return over 1year",
   "Return over 3years",
   "Return over 5years",
+  "Market Capitalization",
   "Current Price",
   "Sales latest quarter",
   "Net profit latest quarter",

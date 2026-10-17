@@ -19,7 +19,7 @@ import "./research-workspace.css";
 
 type Props = { balance: number; onSimulate: (draft: ResearchOrderDraft) => void; ownerId: string; instruments: Instrument[]; onClose: () => void; onOpenChart: (instrument: Instrument) => void };
 type View = "screen" | "peers" | "rank" | "bharat";
-const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "peers", label: "Peer comparison" }, { id: "rank", label: "Top stocks" }, { id: "bharat", label: "Bharat Outperformers" }];
+const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "peers", label: "Peer comparison" }, { id: "rank", label: "Top stocks" }, { id: "bharat", label: "Bharat Strategies" }];
 const PAGE_SIZE = 50;
 const STOCK_LIST_LABELS: Record<string, string> = { all: "All companies", review: "Passed gates", rejected: "Failed gates", approved: "Approved reviews", pending: "Pending reviews" };
 const number = (value: number | null, suffix = "") => value == null ? "Missing" : `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}${suffix}`;
