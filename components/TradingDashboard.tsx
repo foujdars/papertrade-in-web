@@ -3078,7 +3078,7 @@ export function TradingDashboard() {
               onClear={() => setClearSignal((value) => value + 1)}
             />
             {showDrawingLibrary && <DrawingToolLibrary activeTool={activeTool} onSelect={(tool) => { setActiveTool(tool); setToolSignal((value) => value + 1); }} onClose={() => setShowDrawingLibrary(false)} />}
-            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1, ...(type === "drawing-list" ? { instrumentKey: selected.instrumentKey, timeframe } : {}) }))} onClose={() => setShowChartFunctions(false)} />}
+            {showChartFunctions && <ChartFunctionMenu indicators={indicators} onToggleIndicator={toggleIndicator} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1, ...((type === "drawing-list" || type === "pine-editor") ? { instrumentKey: selected.instrumentKey, timeframe } : {}) }))} onClose={() => setShowChartFunctions(false)} />}
             {showTimeframeMenu && <ChartTimeframeMenu current={timeframe} onSelect={(period) => { chooseTimeframe(period); setShowTimeframeMenu(false); }} onClose={() => setShowTimeframeMenu(false)} />}
             {showChartStyleMenu && <ChartStyleMenu onClose={() => setShowChartStyleMenu(false)} />}
             {showComparePicker && <CompareSymbolPicker instruments={tradingUniverse} currentKey={selected.instrumentKey} onClose={() => setShowComparePicker(false)} />}
