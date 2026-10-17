@@ -1,4 +1,6 @@
 "use client";
+import { DesktopPriceLine, DesktopWatchlistFacts } from "./DesktopMarketVisuals";
+import { useDesktopBrowser } from "./useDesktopBrowser";
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
@@ -28,6 +30,7 @@ export function FnoListsWorkspace({
   onClose?: () => void;
   list?: FnoListTab;
 }) {
+  const desktop=useDesktopBrowser();
   const [tab, setTab] = useState<FnoListTab>("indices");
   const activeTab = list ?? tab;
   const [underlyings, setUnderlyings] = useState<FnoUnderlying[]>([]);
@@ -83,6 +86,7 @@ export function FnoListsWorkspace({
             }} aria-label={`Open ${item.symbol} chart`}>
               {item.underlyingType === "EQUITY" && <StockLogo symbol={item.symbol} instrumentKey={item.instrumentKey} />}
               <span className="fno-symbol-identity"><b>{item.symbol}</b><small>{item.name} · NSE</small>{item.underlyingType === "EQUITY" && item.futureContracts > 0 && <button type="button" className="fno-future-link" onClick={(event) => { event.stopPropagation(); onFutureSelect(item); }}>Trade future · {item.futures?.[0]?.expiry}</button>}</span>
+              {desktop&&list&&<><span className="desktop-watchlist-trend"><DesktopPriceLine instrumentKey={item.instrumentKey} label={item.symbol} reference={quote?.previousClose} referenceAt={quote?.updatedAt}/></span><DesktopWatchlistFacts quote={quote}/></>}
               <span className="fno-symbol-quote"><b>{quote ? formatInr(quote.lastPrice) : "—"}</b><small className={quote ? quote.changePercent >= 0 ? "positive" : "negative" : ""}>{changeAvailable ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%` : quote ? "—" : <CandleLoader compact label="Loading quote" />}</small></span>
               <button type="button" className={`watchlist-star ${starred ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); onStar(item); }} aria-label={`${starred ? "Manage" : "Add"} ${item.symbol} custom watchlists`}><Star size={16} fill={starred ? "currentColor" : "none"} /></button>
             </div>

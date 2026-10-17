@@ -433,7 +433,7 @@ export function HomeWorkspace({
               <button onClick={onOpenPositions} aria-label="Open positions"><small>Open</small><b>{openPositionsCount}</b></button>
               <button onClick={onOpenTradeHistory} aria-label="Closed trades"><small>Closed</small><b>{closedTradesCount}</b></button>
             </div>
-            {desktop && !privateBalances && <div className="desktop-portfolio-visuals"><DesktopPercentGauge label="Largest holding" value={holdingsCount>0&&Number.isFinite(riskSummary.exposure)?riskSummary.topConcentration:null} detail={holdingsCount>0?`${riskSummary.topSymbol} · ${riskSummary.label} concentration`:'No holdings to compare'} inverse/><span><b>Portfolio concentration</b><small>Share of holding value in your largest stock</small></span></div>}
+            {desktop && !privateBalances && <div className="desktop-portfolio-visuals"><DesktopPercentGauge label="Largest holding" value={holdingsCount>0&&Number.isFinite(riskSummary.exposure)?riskSummary.topConcentration:null} detail={holdingsCount>0?`${riskSummary.topSymbol} · ${riskSummary.label} concentration`:'—'} inverse/></div>}
           </section>}
 
           {activeMarket === 'global' && <section className="home-section home-portfolio-card home-global-account">

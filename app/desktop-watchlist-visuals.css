@@ -1,0 +1,22 @@
+@media(min-width:941px) {
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist :is(.instrument-row,.fno-symbol-row) { display:grid; grid-template-columns:36px minmax(140px,1fr) minmax(160px,1.4fr) minmax(230px,1.4fr) 135px 32px; gap:20px; align-items:center; min-height:100px; padding:16px 22px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-trend { display:block; min-width:0; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-trend .desktop-price-line { display:block; width:100%; min-height:48px; color:var(--muted); }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-trend svg { display:block; width:100%; height:48px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-trend path { fill:none; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts { display:grid; grid-template-columns:1fr 1.5fr; gap:10px 20px; min-width:0; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts > span { display:grid; gap:4px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts small { color:var(--muted); font-size:10px; }
+ .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts b { font-size:12px; font-weight:550; font-variant-numeric:tabular-nums; color:var(--ink); white-space:nowrap; }
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .instrument-name { min-width:0; }
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .instrument-name small { white-space:normal; line-height:1.4; }
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .instrument-price { text-align:right; }
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .fno-symbol-row.index-row { grid-template-columns:minmax(176px,1fr) minmax(160px,1.4fr) minmax(230px,1.4fr) 135px 32px; }
+ .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .fno-symbol-row.index-row .watchlist-star { grid-column:5; grid-row:1; }
+ @media(max-width:1200px) {
+  .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist :is(.instrument-row,.fno-symbol-row) { grid-template-columns:32px minmax(120px,1fr) minmax(140px,1fr) minmax(190px,1fr) 110px 28px; gap:12px; padding-inline:14px; }
+  .terminal-shell[data-desktop-cleanup="true"] .workspace.section-watchlist .fno-symbol-row.index-row { grid-template-columns:minmax(164px,1fr) minmax(140px,1fr) minmax(190px,1fr) 110px 28px; }
+  .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts { gap:8px 10px; }
+  .terminal-shell[data-desktop-cleanup="true"] .desktop-watchlist-facts b { font-size:11px; }
+ }
+}
