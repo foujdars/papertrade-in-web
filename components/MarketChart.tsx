@@ -1,6 +1,8 @@
 "use client";
 import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
+import { Capacitor } from '@capacitor/core';
+import { chartCanvasPalette, DESKTOP_CHART_MEDIA } from '@/lib/desktop-chart-theme';
 
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { CandleLoader } from "./CandleLoader";
@@ -1161,11 +1163,26 @@ export function MarketChart({
     syncIndicatorData();
   }
 
+  function currentCanvasPalette() {
+    return chartCanvasPalette(chartTheme, {
+      mediaMatches: window.matchMedia(DESKTOP_CHART_MEDIA).matches,
+      platform: chartHost.current?.closest('.terminal-shell')?.getAttribute('data-platform'),
+      section: chartHost.current?.closest('.terminal-shell')?.getAttribute('data-section'),
+      native: Capacitor.isNativePlatform(),
+    });
+  }
+
+  function themedStylePoint<T extends {color?:string}>(point:T,palette:ReturnType<typeof chartCanvasPalette>):T {
+    if(!['high-low','columns'].includes(chartStyleRef.current))return point;
+    return palette.desktop&&point.color===MARKET_GREEN?{...point,color:palette.up}:palette.desktop&&point.color===MARKET_RED?{...point,color:palette.down}:point;
+  }
+
   function paintPriceSeries(candles = dataRef.current) {
     const series = candleSeries.current;
     if (!series) return;
     const style = chartStyleRef.current;
-    const points = styleSeriesData(candles, style, timeframe);
+    const palette=currentCanvasPalette();
+    const points = styleSeriesData(candles, style, timeframe).map(point=>themedStylePoint(point,palette));
     series.setData(points as never);
     const source = prepareStyleCandles(candles, style);
     if (hlcSeries.current && style === "hlc-area") {
@@ -1184,7 +1201,7 @@ export function MarketChart({
     const source = prepareStyleCandles(candles, style);
     const point = source.at(-1);
     if (!point) return;
-    series.update(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)) as never);
+    series.update(themedStylePoint(toStyleSeriesPoint(point, source, source.length - 1, style, chartTimeFromEpoch(Number(point.time), timeframe)),currentCanvasPalette()) as never);
     if (hlcSeries.current && style === "hlc-area") {
       hlcSeries.current.high.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.high });
       hlcSeries.current.low.update({ time: chartTimeFromEpoch(Number(point.time), timeframe), value: point.low });
@@ -1499,28 +1516,31 @@ export function MarketChart({
   }, [tradeMarkerKey, tradeMarkers]);
 
   useEffect(() => {
-    const chart = chartApi.current;
-    if (!chart) return;
-    const neon = chartTheme === "neon";
-    chart.applyOptions({
-      layout: {
-        background: { type: ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
-        textColor: neon ? "#a4adc7" : "#65708a",
-        attributionLogo: false,
-        panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
-      },
-      grid: {
-        vertLines: { color: neon ? "#19233c" : "#edf0f6" },
-        horzLines: { color: neon ? "#19233c" : "#edf0f6" },
-      },
-      rightPriceScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
-      timeScale: { borderColor: neon ? "#2c3859" : "#dfe3ec" },
-      crosshair: {
-        vertLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
-        horzLine: { color: neon ? "#bf9aff" : "#8c96aa", labelBackgroundColor: neon ? "#342353" : "#252b3d" },
-      },
-    });
-  }, [chartTheme]);
+    const media = window.matchMedia(DESKTOP_CHART_MEDIA);
+    const refresh = () => {
+      const chart = chartApi.current;
+      if (!chart) return;
+      const palette = currentCanvasPalette();
+      chart.applyOptions({
+        layout: { background: {type: ColorType.Solid, color: palette.background}, textColor: palette.text, attributionLogo: false,
+          panes: {separatorColor: palette.separator, separatorHoverColor: palette.separatorHover, enableResize: true} },
+        grid: {vertLines: {color: gridVisibleRef.current ? palette.grid : 'rgba(0,0,0,0)'}, horzLines: {color: gridVisibleRef.current ? palette.grid : 'rgba(0,0,0,0)'}},
+        rightPriceScale: {borderColor: palette.border}, timeScale: {borderColor: palette.border},
+        crosshair: {vertLine: {color: palette.crosshair, labelBackgroundColor: palette.crosshairLabel}, horzLine: {color: palette.crosshair, labelBackgroundColor: palette.crosshairLabel}},
+      });
+      const series = candleSeries.current;
+      series?.applyOptions({priceLineColor:palette.desktop?palette.accent:"#6657ee"});
+      if (series?.seriesType() === 'Candlestick') series.applyOptions({upColor: chartStyle === 'hollow-candles' ? marketTint('green',0) : palette.up, downColor:palette.down, borderUpColor:palette.up, borderDownColor:palette.down, wickUpColor:palette.up, wickDownColor:palette.down});
+      else if (series?.seriesType() === 'Bar') series.applyOptions({upColor:palette.up,downColor:palette.down});
+      paintPriceSeries();
+    };
+    refresh();
+    media.addEventListener('change', refresh);
+    const shell=chartHost.current?.closest('.terminal-shell');
+    const observer=new MutationObserver(refresh);
+    if(shell)observer.observe(shell,{attributes:true,attributeFilter:['data-platform','data-section']});
+    return () => {media.removeEventListener('change', refresh);observer.disconnect();};
+  }, [chartTheme, chartStyle]);
 
   useEffect(() => {
     magnetRef.current = magnet;
@@ -1620,7 +1640,8 @@ export function MarketChart({
     }
     if (chartAction.type === "toggle-grid") {
       gridVisibleRef.current = !gridVisibleRef.current;
-      const color = gridVisibleRef.current ? "#edf0f6" : "rgba(0,0,0,0)";
+      const palette = currentCanvasPalette();
+      const color = gridVisibleRef.current ? (palette.desktop ? palette.grid : "#edf0f6") : "rgba(0,0,0,0)";
       chart.applyOptions({ grid: { vertLines: { color }, horzLines: { color } } });
     }
     if (chartAction.type === "toggle-crosshair") {
@@ -1662,25 +1683,26 @@ export function MarketChart({
     void Promise.all([import("lightweight-charts"), import("lightweight-charts-drawing")]).then(([lwc, drawing]) => {
       if (cancelled) return;
       const neon = chartTheme === "neon";
+      const palette = currentCanvasPalette();
       const chart = lwc.createChart(host, {
         autoSize: false,
         width: Math.max(1, Math.floor(host.clientWidth)),
         height: Math.max(1, Math.floor(host.clientHeight)),
         layout: {
-          background: { type: lwc.ColorType.Solid, color: neon ? "#0c142b" : "#ffffff" },
-          textColor: neon ? "#a4adc7" : "#65708a",
+          background: { type: lwc.ColorType.Solid, color: palette.background },
+          textColor: palette.text,
           fontFamily: "Inter, system-ui, sans-serif",
           fontSize: 11,
           attributionLogo: false,
-          panes: { separatorColor: neon ? "#2c3859" : "#e3e6ee", separatorHoverColor: neon ? "#bf9aff" : "#d8d3ff", enableResize: true },
+          panes: { separatorColor: palette.separator, separatorHoverColor: palette.separatorHover, enableResize: true },
         },
         grid: {
-          vertLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
-          horzLines: { color: neon ? "#19233c" : "#edf0f6", style: lwc.LineStyle.Dashed },
+          vertLines: { color: gridVisibleRef.current ? palette.grid : "rgba(0,0,0,0)", style: lwc.LineStyle.Dashed },
+          horzLines: { color: gridVisibleRef.current ? palette.grid : "rgba(0,0,0,0)", style: lwc.LineStyle.Dashed },
         },
         rightPriceScale: {
           visible: true,
-          borderColor: neon ? "#2c3859" : "#dfe3ec",
+          borderColor: palette.border,
           scaleMargins: orderToolRef.current?.enabled
             ? { top: 0.24, bottom: 0.15 }
             : { top: 0.10, bottom: 0.10 },
@@ -1689,7 +1711,7 @@ export function MarketChart({
         },
         leftPriceScale: { visible: false },
         timeScale: {
-          borderColor: neon ? "#2c3859" : "#dfe3ec",
+          borderColor: palette.border,
           timeVisible: !CALENDAR_TIMEFRAMES.has(timeframe),
           secondsVisible: timeframe === "1m",
           tickMarkFormatter: (time: Time, tickType: number) => chartTickTime(time, timeframe, tickType),
@@ -1706,8 +1728,8 @@ export function MarketChart({
         },
         crosshair: {
           mode: magnetArmed() ? lwc.CrosshairMode.MagnetOHLC : lwc.CrosshairMode.Normal,
-          vertLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
-          horzLine: { color: neon ? "#bf9aff" : "#8c96aa", width: 1, style: lwc.LineStyle.Dashed, labelVisible: false, labelBackgroundColor: neon ? "#342353" : "#252b3d" },
+          vertLine: { color: palette.crosshair, width: 1, style: lwc.LineStyle.Dashed, labelBackgroundColor: palette.crosshairLabel },
+          horzLine: { color: palette.crosshair, width: 1, style: lwc.LineStyle.Dashed, labelVisible: false, labelBackgroundColor: palette.crosshairLabel },
         },
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
@@ -1725,7 +1747,7 @@ export function MarketChart({
       const shared = {
         ...(externalFeed ? { priceFormat: globalPriceFormatRef.current } : {}),
         priceLineVisible: false,
-        priceLineColor: "#6657ee",
+        priceLineColor: palette.desktop ? palette.accent : "#6657ee",
         priceLineWidth: 1 as const,
         priceLineStyle: lwc.LineStyle.Dashed,
         lastValueVisible: true,
@@ -1757,7 +1779,7 @@ export function MarketChart({
         },
       };
       const series = kind === "bar"
-        ? chart.addSeries(lwc.BarSeries, { ...shared, upColor: MARKET_GREEN, downColor: MARKET_RED, thinBars: style === "high-low" })
+        ? chart.addSeries(lwc.BarSeries, { ...shared, upColor: palette.up, downColor: palette.down, thinBars: style === "high-low" })
         : kind === "line"
           ? chart.addSeries(lwc.LineSeries, { ...shared, color: primaryLineColor, lineWidth: 2, lineType: style === "step-line" ? lwc.LineType.WithSteps : lwc.LineType.Simple, pointMarkersVisible: style === "line-markers", pointMarkersRadius: 3 })
           : kind === "area"
@@ -1768,13 +1790,13 @@ export function MarketChart({
                 ? chart.addSeries(lwc.HistogramSeries, { ...shared, color: "#2962FF" })
                 : chart.addSeries(lwc.CandlestickSeries, {
                   ...shared,
-                  upColor: style === "hollow-candles" ? marketTint('green', 0) : MARKET_GREEN,
-                  downColor: MARKET_RED,
+                  upColor: style === "hollow-candles" ? marketTint('green', 0) : palette.up,
+                  downColor: palette.down,
                   borderVisible: style === "hollow-candles",
-                  borderUpColor: MARKET_GREEN,
-                  borderDownColor: MARKET_RED,
-                  wickUpColor: MARKET_GREEN,
-                  wickDownColor: MARKET_RED,
+                  borderUpColor: palette.up,
+                  borderDownColor: palette.down,
+                  wickUpColor: palette.up,
+                  wickDownColor: palette.down,
                 });
       chartApi.current = chart;
       candleSeries.current = series;

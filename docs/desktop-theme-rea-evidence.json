@@ -1,0 +1,28 @@
+{
+  "reaVersion": "6.5.0",
+  "pixelObservations": "pixel-observations.json",
+  "approximateLayout": {
+    "watchlistDetails": 300,
+    "leftRail": 54,
+    "rightRail": 46,
+    "topToolbar": 40
+  },
+  "scope": "desktop browser only",
+  "nativeThemeRecovered": false,
+  "report": "findings.md",
+  "lightScreenshot": "light.png",
+  "lightEvidenceId": "ev_aa029905daf2a4b333d520928b1dd9d71f4d7775f888e35c7aef10e191c694a2",
+  "viewport": {
+    "width": 1440,
+    "dpr": 1,
+    "height": 900
+  },
+  "hopperAvailable": false,
+  "visuallyVerified": true,
+  "nativeEvidenceReused": [
+    "../rea-ghidra-native-overview.json",
+    "../rea-ghidra-native-registration.json"
+  ],
+  "darkScreenshot": "dark.png",
+  "darkEvidenceId": "ev_6f1c18ea8e8621f5761fadc37f6cdb018051622c1d6e45b9cde8b1f0f9fa63ff"
+}

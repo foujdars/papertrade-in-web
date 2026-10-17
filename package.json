@@ -28,7 +28,8 @@
     "android:sync": "cap sync android",
     "android:open": "cap open android",
     "android:apk": "cd android && gradlew.bat assembleDebug",
-    "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease"
+    "android:bundle": "npm run android:sync && cd android && gradlew.bat bundleRelease",
+    "test:desktop-theme": "node --experimental-strip-types --test tests/desktop-chart-theme.test.mjs tests/desktop-chart-css.test.mjs tests/chart-style.test.mjs tests/chart-drawing-tools.test.mjs tests/advanced-chart-tools.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
