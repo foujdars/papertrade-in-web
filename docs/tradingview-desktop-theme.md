@@ -12,6 +12,7 @@ Canvas theming checks the same media boundary, browser platform and section, plu
 
 - Neutral white light surfaces and near-black `#0f0f0f` dark surfaces, thin `#ebebeb`/`#2e2e2e` dividers, blue active accents.
 - Compact chart toolbar, 54 px drawing rail, 46 px right navigation rail and approximately 302 px optional side panels.
+- Opening the desktop watchlist reserves a separate grid column so it cannot obscure the chart or price axis.
 - Flat panels, restrained radii, monochrome tool icons and compact readable controls; narrow desktop layouts wrap chart controls when needed.
 - Chart axes, grid, crosshair and candle colors follow the desktop palette. The existing light/dark toggle controls the result.
 - Papertrade keeps its account/header controls and accessible main navigation. This deliberately differs from TradingView's single 40 px public header; it is a reconstruction adapted to existing functions, not a pixel-identical copy or a new TradingView integration.

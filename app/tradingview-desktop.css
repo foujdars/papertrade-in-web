@@ -269,3 +269,11 @@
 .terminal-shell[data-platform="web"][data-section="fno"] .trade-cockpit .desktop-live-pnl { min-width:55px; }
 }
 }
+
+/* Reserve space for the watchlist so it never covers the chart's price axis. */
+@media (min-width:941px) and (hover:hover) and (pointer:fine) {
+.terminal-shell[data-platform="web"][data-section="trade"] .workspace.section-trade:has(> .watchlist-panel.mobile-open),
+.terminal-shell[data-platform="web"][data-section="fno"] .workspace.section-trade:has(> .watchlist-panel.mobile-open) { grid-template-columns:minmax(0,1fr) 302px 46px; }
+.terminal-shell[data-platform="web"][data-section="trade"] .workspace.section-trade:has(> .watchlist-panel.mobile-open) > .watchlist-panel.mobile-open,
+.terminal-shell[data-platform="web"][data-section="fno"] .workspace.section-trade:has(> .watchlist-panel.mobile-open) > .watchlist-panel.mobile-open { position:relative; inset:auto; grid-column:2; grid-row:1; width:100%; max-width:none; }
+}
