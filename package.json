@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "test:bharat": "node --experimental-strip-types --test tests/bharat-outperformers.test.mjs tests/stock-discovery.test.mjs",
     "test:home": "node --experimental-strip-types --test tests/home-freshness.test.mjs tests/india-pulse.test.mjs tests/market-refresh.test.mjs tests/home-derivatives.test.mjs tests/upstox-quotes.test.mjs",
     "test:reliability": "node --experimental-strip-types --test tests/market-refresh.test.mjs tests/entry-signals.test.mjs tests/global-closed-alerts.test.mjs tests/technical-alerts-dispatch.test.mjs tests/upstox-candles.test.mjs",
     "test:research": "node --experimental-strip-types --test tests/fundamental-analysis.test.mjs tests/stock-discovery.test.mjs",

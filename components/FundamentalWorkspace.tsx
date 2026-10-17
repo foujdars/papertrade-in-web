@@ -12,13 +12,14 @@ import { AppDialog } from "./AppDialog";
 import { ModernSelect } from "./ModernSelect";
 import { FundamentalPeers } from "./FundamentalPeers";
 import { TopStocks } from "./TopStocks";
+import { BharatOutperformers } from "./BharatOutperformers";
 import type { ResearchOrderDraft } from "@/lib/stock-discovery";
 import "./fundamental-workspace.css";
 import "./research-workspace.css";
 
 type Props = { balance: number; onSimulate: (draft: ResearchOrderDraft) => void; ownerId: string; instruments: Instrument[]; onClose: () => void; onOpenChart: (instrument: Instrument) => void };
-type View = "screen" | "peers" | "rank";
-const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "peers", label: "Peer comparison" }, { id: "rank", label: "Top stocks" }];
+type View = "screen" | "peers" | "rank" | "bharat";
+const VIEWS: { id: View; label: string }[] = [{ id: "screen", label: "Screener" }, { id: "peers", label: "Peer comparison" }, { id: "rank", label: "Top stocks" }, { id: "bharat", label: "Bharat Outperformers" }];
 const PAGE_SIZE = 50;
 const STOCK_LIST_LABELS: Record<string, string> = { all: "All companies", review: "Passed gates", rejected: "Failed gates", approved: "Approved reviews", pending: "Pending reviews" };
 const number = (value: number | null, suffix = "") => value == null ? "Missing" : `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}${suffix}`;
@@ -197,6 +198,7 @@ export function FundamentalWorkspace({ ownerId, instruments, balance, onSimulate
           {run.missingColumns.length > 0 && <details className="fa-missing"><summary>{run.missingColumns.length} screening columns missing · missing values fail their gates</summary><p>{run.missingColumns.join(" · ")}</p></details>}
           <div hidden={view !== "peers"}><FundamentalPeers key={`${run.importedAt}:${peerAnchor}`} run={run} instruments={instruments} anchorId={peerAnchor || selectedId} onInspect={inspect} onOpenChart={openChart} /></div>
           <div hidden={view !== "rank"}><TopStocks key={run.importedAt} run={run} instruments={instruments} balance={balance} onInspect={inspect} onCompare={compare} onOpenChart={onOpenChart} onSimulate={onSimulate} /></div>
+          <div hidden={view !== "bharat"}><BharatOutperformers key={run.importedAt} run={run} instruments={instruments} onInspect={inspect} onOpenChart={onOpenChart} /></div>
           {reviewOpen && selected && <AppDialog className="fa-review-dialog" labelledBy={`${drawerId}-review`} returnFocus={stockTrigger} onClose={() => setReviewOpen(false)}><header className="fa-review-dialog-head"><h2 id={`${drawerId}-review`}>{selected.nseCode || selected.bseCode || selected.name} analysis</h2><button aria-label="Close company analysis" onClick={() => setReviewOpen(false)}><X size={20} /></button></header><CompanyReview key={`${run.id ?? run.importedAt}:${selected.id}`} result={selected} instruments={instruments} onOpenChart={openChart} onSave={saveReview} />{notice && <p role="status">{notice}</p>}</AppDialog>}
 
         </>}
