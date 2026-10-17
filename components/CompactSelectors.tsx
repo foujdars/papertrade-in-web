@@ -1,5 +1,4 @@
 "use client";
-import { useTransientBack } from "./useTransientBack";
 
 import { Check, ChevronDown, Clock3, List, Plus, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,18 +30,10 @@ function readFavoriteTimeframes() {
   }
 }
 
-function useEscape(onClose: () => void) {
-  useEffect(() => {
-    const closeWithEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", closeWithEscape);
-    return () => window.removeEventListener("keydown", closeWithEscape);
-  }, [onClose]);
-}
-
 export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: string; onSelect: (timeframe: string) => void; onClose: () => void }) {
-  useTransientBack(true, onClose);
-  useEscape(onClose);
   const [favorites, setFavorites] = useState<string[]>([]);
+  // Read device favorites after hydration.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setFavorites(readFavoriteTimeframes()); }, []);
   function toggleFavorite(value: string) {
     setFavorites((currentFavorites) => {
@@ -53,8 +44,7 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
   }
   const groups = favorites.length ? [{ label: "Favorites", values: favorites }, ...timeframeGroups] : timeframeGroups;
   return (
-    <div className="chart-function-backdrop indicator-studio-backdrop timeframe-sheet-backdrop" role="presentation" onPointerDown={onClose}>
-      <section className="chart-function-menu timeframe-menu indicator-studio timeframe-sheet" role="dialog" aria-modal="true" aria-label="Choose chart timeframe" onPointerDown={(event) => event.stopPropagation()}>
+    <AppDialog className="chart-function-menu timeframe-menu indicator-studio timeframe-sheet" label="Choose chart timeframe" initialFocus='[aria-pressed="true"]' onClose={onClose}>
         <header><div><Clock3 size={18} /><span><b>Timeframe</b><small>Choose the candle interval</small></span></div><button onClick={onClose} aria-label="Close timeframe selector"><X size={18} /></button></header>
         <div className="timeframe-groups">
           {groups.map(({ label, values }) => (
@@ -71,8 +61,7 @@ export function ChartTimeframeMenu({ current, onSelect, onClose }: { current: st
             </section>
           ))}
         </div>
-      </section>
-    </div>
+    </AppDialog>
   );
 }
 

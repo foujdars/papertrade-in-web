@@ -5,7 +5,7 @@ import { useTransientBack } from "./useTransientBack";
 import { sessionBoard } from "@/lib/market-sessions";
 import { NOTIFICATION_SETTINGS_EVENT, readNotificationPreferences, saveNotificationPreferences } from "@/lib/notification-preferences";
 
-export function SessionBoard({ variant = "home", intraday = true, hiddenShades = [], onToggleShade }: { variant?: "home" | "chip"; intraday?: boolean; hiddenShades?: string[]; onToggleShade?: (id: string) => void }) {
+export function SessionBoard({ variant = "home", intraday = true, hiddenShades = [], onEnableShade, onToggleShade }: { variant?: "home" | "chip"; intraday?: boolean; onEnableShade?: (id: string) => void; hiddenShades?: string[]; onToggleShade?: (id: string) => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [alerts, setAlerts] = useState(true);
   const [timesOpen, setTimesOpen] = useState(false);
@@ -30,6 +30,13 @@ export function SessionBoard({ variant = "home", intraday = true, hiddenShades =
       document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
+  const previouslyActive = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (variant !== "chip") return;
+    const active = new Set(sessionBoard(now).filter(item => item.open).map(item => item.id));
+    for (const id of active) if (!previouslyActive.current.has(id)) onEnableShade?.(id);
+    previouslyActive.current = active;
+  }, [now, variant, onEnableShade]);
   if (variant === "chip") {
     const board = sessionBoard(now);
     const shortName: Record<string, string> = { sydney: "SYD", tokyo: "TYO", india: "IND", london: "LON", newyork: "NY" };
@@ -44,7 +51,7 @@ export function SessionBoard({ variant = "home", intraday = true, hiddenShades =
               className={`chart-session-chip${item.open ? " is-open" : ""}${shown ? "" : " shades-off"}`}
               aria-pressed={intraday ? shown : undefined}
               aria-disabled={!intraday}
-              title={intraday ? `${item.name} session · ${item.period} IST` : "Session shading is available on intraday timeframes (for example 5m or 1h)."}
+              title={intraday ? `${item.name} session · ${item.period} IST` : "Session shading is available on all intraday intervals."}
               aria-label={!intraday ? `${item.name} session shading requires an intraday timeframe` : `${shown ? "Hide" : "Show"} ${item.name} session shade, ${item.period} IST${item.open ? ", live" : ""}`}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => { event.stopPropagation(); if (intraday) onToggleShade?.(item.id); }}

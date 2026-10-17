@@ -1,5 +1,5 @@
 "use client";
-import { useTransientBack } from "./useTransientBack";
+import { AppDialog } from "./AppDialog";
 import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, GitCompareArrows, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
@@ -113,7 +113,6 @@ export function FnoChartWorkspace({
 }) {
   const [orderMode, setOrderMode] = useState<"Market" | "Limit">("Market");
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
-  useTransientBack(timeMenuOpen, () => setTimeMenuOpen(false));
   const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
   const [drawingMenuOpen, setDrawingMenuOpen] = useState(false);
   const [styleMenuOpen, setStyleMenuOpen] = useState(false);
@@ -265,8 +264,7 @@ export function FnoChartWorkspace({
 
       {timeMenuOpen && (
         <>
-          <button className="fno-time-menu-backdrop" onClick={() => setTimeMenuOpen(false)} aria-label="Close timeframe menu" />
-          <section className="fno-timeframe-menu" aria-label="Chart timeframe">
+          <AppDialog className="fno-timeframe-menu" label="Chart timeframe" onClose={() => setTimeMenuOpen(false)}>
             <header><b>Chart interval</b><button onClick={() => setTimeMenuOpen(false)}><ChevronDown size={17} /></button></header>
             <nav className="fno-chart-menu-tabs" aria-label="Chart menu sections">
               <button onClick={() => { setTimeMenuOpen(false); setIndicatorMenuOpen(true); }}><Activity size={16} /><span><b>Indicators</b><small>Studies</small></span></button>
@@ -277,7 +275,7 @@ export function FnoChartWorkspace({
             {FNO_TIMEFRAME_GROUPS.map((group) => (
               <div key={group.label}><span>{group.label}</span><nav>{group.values.map((value) => <button key={value} className={timeframe === value ? "active" : ""} onClick={() => { onTimeframeChange(value); setTimeMenuOpen(false); }}>{value}</button>)}</nav></div>
             ))}
-          </section>
+          </AppDialog>
         </>
       )}
       {indicatorMenuOpen && <ChartFunctionMenu indicators={indicators} onDrawing={tool=>{setActiveTool(tool);setToolSignal(value=>value+1);}} onToggleIndicator={(indicator) => setIndicators((current) => ({ ...current, [indicator]: !current[indicator] }))} onAction={(type: ChartAction) => setChartAction((current) => ({ type, token: (current?.token ?? 0) + 1, ...(type === "pine-editor" ? {instrumentKey:option.instrumentKey,timeframe} : {}) }))} onClose={() => setIndicatorMenuOpen(false)} />}

@@ -11,10 +11,12 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  for(const global of [false,true]){
  const page=await browser.newPage({viewport:{width:1000,height:700}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  const start=Date.parse(global?'2026-10-15T00:00:00Z':'2026-10-15T03:45:00Z')/1000;
- await page.addInitScript(({start,global})=>{window.fixtureCandles=Array.from({length:global?288:76},(_,i)=>({time:start+i*300,open:100,close:101,high:102,low:99,volume:1000}));},{start,global});
+ await page.addInitScript(({start,global})=>{localStorage.setItem('papertrade-chart-view-v1',JSON.stringify({hiddenSessionShades:['india']}));window.fixtureCandles=Array.from({length:global?288:76},(_,i)=>({time:start+i*300,open:100,close:101,high:102,low:99,volume:1000}));},{start,global});
+ await page.clock.install({time:new Date('2026-10-15T05:00:00Z')});
  await page.goto(`http://127.0.0.1:${server.address().port}/${global?'?global':''}`);
  await page.waitForFunction(()=>window.qaChart&&window.loadSessionBars);await page.evaluate(()=>window.loadSessionBars());
  await page.waitForFunction(()=>document.querySelectorAll('.chart-session-shade').length>0);
+ assert.equal(await page.getByRole('button',{name:/Hide India session shade/}).getAttribute('aria-pressed'),'true','Active session starts enabled even after an old hidden preference');
  for(const theme of ['light','neon']){
  if(theme==='neon')await page.getByRole('button',{name:'Theme',exact:true}).click();
  for(const width of [390,1000]){
@@ -33,6 +35,25 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await page.getByRole('button',{name:/Show India session shade/}).click();await page.waitForFunction(()=>document.querySelectorAll('.chart-session-shade').length>0);
  }
  }
+ for(const interval of ['1m','15m','30m','1H','4H','5m']){
+ await page.getByRole('button',{name:interval,exact:true}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.chart-session-shade').length>0);
+ }
+ await page.getByRole('button',{name:'1H',exact:true}).click();
+ await page.evaluate(()=>{const start=Date.parse('2026-09-01T00:00:00Z')/1000;window.fixtureCandles=Array.from({length:721},(_,i)=>({time:start+i*3600,open:100,close:101,high:102,low:99,volume:1000}));window.loadSessionBars();});
+ await page.waitForFunction(()=>window.qaSeries.data().length>=721);
+ await page.evaluate(()=>window.qaChart.timeScale().fitContent());
+ await page.waitForFunction(()=>{const range=window.qaChart.timeScale().getVisibleRange();return range&&Number(range.to)-Number(range.from)>14*86400;});
+ await page.waitForFunction(()=>document.querySelectorAll('.chart-session-shade').length>0);
+ await page.getByRole('button',{name:'5m',exact:true}).click();
+ await page.getByRole('button',{name:'Timeframe picker',exact:true}).click();
+ const picker=page.getByRole('dialog',{name:'Choose chart timeframe',exact:true});await picker.waitFor();
+ const bounds=await picker.boundingBox();assert.ok(bounds.x>=0&&bounds.width<=1000&&bounds.y>=0,'Timeframe sheet fits the viewport');
+ await picker.getByRole('button',{name:'1 hour',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('dialog[open]'));
+ await page.getByRole('button',{name:'5m',exact:true}).click();
+ await page.getByRole('button',{name:'Timeframe picker',exact:true}).click();await picker.waitFor();
+ await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('dialog[open]'));
  await page.getByRole('button',{name:'Frame',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.chart-session-shade'));
  assert.equal(await page.getByRole('button',{name:'India session shading requires an intraday timeframe'}).getAttribute('aria-disabled'),'true');
  assert.deepEqual(errors,[]);
