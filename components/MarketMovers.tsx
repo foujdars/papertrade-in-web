@@ -1,4 +1,6 @@
 "use client";
+import { DesktopPriceLine } from "./DesktopMarketVisuals";
+import { useDesktopBrowser } from "./useDesktopBrowser";
 import { ChevronRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -19,6 +21,7 @@ function percent(change: number) {
 }
 
 export function MarketMovers({ onOpen, inline = false }: { onOpen: (symbol: string) => void; inline?: boolean }) {
+  const desktop = useDesktopBrowser();
   const [lists, setLists] = useState<Lists | null>(null);
   const [failed, setFailed] = useState(false);
   const [metadata,setMetadata]=useState<MoverMetadata|null>(null);
@@ -58,10 +61,10 @@ export function MarketMovers({ onOpen, inline = false }: { onOpen: (symbol: stri
     <MarketDataStatus metadata={metadata} failed={failed} tab={tab}/>
     <div className="desktop-mover-tabs" role="tablist" aria-label="Mover list">{MOVER_TABS.map(item => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
     <div className="desktop-market-table" role="table" aria-label={`${label} stocks`}>
-      <div className="desktop-market-table-head" role="row"><span role="columnheader">Company</span><span role="columnheader">Market price</span><span role="columnheader">1D change</span><span role="columnheader">Volume</span></div>
+      <div className="desktop-market-table-head" role="row"><span role="columnheader">Company</span><span role="columnheader">Market price</span><span role="columnheader">1D change</span><span role="columnheader">Volume</span>{desktop&&<span role="columnheader">Latest session</span>}</div>
       {rows.map(row => <button key={row.symbol} className="desktop-stock-row" role="row" aria-label={`Open ${row.symbol} chart`} onClick={() => onOpen(row.symbol)}>
         <span className="desktop-stock-name" role="cell"><StockLogo symbol={row.symbol} size={34}/><span><b>{row.symbol}</b><small>{row.name}</small><small className="market-quote-time">{row.source==='tradingview'?'Delayed scanner quote':`${row.delayed?'Delayed · ':''}${marketTimeLabel(row.quoteAt)}`}</small></span></span>
-        <span role="cell">₹{price.format(row.price)}</span><span role="cell" className={row.change < 0 ? 'negative' : 'positive'}>{percent(row.change)}</span><span role="cell">{volumeLabel(row.volume)}</span>
+        <span role="cell">₹{price.format(row.price)}</span><span role="cell" className={row.change < 0 ? 'negative' : 'positive'}>{percent(row.change)}</span><span role="cell">{volumeLabel(row.volume)}</span>{desktop&&<span role="cell"><DesktopPriceLine instrumentKey={row.instrumentKey} label={row.symbol} reference={row.previousClose} referenceAt={row.quoteAt??undefined}/></span>}
       </button>)}
       {!rows.length && <p role="status" className="desktop-table-empty">{failed||metadata?.failedTabs?.includes(tab)?'Quotes unavailable. Retrying…':Array.isArray(lists?.[tab])?'No stocks on this list right now.':'Loading market movers…'}</p>}
     </div>

@@ -52,6 +52,7 @@ import "./pine-editor.css";
 import "./tradingview-desktop.css";
 import "./desktop-chart-settings.css";
 import "./desktop-chart-workspace.css";
+import "./desktop-data-visuals.css";
 import "./indicator-templates.css";
 import "./market-data-status.css";
 import "./algo-trading.css";
