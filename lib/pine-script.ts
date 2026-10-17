@@ -3,7 +3,7 @@ import type { StudyPlot } from './study-calculations';
 
 export type PineInput = { id:string; title:string; type:'int'|'float'|'bool'|'source'; defaultValue:number|boolean|string; value:number|boolean|string; min?:number; max?:number; step?:number };
 export type PineAlert = { title:string; message:string; values:boolean[] };
-export type PineScriptRun = { plots:StudyPlot[]; levels:number[]; levelStyles:{price:number;title:string;color:string}[]; overlay:boolean; title:string; inputs:PineInput[]; alerts:PineAlert[]; error:string|null };
+export type PineScriptRun = { plots:StudyPlot[]; levels:number[]; levelStyles:{price:number;title:string;color:string;width?:number;style?:string}[]; overlay:boolean; title:string; inputs:PineInput[]; alerts:PineAlert[]; error:string|null };
 type Atom = number | boolean | string;
 type Value = Atom | Atom[];
 type Token = { text:string; line:number; kind:string };

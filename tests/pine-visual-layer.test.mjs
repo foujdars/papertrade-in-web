@@ -116,3 +116,44 @@ test('bar-index visuals and autoscale follow main candles on a comparison union 
  assert.equal(layer.x((candles[0].time+20)*1000,'bar_time'),20,'bar-time points map exact comparison-only timestamps');
  layer.clear();assert.equal(layer.autoscaleInfo(3,3),null);
 });
+
+test('actual PineTS force_overlay drawing snapshots are isolated from script-pane objects',async()=>{
+ const run=await new PineTS(candles.map(c=>({...c,openTime:c.time*1000,closeTime:c.time*1000+59999})),'TEST','1').run(`//@version=6
+indicator("Force",overlay=false)
+plotshape(true,"Forced marker",shape.cross,location.absolute,force_overlay=true)
+if barstate.islast
+    label.new(1,50,"Pane")
+    label.new(2,12,"Price",force_overlay=true)
+    line.new(0,10,3,14,force_overlay=true)
+    box.new(0,12,3,9,force_overlay=true)`);
+ const raw=Object.entries(run.plots).map(([key,p])=>({key,...p}));
+ const pane=normalizePineVisuals(raw,candles,false),overlay=normalizePineVisuals(raw,candles,true);
+ assert.deepEqual(pane.labels.map(l=>l.text),['Pane']);assert.deepEqual(overlay.labels.map(l=>l.text),['Price']);
+ assert.equal(pane.lines.length,0);assert.equal(overlay.lines.length,1);assert.equal(overlay.boxes.length,1);
+ assert.equal(pane.shapes.length,0);assert.equal(overlay.shapes.length,4);
+});
+
+test('fills honor independent source offsets, explicit gap bridging and price-space gradients',()=>{
+ const raw=[
+  {key:'A',options:{offset:1,display:'none'},data:candles.map(c=>({time:c.time*1000,value:c.close}))},
+  {key:'B',options:{display:'none'},data:candles.map(c=>({time:c.time*1000,value:5}))},
+  {key:'F',options:{style:'fill',plot1:'A',plot2:'B',fillgaps:false,top_value:15,bottom_value:5,top_color:'#ff0000',bottom_color:'#0000ff'},data:[]}
+ ];
+ const visual=normalizePineVisuals(raw,candles);assert.deepEqual(visual.fills[0].a,[null,11,12,13]);assert.deepEqual(visual.fills[0].b,[5,5,5,5]);assert.equal(visual.fills[0].fillGaps,false);
+ const layer=new PineVisualLayer();attached(layer);layer.update(candles,visual);const draw=canvas();
+ draw.ctx.createLinearGradient=(...args)=>{draw.calls.push(['gradient',...args]);return {addColorStop:(...stop)=>draw.calls.push(['stop',...stop])};};
+ layer.paneViews()[0].renderer().draw(draw.target);
+ assert.ok(draw.calls.some(c=>c[0]==='gradient'&&c[2]===25&&c[4]===75));
+ assert.ok(draw.calls.some(c=>c[0]==='stop'&&c[1]===0&&c[2]==='#ff0000'));
+ const gap={a:[10,null,null,16],b:[5,null,null,8],colors:['#f00'],fillGaps:true};
+ layer.update(candles,{fills:[gap]});const bridged=canvas();layer.paneViews()[0].renderer().draw(bridged.target);
+ assert.equal(bridged.calls.filter(c=>c[0]==='fill').length,1);assert.ok(bridged.calls.some(c=>c[0]==='lineTo'&&c[1]===70&&c[2]===20));
+ layer.update(candles,{fills:[{...gap,fillGaps:false}]});const broken=canvas();layer.paneViews()[0].renderer().draw(broken.target);assert.equal(broken.calls.filter(c=>c[0]==='fill').length,0);
+});
+
+test('line and linefill autoscale use only visible interpolated prices',()=>{
+ const layer=new PineVisualLayer();attached(layer);
+ const line={x1:0,y1:10,x2:100,y2:1010,extend:'both'};
+ layer.update(candles,{lines:[line]});assert.deepEqual(layer.autoscaleInfo(1,2),{priceRange:{minValue:20,maxValue:30}});
+ layer.update(candles,{linefills:[{a:line,b:{x1:0,y1:5,x2:100,y2:1005},color:'#f00'}]});assert.deepEqual(layer.autoscaleInfo(1,2),{priceRange:{minValue:15,maxValue:30}});
+});

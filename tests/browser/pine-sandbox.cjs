@@ -8,13 +8,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
   const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', req.url === '/qa.js' ? 'application/javascript' : 'text/html');
     res.end(req.url === '/qa.js' ? bundle.outputFiles[0].text : '<script src="/qa.js"></script>');
-  }).listen(3268, '127.0.0.1');
-  const browser = await chromium.launch({ headless: true });
+  }).listen(3269, '127.0.0.1');
+  let browser;
   try {
+    browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const external = [];
-    page.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith('http://127.0.0.1:3268')) external.push(request.url()); });
-    await page.goto('http://127.0.0.1:3268');
+    page.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith('http://127.0.0.1:3269')) external.push(request.url()); });
+    await page.goto('http://127.0.0.1:3269');
     const success = await page.evaluate(() => sandboxQA.executePineSandbox(`self.onmessage = e => postMessage({result: new Function('return 21 * 2')()});`, {}));
     assert.equal(success, 42);
     const dataResult = await page.evaluate(() => sandboxQA.executePineSandbox(`self.onmessage = e => {
@@ -48,7 +49,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     assert.deepEqual(external, []);
     console.log('Pine sandbox: generated code executes, network/storage unavailable, timeouts and cancellation terminate work, no frames leaked.');
   } finally {
-    await browser.close();
+    await browser?.close();
     await new Promise(resolve => server.close(resolve));
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });

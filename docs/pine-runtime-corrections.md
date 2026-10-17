@@ -1,0 +1,33 @@
+# Pine runtime corrections, 18 October 2026
+
+This is an independently implemented compatibility adapter around AGPL-3.0-only PineTS 0.11.1. These corrections are supported by source inspection, documented semantics and independently calculated fixtures. They do not establish complete TradingView parity or reproduce its proprietary server compiler.
+
+## Corrections implemented
+
+- **EMA initialization:** TradingView's [v6 reference](https://www.tradingview.com/pine-script-reference/v6/#fun_ta.ema) shows the first source sample as the initial EMA value. PineTS 0.11.1's `src/namespaces/ta/methods/ema.ts` waits for an SMA seed. A provider-scoped adapter now initializes from the first finite sample and uses `alpha = 2 / (length + 1)` thereafter. MACD's internal EMA calls and `request.security` secondary contexts receive the same correction. RMA is unchanged. The official reference says `na` samples are ignored: preserving the accumulated average follows that instruction; carrying the previous output through an `na` bar is our interpretation, not a captured TradingView output comparison. Leading missing samples remain missing.
+- **Distinct/repeated EMA calls:** state is keyed by the runtime's call-site identity. Tentative state for a developing bar is separate from committed state, so replacing a value on that same bar does not advance the average again. This is tested directly; the app still reruns complete snapshots and does not claim tick-level `varip` persistence.
+- **Closed-bar state:** a closed final candle now reports `barstate.ishistory = true` and `isrealtime = false`. A developing final bar reports realtime; replay reports historical. `isconfirmed` and `islastconfirmedhistory` follow that snapshot. See [TradingView bar states](https://www.tradingview.com/pine-script-docs/concepts/bar-states/).
+- **Native declarations:** typed `const` declarations and methods whose local first parameter is named `self` no longer fail the JavaScript guard. UDT methods, maps and matrices have positive expected-value fixtures. An unbound host-global `self` remains forbidden.
+- **Confirmed higher-timeframe values:** `request.security(..., close[1], lookahead = barmerge.lookahead_on)` is accepted, as are complete expressions followed by a positive constant history offset and tuples that offset every item. The gate deliberately does not guess that an arbitrary variable is already historically offset. Unoffset/dynamic lookahead remains rejected. The independent fixture verifies values arrive at the start of the next bucket and that later bucket changes cannot affect earlier output. See [other timeframes and data](https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/#lookahead).
+- **Named security arguments:** a narrowly scoped native-source transformation changes named `symbol`, `timeframe`, and `expression` arguments into their documented positions before PineTS parses them. PineTS 0.11.1 otherwise captures the whole options object instead of the expression history. Comments and strings are excluded from matching. Optional named arguments remain named; this is not a JavaScript source-rewrite engine.
+- **Exchange isolation:** the provider boundary preserves an exchange-qualified symbol through PineTS's prefix-stripping path. `NSE:TEST` and `BSE:TEST` cannot share a dataset merely because the ticker is the same. Requested currency/session/timezone/type metadata now belongs to the requested symbol instead of the chart.
+- **Chart aliases in replay:** the current chart's bare ticker, qualified ticker, empty symbol and symbol metadata aliases reuse the supplied same-timeframe history. They do not unnecessarily fetch another dataset or change indicator warmup. Explicitly different exchanges still resolve separately.
+- **Equal-timeframe intrabars:** PineTS's `security_lower_tf` shortcut returned chart values for a different requested symbol at the chart timeframe. The adapter now uses its symbol-aware `security` path and wraps the result in the required one-element arrays (including tuple-of-array results).
+
+## Feed boundary
+
+The host resolves exact NSE equities from the existing Upstox instrument directory, the app's NIFTY/BANKNIFTY/SENSEX definitions, and Delta contracts from the existing catalog. It permits only existing candle endpoints. An unavailable exchange or an inexact symbol is rejected, not substituted. Catalog data does not include every exchange tick size or multiplier; missing values produce a warning rather than borrowing another symbol's contract metadata.
+
+Eight additional symbol/timeframe datasets are permitted per run, with caching and a 20,000-candle limit. No script can choose a URL or authenticated action. Additional feeds remain unavailable during replay: fetching a historical higher-timeframe candle can expose finalized OHLC values from beyond the replay cursor. The current implementation does not pretend that trimming candle open timestamps solves this. Same-symbol, same-timeframe requests use the supplied chart snapshot.
+
+## Integration and evidence
+
+`lib/pine-runtime-compat.ts` uses PineTS's internal `_initializeContext` hook only for registered providers. This covers secondary contexts without modifying the installed dependency or affecting unrelated PineTS providers. The production bundle build refuses package versions other than 0.11.1; tests also assert the version and hook. A runtime upgrade requires reviewing this adapter, not merely changing the pin.
+
+Source inspection used the installed package's source maps and the LuxAlgo/PineTS repository at `11aafe8833ce89d6511b3a78c07e5b58115f779a`. The root investigation's fresh REA capture of the official v6 EMA reference is `ev_1ec4fd716ff67a08d97de7b07d965970c54ac022651a9f265835160fda9b1361` (`work/pine-fidelity-research/ema-reference-accessibility.txt`, outside the app checkout). Upstream snapshots generated by PineTS are not treated as a TradingView oracle.
+
+Relevant checks: `tests/pine-runtime.test.mjs`, `tests/pine-runtime-compat.test.mjs`, `tests/pine-market-data.test.mjs`, and the independent CSV comparison fixtures in `tests/pine-reference.test.mjs`.
+
+## Remaining boundaries
+
+No import/export library resolver, protected scripts, financial/economic feeds, TradingView cloud alerts/publishing, or full nested dynamic-request conformance is provided. Full tick rollback, intrabar persistence, all session holiday calendars, and cross-feed corporate-action equivalence remain unverified. Numerical fixtures are a narrower claim than complete Pine compatibility; actual TradingView-exported reference CSVs can be compared with the supplied reference harness.

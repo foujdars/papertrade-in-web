@@ -1,6 +1,6 @@
 import { runAdvancedPineScript } from './pine-runtime';
 import type { Candle } from './market';
-import type { PineRuntimeContext } from './pine-runtime-types';
+import type { PineRuntimeContext, PineMarketData } from './pine-runtime-types';
 
 type Request = {
   source: string;
@@ -9,8 +9,8 @@ type Request = {
   context: PineRuntimeContext;
 };
 let requestId = 0;
-const pending = new Map<number, {resolve:(candles:Candle[])=>void;reject:(error:Error)=>void}>();
-self.onmessage = async (event: MessageEvent<Request | {type:'data-response';id:number;data?:Candle[];error?:string}>) => {
+const pending = new Map<number, {resolve:(data:PineMarketData)=>void;reject:(error:Error)=>void}>();
+self.onmessage = async (event: MessageEvent<Request | {type:'data-response';id:number;data?:PineMarketData;error?:string}>) => {
   if ('type' in event.data && event.data.type === 'data-response') {
     const request = pending.get(event.data.id);
     pending.delete(event.data.id);

@@ -1,15 +1,22 @@
-import { LineSeries, HistogramSeries, MismatchDirection, type Logical, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
+import { LineSeries, HistogramSeries, BaselineSeries, LineType, MismatchDirection, type AutoscaleInfo, type Logical, type IChartApi, type ISeriesApi, type Time, type LineWidth, type LineStyle, type ISeriesPrimitive, type SeriesAttachedParameter, type IPrimitivePaneView } from 'lightweight-charts';
 import type { Candle } from './market';
 import type { PineScriptRun } from './pine-script';
 import type { AdvancedPineRun } from './pine-runtime-types';
 import { PineVisualLayer, normalizePineVisuals } from './pine-visual-layer';
-import { computeStudy, type StudyResult } from './study-calculations';
+import { computeStudy, type StudyResult, type StudyPlot } from './study-calculations';
 import { STUDIES, studyDefaults, type StudyConfig } from './indicator-catalog';
 import { buildVolumeProfile } from './volume-profile';
 import { IchimokuCloud } from './ichimoku-cloud';
 import { macdHistogramColor } from './histogram-color';
 
-type Bundle={id:string;config:StudyConfig;signature:string;series:ISeriesApi<'Line'|'Histogram'>[];pane:number;result:StudyResult;primitive?:{update:(data:Candle[],result?:StudyResult)=>void};pine?:PineVisualLayer};
+type Bundle={id:string;config:StudyConfig;signature:string;series:ISeriesApi<'Line'|'Histogram'|'Baseline'>[];seriesPanes:number[];pane:number;result:StudyResult;primitive?:{update:(data:Candle[],result?:StudyResult)=>void};pine?:PineVisualLayer;pineOverlay?:PineVisualLayer};
+const plotStyle=(plot:StudyPlot)=>String(plot.style??(plot.histogram?'histogram':plot.points?'circles':'line')).replace(/^style_/,'');
+const plotDash=(plot:StudyPlot,fallback:number)=>plot.lineStyle?.includes('dotted')?1:plot.lineStyle?.includes('dashed')?2:fallback;
+const plotPriceLabel=(plot:StudyPlot)=>plot.display!=='pane'&&plot.display!=='data_window'&&plot.display!=='status_line';
+const baselineColors=(color:string)=>({topLineColor:color,bottomLineColor:color,topFillColor1:color,topFillColor2:color,bottomFillColor1:color,bottomFillColor2:color});
+
+/** A line skips na values; the br styles retain whitespace and break the path. */
+export function pinePlotBridgesGaps(plot:StudyPlot){return ['line','area','stepline','stepline_diamond'].includes(plotStyle(plot))||!!plot.join;}
 const entryColorIndex=(name:string)=>({'EMA 5':0,'EMA 21':1,'EMA 50':2,VWAP:3,Long:4,Short:5})[name as 'EMA 5'|'EMA 21'|'EMA 50'|'VWAP'|'Long'|'Short']??0;
 class VisibleProfile implements ISeriesPrimitive<Time>{
  chart?:IChartApi;series?:ISeriesApi<'Line'>;request?:()=>void;data:Candle[]=[];config:StudyConfig;
@@ -47,29 +54,51 @@ export class ChartStudyRenderer {
  sync(enabled:Record<string,boolean>,settings:Record<string,StudyConfig>,timeframe:string,data:Candle[],custom?:{result:PineScriptRun|AdvancedPineRun}){
   const selected=STUDIES.filter(s=>s.id!=='smc'&&s.id!=='patterns'&&s.id!=='opening-range'&&s.id!=='previous-day'&&s.id!=='prior-levels'&&s.id!=='anchored-vwap'&&s.id!=='psbb'&&enabled[s.id]&&!s.unavailable).map(s=>({definition:s,config:settings[s.id]??studyDefaults(s.id)})).filter(s=>!s.config.hidden&&(!s.config.timeframes.length||s.config.timeframes.includes(timeframe))).map(s=>({...s,result:computeStudy(s.definition.id,data,s.config,this.comparisons[s.config.comparisonKey??''])}));
   if(custom && !custom.result.error && (custom.result.plots.length || custom.result.levels.length || 'visuals' in custom.result && custom.result.visuals.length || 'strategy' in custom.result && custom.result.strategy)) selected.push({definition:{id:'script',name:custom.result.title,group:'Pine',overlay:custom.result.overlay,fields:[]},config:studyDefaults('script'),result:{plots:custom.result.plots,levels:custom.result.levels,levelStyles:custom.result.levelStyles,range:!custom.result.plots.length && custom.result.levels.length ? [Math.min(...custom.result.levels)-1,Math.max(...custom.result.levels)+1] : undefined}});
-  const signature=JSON.stringify(selected.map(s=>[s.definition.id,s.config,s.result.plots.map(p=>[p.name,p.histogram,p.points,p.width]),s.result.range,s.result.levels,s.result.levelStyles,s.definition.overlay,s.definition.name,s.definition.id==='script'?s.result.plots.map(p=>p.colors?.find(Boolean)):undefined]));
+  const signature=JSON.stringify([selected.map(s=>[s.definition.id,s.config,s.result.plots.map(p=>[p.name,p.histogram,p.points,p.width,p.style,p.forceOverlay,p.trackPrice,p.histbase,p.join,p.showLast,p.display,p.lineStyle]),s.result.range,s.result.levels,s.result.levelStyles,s.definition.overlay,s.definition.name,s.definition.id==='script'?s.result.plots.map(p=>p.colors?.find(Boolean)):undefined]),!!custom&&'visuals' in custom.result]);
   if(signature!==this.signature){
    const range=this.chart.timeScale().getVisibleLogicalRange(),price=this.chart.priceScale('right'),auto=price.options().autoScale,priceRange=price.getVisibleRange();
-   for(const b of [...this.bundles].reverse())for(const s of [...b.series].reverse())this.chart.removeSeries(s);
+   for(const b of [...this.bundles].reverse()){
+    // Removing a series does not guarantee the library invokes primitive
+    // detached hooks. Explicitly detach to release old chart/data references.
+    if(b.pine)b.series[b.seriesPanes.indexOf(b.pane)]?.detachPrimitive(b.pine);
+    if(b.pineOverlay)b.series[b.seriesPanes.indexOf(0)]?.detachPrimitive(b.pineOverlay);
+    for(const s of [...b.series].reverse())this.chart.removeSeries(s);
+   }
    this.bundles=[];this.signature=signature;let pane=0;
    for(const {definition:d,config:c,result} of selected){
-    const index=d.overlay||d.id==='volume'?0:++pane,series:Bundle['series']=[];
+    const index=d.overlay||d.id==='volume'?0:++pane,series:Bundle['series']=[],seriesPanes:number[]=[];
     // Preserve an empty pane/series when history is unavailable so later live data can fill it.
     const plots=result.plots.length?result.plots:[{name:d.name,values:[]}];
     for(let i=0;i<plots.length;i++){
      const plot=plots[i],isVolume=d.id==='volume',color=d.id==='script'&&!result.plots.length?'transparent':d.id==='script'?(plot.colors?.find(Boolean)??c.colors[i%c.colors.length]):(isVolume&&i===1?c.colors[2]:c.colors[(d.id==='entry'?entryColorIndex(plot.name):i)%c.colors.length])+Math.round(c.opacity/100*(isVolume&&i===0?145:255)).toString(16).padStart(2,'0');
-     const oscillator=d.id==='rsi';
-     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{color,priceScaleId:isVolume?'volume':undefined,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue,priceFormat:d.volume?{type:'volume'}:{type:'price',precision:2,minMove:.01}},index):this.chart.addSeries(LineSeries,{color,priceScaleId:isVolume?'volume':undefined,lineWidth:(d.id==='script'?Math.max(1,Math.min(4,plot.width??c.width)):oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:(oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineVisible:!plot.points,pointMarkersVisible:!!plot.points,pointMarkersRadius:3,priceLineVisible:false,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0)&&!(d.id==='script'&&!result.plots.length),crosshairMarkerVisible:oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined},index);
-     if(i===0)for(const level of result.levels??[]){const style=result.levelStyles?.find(item=>item.price===level);s.createPriceLine({price:level,color:style?.color??(oscillator?'#8054da66':'#8c849b80'),lineWidth:1,lineStyle:2,axisLabelVisible:false,title:style?.title??''});}series.push(s);
+     const oscillator=d.id==='rsi',isPine=d.id==='script',style=plotStyle(plot),targetPane=isPine&&plot.forceOverlay?0:index;
+     const area=isPine&&['area','areabr'].includes(style),cross=isPine&&style==='cross';
+     const common={priceScaleId:isVolume?'volume':undefined,priceLineVisible:isPine&&!!plot.trackPrice,lastValueVisible:!isVolume&&c.showValue&&!(oscillator&&i>0)&&!(isPine&&!result.plots.length)&&(!isPine||plotPriceLabel(plot)),priceFormat:d.volume?{type:'volume' as const}:{type:'price' as const,precision:2,minMove:.01}};
+     const line={...common,lineWidth:(isPine?Math.max(1,Math.min(4,plot.width??c.width)):oscillator&&i===0?Math.max(2,c.width):c.width) as LineWidth,lineStyle:plotDash(plot,oscillator&&i>0&&c.dash===0?2:c.dash) as LineStyle,lineType:isPine&&style.startsWith('stepline')?LineType.WithSteps:LineType.Simple,lineVisible:!(plot.points||isPine&&['circles','cross'].includes(style))||!!plot.join,pointMarkersVisible:(!!plot.points||isPine&&style==='circles')&&!cross,pointMarkersRadius:isPine?Math.max(1,Math.min(8,plot.width??1)+1):3,crosshairMarkerVisible:isPine||oscillator&&i===0,crosshairMarkerRadius:4,title:'',autoscaleInfoProvider:result.range?()=>({priceRange:{minValue:result.range![0],maxValue:result.range![1]}}):undefined};
+     const s=plot.histogram?this.chart.addSeries(HistogramSeries,{...common,color,base:isPine?plot.histbase??0:0},targetPane):area?this.chart.addSeries(BaselineSeries,{...line,...baselineColors(color),baseValue:{type:'price',price:plot.histbase??0},...(style==='area'?{autoscaleInfoProvider:(original:()=>AutoscaleInfo|null)=>{const range=original();return range?.priceRange?{...range,priceRange:{minValue:Math.min(range.priceRange.minValue,plot.histbase??0),maxValue:Math.max(range.priceRange.maxValue,plot.histbase??0)}}:range;}}:{})},targetPane):this.chart.addSeries(LineSeries,{...line,color},targetPane);
+     series.push(s);seriesPanes.push(targetPane);
     }
-    const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,pane:index,result};
+    const bundle:Bundle={id:d.id,config:c,signature:JSON.stringify(c),series,seriesPanes,pane:index,result};
+    const paneAnchor=(targetPane:number)=>{
+      const existing=seriesPanes.indexOf(targetPane);if(existing>=0)return series[existing];
+      const anchor=this.chart.addSeries(LineSeries,{color:'transparent',lineVisible:false,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,autoscaleInfoProvider:()=>null},targetPane);
+      series.push(anchor);seriesPanes.push(targetPane);return anchor;
+    };
+    const levelSeries=paneAnchor(index);
+    for(const level of result.levels??[]){const style=result.levelStyles?.find(item=>item.price===level);levelSeries.createPriceLine({price:level,color:style?.color??(d.id==='rsi'?'#8054da66':'#8c849b80'),lineWidth:Math.max(1,Math.min(4,style?.width??1)) as LineWidth,lineStyle:style?.style?.includes('dotted')?1:style?.style?.includes('solid')?0:2,axisLabelVisible:false,title:style?.title??''});}
     if(d.id==='ichimoku'&&series[2]){const cloud=new IchimokuCloud(c);(series[2] as ISeriesApi<'Line'>).attachPrimitive(cloud);bundle.primitive=cloud;}
     if(d.id==='volume')this.chart.priceScale('volume',0).applyOptions({visible:false,autoScale:true,scaleMargins:{top:.79,bottom:0}});
     if(d.id==='rsi'){const label=/^#[\da-f]{6}/i.test(c.colors[0]||'')?c.colors[0].slice(0,7):'#8054da';series[0].applyOptions({priceLineColor:label});this.chart.priceScale('right',index).applyOptions({scaleMargins:{top:.1,bottom:.12},alignLabels:true});const bands=new OscillatorBands(c.inputs.lower??30,c.inputs.upper??70);(series[0] as ISeriesApi<'Line'>).attachPrimitive(bands);bundle.primitive=bands;}
     if(d.id==='vpvr'){series[0].applyOptions({visible:true,lastValueVisible:false,color:'transparent',autoscaleInfoProvider:()=>null});const primitive=new VisibleProfile(c);(series[0] as ISeriesApi<'Line'>).attachPrimitive(primitive);bundle.primitive=primitive;}
     if(d.id==='script' && custom && 'visuals' in custom.result){
-      bundle.pine=new PineVisualLayer(this.time);(series[0] as ISeriesApi<'Line'>).attachPrimitive(bundle.pine);
-      if(!result.plots.length)series[0].applyOptions({autoscaleInfoProvider:()=>{
+      bundle.pine=new PineVisualLayer(this.time);levelSeries.attachPrimitive(bundle.pine);
+      if(index>0){
+        bundle.pineOverlay=new PineVisualLayer(this.time);const overlayAnchor=paneAnchor(0);overlayAnchor.attachPrimitive(bundle.pineOverlay);
+        if(series.indexOf(overlayAnchor)>=result.plots.length)overlayAnchor.applyOptions({autoscaleInfoProvider:()=>{
+          const visible=this.chart.timeScale().getVisibleLogicalRange();return bundle.pineOverlay?.autoscaleInfo((visible?.from??0) as Logical,(visible?.to??Math.max(0,this.data.length-1)) as Logical)??null;
+        }});
+      }
+      if(!result.plots.some(plot=>(plot.forceOverlay?0:index)===index))levelSeries.applyOptions({autoscaleInfoProvider:()=>{
         // Transparent anchors establish the time axis only. Their candle-close
         // values must not pull an oscillator's drawing scale toward market price.
         const visible=this.chart.timeScale().getVisibleLogicalRange();
@@ -89,26 +118,34 @@ export class ChartStudyRenderer {
   this.update(data,new Map(selected.map(s=>[s.definition.id,s.result])));
   const script=this.bundles.find(b=>b.id==='script');
   if(script?.pine && custom && 'visuals' in custom.result){
-    const visuals=normalizePineVisuals(custom.result.visuals,data);
+    const visuals=normalizePineVisuals(custom.result.visuals,data,script.pane>0?false:undefined);
+    const overlay=script.pineOverlay?normalizePineVisuals(custom.result.visuals,data,true):visuals;
+    // Crosses and step diamonds are custom markers, not circles substituted by the host.
+    for(const plot of script.result.plots){const style=plotStyle(plot);if(!['cross','stepline_diamond'].includes(style))continue;
+      const target=plot.forceOverlay?overlay:visuals;target.shapes??=[];
+      for(let i=0;i<plot.values.length;i++)if(Number.isFinite(plot.values[i])&&(plot.showLast===undefined||i>=data.length-plot.showLast))target.shapes.push({x:i+(plot.offset??0),y:plot.values[i],location:'price',style:style==='cross'?'cross':'diamond',color:plot.colors?.[i]??'#2962ff',size:Math.max(8,Math.min(16,(plot.width??1)*3+5))});
+    }
     if(custom.result.strategy){
-      visuals.shapes ??=[];
+      overlay.shapes ??=[];
       for(const trade of custom.result.strategy.trades){
         const entry=data.findIndex(c=>c.time===trade.entryTime),exit=data.findIndex(c=>c.time===trade.exitTime);
-        if(entry>=0)visuals.shapes.push({x:entry,y:trade.entryPrice,style:trade.direction==='long'?'triangleup':'triangledown',color:trade.direction==='long'?'#089981':'#f23645',text:trade.id,location:trade.direction==='long'?'belowbar':'abovebar'});
-        if(exit>=0)visuals.shapes.push({x:exit,y:trade.exitPrice,style:'xcross',color:'#787b86',text:'Exit',location:trade.direction==='long'?'abovebar':'belowbar'});
+        if(entry>=0)overlay.shapes.push({x:entry,y:trade.entryPrice,style:trade.direction==='long'?'triangleup':'triangledown',color:trade.direction==='long'?'#089981':'#f23645',text:trade.id,location:trade.direction==='long'?'belowbar':'abovebar'});
+        if(exit>=0)overlay.shapes.push({x:exit,y:trade.exitPrice,style:'xcross',color:'#787b86',text:'Exit',location:trade.direction==='long'?'abovebar':'belowbar'});
       }
     }
     script.pine.update(data,visuals);
+    script.pineOverlay?.update(data,overlay);
   }
  }
  update(data:Candle[],results?:Map<string,StudyResult>){this.data=data;for(const b of this.bundles){
   b.result=results?.get(b.id)??(b.id==='script'?b.result:computeStudy(b.id,data,b.config));
   for(let k=0;k<b.series.length;k++){
-   const plot=b.id==='vpvr'?{name:'Profile anchor',values:data.map(c=>c.close)}:b.id==='script'&&!b.result.plots.length?{name:'Visual anchor',values:data.map(c=>c.close),colors:data.map(()=> 'transparent')}:b.result.plots[k],offset=plot?.offset??0;
+   const plot:StudyPlot|undefined=b.id==='vpvr'?{name:'Profile anchor',values:data.map(c=>c.close)}:b.id==='script'&&k>=b.result.plots.length?{name:'Visual anchor',values:data.map(c=>c.close),colors:data.map(()=> 'transparent')}:b.result.plots[k],offset=plot?.offset??0;
    // Displacements beyond loaded candles are not extrapolated through weekends/holidays.
    const points=(plot?.values??data.map(()=>Number.NaN)).flatMap((value,i)=>{
     const at=i+offset;if(at<0||at>=data.length)return [];
-    if(!Number.isFinite(value))return b.id==='zigzag'?[]:[{time:this.time(data[at].time)}];
+    if(plot?.showLast!==undefined&&i<data.length-plot.showLast)return [];
+    if(!Number.isFinite(value))return b.id==='zigzag'||b.id==='script'&&plot&&pinePlotBridgesGaps(plot)?[]:[{time:this.time(data[at].time)}];
     const alpha=Math.round(b.config.opacity/100*(b.id==='volume'&&k===0?145:255)).toString(16).padStart(2,'0');
     let color=plot?.colors?.[i];
     if(b.id==='volume'&&k===0)color=b.config.colors[data[i].close>=data[i].open?0:1];
@@ -116,7 +153,7 @@ export class ChartStudyRenderer {
     else if(b.id==='macd'&&plot?.histogram)color=macdHistogramColor(value,plot.values[i-1],b.config.colors);
     else if(plot?.histogram&&b.id!=='chop-zone'&&b.id!=='script')color=b.config.colors[value>=0?0:1];
     if(color && b.id!=='script')color=color.slice(0,7)+alpha;
-    return [{time:this.time(data[at].time),value,color}];
+    return [{time:this.time(data[at].time),value,color,...(b.id==='script'&&plot&&['area','areabr'].includes(plotStyle(plot))&&color?baselineColors(color):{})}];
    });b.series[k].setData(points);
   }b.primitive?.update(data,b.result);
  }}
@@ -127,25 +164,24 @@ export class ChartStudyRenderer {
   const scale=this.chart.timeScale();
   for(const b of this.bundles){
    if(b.id==='vpvr'||b.config.opacity===0)continue;
-   const rect=this.chart.panes()[b.pane]?.getHTMLElement()?.getBoundingClientRect();
-   if(!rect)continue;
-   const x=clientX-rect.left,y=clientY-rect.top;
-   if(x<0||x>scale.width()||y<0||y>rect.height)continue;
-   const logical=scale.coordinateToLogical(x);if(logical===null)continue;
-   for(const series of b.series){
+   for(let k=0;k<b.series.length;k++){
+    const series=b.series[k],plot=b.result.plots[k];if(b.id==='script'&&!plot)continue;
+    const rect=this.chart.panes()[b.seriesPanes[k]??b.pane]?.getHTMLElement()?.getBoundingClientRect();if(!rect)continue;
+    const x=clientX-rect.left,y=clientY-rect.top;if(x<0||x>scale.width()||y<0||y>rect.height)continue;
+    const logical=scale.coordinateToLogical(x);if(logical===null)continue;
     if(!series.options().visible)continue;
     const left=series.dataByIndex(Math.floor(logical),MismatchDirection.NearestLeft),right=series.dataByIndex(Math.ceil(logical),MismatchDirection.NearestRight);
     const pixel=(p:typeof left)=>{if(!p||!('value' in p))return null;const px=scale.timeToCoordinate(p.time),py=series.priceToCoordinate(p.value);return px===null||py===null?null:{x:px,y:py};};
     const a=pixel(left),z=pixel(right);let distance=Infinity;
     if(series.seriesType()==='Histogram'){
-     const base=series.priceToCoordinate(0),next=scale.logicalToCoordinate((Math.floor(logical)+1) as Logical),prev=scale.logicalToCoordinate(Math.floor(logical) as Logical);
+     const base=series.priceToCoordinate(plot?.histbase??0),next=scale.logicalToCoordinate((Math.floor(logical)+1) as Logical),prev=scale.logicalToCoordinate(Math.floor(logical) as Logical);
      const half=next!==null&&prev!==null?Math.abs(next-prev)*.45:3;
      for(const p of [a,z])if(p&&base!==null&&Math.abs(x-p.x)<=half&&y>=Math.min(base,p.y)&&y<=Math.max(base,p.y))distance=0;
-    }else if(b.result.plots[b.series.indexOf(series)]?.points){
+    }else if(plot?.points&&!plot.join){
      for(const p of [a,z])if(p)distance=Math.min(distance,Math.hypot(x-p.x,y-p.y));
     }else if(a&&z){
      const dx=z.x-a.x,dy=z.y-a.y,t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy||1)));
-     distance=Math.hypot(x-a.x-t*dx,y-a.y-t*dy);
+     distance=plot&&plotStyle(plot).startsWith('stepline')?Math.min(x>=Math.min(a.x,z.x)&&x<=Math.max(a.x,z.x)?Math.abs(y-a.y):Infinity,y>=Math.min(a.y,z.y)&&y<=Math.max(a.y,z.y)?Math.abs(x-z.x):Infinity):Math.hypot(x-a.x-t*dx,y-a.y-t*dy);
     }
     if(distance<closest){closest=distance;hit=b.id;}
    }

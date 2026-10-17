@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { snapStudyCrosshair } from '../lib/study-crosshair.ts';
+import { locateStudyPane, studyPaneSeries } from '../lib/study-pane-drawings.ts';
 
 function fixture() {
   const calls = [];
@@ -37,4 +38,14 @@ test('price and other indicator panes, pointer exit and missing RSI history do n
   rsi.options = () => ({ visible: false });
   assert.equal(snapStudyCrosshair(chart, rsi, event), false);
   assert.deepEqual(calls, []);
+});
+
+test('drawing and crosshair projection use the oscillator series when the first Pine plot is force_overlay',()=>{
+ const price={coordinateToPrice:y=>1000-y},oscillator={coordinateToPrice:y=>100-y};
+ const bundle={id:'script',pane:1,series:[price,oscillator],seriesPanes:[0,1]};
+ const chart={panes:()=>[{getHeight:()=>300},{getHeight:()=>100}]};
+ assert.equal(studyPaneSeries(bundle),oscillator);
+ assert.deepEqual(locateStudyPane(chart,[bundle],350),{studyId:'script',value:50,y:350});
+ assert.equal(locateStudyPane(chart,[bundle],150),null);
+ assert.equal(studyPaneSeries({pane:1,series:[oscillator]}),oscillator,'legacy single-pane studies retain their primary series');
 });

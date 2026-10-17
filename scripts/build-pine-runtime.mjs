@@ -1,5 +1,10 @@
 import { build } from 'esbuild';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+
+// The compatibility adapter uses PineTS's context factory, an internal seam.
+// Never silently ship it against an unreviewed package version.
+const installedPineTS=JSON.parse(await readFile(new URL('../package.json',import.meta.resolve('pinets')),'utf8'));
+if(installedPineTS.version!=='0.11.1')throw new Error(`PineTS ${installedPineTS.version} requires a review of lib/pine-runtime-compat.ts before building.`);
 
 // A single offline bundle is required: the sandbox deliberately cannot import
 // scripts or fetch market data from the application's authenticated origin.

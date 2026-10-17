@@ -82,7 +82,7 @@ test('same timeframe security equals chart while higher timeframe RPC exposes on
  assert.equal(r.error,null);assert.equal(calls,1);assert.deepEqual(r.plots[0].values,rows.map(c=>c.close));assert.ok(r.plots[1].values.slice(0,4).every(Number.isNaN));assert.deepEqual(r.plots[1].values.slice(4,10),[1005,1005,1005,1005,1005,1105]);
 });
 test('native v5 math and Wilder RSI warmups are numeric and barstate distinguishes last bar',async()=>{
- const r=await runAdvancedPineScript('//@version=5\nindicator("v5")\nplot(math.log(math.exp(2)),"Log")\nplot(ta.rsi(close,4),"RSI")\nplot(barstate.islast?1:0,"Last")\nplot(barstate.isrealtime?1:0,"Realtime")',candles,{}, {timeframe:'1'});assert.equal(r.error,null);near(r.plots[0].values[0],2);assert.ok(r.plots[1].values.slice(0,4).every(Number.isNaN));near(r.plots[1].values[4],100);assert.equal(r.plots[2].values.filter(v=>v===1).length,1);assert.equal(r.plots[2].values.at(-1),1);assert.deepEqual(r.plots[3].values.slice(0,-1),Array(candles.length-1).fill(0));assert.equal(r.plots[3].values.at(-1),1);assert.ok(r.warnings.some(w=>w.includes('last loaded bar as realtime')));
+ const r=await runAdvancedPineScript('//@version=5\nindicator("v5")\nplot(math.log(math.exp(2)),"Log")\nplot(ta.rsi(close,4),"RSI")\nplot(barstate.islast?1:0,"Last")\nplot(barstate.isrealtime?1:0,"Realtime")',candles,{}, {timeframe:'1'});assert.equal(r.error,null);near(r.plots[0].values[0],2);assert.ok(r.plots[1].values.slice(0,4).every(Number.isNaN));near(r.plots[1].values[4],100);assert.equal(r.plots[2].values.filter(v=>v===1).length,1);assert.equal(r.plots[2].values.at(-1),1);assert.deepEqual(r.plots[3].values.slice(0,-1),Array(candles.length-1).fill(0));assert.equal(r.plots[3].values.at(-1),0);assert.ok(r.warnings.some(w=>w.includes('Closed bars and replay are historical')));
 });
 test('strategy broker accounts configured percent fees and tick slippage',async()=>{
  const r=await runAdvancedPineScript(`//@version=6
@@ -108,7 +108,7 @@ h=hline(105,"Hidden level",display=display.none)
 fill(p,h,color.blue)
 plot(close,"Step",style=plot.style_stepline,show_last=2,offset=1,trackprice=true,force_overlay=true)
 plot(close,"Cross",style=plot.style_cross)
-hline(100,"Custom line",linestyle=hline.style_dotted,linewidth=3)`);assert.equal(r.error,null);assert.deepEqual(r.plots.map(p=>p.name),['Step','Cross']);assert.deepEqual(r.levelStyles.map(l=>l.title),['Custom line']);assert.ok(r.plots[0].values.slice(0,-2).every(Number.isNaN));assert.deepEqual(r.plots[0].values.slice(-2),[179,180]);assert.ok(r.visuals.find(v=>v.title==='Hidden').data.length===80);for(const fragment of ['step','Cross','trackprice','offset','dash','force_overlay'])assert.ok(r.warnings.some(w=>w.toLowerCase().includes(fragment.toLowerCase())),fragment);
+hline(100,"Custom line",linestyle=hline.style_dotted,linewidth=3)`);assert.equal(r.error,null);assert.deepEqual(r.plots.map(p=>p.name),['Step','Cross']);assert.deepEqual(r.levelStyles.map(l=>l.title),['Custom line']);assert.ok(r.plots[0].values.slice(0,-2).every(Number.isNaN));assert.deepEqual(r.plots[0].values.slice(-2),[179,180]);assert.ok(r.visuals.find(v=>v.title==='Hidden').data.length===80);assert.equal(r.plots[0].style,'stepline');assert.equal(r.plots[0].trackPrice,true);assert.equal(r.plots[0].forceOverlay,true);assert.equal(r.plots[1].style,'cross');assert.equal(r.levelStyles[0].width,3);assert.equal(r.levelStyles[0].style,'dotted');for(const fragment of ['offset'])assert.ok(r.warnings.some(w=>w.toLowerCase().includes(fragment.toLowerCase())),fragment);
 });
 test('symbol metadata honors crypto currency, point value and session context',async()=>{
  const r=await runAdvancedPineScript('//@version=6\nindicator("Metadata")\nplot(syminfo.pointvalue,"Point value")\nif barstate.islast\n    log.info("{0}/{1}/{2}",syminfo.currency,syminfo.type,syminfo.basecurrency)',candles,{}, {symbol:'DELTA:BTCUSD',timeframe:'1',currency:'USD',baseCurrency:'BTC',type:'crypto',pointValue:10,timezone:'UTC',session:'24x7',tickSize:.5});assert.equal(r.error,null);assert.equal(r.plots[0].values[0],10);assert.equal(r.logs[0].message,'USD/crypto/BTC');
@@ -128,11 +128,105 @@ if bar_index==5
     strategy.close("L")`,candles.slice(0,10),{}, {timeframe:'1',currency:'INR',type:'futures',pointValue:10});assert.equal(r.error,null);near(r.strategy.netProfit,80);assert.equal(r.strategy.currency,'INR');
 });
 
-test('oscillator drawings do not falsely warn main-chart routing, while force_overlay warns script-pane routing',async()=>{
+test('oscillator drawings and force_overlay retain their intended pane routing',async()=>{
  const plain=await runAdvancedPineScript('//@version=6\nindicator("Pane",overlay=false)\nif barstate.islast\n    label.new(bar_index,5,"Oscillator")',candles,{}, {timeframe:'1'});
  assert.equal(plain.error,null);assert.equal(plain.overlay,false);assert.ok(plain.visuals.some(v=>v.options.style==='label'));
  assert.ok(!plain.warnings.some(w=>/main chart pane/i.test(w)));
  const forced=await runAdvancedPineScript('//@version=6\nindicator("Pane",overlay=false)\nplot(close,force_overlay=true)',candles,{}, {timeframe:'1'});
- assert.equal(forced.error,null);assert.ok(forced.warnings.some(w=>/force_overlay/.test(w)&&/script pane/.test(w)));
+ assert.equal(forced.error,null);assert.equal(forced.plots[0].forceOverlay,true);assert.ok(!forced.warnings.some(w=>/force_overlay/.test(w)&&/not implemented/.test(w)));
  assert.ok(!forced.warnings.some(w=>/main chart pane/i.test(w)));
+});
+
+test('typed const, user-defined objects and methods with a local self parameter execute natively',async()=>{
+ const r=await run(`const float factor=2.0
+type Quote
+    float price
+    float weight = 2
+method scaled(Quote self) =>
+    self.price * self.weight
+q=Quote.new(close, factor)
+plot(q.scaled(),"Weighted price")`);
+ assert.equal(r.error,null);assert.deepEqual(r.plots[0].values,candles.map(c=>c.close*2));
+ for(const tail of ['plot(self)','x = self["postMessage"]'])assert.throws(()=>validateAdvancedPineSource(`//@version=6\nindicator("bound")\ntype Q\n    float v\nmethod v(Q self) => self.v\n${tail}`),/Unbound host access/);
+});
+
+test('native map methods and matrix trace maintain independent persistent state',async()=>{
+ const r=await run(`const int dimension=2
+var map<string, float> values=map.new<string,float>()
+values.put("price",close)
+var matrix<float> grid=matrix.new<float>(dimension,dimension,0)
+grid.set(0,0,close)
+grid.set(1,1,open)
+plot(values.get("price"),"Map price")
+plot(matrix.trace(grid),"Trace")`);
+ assert.equal(r.error,null);assert.deepEqual(r.plots[0].values,candles.map(c=>c.close));assert.deepEqual(r.plots[1].values,candles.map(c=>c.open+c.close));
+});
+
+test('confirmed HTF history offsets appear at bucket open without future leakage, including tuples',async()=>{
+ const start=1700000100,rows=Array.from({length:20},(_,i)=>({...candles[i],time:start+i*60}));
+ const higher=Array.from({length:4},(_,i)=>({time:start+i*300,open:1000+i*100,high:1010+i*100,low:990+i*100,close:1005+i*100,volume:500}));
+ const source=`//@version=6
+indicator("Confirmed HTF")
+[priorClose, priorHigh]=request.security(syminfo.tickerid,"5",[close[1],high[1]],lookahead=barmerge.lookahead_on)
+plot(priorClose,"Prior close")
+plot(priorHigh,"Prior high")
+plot(request.security(syminfo.tickerid,"5",ta.sma(close,2)[1],lookahead=barmerge.lookahead_on),"Prior average")`;
+ const r=await runAdvancedPineScript(source,rows,{}, {symbol:'NSE:TEST',timeframe:'1'},async()=>higher);
+ assert.equal(r.error,null);assert.ok(r.plots[0].values.slice(0,5).every(Number.isNaN));
+ assert.deepEqual(r.plots[0].values.slice(5),[...Array(5).fill(1005),...Array(5).fill(1105),...Array(5).fill(1205)]);
+ assert.deepEqual(r.plots[1].values.slice(5),[...Array(5).fill(1010),...Array(5).fill(1110),...Array(5).fill(1210)]);
+ assert.deepEqual(r.plots[2].values.slice(10),[...Array(5).fill(1055),...Array(5).fill(1155)]);
+ const changed=higher.map((c,i)=>i>=2?{...c,open:9000,high:10000,low:8000,close:9999}:c);
+ const prefix=await runAdvancedPineScript(source,rows.slice(0,12),{}, {symbol:'NSE:TEST',timeframe:'1'},async()=>changed);
+ assert.equal(prefix.error,null);for(let i=0;i<3;i++)assert.deepEqual(prefix.plots[i].values,r.plots[i].values.slice(0,12));
+ for(const expression of ['close','close[0]','close[1]+high','[close[1],high]','close[1] + high[1]','ta.sma(close,2)'])assert.throws(()=>validateAdvancedPineSource(`//@version=6\nindicator("Guard")\nplot(request.security("X","5",${expression},lookahead=barmerge.lookahead_on))`),/historical offset/);
+});
+
+test('cross-symbol requests preserve exchange prefixes and use requested metadata',async()=>{
+ const rows=candles.slice(0,10),requests=[];
+ const r=await runAdvancedPineScript(`//@version=6
+indicator("Exchange isolation")
+plot(request.security("BSE:TEST","1",close),"BSE")
+plot(request.security(symbol="DELTA:BTCUSD",timeframe="1",expression=close),"BTC")
+plot(request.security("DELTA:BTCUSD","1",syminfo.pointvalue),"Multiplier")
+[currencyName,exchangeName]=request.security("DELTA:BTCUSD","1",[syminfo.currency,syminfo.prefix])
+if barstate.islast
+    log.info("{0}/{1}",currencyName,exchangeName)`,rows,{}, {symbol:'NSE:TEST',timeframe:'1',currency:'INR',pointValue:1},async(symbol)=>{
+  requests.push(symbol);return {candles:rows.map(c=>({...c,open:c.open+100,high:c.high+100,low:c.low+100,close:c.close+100})),symbolInfo:{symbol,currency:symbol.startsWith('DELTA:')?'USD':'INR',timezone:'UTC',session:'24x7',pointValue:10,type:'futures'}};
+ });
+ assert.equal(r.error,null);assert.ok(requests.includes('BSE:TEST'));assert.ok(requests.includes('DELTA:BTCUSD'));assert.deepEqual(r.plots[0].values,rows.map(c=>c.close+100));assert.deepEqual(r.plots[1].values,rows.map(c=>c.close+100));assert.deepEqual(r.plots[2].values,Array(10).fill(10));assert.equal(r.logs[0].message,'USD/DELTA');
+});
+
+test('security_lower_tf equal-timeframe cross-symbol requests return the requested arrays, not chart values',async()=>{
+ const rows=candles.slice(0,5);
+ const r=await runAdvancedPineScript(`//@version=6
+indicator("Intrabar symbols")
+values=request.security_lower_tf("BSE:TEST","1",close)
+[opens,closes]=request.security_lower_tf("BSE:TEST","1",[open,close])
+plot(array.get(values,0),"Close")
+plot(array.get(opens,0),"Open")
+plot(array.get(closes,0),"Tuple close")`,rows,{}, {symbol:'NSE:TEST',timeframe:'1'},async()=>rows.map(c=>({...c,open:c.open+100,high:c.high+100,low:c.low+100,close:c.close+100})));
+ assert.equal(r.error,null);assert.deepEqual(r.plots[0].values,rows.map(c=>c.close+100));assert.deepEqual(r.plots[1].values,rows.map(c=>c.open+100));assert.deepEqual(r.plots[2].values,rows.map(c=>c.close+100));
+});
+
+test('closed-market, developing-bar and replay barstate flags follow the supplied snapshot',async()=>{
+ const rows=candles.slice(0,4),source=`//@version=6
+indicator("State")
+plot(barstate.isrealtime?1:0,"Realtime")
+plot(barstate.ishistory?1:0,"History")
+plot(barstate.isconfirmed?1:0,"Confirmed")
+plot(barstate.islastconfirmedhistory?1:0,"Last history")`;
+ const closed=await runAdvancedPineScript(source,rows,{}, {timeframe:'1',now:(rows.at(-1).time+60)*1000});
+ assert.equal(closed.error,null);assert.deepEqual(closed.plots.map(p=>p.values),[[0,0,0,0],[1,1,1,1],[1,1,1,1],[0,0,0,1]]);
+ const live=await runAdvancedPineScript(source,rows,{}, {timeframe:'1',now:(rows.at(-1).time+30)*1000});
+ assert.equal(live.error,null);assert.deepEqual(live.plots.map(p=>p.values),[[0,0,0,1],[1,1,1,0],[1,1,1,0],[0,0,1,0]]);
+ const replay=await runAdvancedPineScript(source,rows,{}, {timeframe:'1',now:(rows.at(-1).time+30)*1000,replay:true});
+ assert.equal(replay.error,null);assert.deepEqual(replay.plots.map(p=>p.values),closed.plots.map(p=>p.values));
+});
+
+test('additional chart timeframe retains known contract metadata when directory has only identity',async()=>{
+ const start=1700000100,rows=Array.from({length:10},(_,i)=>({...candles[i],time:start+i*60}));
+ const higher=[rows[0],{...rows[5],time:start+300}];
+ const r=await runAdvancedPineScript('//@version=6\nindicator("Contract metadata")\nplot(request.security(syminfo.tickerid,"5",syminfo.pointvalue),"Point value")\nplot(request.security(syminfo.tickerid,"5",syminfo.mintick),"Tick")',rows,{}, {symbol:'DELTA:BTCUSD',timeframe:'1',currency:'USD',tickSize:.5,pointValue:10,timezone:'UTC',session:'24x7'},async()=>({candles:higher,symbolInfo:{symbol:'DELTA:BTCUSD',currency:'USD',timezone:'UTC',session:'24x7'}}));
+ assert.equal(r.error,null);assert.equal(r.plots[0].values.at(-1),10);assert.equal(r.plots[1].values.at(-1),.5);assert.ok(!r.warnings.some(w=>w.includes('Missing mintick')));
 });
