@@ -261,10 +261,10 @@ export function HomeWorkspace({
     const digits = value >= 1 ? 2 : 4;
     return value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   };
-  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number|null; volume: number; quoteLabel?:string; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
+  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number|null; volume: number; quoteLabel?:string; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" title={line.quoteLabel} aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
     {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
     <span className="home-pair-name"><b>{line.symbol}</b><small>{line.name}</small><small className="home-pair-vol">{line.volume > 0 ? `Vol ${volumeLabel(line.volume)}` : "—"}</small></span>
-    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 && line.change!=null ? (line.change < 0 ? "down" : "up") : ""}>{line.price>0?quoteChangeText(line.change):"—"}</em>{line.quoteLabel&&<small className="market-quote-time">{line.quoteLabel}</small>}</span>
+    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 && line.change!=null ? (line.change < 0 ? "down" : "up") : ""}>{line.price>0?quoteChangeText(line.change):"—"}</em>{desktop&&line.quoteLabel&&<small className="market-quote-time">{line.quoteLabel}</small>}</span>
   </button>;
   const quoteLine = (quote: BoardQuote, seen: Set<string>) => {
     const stock = matchShelfInstrument(stockOptions, boardShelf, quote.symbol);
@@ -357,7 +357,7 @@ export function HomeWorkspace({
                     <div className="home-search-tabs" role="tablist" aria-label="Market">
                       {([["all", "All"], ["in", "IN"], ["mcx", "MCX"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
                     </div>
-                    {!search.trim()&&shelf!=='mcx'&&<MarketDataStatus metadata={boardMetadata[boardKey]} failed={boardsFailed} now={now}/>}
+                    {desktop&&!search.trim()&&shelf!=='mcx'&&<MarketDataStatus metadata={boardMetadata[boardKey]} failed={boardsFailed} now={now}/>}
                     <div className="home-search-sheet-list">
                       {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
                         {shelf === "mcx" && <div className="home-search-group"><b>{commoditySessionLabel ?? "MCX futures"}</b></div>}

@@ -1,4 +1,5 @@
 "use client";
+import { ChartColorControl } from './ChartColorControl';
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CandlestickChart, Check, ChevronRight, Copy, LayoutTemplate, Paintbrush, RotateCcw, Save, Scaling, Trash2, X } from "lucide-react";
@@ -26,7 +27,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
   return <label className="desktop-settings-toggle"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span>{label}{hint && <small>{hint}</small>}</span></label>;
 }
 function Color({ label, value, fallback, onChange }: { label: string; value: string | null; fallback: string; onChange: (value: string | null) => void }) {
-  return <div className="desktop-settings-color"><label title={label}><input type="color" aria-label={label} value={value ?? fallback} onChange={(event) => onChange(event.target.value)} /><span>{value?.toUpperCase() ?? "Auto"}</span></label><button type="button" title={`Reset ${label.toLowerCase()} to automatic`} aria-label={`Reset ${label.toLowerCase()}`} disabled={value === null} onClick={() => onChange(null)}><RotateCcw size={12} /></button></div>;
+  return <div className="desktop-settings-color"><label title={label}><ChartColorControl label={label} value={value ?? fallback} onChange={onChange} /><span>{value?.toUpperCase() ?? "Auto"}</span></label><button type="button" title={`Reset ${label.toLowerCase()} to automatic`} aria-label={`Reset ${label.toLowerCase()}`} disabled={value === null} onClick={() => onChange(null)}><RotateCcw size={12} /></button></div>;
 }
 
 export function DesktopChartSettingsDialog({ onClose, theme = "light", symbol = "Chart", chartStyle = "candles", palette }: {

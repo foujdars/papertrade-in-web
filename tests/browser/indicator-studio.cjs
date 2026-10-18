@@ -1,3 +1,4 @@
+const {setChartColor}=require('./chart-color-helper.cjs');
 const fs=require('fs'),http=require('http'),esbuild=require('esbuild'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 (async()=>{
@@ -15,7 +16,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  await open();await search('RSI');await page.getByRole('dialog',{name:'Functions',exact:true}).getByRole('button',{name:'Settings for Relative Strength Index',exact:true}).click();const editor=page.getByRole('dialog',{name:'Relative Strength Index settings',exact:true});await editor.waitFor();
  await editor.getByLabel('Length',{exact:true}).fill('7');await editor.getByRole('button',{name:'Apply',exact:true}).click();await page.getByRole('button',{name:'Close functions'}).click();
  await page.waitForFunction(before=>window.qaStudies.bundles.find(b=>b.id==='rsi').series[0].data().at(-1).value!==before,rsiBefore);
- await page.getByRole('button',{name:'Indicator actions for Relative Strength Index',exact:true}).click();await page.getByRole('button',{name:'Indicator settings',exact:true}).click();await editor.getByRole('button',{name:'Style',exact:true}).click();await editor.getByLabel('Plot 1 color',{exact:true}).fill('#ff8800');await editor.getByRole('button',{name:'Line width',exact:true}).click();await page.getByRole('option',{name:'3 px',exact:true}).click();await editor.getByRole('button',{name:'Apply',exact:true}).click();
+ await page.getByRole('button',{name:'Indicator actions for Relative Strength Index',exact:true}).click();await page.getByRole('button',{name:'Indicator settings',exact:true}).click();await editor.getByRole('button',{name:'Style',exact:true}).click();await setChartColor(page,editor,'Plot 1 color','#ff8800');await editor.getByRole('button',{name:'Line width',exact:true}).click();await page.getByRole('option',{name:'3 px',exact:true}).click();await editor.getByRole('button',{name:'Apply',exact:true}).click();
  await page.waitForFunction(()=>window.qaStudies.bundles.find(b=>b.id==='rsi').series[0].options().lineWidth===3);
  assert.match(await page.evaluate(()=>window.qaStudies.bundles.find(b=>b.id==='rsi').series[0].options().color),/#ff8800/);
  await page.reload();await page.waitForFunction(()=>window.qaStudies?.bundles.find(b=>b.id==='rsi')?.config.inputs.length===7);assert.equal(await page.evaluate(()=>window.qaChart.panes().length),3);

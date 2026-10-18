@@ -1,3 +1,4 @@
+const {setChartColor}=require('./chart-color-helper.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/chart-browser-qa');fs.mkdirSync(output,{recursive:true});
@@ -20,11 +21,11 @@ const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/chart-browser-q
   const settings=page.getByRole('dialog',{name:'Chart settings',exact:true});
   await page.getByRole('button',{name:'Chart settings',exact:true}).click();
   const original=await page.evaluate(()=>window.qaSeries.options().upColor);
-  await settings.getByLabel('Up candle color',{exact:true}).fill('#123456');await settings.getByRole('button',{name:'Cancel',exact:true}).click();
+  await setChartColor(page,settings,'Up candle color','#123456');await settings.getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await page.evaluate(()=>window.qaSeries.options().upColor),original);
-  await page.getByRole('button',{name:'Chart settings',exact:true}).click();await settings.getByLabel('Up candle color',{exact:true}).fill('#123456');await settings.getByLabel('Show wicks',{exact:true}).uncheck();
+  await page.getByRole('button',{name:'Chart settings',exact:true}).click();await setChartColor(page,settings,'Up candle color','#123456');await settings.getByLabel('Show wicks',{exact:true}).uncheck();
   await settings.getByRole('tab',{name:'Scales and lines',exact:true}).click();await settings.getByLabel('Price scale mode',{exact:true}).selectOption('log');await settings.getByLabel('Invert scale',{exact:false}).check();await settings.getByLabel('Top scale margin',{exact:true}).fill('22');
-  await settings.getByRole('tab',{name:'Canvas',exact:true}).click();await settings.getByLabel('Chart background color',{exact:true}).fill('#fffaf0');await settings.getByLabel('Vertical grid lines',{exact:true}).uncheck();await settings.getByRole('button',{name:'OK',exact:true}).click();
+  await settings.getByRole('tab',{name:'Canvas',exact:true}).click();await setChartColor(page,settings,'Chart background color','#fffaf0');await settings.getByLabel('Vertical grid lines',{exact:true}).uncheck();await settings.getByRole('button',{name:'OK',exact:true}).click();
   await page.waitForFunction(()=>window.qaSeries.options().upColor==='#123456');
   assert.deepEqual(await page.evaluate(()=>{const s=window.qaSeries.options(),c=window.qaChart.options();return[s.wickVisible,c.layout.background.color,c.grid.vertLines.visible,c.rightPriceScale.mode,c.rightPriceScale.invertScale,c.rightPriceScale.scaleMargins.top];}),[false,'#fffaf0',false,1,true,.22]);
   await page.reload();await page.waitForFunction(()=>window.qaSeries?.options().upColor==='#123456');
