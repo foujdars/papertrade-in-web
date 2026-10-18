@@ -56,6 +56,7 @@ import "./desktop-data-visuals.css";
 import "./desktop-layout-cleanup.css";
 import "./desktop-watchlist-visuals.css";
 import "./desktop-depth.css";
+import "./desktop-chart-space.css";
 import "./indicator-templates.css";
 import "./market-data-status.css";
 import "./algo-trading.css";
