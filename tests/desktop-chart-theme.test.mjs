@@ -8,19 +8,27 @@ test('desktop scope requires wide fine pointer web trade/F&O and rejects native 
  assert.equal(isDesktopWebChart(desktop),true);assert.equal(isDesktopWebChart({...desktop,section:'fno'}),true);
  for(const override of [{mediaMatches:false},{platform:'android'},{platform:null},{native:true},{section:'home'},{section:'research'},{section:null}])assert.equal(isDesktopWebChart({...desktop,...override}),false);
 });
-test('desktop dark and light tokens match requested chart colors without changing global market colors',()=>{
- const dark=chartCanvasPalette('neon',desktop),light=chartCanvasPalette('light',desktop);
- assert.equal(dark.background,'#0f0f0f');assert.equal(dark.grid,'#2e2e2e');assert.equal(dark.text,'#b2b5be');assert.equal(dark.border,'#2e2e2e');
- assert.equal(light.background,'#ffffff');assert.equal(light.grid,'#f0f3fa');assert.equal(light.text,'#787b86');assert.equal(light.border,'#ebebeb');
- for(const palette of [dark,light]){assert.equal(palette.accent,'#2962ff');assert.equal(palette.up,'#089981');assert.equal(palette.down,'#f23645');}
- assert.notEqual(MARKET_GREEN,dark.up);assert.notEqual(MARKET_RED,dark.down);
+function luminance(hex){
+ const channels=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);
+ return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;
+}
+
+test('both chart themes have darker surfaces than their app canvas and readable axis text',()=>{
+ for(const [theme,canvas] of [['neon','#202d40'],['light','#fafbff']]){
+  const palette=chartCanvasPalette(theme,desktop);
+  assert.ok(luminance(palette.background)<luminance(canvas));
+  const levels=[luminance(palette.background),luminance(palette.text)].sort((a,b)=>b-a);
+  assert.ok((levels[0]+.05)/(levels[1]+.05)>=4.5);
+  assert.equal(palette.up,'#089981');assert.equal(palette.down,'#f23645');
+ }
 });
-test('mobile coarse pointer native large-screen and unrelated sections retain exact baseline palettes',()=>{
- const baseline={
-  neon:{desktop:false,accent:'#bf9aff',background:'#0c142b',text:'#a4adc7',grid:'#19233c',border:'#2c3859',separator:'#2c3859',separatorHover:'#bf9aff',crosshair:'#bf9aff',crosshairLabel:'#342353',up:MARKET_GREEN,down:MARKET_RED},
-  light:{desktop:false,accent:'#8054da',background:'#ffffff',text:'#65708a',grid:'#edf0f6',border:'#dfe3ec',separator:'#e3e6ee',separatorHover:'#d8d3ff',crosshair:'#8c96aa',crosshairLabel:'#252b3d',up:MARKET_GREEN,down:MARKET_RED},
- };
- for(const theme of ['light','neon'])for(const override of [{mediaMatches:false},{platform:'android'},{native:true},{section:'home'},{platform:null}])assert.deepEqual(chartCanvasPalette(theme,{...desktop,...override}),baseline[theme]);
- // Leaving the media boundary restores the same tokens rather than retaining desktop colors.
- chartCanvasPalette('neon',desktop);assert.deepEqual(chartCanvasPalette('neon',{...desktop,mediaMatches:false}),baseline.neon);
+
+test('all platforms share theme surfaces while mobile retains semantic market candle colors',()=>{
+ for(const theme of ['light','neon'])for(const override of [{mediaMatches:false},{platform:'android'},{native:true},{section:'home'},{platform:null}]){
+  const palette=chartCanvasPalette(theme,{...desktop,...override});
+  const expected=chartCanvasPalette(theme,desktop);
+  assert.equal(palette.desktop,false);
+  for(const key of ['accent','background','text','grid','border','separator','separatorHover','crosshair','crosshairLabel'])assert.equal(palette[key],expected[key]);
+  assert.equal(palette.up,MARKET_GREEN);assert.equal(palette.down,MARKET_RED);
+ }
 });

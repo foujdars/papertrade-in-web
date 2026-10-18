@@ -61,6 +61,7 @@ import "./chart-color-control.css";
 import "./indicator-templates.css";
 import "./market-data-status.css";
 import "./algo-trading.css";
+import "./app-themes.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")
@@ -84,7 +85,7 @@ export const metadata: Metadata = {
   },
   title: {
     default: "PaperTrade IN",
-    template: "%s · PaperTrade IN",
+    template: "%s Â· PaperTrade IN",
   },
   description: "Indian market paper-trading simulator in INR.",
   openGraph: {
