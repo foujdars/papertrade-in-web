@@ -23,12 +23,25 @@ test('both chart themes have darker surfaces than their app canvas and readable 
  }
 });
 
-test('all platforms share theme surfaces while mobile retains semantic market candle colors',()=>{
- for(const theme of ['light','neon'])for(const override of [{mediaMatches:false},{platform:'android'},{native:true},{section:'home'},{platform:null}]){
-  const palette=chartCanvasPalette(theme,{...desktop,...override});
-  const expected=chartCanvasPalette(theme,desktop);
-  assert.equal(palette.desktop,false);
-  for(const key of ['accent','background','text','grid','border','separator','separatorHover','crosshair','crosshairLabel'])assert.equal(palette[key],expected[key]);
-  assert.equal(palette.up,MARKET_GREEN);assert.equal(palette.down,MARKET_RED);
- }
+test('mobile coarse pointer native large-screen and unrelated sections retain exact baseline palettes',()=>{
+ const baseline={
+  neon:{desktop:false,accent:'#bf9aff',background:'#0c142b',text:'#a4adc7',grid:'#19233c',border:'#2c3859',separator:'#2c3859',separatorHover:'#bf9aff',crosshair:'#bf9aff',crosshairLabel:'#342353',up:MARKET_GREEN,down:MARKET_RED},
+  light:{desktop:false,accent:'#8054da',background:'#ffffff',text:'#65708a',grid:'#edf0f6',border:'#dfe3ec',separator:'#e3e6ee',separatorHover:'#d8d3ff',crosshair:'#8c96aa',crosshairLabel:'#252b3d',up:MARKET_GREEN,down:MARKET_RED},
+ };
+ for(const theme of ['light','neon'])for(const override of [{mediaMatches:false},{platform:'android'},{native:true},{section:'home'},{platform:null}])assert.deepEqual(chartCanvasPalette(theme,{...desktop,...override}),baseline[theme]);
+ // Leaving the media boundary restores the same tokens rather than retaining desktop colors.
+ chartCanvasPalette('neon',desktop);assert.deepEqual(chartCanvasPalette('neon',{...desktop,mediaMatches:false}),baseline.neon);
+});
+
+test('theme stylesheet is entirely confined to desktop web shells',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {default:postcss}=await import('postcss');
+ const css=postcss.parse(await readFile(new URL('../app/app-themes.css',import.meta.url),'utf8'));
+ const rules=css.nodes.filter(node=>node.type!=='comment');
+ assert.equal(rules.length,1);
+ assert.equal(rules[0].name,'media');
+ assert.equal(rules[0].params,'(min-width: 941px) and (hover: hover) and (pointer: fine)');
+ css.walkRules(rule=>{
+  assert.ok(rule.selectors.every(selector=>selector.includes('.terminal-shell[data-platform="web"]')));
+ });
 });
