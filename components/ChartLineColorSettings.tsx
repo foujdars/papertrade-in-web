@@ -4,6 +4,7 @@ import { MARKET_GREEN, MARKET_RED } from "@/lib/market-colours";
 
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { ChartColorControl } from './ChartColorControl';
 import { ChartDialogPortal } from "./ChartDialogPortal";
 import { useTransientBack } from "./useTransientBack";
 
@@ -28,7 +29,7 @@ export function ChartLineColorSettings({ name, color, onChange, onClose }: {
         <div className="chart-line-color-swatches" role="group" aria-label="Choose line color">
           {COLORS.map((choice) => <button key={choice} type="button" aria-label={`Set line color ${choice}`} aria-pressed={choice.toLowerCase() === color.toLowerCase()} className={choice.toLowerCase() === color.toLowerCase() ? "active" : ""} style={{ background: choice }} onClick={() => onChange(choice)} />)}
         </div>
-        <label className="chart-line-custom-color">Custom color <input type="color" value={color} aria-label="Custom line color" onChange={(event) => onChange(event.target.value)} /></label>
+        <label className="chart-line-custom-color">Custom color <ChartColorControl label="Custom line color" value={color} onChange={onChange} /></label>
         <footer><button type="button" onClick={onClose}>Done</button></footer>
       </section>
     </div>

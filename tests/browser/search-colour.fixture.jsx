@@ -1,0 +1,14 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {Capacitor} from '@capacitor/core';
+import {AuthProvider} from '../../components/AuthProvider';
+import {TradingDashboard} from '../../components/TradingDashboard';
+import {ChartStudyRenderer} from '../../lib/chart-study-renderer';
+import {DrawingManager} from 'lightweight-charts-drawing';
+const sync=ChartStudyRenderer.prototype.sync;
+ChartStudyRenderer.prototype.sync=function(...args){const result=sync.apply(this,args);if(this.bundles.some(b=>b.id==='ema200'))window.qaRenderer=this;return result;};
+const attach=DrawingManager.prototype.attach;
+DrawingManager.prototype.attach=function(...args){window.qaManager=this;return attach.apply(this,args);};
+const native=new URLSearchParams(location.search).has('native');
+Capacitor.isNativePlatform=()=>native;Capacitor.getPlatform=()=>native?'android':'web';
+createRoot(document.getElementById('root')).render(<AuthProvider><TradingDashboard/></AuthProvider>);

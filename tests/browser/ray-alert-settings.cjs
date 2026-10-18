@@ -1,3 +1,4 @@
+const {setChartColor}=require('./chart-color-helper.cjs');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const output=path.resolve(process.env.RAY_QA_OUTPUT_DIR||'work/ray-alert-browser-qa');fs.mkdirSync(output,{recursive:true});
@@ -26,7 +27,7 @@ const browser=await chromium.launch({headless:true});try{
  const select=()=>page.evaluate(()=>window.qaManager.selectDrawing('ray-test'));
  await select();await page.getByRole('button',{name:'Drawing settings',exact:true}).click();const settings=page.getByRole('dialog',{name:'Drawing settings',exact:true});
  await settings.getByLabel('Line opacity',{exact:true}).fill('55');await settings.getByRole('button',{name:'Ray direction',exact:true}).click();await page.getByRole('option',{name:'Left',exact:true}).click();
- await settings.getByRole('tab',{name:'Text',exact:true}).click();await settings.getByLabel('Drawing text').fill('Resistance');await settings.getByLabel('Text colour',{exact:true}).fill('#008800');await settings.getByRole('button',{name:'Bold text'}).click();await settings.getByRole('button',{name:'Italic text'}).click();await settings.getByRole('button',{name:'Font size',exact:true}).click();await page.getByRole('option',{name:'18 px',exact:true}).click();
+ await settings.getByRole('tab',{name:'Text',exact:true}).click();await settings.getByLabel('Drawing text').fill('Resistance');await setChartColor(page,settings,'Text colour','#008800');await settings.getByRole('button',{name:'Bold text'}).click();await settings.getByRole('button',{name:'Italic text'}).click();await settings.getByRole('button',{name:'Font size',exact:true}).click();await page.getByRole('option',{name:'18 px',exact:true}).click();
  await settings.getByRole('tab',{name:'Coordinates',exact:true}).click();await settings.getByLabel('Price for point 1',{exact:true}).fill('113.50');await settings.getByRole('tab',{name:'Visibility',exact:true}).click();await settings.getByLabel('Visible on 5m',{exact:true}).uncheck();
  await page.screenshot({path:path.join(output,'ray-settings-visibility.png')});await settings.getByRole('button',{name:'Apply',exact:true}).click();
  const saved=()=>page.evaluate(()=>window.qaManager.getAllDrawings()[0].toJSON());let ray=await saved();assert.equal(ray.anchors[0].price,113.5);assert.equal(ray.options.opacity,55);assert.equal(ray.options.bold,true);assert.equal(ray.options.italic,true);assert.equal(ray.options.fontSize,18);assert.equal(ray.options.direction,'left');assert.equal(ray.options.textColor,'#008800');

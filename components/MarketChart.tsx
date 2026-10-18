@@ -1,4 +1,5 @@
 "use client";
+import { readVisibleTimeRange } from "@/lib/chart-visible-range";
 import { priceRangeWithoutZeroAnchor } from "@/lib/chart-price-range";
 import { MARKET_GREEN, MARKET_RED, marketTint } from "@/lib/market-colours";
 import { Capacitor } from '@capacitor/core';
@@ -1958,7 +1959,7 @@ export function MarketChart({
             // Logical indexes belong to every series on the shared timeline,
             // not to this candle array. Other studies/comparisons can prepend
             // timestamps, so using those indexes to slice candles can be empty.
-            const visible = chart.timeScale().getVisibleRange();
+            const visible = readVisibleTimeRange(chart.timeScale());
             const bars = prepareStyleCandles(dataRef.current, chartStyleRef.current);
             const from = visible ? timeToTimestamp(visible.from) : -Infinity;
             const to = visible ? timeToTimestamp(visible.to) : Infinity;
@@ -2986,7 +2987,7 @@ export function MarketChart({
     const draw = () => {
       const chart = chartApi.current;
       const scale = chart?.timeScale();
-      const visible = scale?.getVisibleRange();
+      const visible = scale ? readVisibleTimeRange(scale) : null;
       const width = chartHost.current?.clientWidth ?? 0;
       if (!chart || !scale || !visible || width < 2) { setSessionShades([]); return; }
       const from = timeToTimestamp(visible.from);

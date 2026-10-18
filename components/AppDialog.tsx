@@ -4,9 +4,9 @@ import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject }
 import { useTransientBack } from "./useTransientBack";
 
 /** Shared app-themed modal behavior for pickers and drawers. */
-export function AppDialog({ children, className, id, label, labelledBy, style, initialFocus, returnFocus, avoidTouchKeyboard = false, onClose }: {
+export function AppDialog({ children, className, id, label, labelledBy, style, initialFocus, returnFocus, avoidTouchKeyboard = false, containEscape = false, onClose }: {
   children: ReactNode; className?: string; id?: string; label?: string; labelledBy?: string; style?: CSSProperties;
-  initialFocus?: string; returnFocus?: RefObject<HTMLElement | null>; avoidTouchKeyboard?: boolean; onClose: () => void;
+  initialFocus?: string; returnFocus?: RefObject<HTMLElement | null>; avoidTouchKeyboard?: boolean; containEscape?: boolean; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useTransientBack(true, onClose);
@@ -20,8 +20,9 @@ export function AppDialog({ children, className, id, label, labelledBy, style, i
   }, [initialFocus, returnFocus, avoidTouchKeyboard]);
 
   return <dialog ref={dialog} id={id} className={`app-dialog ${className ?? ""}`} aria-label={label} aria-labelledby={labelledBy} style={style}
-    onCancel={event => { event.preventDefault(); onClose(); }}
+    onCancel={event => { event.preventDefault(); if (containEscape) event.stopPropagation(); onClose(); }}
     onKeyDown={event => {
+      if (containEscape && event.key === "Escape") event.stopPropagation();
       if (event.key !== "Tab") return;
       const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]')]
         .filter(control => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length > 0);

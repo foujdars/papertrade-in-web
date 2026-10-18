@@ -1,3 +1,4 @@
+const {setChartColor}=require('./chart-color-helper.cjs');
 const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/chart-browser-qa');fs.mkdirSync(output,{recursive:true});
@@ -23,7 +24,7 @@ const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/chart-browser-q
    await page.setViewportSize({width,height:844});
    await page.getByRole('button',{name:'Chart settings',exact:true}).click();await inViewport(settings);
    await settings.getByRole('tab',{name:'Scales and lines',exact:true}).click();await inViewport(settings.getByRole('button',{name:'OK',exact:true}));
-   await settings.getByRole('tab',{name:'Symbol',exact:true}).click();await settings.getByLabel('Up candle color',{exact:true}).fill('#123456');await settings.getByLabel('Show wicks',{exact:true}).uncheck();
+   await settings.getByRole('tab',{name:'Symbol',exact:true}).click();await setChartColor(page,settings,'Up candle color','#123456');await settings.getByLabel('Show wicks',{exact:true}).uncheck();
    await settings.getByRole('button',{name:'OK',exact:true}).click();await page.waitForFunction(()=>window.qaSeries.options().upColor==='#123456'&&!window.qaSeries.options().wickVisible);
    await page.getByRole('button',{name:'Functions',exact:true}).click();const functions=page.getByRole('dialog',{name:'Functions',exact:true});
    await functions.getByRole('button',{name:'Chart controls',exact:true}).click();await functions.getByRole('button',{name:'Chart settings',exact:true}).click();await settings.waitFor();await settings.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -46,7 +47,7 @@ const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/chart-browser-q
   await pine.getByRole('button',{name:'Scripts',exact:true}).click();await pine.locator('input[type=file]').waitFor({state:'visible'});await pine.getByRole('button',{name:'Export .pine',exact:false}).waitFor({state:'visible'});await pine.getByRole('button',{name:'Scripts',exact:true}).click();
   await pine.getByRole('tab',{name:'Editor',exact:true}).click();await page.setViewportSize({width:390,height:420});await inViewport(pine.getByRole('button',{name:'Add to chart',exact:true}));await inViewport(pine.getByLabel('Pine source code',{exact:true}));await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'mobile-pine-editor.png')});
   await page.evaluate(()=>window.dispatchEvent(new Event('papertrade:dismiss-layer',{cancelable:true})));await pine.waitFor({state:'detached'});
-  await page.evaluate(()=>window.qaNative('android'));await page.getByRole('button',{name:'Chart settings',exact:true}).click();await settings.getByRole('tab',{name:'Symbol',exact:true}).click();await settings.getByLabel('Up candle color',{exact:true}).fill('#654321');await settings.getByRole('button',{name:'OK',exact:true}).click();await page.waitForFunction(()=>window.qaSeries.options().upColor==='#654321');
+  await page.evaluate(()=>window.qaNative('android'));await page.getByRole('button',{name:'Chart settings',exact:true}).click();await settings.getByRole('tab',{name:'Symbol',exact:true}).click();await setChartColor(page,settings,'Up candle color','#654321');await settings.getByRole('button',{name:'OK',exact:true}).click();await page.waitForFunction(()=>window.qaSeries.options().upColor==='#654321');
   await page.getByRole('button',{name:'Open Pine Editor',exact:true}).click();assert.equal(await pine.getAttribute('data-advanced'),'true');await pine.getByRole('button',{name:'Compile',exact:true}).click();await pine.getByText('Compiled successfully. Select Add to chart to apply.',{exact:true}).waitFor();
   await page.setViewportSize({width:1024,height:768});await inViewport(pine);await pine.getByRole('tab',{name:'Strategy Tester',exact:true}).click();await page.screenshot({path:path.join(output,'native-tablet-pine.png')});await page.evaluate(()=>window.dispatchEvent(new Event('papertrade:dismiss-layer',{cancelable:true})));await pine.waitFor({state:'detached'});
   await page.getByRole('button',{name:'Chart settings',exact:true}).click();await inViewport(settings);await page.screenshot({path:path.join(output,'native-tablet-chart-settings.png')});await settings.getByRole('button',{name:'Cancel',exact:true}).click();
