@@ -100,3 +100,23 @@
 .chart-replay-speeds button[aria-pressed="true"] { color: var(--purple, #753bce); border-color: color-mix(in srgb, var(--purple, #753bce) 55%, var(--line)); background: var(--purple-soft, #f3e9ff); }
 .chart-replay-speeds button:disabled { opacity: .4; cursor: not-allowed; }
 .bar-replay .chart-replay-bar { margin: 0; border-width: 1px 0 0; border-radius: 0; }
+
+/* Fine-pointer desktop playback stays one compact row; touch UI is unchanged. */
+.chart-replay-bar[data-compact="true"] {
+  display:grid; grid-template-columns:auto auto minmax(0,1fr); align-items:center;
+  gap:12px; margin:0; padding:3px 8px; min-height:36px;
+  border-width:1px 0 0; border-radius:0;
+}
+.chart-replay-bar[data-compact="true"] .chart-replay-transport { grid-column:1; grid-row:1; gap:3px; }
+.chart-replay-bar[data-compact="true"] .chart-replay-transport button {
+  display:inline-flex; align-items:center; justify-content:center; flex:0 0 28px;
+  width:28px; min-width:28px; height:28px; min-height:28px; padding:0; border-radius:4px;
+}
+.chart-replay-bar[data-compact="true"] .replay-play-toggle { color:var(--purple); background:var(--purple-soft,var(--soft)); }
+.chart-replay-bar[data-compact="true"] .chart-replay-speeds { grid-column:2; grid-row:1; display:flex; gap:2px; }
+.chart-replay-bar[data-compact="true"] .chart-replay-speeds button { min-width:30px; min-height:26px; height:26px; padding:2px 4px; border-radius:4px; font-size:10px; }
+.chart-replay-bar[data-compact="true"] .chart-replay-meta { grid-column:3; grid-row:1; min-width:0; justify-content:flex-end; align-items:center; gap:12px; font-weight:400; }
+.chart-replay-bar[data-compact="true"] .chart-replay-meta span:last-child { flex-shrink:0; font-variant-numeric:tabular-nums; }
+.chart-replay-bar[data-compact="true"]:has(.chart-replay-retry) { grid-template-columns:auto auto minmax(0,1fr) auto; }
+.chart-replay-bar[data-compact="true"] .chart-replay-retry { grid-column:4; grid-row:1; min-height:26px; padding:3px 8px; border:1px solid var(--line); border-radius:4px; background:var(--soft); color:var(--ink); font:inherit; font-size:11px; cursor:pointer; }
+.chart-replay-bar[data-compact="true"] button:focus-visible { outline:2px solid var(--purple); outline-offset:1px; }
