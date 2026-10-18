@@ -600,7 +600,13 @@ export function MarketChart({
   const pineResizePointer=useRef<number|null>(null);
   useEffect(()=>{
     const media=window.matchMedia(DESKTOP_CHART_MEDIA),refresh=()=>setPineCanDock(media.matches&&!Capacitor.isNativePlatform());refresh();media.addEventListener('change',refresh);
-    try{setPineDockSettings(normalizePineDock(JSON.parse(localStorage.getItem(PINE_DOCK_STORAGE_KEY)??'null')));}catch{/* A blocked store keeps the default layout. */}
+    // A wide desktop can keep the chart's full height while editing. Honour
+    // saved layouts, and leave touch/native presentation on its existing path.
+    const preferred:PineDockSettings=media.matches&&!Capacitor.isNativePlatform()
+      ? {...DEFAULT_PINE_DOCK,layout:window.innerWidth>=1280?'right':'bottom',bottom:.52}
+      : DEFAULT_PINE_DOCK;
+    setPineDockSettings(preferred);
+    try{const saved=localStorage.getItem(PINE_DOCK_STORAGE_KEY);if(saved)setPineDockSettings(normalizePineDock(JSON.parse(saved)));}catch{/* The responsive default works without storage. */}
     return()=>media.removeEventListener('change',refresh);
   },[]);
   function changePineDock(update:(current:PineDockSettings)=>PineDockSettings){setPineDockSettings(current=>{const next=normalizePineDock(update(current));try{localStorage.setItem(PINE_DOCK_STORAGE_KEY,JSON.stringify(next));}catch{/* Layout still works without storage. */}return next;});}
