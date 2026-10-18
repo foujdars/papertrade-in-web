@@ -3,7 +3,8 @@ import { useTransientBack } from "./useTransientBack";
 import { CandleLoader } from "./CandleLoader";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, SlidersHorizontal } from "lucide-react";
+import { X, SlidersHorizontal, Play, Pause, StepBack, StepForward, RotateCcw } from "lucide-react";
+import { useDesktopChartBrowser } from "./useDesktopChartBrowser";
 import { MarketChart, DEFAULT_CHART_INDICATORS, type ChartActionRequest, type DrawingTool } from "@/components/MarketChart";
 import { ChartFunctionMenu } from "@/components/ChartFunctionMenu";
 import { ChartTimeframeMenu } from "@/components/CompactSelectors";
@@ -127,15 +128,18 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
 const REPLAY_SPEEDS = [0.5, 1, 2, 4, 8, 10];
 
 export function ChartReplayBar({ replay, onExit }: { replay: ReplayController; onExit?: () => void }) {
-  return <div className="chart-replay-bar" role="toolbar" aria-label="Bar replay">
-    <div className="chart-replay-meta"><span>{replay.loading ? "Loading replay…" : replay.message ? replay.message : replay.selecting ? "Move the line, then tap Play" : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : ""}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
-    {!!replay.message && !replay.loading && <button type="button" onClick={replay.retryLoad}>Retry</button>}
-    <div className="chart-replay-transport">
-      {replay.playing && <button type="button" onClick={replay.togglePlay}>Pause</button>}
-      <button type="button" className="replay-step-symbol" aria-label="Previous candle" onClick={replay.back} disabled={!replay.candles.length || replay.cursor <= 0}>←</button>
-      <button type="button" className="replay-step-symbol" aria-label="Next candle" onClick={replay.step} disabled={!replay.candles.length || replay.ended}>→</button>
-      <button type="button" onClick={replay.restart} disabled={replay.startTime == null}>Again</button>
-      {onExit && <button type="button" onClick={onExit}>Exit</button>}
+  const compact = useDesktopChartBrowser();
+  const status = replay.loading ? "Loading replay…" : replay.message ? replay.message : !compact && replay.selecting ? "Move the line, then tap Play" : replay.ended ? "Replay complete" : replay.current ? `${dateLabel(replay.current.time)} IST` : "";
+  return <div className="chart-replay-bar" data-compact={compact || undefined} role="toolbar" aria-label="Bar replay">
+    <div className="chart-replay-meta"><span title={status}>{status}</span><span>{replay.candles.length ? `${replay.cursor + 1} / ${replay.candles.length}` : ""}</span></div>
+    {!!replay.message && !replay.loading && <button type="button" className="chart-replay-retry" onClick={replay.retryLoad}>Retry</button>}
+    <div className="chart-replay-transport" role="group" aria-label="Replay playback">
+      {!compact && replay.playing && <button type="button" onClick={replay.togglePlay}>Pause</button>}
+      <button type="button" className="replay-step-symbol" aria-label="Previous candle" title="Previous candle" onClick={replay.back} disabled={!replay.candles.length || replay.cursor <= 0}>{compact ? <StepBack size={15} aria-hidden="true"/> : '←'}</button>
+      {compact && <button type="button" className="replay-play-toggle" aria-label={replay.playing ? "Pause replay" : "Play replay"} title={replay.playing ? "Pause replay" : "Play replay"} onClick={replay.togglePlay} disabled={!replay.candles.length || replay.loading || replay.cursor >= replay.candles.length - 1}>{replay.playing ? <Pause size={15} aria-hidden="true"/> : <Play size={15} aria-hidden="true"/>}</button>}
+      <button type="button" className="replay-step-symbol" aria-label="Next candle" title="Next candle" onClick={replay.step} disabled={!replay.candles.length || replay.ended || compact && replay.cursor >= replay.candles.length - 1}>{compact ? <StepForward size={15} aria-hidden="true"/> : '→'}</button>
+      <button type="button" aria-label="Restart replay" title="Restart replay" onClick={replay.restart} disabled={replay.startTime == null}>{compact ? <RotateCcw size={15} aria-hidden="true"/> : 'Again'}</button>
+      {onExit && <button type="button" aria-label="Exit replay" title="Exit replay" onClick={onExit}>{compact ? <X size={15} aria-hidden="true"/> : 'Exit'}</button>}
     </div>
     <div className="chart-replay-speeds" role="group" aria-label="Replay speed">
       {REPLAY_SPEEDS.map((speed) => <button key={speed} type="button" aria-pressed={replay.speed === speed} disabled={!replay.candles.length} onClick={() => replay.setSpeed(speed)}>{speed}×</button>)}

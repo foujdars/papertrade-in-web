@@ -26,6 +26,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
     react,
     "./useTransientBack": { useTransientBack() {} },
     "./CandleLoader": { CandleLoader: () => null },
+    "./useDesktopChartBrowser": { useDesktopChartBrowser: () => false },
     "@/components/MarketChart": { MarketChart: chart, DEFAULT_CHART_INDICATORS: {} },
     "@/components/ChartFunctionMenu": {}, "@/components/CompactSelectors": {}, "@/components/StockLogo": {},
     "@/lib/market": { formatInr: String },
@@ -61,7 +62,7 @@ test("replay previews, confirms and starts on the chosen candle without showing 
 
 test("the chart's actual drag handlers snap, cancel safely and confirm only a tap", async () => {
   const source = await readFile(new URL("../components/MarketChart.tsx", import.meta.url), "utf8");
-  const start = source.indexOf('{isReplay && replayMarkerX !== null && <>');
+  const start = source.indexOf('{isReplay && replaySelecting && replayMarkerX !== null && <>');
   const end = source.indexOf('<div className="chart-symbol-legend', start);
   assert.ok(start > 0 && end > start);
   const props = {
@@ -136,7 +137,7 @@ test("chart entry points and header coach use shared replay on the selected time
   const coach = await readFile(new URL("../components/TradingCoach.tsx", import.meta.url), "utf8");
   const fno = await readFile(new URL("../components/FnoChartWorkspace.tsx", import.meta.url), "utf8");
   const advanced = await readFile(new URL("../components/AdvancedChartWorkspace.tsx", import.meta.url), "utf8");
-  assert.match(dashboard, /<NotificationCenter \/>[\s\S]{0,150}header-coach-button/);
+  assert.match(dashboard, /<NotificationCenter\b[^>]*\/>[\s\S]{0,150}header-coach-button/);
   assert.doesNotMatch(dashboard, /className="coach-launch-button"/);
   assert.match(dashboard, /instrument=\{replayInstrument\} timeframe=\{replayReviewTimeframe \?\? timeframe\}/);
   assert.match(dashboard, /setReplayReviewTimeframe\(pnlReviewTimeframe\)/);

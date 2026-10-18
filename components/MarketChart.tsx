@@ -1177,7 +1177,7 @@ export function MarketChart({
         return;
       }
     }
-    const bars = Math.max(12, Math.min(visibleBarsRef.current, count));
+    const bars = Math.min(count, Math.max(12, visibleBarsRef.current));
     const tool = orderToolRef.current;
     const extraRightOffset = tool?.enabled ? Math.max(5, Math.min(10, bars * 0.18)) : Math.max(2, Math.min(4, bars * 0.08));
     const scale = chart.timeScale();
