@@ -2,13 +2,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { advanceGlobalAccount, readGlobalAccount, type ChartExtreme } from "@/lib/global-order-engine";
 import { advanceOptions, type OptionObservation, type OptionSnapshot } from "@/lib/global-option-orders";
-import { advancePaperBots, type BotObservation } from "@/lib/paper-bot-engine";
-import { BOT_ASSETS, botFrames, botScope, type BotFrame } from "@/lib/paper-bot-state";
 import { BotCloudError, requestBotCloud, signedInBotOwner, type BackgroundState, type CloudBotResponse } from "@/lib/paper-bot-client";
 import type { PerpAccount, PerpQuote, PerpSpec, PerpSymbol } from "@/lib/global-markets";
 
 export type GlobalSnapshot = { quote: PerpQuote; spec: PerpSpec };
-export function useGlobalTrading(owner: string, selected: PerpSymbol | null, selectedOption: string | null = null, botVisible = false) {
+export function useGlobalTrading(owner: string, selected: PerpSymbol | null, selectedOption: string | null = null) {
   const key = `papertrade-perpetual-wallet-v1:${owner}`;
   const cloudKey = `papertrade-perpetual-cloud-v1:${owner}`;
   const [background, setBackground] = useState<BackgroundState>({ mode: 'checking', ready: false, message: 'Checking execution mode…', lastChecked: 0 });
@@ -22,7 +20,6 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
   const [marketError, setMarketError] = useState("");
   const [lastChecked, setLastChecked] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
-  const observationsRef = useRef<Record<string, BotObservation>>({});
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(0);
   const activeKey = useRef("");
@@ -139,6 +136,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
               const latest = attempt ? await requestBotCloud(owner) : data;
               if (!latest.record) throw new Error('Shared wallet unavailable.');
               const next = fn(readGlobalAccount(JSON.stringify(latest.record.account)), snapshotsRef.current, optionSnapshotsRef.current);
+              next.bots = next.bots?.map(bot => ({ ...bot, enabled: false }));
               try {
                 const saved = await requestBotCloud(owner, { action: 'save', version: latest.record.version, account: next });
                 if (activeKey.current !== key) return false;
@@ -161,45 +159,11 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
   const monitorSymbols = useMemo(() => [...new Set([
     selected,
     selectedOption,
-    ...(botVisible ? Object.keys(BOT_ASSETS) : []),
-    ...(account?.bots?.filter(bot => bot.enabled).map(bot => bot.symbol) ?? []),
     ...(account?.positions.map(position => position.symbol) ?? []),
     ...(account?.orders.map(order => order.symbol) ?? []),
     ...(account?.optionPositions?.map(position => position.symbol) ?? []),
     ...(account?.optionOrders?.map(order => order.symbol) ?? []),
-  ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, botVisible, account?.bots, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
-  const botScopes = (background.mode === 'local' ? account?.bots ?? [] : []).filter(b => b.enabled).flatMap(b => [...botFrames(b), ...(b.trendTimeframe && b.trendTimeframe !== "off" ? [b.trendTimeframe] : [])].map(frame => `${b.symbol}:${frame}:${b.startedAt}`)).join(",");
-  // Candle history must never hold up live quotes or protective exits.
-  useEffect(() => {
-    observationsRef.current = {};
-    if (!botScopes) return;
-    const controller = new AbortController();
-    let running = false;
-    const pollHistory = async () => {
-      if (running || document.hidden || controller.signal.aborted) return;
-      running = true;
-      try {
-        const observations: Record<string, BotObservation> = {};
-        await Promise.allSettled(botScopes.split(",").map(async scope => {
-          const [symbol, frame] = scope.split(":") as [string, BotFrame];
-          const key = botScope(symbol, frame);
-          try {
-            const response = await fetch(`/api/global-markets?mode=candles&symbol=${symbol}&timeframe=${frame}`, {
-              cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]),
-            });
-            const history = await response.json();
-            if (!response.ok || !history.ok || !Array.isArray(history.candles)) throw new Error("History unavailable");
-            if (!controller.signal.aborted && !document.hidden) observations[key] = { candles: history.candles, fetchedAt: history.fetchedAt };
-          } catch { /* A failed timeframe never borrows another history. */ }
-        }));
-        if (!controller.signal.aborted && !document.hidden) observationsRef.current = observations;
-      } finally { running = false; }
-    };
-    void pollHistory();
-    const timer = window.setInterval(() => void pollHistory(), 10000);
-    document.addEventListener("visibilitychange", pollHistory);
-    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", pollHistory); };
-  }, [botScopes, key, refreshTick]);
+  ].filter((symbol): symbol is string => !!symbol))].sort().join(","), [selected, selectedOption, account?.positions, account?.orders, account?.optionPositions, account?.optionOrders]);
   useEffect(() => {
     if (!monitorSymbols) return;
     const controller = new AbortController();
@@ -243,7 +207,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           if (document.hidden || controller.signal.aborted) return a;
           const now = Date.now();
           const advanced = advanceOptions(advanceGlobalAccount(a, quotes, specs, now, extremesRef.current), observedOptions, now);
-          return advancePaperBots(advanced, next, observationsRef.current, now);
+          return advanced;
         }, true);
       } finally { running = false; }
     };

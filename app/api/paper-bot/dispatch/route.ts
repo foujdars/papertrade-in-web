@@ -1,3 +1,4 @@
+import { sampleNseAdTape } from '@/lib/india-ad-tape';
 import { GET as market } from '@/app/api/global-markets/route';
 import { randomUUID } from 'node:crypto';
 import { runBackgroundAccount, type CloudBotAccount, type BotMarket } from '@/lib/paper-bot-background';
@@ -8,8 +9,10 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   let healthDb: ReturnType<typeof botDatabase> | undefined;
   const started = Date.now();
+  let tapeSample: Promise<unknown> | undefined;
   try {
     requireBotScheduler(request);
+    tapeSample = sampleNseAdTape().catch(() => undefined);
     const db = botDatabase(); healthDb = db;
     const { data, error } = await db.from('paper_bot_accounts').select('user_id,account,version,last_checked_at,last_error').eq('active', true).limit(26);
     if (error || !data || data.length > 25) throw new BotRequestError('Background bot capacity or storage needs attention.');
@@ -44,5 +47,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (healthDb) await healthDb.rpc('paper_bot_heartbeat', { p_at: started, p_ok: false, p_failed: 1 }).then(() => {}, () => {});
     return botError(error);
+  } finally {
+    await tapeSample;
   }
 }

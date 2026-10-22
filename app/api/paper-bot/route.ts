@@ -26,6 +26,8 @@ export async function POST(request: Request) {
     let account;
     try { account = readGlobalAccount(JSON.stringify(body.account)); } catch { throw new BotRequestError('Wallet data is invalid; it has not been replaced.', 400); }
     const current = await cloudBotAccount(db, userId);
+    if (body.action === 'save' && account.bots?.some(bot => bot.enabled)) throw new BotRequestError('Trading bot has been removed. Automatic strategies cannot be enabled.', 410);
+    account.bots = account.bots?.map(bot => ({ ...bot, enabled: false }));
     if (body.action === 'enable') {
       if (current) return Response.json({ record: current, ...await botHealth(db) }, { headers }); // Idempotent migration, never overwrite an existing remote wallet.
       if (!(await botHealth(db)).ready) throw new BotRequestError('Wait for the background scheduler to be online before enabling.');
@@ -35,8 +37,6 @@ export async function POST(request: Request) {
     }
     if (body.action !== 'save' || !current || !Number.isSafeInteger(body.version)) throw new BotRequestError('Refresh the shared wallet before saving.', 409);
     if (body.version !== current.version) return Response.json({ error: 'Wallet changed; retry with current state.', record: current }, { status: 409, headers });
-    const starts = account.bots?.some(bot => bot.enabled && (!current.account.bots?.find(previous => previous.symbol === bot.symbol)?.enabled || current.account.bots?.find(previous => previous.symbol === bot.symbol)?.startedAt !== bot.startedAt));
-    if (starts && !(await botHealth(db)).ready) throw new BotRequestError('The background scheduler is offline. Pause and exit remain available.');
     const saved = await saveCloudBotAccount(db, current, account);
     if (!saved) return Response.json({ error: 'Wallet changed; refresh before retrying.' }, { status: 409, headers });
     return Response.json({ record: saved }, { headers });

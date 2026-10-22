@@ -19,6 +19,7 @@ type Pulse = {
   pcr: PutCallRatio | null;
   vixCheckedAt: number | null;
   sessionLive: boolean;
+  breadthCheckedAt: number | null;
 };
 
 type Part = "breadth" | "vix" | "flows" | "gauges";
@@ -64,7 +65,7 @@ async function loadPart(part: Part, now: number): Promise<Snapshot> {
     // Sample as soon as breadth arrives; daily flows and option chains cannot hold it up.
     const sampledAt = Date.now();
     const tape = await recordNseAdTape(breadth, undefined, sampledAt);
-    return { breadth, tape, sessionLive: inNseCashSession(sampledAt) };
+    return { breadth, breadthCheckedAt: breadth ? sampledAt : null, tape, sessionLive: inNseCashSession(sampledAt) };
   }
   if (part === "vix") {
     try {

@@ -29,6 +29,25 @@ function merge(left: AdPoint[], right: AdPoint[]) {
   return mergeAdSamples(left, right);
 }
 
+/** Merge under the store transaction so short/cold instances cannot truncate a session. */
+export function mergeTapeDocuments(saved: Record<string, unknown> | undefined, incoming: Record<string, unknown>) {
+  const sessions = new Map<string, AdPoint[]>();
+  for (const doc of [saved, incoming]) {
+    if (!doc) continue;
+    for (const [dayKey, pointsKey] of [["closedDay", "closed"], ["day", "points"]]) {
+      const day = doc[dayKey];
+      if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      const points = clean(doc[pointsKey]).filter(point => istDay(point.t) === day);
+      if (points.length) sessions.set(day, merge(sessions.get(day) ?? [], points));
+      else if (!sessions.has(day)) sessions.set(day, []);
+    }
+  }
+  const days = [...sessions.keys()].sort();
+  const day = days.at(-1) ?? "", closedDay = days.filter(d => d < day && sessions.get(d)!.length).at(-1) ?? "";
+  const pack = (points: AdPoint[]) => points.map(point => ({ t: point.t, a: point.advance, d: point.decline }));
+  return { day, points: pack(sessions.get(day) ?? []), closedDay, closed: pack(sessions.get(closedDay) ?? []), updatedAt: Math.max(Number(saved?.updatedAt) || 0, Number(incoming.updatedAt) || 0) };
+}
+
 async function storeOf(db?: Firestore) {
   if (db) return db;
   if (!firebaseProjectId()) return null;
@@ -120,7 +139,13 @@ export async function recordNseAdTape(breadth: NseBreadth | null, db?: Firestore
   if (changed && store && canPersist) {
     try {
       const pack = (points: AdPoint[]) => points.map(point => ({ t: point.t, a: point.advance, d: point.decline }));
-      await bounded(store.doc(DOC).set({ day, points: pack(next), closedDay: memory.closedDay, closed: pack(memory.closed), updatedAt: now }));
+      const ref = store.doc(DOC);
+      const incoming = { day, points: pack(next), closedDay: memory.closedDay, closed: pack(memory.closed), updatedAt: now };
+      // Atomic merge also protects late writes after the response deadline.
+      await bounded(store.runTransaction(async tx => {
+        const saved = await tx.get(ref);
+        tx.set(ref, mergeTapeDocuments(saved.data(), incoming));
+      }));
     } catch { /* Keep the tape in memory until the next write. */ }
   }
   return selectAdTape(next, memory.closed, now);
