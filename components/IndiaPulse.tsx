@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { MarketGauge } from "./MarketGauge";
 import { startVisiblePolling } from "@/lib/visible-polling";
 
-type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
+type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; breadthCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
@@ -37,7 +37,7 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
   const [width, setWidth] = useState(360);
   useEffect(() => {
     if (!chartRef.current) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(260, Math.round(entry.contentRect.width))));
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(200, Math.round(entry.contentRect.width))));
     observer.observe(chartRef.current);
     return () => observer.disconnect();
   }, []);
@@ -165,7 +165,7 @@ function usePulse(part: "breadth" | "gauges" | "flows", enabled = true) {
       if (signal.aborted) return;
       if (!response.ok || !body?.ok) throw new Error("Pulse unavailable");
       setFailed(false);
-      setPulse(previous => ({ breadth: body.breadth ?? null, tape: mergeAdSamples(previous?.tape ?? [], Array.isArray(body.tape) ? body.tape : []), vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }));
+      setPulse(previous => ({ breadth: body.breadth ?? null, tape: mergeAdSamples(previous?.tape ?? [], Array.isArray(body.tape) ? body.tape : []), vix: body.vix ?? null, breadthCheckedAt: Number.isFinite(body.breadthCheckedAt) ? body.breadthCheckedAt : null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }));
     }, part === "breadth" ? 10_000 : part === "flows" ? 5 * 60_000 : 30_000, () => setFailed(true));
   }, [part, enabled]);
   return { pulse, range, setRange, observedAt, failed };
@@ -179,6 +179,7 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
   useTransientBack(expanded, () => setExpanded(false));
   const latestPoint = pulse?.tape[pulse.tape.length - 1];
   const marketOpen = Boolean(pulse?.sessionLive && clock.format(observedAt) < "15:30");
+  const incompleteTape = !!latestPoint && ((marketOpen ? observedAt : sessionBounds([latestPoint]).end) - latestPoint.t > 3 * 60_000);
   const sampleTime = latestPoint ? clock.format(latestPoint.t) : "";
   const adStatus = marketOpen
     ? latestPoint ? observedAt - latestPoint.t < 3 * 60_000 ? "Live" : "Last sample" : "Waiting for live data"
@@ -193,7 +194,10 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
   const oi = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
   return <div className="india-pulse-layout">
     <section className={`home-section india-pulse india-breadth-card${expanded ? " is-expanded" : ""}`} aria-label="Indian market pulse">
-      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}{failed || (marketOpen && adStatus === "Last sample") ? " · Delayed" : ""}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
+      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}{failed ? " · Delayed" : incompleteTape ? " · Partial history" : ""}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
+      {pulse?.breadth && <div className="india-breadth-counts" aria-label="Latest market breadth" title={pulse.breadthCheckedAt ? `Checked ${checkedTime(pulse.breadthCheckedAt)} · Source: Moneycontrol` : "Source: Moneycontrol"}>
+        <span className="up">Advances <b>{pulse.breadth.advance.toLocaleString("en-IN")}</b></span><span className="down">Declines <b>{pulse.breadth.decline.toLocaleString("en-IN")}</b></span>
+      </div>}
       <div className="india-ad">
         {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : <div id={chartId} className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : pulse ? "Chart unavailable" : "Loading market pulse…"}{pulse?.sessionLive && pulse.breadth ? <span className="india-breadth-pending">Advance {pulse.breadth.advance.toLocaleString("en-IN")} · Decline {pulse.breadth.decline.toLocaleString("en-IN")}</span> : null}</div>}
       </div>

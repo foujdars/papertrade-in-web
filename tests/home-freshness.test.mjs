@@ -244,3 +244,45 @@ test('breadth streams complete counts without waiting for the rest of the homepa
   assert.deepEqual(await result, { advance: 1234, decline: 567 });
   assert.equal(cancelled, true, 'The remaining page never has to download');
 });
+
+test('separate cold instances merge session history atomically instead of overwriting each other', async () => {
+  const stubs = { './push-admin.ts': 'export const firebaseProjectId=()=>null; export const pushServices=async()=>({});' };
+  const first = await moduleWithStubs('lib/india-ad-tape.ts', stubs);
+  const second = await moduleWithStubs('lib/india-ad-tape.ts', stubs);
+  let saved, queue = Promise.resolve();
+  const ref = { get: async () => ({ data: () => structuredClone(saved) }) };
+  const db = { doc: () => ref, runTransaction: fn => {
+    const work = queue.then(() => fn({ get: ref.get, set: (_ref, data) => { saved = structuredClone(data); } }));
+    queue = work.catch(() => {}); return work;
+  } };
+  const now = Date.parse('2026-10-12T05:00:00Z');
+  await Promise.all([first.recordNseAdTape({ advance: 900, decline: 700 }, db, now), second.recordNseAdTape({ advance: 910, decline: 690 }, db, now + 60_000)]);
+  assert.deepEqual(saved.points.map(p => p.a), [900, 910]);
+  assert.deepEqual(saved.points.map(p => p.t), [now, now + 60_000]);
+});
+
+test('late prior-session commits cannot roll back the active session', async () => {
+  const source = await moduleWithStubs('lib/india-ad-tape.ts', { './push-admin.ts': 'export const firebaseProjectId=()=>null; export const pushServices=async()=>({});' });
+  const point = day => ({ t: Date.parse(`${day}T05:00:00Z`), a: 1000, d: 900 });
+  const merged = source.mergeTapeDocuments({ day: '2026-10-13', points: [point('2026-10-13')], updatedAt: 20 }, { day: '2026-10-12', points: [point('2026-10-12')], updatedAt: 10 });
+  assert.equal(merged.day, '2026-10-13'); assert.equal(merged.points.length, 1);
+  assert.equal(merged.closedDay, '2026-10-12'); assert.equal(merged.closed.length, 1); assert.equal(merged.updatedAt, 20);
+});
+
+test('existing scheduler samples breadth without active trading accounts and awaits persistence', async t => {
+  let samples = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  globalValue(t, '__pulseScheduler', { sample: () => { samples++; return gate; }, db: { from: () => ({ select() { return this; }, eq() { return this; }, limit: async () => ({ data: [] }) }), rpc: async () => ({}) } });
+  const api = await moduleWithStubs('app/api/paper-bot/dispatch/route.ts', {
+    '@/lib/india-ad-tape': 'export const sampleNseAdTape=()=>globalThis.__pulseScheduler.sample();',
+    '@/app/api/global-markets/route': 'export const GET=()=>{throw new Error("No feed expected")};',
+    '@/lib/paper-bot-background': 'export const runBackgroundAccount=()=>{throw new Error("No accounts expected")};',
+    '@/lib/paper-bot-server': 'export const botDatabase=()=>globalThis.__pulseScheduler.db; export const requireBotScheduler=r=>{if(r.headers.get("authorization")!=="Bearer test") throw new Error("Unauthorized")}; export const botError=()=>new Response(null,{status:401}); export class BotRequestError extends Error{}; export const saveCloudBotAccount=()=>null;',
+  });
+  const request = auth => new Request('https://test.invalid/api/paper-bot/dispatch', { method: 'POST', headers: auth ? { authorization: 'Bearer test' } : {} });
+  assert.equal((await api.POST(request(false))).status, 401); assert.equal(samples, 0);
+  let finished = false;
+  const response = api.POST(request(true)).then(r => { finished = true; return r; });
+  await settle(); assert.equal(samples, 1); assert.equal(finished, false);
+  release([]); assert.equal((await response).status, 200);
+});

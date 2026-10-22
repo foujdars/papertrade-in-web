@@ -7,8 +7,6 @@ import { HeaderPopover } from "./HeaderPopover";
 import { ChartSymbolControls, ChartFavouriteButton } from './ChartSymbolControls';
 import { researchExecutionError, type ResearchOrderDraft } from "@/lib/stock-discovery";
 import { NewsWorkspace } from "./NewsWorkspace";
-import { BotWorkspace } from "./BotWorkspace";
-import { AlgoTradingWorkspace } from "./AlgoTradingWorkspace";
 import dynamic from "next/dynamic";
 const FundamentalWorkspace = dynamic(() => import("./FundamentalWorkspace").then(module => module.FundamentalWorkspace));
 import { holdingPerformance } from "@/lib/holding-performance";
@@ -29,7 +27,7 @@ import { ModernSelect } from "./ModernSelect";
 import { startVisiblePolling } from "@/lib/visible-polling";
 
 import {
-  Newspaper, Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, BookOpenCheck, Bot, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
+  Newspaper, Activity, CalendarDays, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, BookOpenCheck, BriefcaseBusiness, Cable, CandlestickChart, Check, CheckCircle2, ChevronDown, ChevronRight, Cloud, Home, StepBack,
   Download, LineChart, LockKeyhole, Link2, Minus, Moon, MoreHorizontal, Plus, Rocket, ShieldCheck, Smartphone, Sun,
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, Pencil,
@@ -123,15 +121,8 @@ import { getNativeTradeAlert, type NativeTriggeredPriceAlert } from "@/lib/nativ
 import { addPaperTradeNotification } from "@/lib/notification-center";
 import { RiskSizingPlan } from "@/components/RiskSizingPlan";
 import { BarReplayDialog, ChartReplayBar, useReplayController } from "@/components/BarReplay";
-import { TradingCoach, type CoachTab } from "@/components/TradingCoach";
 import {
-  buildOptionPayoff,
   calculateRiskBasedQuantity,
-  DEFAULT_TRADING_LIMITS,
-  evaluateTradingLimits,
-  readTradingLimits,
-  type OptionPayoffLeg,
-  type TradingLimits,
 } from "@/lib/trading-coach";
 
 const watchlistTabs = ["NIFTY 50", "BANK NIFTY", "NIFTY 500", "ALL NSE"] as const;
@@ -208,7 +199,7 @@ type CustomWatchlist = {
   symbols: string[];
 };
 
-type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "bot" | "algo" | "news";
+type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "orders" | "markets" | "ipo" | "pnl" | "fundamentals" | "news";
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
 type UiDensity = "comfortable" | "compact";
@@ -424,11 +415,9 @@ export function TradingDashboard() {
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
-  const [botOpen, setBotOpen] = useState(false);
-  const [algoOpen, setAlgoOpen] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [fundamentalsOpen, setFundamentalsOpen] = useState(false);
-  const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey), deltaOptionSymbolFromInstrumentKey(selected.instrumentKey), botOpen);
+  const globalTrading = useGlobalTrading(user?.id ?? "guest", deltaSymbolFromInstrumentKey(selected.instrumentKey), deltaOptionSymbolFromInstrumentKey(selected.instrumentKey));
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [commodityInstruments, setCommodityInstruments] = useState<Instrument[]>([]);
@@ -566,11 +555,8 @@ export function TradingDashboard() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { notificationsOpen, moreMenuOpen, accountOpen, setNotificationsOpen, setMoreMenuOpen, setAccountOpen } = useHeaderPanels();
-  const [coachOpen, setCoachOpen] = useState(false);
   const [replayInstrument, setReplayInstrument] = useState<Instrument | null>(null);
   const [replayReviewTimeframe, setReplayReviewTimeframe] = useState<string | null>(null);
-  const [coachTab, setCoachTab] = useState<CoachTab>("journal");
-  const [tradingLimits, setTradingLimits] = useState<TradingLimits>(DEFAULT_TRADING_LIMITS);
   const [homeCards, setHomeCards] = useState<HomeCardPreferences>(DEFAULT_HOME_CARDS);
   const [uiDensity, setUiDensity] = useState<UiDensity>("comfortable");
   const [motionEnabled, setMotionEnabled] = useState(true);
@@ -579,10 +565,6 @@ export function TradingDashboard() {
   const [uiPreferencesReady, setUiPreferencesReady] = useState(false);
   const [accountDeleteArmed, setAccountDeleteArmed] = useState(false);
   const [accountDeleteWorking, setAccountDeleteWorking] = useState(false);
-  useEffect(() => {
-    const restore = window.setTimeout(() => setTradingLimits(readTradingLimits()), 0);
-    return () => window.clearTimeout(restore);
-  }, []);
   const [accountDeleteError, setAccountDeleteError] = useState("");
   const [fundsInput, setFundsInput] = useState("100000");
   const [showTradeSymbols, setShowTradeSymbols] = useState(false);
@@ -597,10 +579,9 @@ export function TradingDashboard() {
   const [marketQuoteUpdatedAt, setMarketQuoteUpdatedAt] = useState<Record<string, number>>({});
   const [globalCandles, setGlobalCandles] = useState<Candle[] | undefined>();
   const globalCandleScopeRef = useRef("");
-  const activeNavigationSection: NavigationSection = algoOpen ? "algo" : newsOpen ? "news" : fundamentalsOpen
+  const activeNavigationSection: NavigationSection = newsOpen ? "news" : fundamentalsOpen
     ? "fundamentals"
-    : botOpen
-    ? "bot"
+
     : homeOpen
     ? "home"
     : sidebarOpen
@@ -616,7 +597,7 @@ export function TradingDashboard() {
             : workspaceMode;
   const marketNavigationActive = activeNavigationSection === "markets" || activeNavigationSection === "watchlist";
   const navigationSnapshot = useCallback(() => {
-    const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.algo-workspace', '.fundamental-workspace', '.pnl-trade-list'];
+    const selectors = ['.home-dashboard-scroll', '.watchlist-panel', '.trading-watchlist', '.instrument-list', '.market-discovery-panel', '.news-workspace', '.fundamental-workspace', '.pnl-trade-list'];
     const scroll = Object.fromEntries(selectors.map(selector => [selector, document.querySelector(selector)?.scrollTop ?? 0]));
     return { section: activeNavigationSection, group: marketsInitialGroup, scroll, instrument: selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey };
   }, [activeNavigationSection, marketsInitialGroup, selected, timeframe, chartHistory, workspaceMode, spotInstrument, fnoUnderlying, fnoFutureInstrument, fnoTopMode, fnoListOpen, watchlist, search, pnlTab, pnlScope, pnlDrill, pnlHistoryFilter, pnlHistoryOnly, selectedPnlDateKey]);
@@ -710,8 +691,6 @@ export function TradingDashboard() {
     setOrdersOpen(false);
     setMarketsOpen(false);
     setPnlOpen(false);
-    setBotOpen(false);
-    setAlgoOpen(false);
     setNewsOpen(false);
     setFundamentalsOpen(false);
     setFnoListOpen(false);
@@ -967,7 +946,7 @@ export function TradingDashboard() {
       if (hasTransientBackLayer() || event.defaultPrevented) return;
       const snapshot = event.state?.papertradeChart as ChartHistorySnapshot | undefined;
       if (!snapshot?.instrument?.instrumentKey) return;
-      setHomeOpen(false); setNewsOpen(false); setFundamentalsOpen(false); setBotOpen(false); setAlgoOpen(false);
+      setHomeOpen(false); setNewsOpen(false); setFundamentalsOpen(false);
       setHoldingsOpen(false); setOrdersOpen(false); setMarketsOpen(false); setPnlOpen(false);
       setSelected(snapshot.instrument);
       setTimeframe(snapshot.timeframe);
@@ -1936,17 +1915,6 @@ export function TradingDashboard() {
   const plannedRisk = chartStopLossPrice > 0 ? Math.abs(visibleLivePrice - chartStopLossPrice) * quantity : Number.NaN;
   const plannedReward = chartTargetPrice > 0 ? Math.abs(chartTargetPrice - visibleLivePrice) * quantity : Number.NaN;
   const rewardRiskRatio = plannedRisk > 0 ? plannedReward / plannedRisk : 0;
-  const tradingLimitStatus = useMemo(() => evaluateTradingLimits(orders, closedTrades, tradingLimits, clock?.getTime() ?? 0), [clock, closedTrades, orders, tradingLimits]);
-  const proposedOptionLeg: OptionPayoffLeg | null = selected.assetType === "OPTION" && selected.optionType && selected.strikePrice && visibleLivePrice > 0 ? {
-    optionType: selected.optionType,
-    side,
-    strike: selected.strikePrice,
-    premium: visibleLivePrice,
-    quantity,
-  } : null;
-  const optionSpotPrice = topQuote?.lastPrice ?? spotInstrument?.price ?? selected.price;
-  const singleOptionPayoff = proposedOptionLeg ? buildOptionPayoff([proposedOptionLeg], optionSpotPrice) : null;
-  const orderReducesOpenPosition = selectedPosition.quantity > 0 && positionProduct === product && ((selectedPosition.side === "LONG" && side === "SELL") || (selectedPosition.side === "SHORT" && side === "BUY"));
   const homeStockOptions = useMemo(() => [...SEARCHABLE_INDEX_TICKERS.map((instrument) => {
     const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
     return { symbol: instrument.symbol, name: instrument.name, price: quote?.lastPrice ?? 0, changePercent: quote?.changePercent ?? 0, categories: ["INDEX"], instrumentKey: instrument.instrumentKey, assetType: "INDEX" as const };
@@ -2284,10 +2252,6 @@ export function TradingDashboard() {
     }
     if (!selectedDeltaSymbol && !currentSession.isOpen) { setToast(currentSession.message); return; }
     if (!Number.isFinite(quantity) || quantity < 1) return;
-    if (tradingLimitStatus.blocked && !orderReducesOpenPosition) {
-      setToast(tradingLimitStatus.reasons[0] || "A personal trading limit is active.");
-      return;
-    }
     if ((selected.assetType === "OPTION" || selected.assetType === "FUTURE") && quantity % quantityStep !== 0) {
       setToast(`F&O quantity must be a multiple of the ${quantityStep}-unit lot size.`);
       return;
@@ -2745,9 +2709,7 @@ export function TradingDashboard() {
   }
 
   function openNavigationSection(section: NavigationSection, remember = true) {
-    setAlgoOpen(section === "algo");
     setNewsOpen(section === "news");
-    setBotOpen(section === "bot");
     setFundamentalsOpen(section === "fundamentals");
     if (remember && section !== activeNavigationSection) {
       rememberWatchlistLocation();
@@ -2822,7 +2784,6 @@ export function TradingDashboard() {
     const currentCash = Number.isFinite(storedCash) ? storedCash : balance;
     const position = calculatePosition(currentOrders, instrument.symbol, executionPrice, task.product);
     const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
-    if (tradingLimitStatus.blocked && !reduces) return tradingLimitStatus.reasons[0] || "Personal trading limit is active.";
     if (instrument.expiry && Date.parse(instrument.expiry) < new Date().setHours(0, 0, 0, 0)) return "The derivative has expired.";
     if (task.product === "DELIVERY" && task.side === "SELL" && !["OPTION", "FUTURE"].includes(instrument.assetType ?? "")) {
       const error = validateDeliverySell(currentOrders, instrument.symbol, task.quantity); if (error) return error;
@@ -2848,7 +2809,6 @@ export function TradingDashboard() {
     if (!paperDataReady) return "Please wait for your paper account to load.";
     const position = calculatePosition(orders, task.instrument.symbol, task.price, task.product);
     const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
-    if (tradingLimitStatus.blocked && !reduces) return tradingLimitStatus.reasons[0] || "Personal trading limit is active.";
     if (task.product === "DELIVERY" && task.side === "SELL" && !["OPTION", "FUTURE"].includes(task.instrument.assetType ?? "")) {
       const error = validateDeliverySell(orders, task.instrument.symbol, task.quantity); if (error) return error;
     }
@@ -2931,7 +2891,7 @@ export function TradingDashboard() {
           <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "fundamentals" ? "nav-active" : ""} aria-label="Fundamental Analysis" title="Fundamental Analysis" onClick={() => openNavigationSection("fundamentals")}><ChartNoAxesCombined className="desktop-nav-icon" size={16} aria-hidden="true"/>Analysis</button>
           <button className={!(desktopBrowser && positionsOpen) && activeNavigationSection === "pnl" ? "nav-active" : ""} onClick={() => openNavigationSection("pnl")}><Activity className="desktop-nav-icon" size={16} aria-hidden="true"/>P&amp;L</button>
         </nav>
-        <span className="desktop-workspace-title">{desktopBrowser && positionsOpen ? "Open positions" : activeNavigationSection === "algo" ? "Algo Trading" : activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
+        <span className="desktop-workspace-title">{desktopBrowser && positionsOpen ? "Open positions" : activeNavigationSection === "home" ? "Market overview" : activeNavigationSection === "trade" || activeNavigationSection === "fno" ? "Chart workspace" : activeNavigationSection === "fundamentals" ? "Stock analysis" : activeNavigationSection === "pnl" ? "Performance & trade history" : activeNavigationSection === "ipo" ? "IPO discovery" : activeNavigationSection.charAt(0).toUpperCase() + activeNavigationSection.slice(1)}</span>
         <div className="top-actions">
           <div className={`market-status ${feedStatus.mode}`} title={feedStatus.mode === "live" ? "Live Upstox data" : "Live data unavailable"} aria-label={feedStatus.mode === "live" ? "Live market data connected" : "Live market data unavailable"}>
             <span /> <span className="market-status-text">{feedStatus.mode === "live" ? "Live data" : "Data offline"}</span>
@@ -2941,25 +2901,19 @@ export function TradingDashboard() {
           {!isAndroidApp && !desktopBrowser && <button className="api-button" onClick={() => setShowApi(true)}><Cable size={16} /> Broker API</button>}
           <button className="suggestion-button" onClick={() => setFeedbackOpen(true)} aria-label="Send suggestions" title="Send suggestions"><MessageCircle size={16} /><span>Suggestions</span></button>
           <NotificationCenter open={notificationsOpen} setOpen={setNotificationsOpen} />
-          <button type="button" className="icon-button header-coach-button" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }} aria-label="Open trading coach" title="Trading coach"><Target size={19} /></button>
-          <div className="more-menu-wrap">
+          {!desktopBrowser && <div className="more-menu-wrap">
             <button className={`icon-button more-menu-trigger ${moreMenuOpen ? "active" : ""}`} onClick={() => setMoreMenuOpen((value) => !value)} aria-expanded={moreMenuOpen} aria-label="More options"><MoreHorizontal size={19} /></button>
             {moreMenuOpen && <>
               <button className="more-menu-scrim" aria-label="Close more options" onClick={() => setMoreMenuOpen(false)} />
               <HeaderPopover className="more-menu-panel" label="More options">
-                <header className="tools-menu-heading"><b>{desktopBrowser ? "Trading tools" : "Tools & settings"}</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
-                <div className="tools-menu-features">
-                  <button aria-label="Algo Trading" onClick={() => { setMoreMenuOpen(false); openNavigationSection("algo"); }}><span className="tools-menu-icon"><Activity size={21} /></span><span><b>Algo Trading</b><small>Build, backtest & paper trade</small></span><ChevronRight size={18} /></button>
-                  {!desktopBrowser && <button aria-label="Coach" onClick={() => { setCoachTab("journal"); setCoachOpen(true); setMoreMenuOpen(false); }}><span className="tools-menu-icon"><Target size={21} /></span><span><b>Trading coach</b><small>Journal, replay & trading limits</small></span><ChevronRight size={18} /></button>}
-                  <button aria-label="Bot" onClick={() => { setMoreMenuOpen(false); openNavigationSection("bot"); }}><span className="tools-menu-icon"><Bot size={21} /></span><span><b>Trading bot</b><small>Strategies, controls & activity</small></span><ChevronRight size={18} /></button>
-                </div>
+                <header className="tools-menu-heading"><b>Settings</b><button type="button" className="icon-button" aria-label="Close tools menu" onClick={() => setMoreMenuOpen(false)}><X size={18} /></button></header>
                 {!desktopBrowser && <div className="tools-menu-secondary">
                   <button onClick={() => { openHeaderWallet(); setMoreMenuOpen(false); }}><WalletCards size={18}/><span>Wallet</span></button>
                   <button onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"}>{theme === "neon" ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === "neon" ? "Light mode" : "Dark mode"}</span></button>
                 </div>}
               </HeaderPopover>
             </>}
-          </div>
+          </div>}
           {!desktopBrowser && <button className="icon-button header-wallet-button" onClick={openHeaderWallet} aria-label="Practice wallet" title="Practice wallet"><WalletCards size={17} /></button>}
           <button className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "neon" ? "Use light theme" : "Use neon dark theme"} title={theme === "neon" ? "Light theme" : "Neon dark theme"}>{theme === "neon" ? <Sun size={17} /> : <Moon size={17} />}</button>
           {authConfigured && user && <button className="profile-button account-button" onClick={() => { setAccountDeleteArmed(false); setAccountDeleteError(""); setAccountOpen(value => !value); }} aria-expanded={accountOpen} aria-label="Open account" title={user.email ?? "Account"}>{user.user_metadata?.avatar_url ? <Image unoptimized width={36} height={36} src={user.user_metadata.avatar_url as string} alt="" referrerPolicy="no-referrer" /> : <UserRound size={18} />}</button>}
@@ -3180,11 +3134,9 @@ export function TradingDashboard() {
           </div>
           {researchDraft && <div className="research-ticket-note"><b>Top Stocks research draft</b><small>Reference {formatInr(researchDraft.reference)} · {researchDraft.asOf}. Live budget {formatInr(researchDraft.budget)} · planned loss budget {formatInr(researchDraft.riskBudget)} including estimated charges. Fresh quotes and an open session are required.</small><button type="button" onClick={() => { setResearchDraft(null); setTradeThesis(""); }}>Clear research draft</button></div>}
           <RiskSizingPlan open={riskSizingOpen} onToggle={() => setRiskSizingOpen((value) => !value)} maxRisk={maxRiskInput} onMaxRiskChange={setMaxRiskInput} suggestedQuantity={suggestedRiskQuantity} onApply={() => setQuantityInput(String(suggestedRiskQuantity))} risk={plannedRisk} reward={plannedReward} ratio={rewardRiskRatio} strategy={tradeStrategy} onStrategyChange={setTradeStrategy} confidence={tradeConfidence} onConfidenceChange={setTradeConfidence} thesis={tradeThesis} onThesisChange={setTradeThesis} />
-          {selected.assetType === "OPTION" && singleOptionPayoff && <button type="button" className="ticket-payoff-preview" onClick={() => { setCoachTab("payoff"); setCoachOpen(true); }}><span><Target size={16} /><b>Expiry payoff preview</b><small>{singleOptionPayoff.breakevens.length ? `Breakeven ${singleOptionPayoff.breakevens.map((value) => formatInr(value)).join(" · ")}` : "Open full payoff chart"}</small></span><ChevronRight size={16} /></button>}
           <div className="product-select"><label className={!intradayOrdersAllowed ? "disabled-product" : ""}><input type="radio" name="product" checked={product === "INTRADAY"} disabled={!intradayOrdersAllowed} onChange={() => setProduct("INTRADAY")} /><span><b>Intraday</b><small>{intradayOrdersAllowed ? "MIS · auto square-off" : "Closed for this session"}</small></span></label><label><input type="radio" name="product" checked={product === "DELIVERY"} onChange={() => { setProduct("DELIVERY"); if (selected.assetType !== "OPTION" && selected.assetType !== "FUTURE" && deliveryHoldingQuantity <= 0 && side === "SELL") activateRiskTool("BUY"); }} /><span><b>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Carry forward" : "Delivery"}</b><small>{selected.assetType === "FUTURE" ? "Paper cash settlement · no share delivery" : selected.assetType === "OPTION" ? "NRML · until expiry" : "CNC · buy or sell holdings"}</small></span></label></div>
           {afterHoursDeliveryCanQueue && <p className="after-hours-order-note">NSE is closed. Delivery can be queued now and will use a fresh quote when the app is open during the next trading session. The displayed price is only an estimate.</p>}
           <div className="margin-card"><div><span>Order value</span><b>{formatInr(orderValue)}</b></div><div><span>{isCashDeliveryOrder ? "Funds required" : "Est. margin"}</span><b>{formatInr(isCashDeliveryOrder ? estimatedFundsRequired : margin)}</b></div><div><span>{isCashDeliveryOrder ? "Est. delivery charges" : "Est. taxes & charges"}</span><b>{formatInr(estimatedOrderCharges.total)}</b></div><div><span>Available cash</span><b>{formatInr(balance)}</b></div></div>
-          {tradingLimitStatus.blocked && !orderReducesOpenPosition && <div className="ticket-limit-block"><ShieldCheck size={17} /><span><b>New trades paused by your limits</b><small>{tradingLimitStatus.reasons.join(" · ")}</small></span><button type="button" onClick={() => { setCoachTab("limits"); setCoachOpen(true); }}>Review</button></div>}
           {selectedPosition.quantity > 0 && (
             <div className="ticket-live-position">
               <div><span>{selectedPosition.side} · {selectedPosition.quantity} units</span><b className={selectedPosition.unrealizedPnl >= 0 ? "positive" : "negative"}>{selectedPosition.unrealizedPnl >= 0 ? "+" : ""}{formatInr(selectedPosition.unrealizedPnl)}</b></div>
@@ -3205,8 +3157,8 @@ export function TradingDashboard() {
               {positionProduct === "INTRADAY" && !intradayOrdersAllowed && <small className="market-closed-note">{intradayStatusMessage}</small>}
             </div>
           )}
-          <button disabled={(researchDraft !== null && (!marketStatus.isOpen || !verifiedLivePrice)) || (!verifiedLivePrice && !afterHoursDeliveryCanQueue) || (!selectedMarketOrdersAllowed && !afterHoursDeliveryCanQueue) || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError) || (tradingLimitStatus.blocked && !orderReducesOpenPosition)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{researchDraft && !marketStatus.isOpen ? "RESEARCH DRAFT · MARKET CLOSED" : tradingLimitStatus.blocked && !orderReducesOpenPosition ? "TRADING LIMIT ACTIVE" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : afterHoursDeliveryCanQueue ? `QUEUE ${side} ${quantity} ${selected.symbol}` : !verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
-          <p className="disclaimer"><Bot size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
+          <button disabled={(researchDraft !== null && (!marketStatus.isOpen || !verifiedLivePrice)) || (!verifiedLivePrice && !afterHoursDeliveryCanQueue) || (!selectedMarketOrdersAllowed && !afterHoursDeliveryCanQueue) || (!selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed) || Boolean(deliverySellError)} className={`place-order ${side.toLowerCase()}`} onClick={placeOrder}>{researchDraft && !marketStatus.isOpen ? "RESEARCH DRAFT · MARKET CLOSED" : deliverySellError ? deliveryHoldingQuantity > 0 ? `ONLY ${deliveryHoldingQuantity} HELD` : "BUY BEFORE DELIVERY SELL" : afterHoursDeliveryCanQueue ? `QUEUE ${side} ${quantity} ${selected.symbol}` : !verifiedLivePrice ? `WAITING FOR ${selectedVenueLabel === "NSE" ? "UPSTOX" : selectedVenueLabel}` : !selectedMarketOrdersAllowed ? selectedIsWatchOnly ? "WATCH ONLY" : "MARKET CLOSED" : !selectedDeltaSymbol && product === "INTRADAY" && !intradayOrdersAllowed ? "INTRADAY CLOSED" : `${side} ${quantity} ${selected.symbol}`}<ChevronRight size={18} /></button>
+          <p className="disclaimer"><ShieldCheck size={15} /> Simulation only. Orders are saved on this device and never reach an exchange.</p>
           <div className="recent-orders-mini">
             <div className="section-line"><b>Recent orders</b><button onClick={() => setOrdersOpen(true)}>View all</button></div>
             {todayOrders.slice(0, 3).map((order) => <div className="mini-order" key={order.id}><span className={order.side === "BUY" ? "buy-tag" : "sell-tag"}>{order.side}</span><button className="mini-order-symbol stock-identity" onClick={() => openPositionChart(order.symbol)}><StockLogo {...order} size={28} /><span><b>{order.symbol}</b><small>{order.quantity} × {order.price.toFixed(2)}</small></span></button><small>{order.time}</small></div>)}
@@ -3341,7 +3293,7 @@ export function TradingDashboard() {
         }}
       />}
 
-      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={!["bot", "algo"].includes(activeNavigationSection)} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
+      <nav className="mobile-bottom-nav" aria-label="Quick navigation" data-has-active={true} style={{ "--nav-index": activeNavigationSection === "home" ? 0 : ["trade", "fno"].includes(activeNavigationSection) ? 1 : marketNavigationActive ? 2 : activeNavigationSection === "news" ? 3 : activeNavigationSection === "ipo" ? 4 : activeNavigationSection === "fundamentals" ? 5 : 6 } as CSSProperties}>
         <button className={activeNavigationSection === "home" ? "active" : ""} onClick={() => openNavigationSection("home")}><Home size={19} /><span>Home</span></button>
         <button className={["trade", "fno"].includes(activeNavigationSection) ? "active" : ""} onClick={() => openNavigationSection("trade")}><LineChart size={19} /><span>Charts</span></button>
         <button className={marketNavigationActive ? "active" : ""} onClick={() => { if (!marketNavigationActive) openNavigationSection("watchlist"); }}><Bookmark size={19} /><span>Watchlist</span></button>
@@ -3368,10 +3320,7 @@ export function TradingDashboard() {
         setTimeframe("1D");
         setProduct("DELIVERY");
       }} />}
-      {botOpen && <BotWorkspace trading={globalTrading} onClose={closeNavigationPage} onPnl={() => { openNavigationSection("pnl"); setPnlScope({ ...DEFAULT_PNL_SCOPE, asset: "global" }); }} />}
-      {algoOpen && <AlgoTradingWorkspace key={user?.id ?? "guest"} ownerId={user?.id ?? "guest"} instruments={tradingUniverse} underlyings={fnoUnderlyings} onClose={closeNavigationPage} />}
       {replayInstrument && !replayOnChart && <BarReplayDialog key={replayInstrument.instrumentKey} instrument={replayInstrument} timeframe={replayReviewTimeframe ?? timeframe} theme={theme} onClose={exitChartReplay} />}
-      {coachOpen && <TradingCoach initialTab={coachTab} timeframe={timeframe} theme={theme} selected={selected} orders={orders} trades={closedTrades} limits={tradingLimits} proposedOptionLeg={proposedOptionLeg} spotPrice={optionSpotPrice} onLimitsChange={setTradingLimits} onReviewTrade={(tradeId) => { setCoachOpen(false); openNavigationSection("pnl"); setPnlHistoryOnly(true); setPnlHistoryFilter("all"); setPnlTradeMenuId(tradeId); }} onOpenInsights={() => { setCoachOpen(false); openNavigationSection("pnl"); setPnlTab("insights"); }} onClose={() => setCoachOpen(false)} />}
       {showApi && <ApiSettings onClose={() => setShowApi(false)} />}
       {holdingsOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) closeNavigationPage(); }}>

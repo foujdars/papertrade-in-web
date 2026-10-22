@@ -64,16 +64,17 @@ test('missing payload never resets a wallet and stale versions cannot overwrite 
   assert.equal((await write({ action: 'save', version: 1, account: wallet() })).status, 200);
   assert.equal(state.records.get('alice').version, 2);
 });
-test('scheduler outage blocks starts while permitting pause and manual wallet edits', async () => {
+test('retired bots cannot restart, while manual wallet edits remain available during scheduler outages', async () => {
   reset(); await write({ action: 'enable', account: wallet() });
   const account = wallet(); account.bots = [{ ...defaultBot('BTCUSD'), enabled: true, startedAt: Date.now() }];
-  assert.equal((await write({ action: 'save', version: 1, account })).status, 200);
+  assert.equal((await write({ action: 'save', version: 1, account })).status, 410);
+  assert.equal(state.records.get('alice').version, 1);
   state.health.ok = false;
   account.bots[0].enabled = false;
-  assert.equal((await write({ action: 'save', version: 2, account })).status, 200);
+  assert.equal((await write({ action: 'save', version: 1, account })).status, 200);
   account.bots[0].enabled = true;
-  assert.equal((await write({ action: 'save', version: 3, account })).status, 503);
+  assert.equal((await write({ action: 'save', version: 2, account })).status, 410);
   assert.equal(state.records.get('alice').account.bots[0].enabled, false);
   account.bots[0].enabled = false; account.wallet += 1;
-  assert.equal((await write({ action: 'save', version: 3, account })).status, 200);
+  assert.equal((await write({ action: 'save', version: 2, account })).status, 200);
 });

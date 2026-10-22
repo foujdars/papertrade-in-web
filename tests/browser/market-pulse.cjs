@@ -17,7 +17,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
   let browser;
   try {
     const launch={headless:true};
-    if(process.env.CHROMIUM_PACKAGE) {const pkg=require(process.env.CHROMIUM_PACKAGE), c=pkg.default||pkg;launch.executablePath=await c.executablePath();launch.args=c.args;}
+    if(process.env.CHROMIUM_PACKAGE) {const pkg=require(process.env.CHROMIUM_PACKAGE), c=pkg.default||pkg;launch.executablePath=await c.executablePath();launch.args=c.args.filter(arg=>arg!=='--single-process');}
     browser=await chromium.launch(launch);
     const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -38,7 +38,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
       if(theme==='neon') await page.getByRole('button',{name:'Theme',exact:true}).click();
       for(const width of [320,375,390,768,1280]) {
         await page.setViewportSize({width,height:844});
-        await page.waitForFunction(()=>Math.abs(document.querySelector('.india-ad-chart').getBoundingClientRect().width-Number(document.querySelector('.india-ad-chart').getAttribute('viewBox').split(' ')[2]))<1);
+        await page.waitForFunction(()=>Math.abs(document.querySelector('.india-ad-chart').getBoundingClientRect().width-Number(document.querySelector('.india-ad-chart').getAttribute('viewBox').split(' ')[2]))<1).catch(async error=>{console.error({theme,width,chart:await chart.evaluate(el=>({width:el.getBoundingClientRect().width,viewBox:el.getAttribute('viewBox'),parent:el.parentElement.getBoundingClientRect().width}))});throw error;});
         const columns=await page.locator('.india-gauge-panel > div').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
         assert.equal(columns[0].y,columns[1].y);assert.equal(columns[0].height,columns[1].height);
         assert.ok(columns[1].x>columns[0].x);assert.ok(Math.abs(columns[0].width-columns[1].width)<1);
@@ -78,6 +78,15 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
     assert.equal(await page.locator('.india-vix-status').count(),0);
     assert.equal(await page.locator('.india-vix-value strong').textContent(),'—');
     assert.equal(await page.locator('.india-pcr-main strong').textContent(),'—');
+    // A stopped sampler must not leave obsolete chart endpoint counts as the current breadth.
+    pulse={...pulse,breadth:{advance:891,decline:2347},breadthCheckedAt:Date.parse('2026-10-07T10:10:00Z'),tape:[{t:Date.parse('2026-10-07T04:57:00Z'),advance:836,decline:2167}]};
+    await page.clock.fastForward(11000);
+    await page.waitForFunction(()=>document.querySelector('.india-breadth-counts')?.textContent.includes('2,347'));
+    assert.match(await page.locator('.india-breadth-head small').textContent(), /Partial history/);
+    assert.equal(await chart.locator('path.up').getAttribute('d').then(d=>d.includes('L')),false,'Missing session history is never fabricated');
+    pulse={...pulse,tape:[...pulse.tape,{t:Date.parse('2026-10-07T04:58:00Z'),advance:850,decline:2150}]};
+    await page.clock.fastForward(11000);
+    await page.waitForFunction(()=>document.querySelector('.india-ad-chart path.up').getAttribute('d').includes('L'));
     assert.deepEqual(errors,[]);
     console.log('PASS: side-by-side live gauges and breadth endpoint labels at 320–1280px in both themes; expansion, popups, 30-second refresh, sparse and unavailable data.');
   } finally {await browser?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}

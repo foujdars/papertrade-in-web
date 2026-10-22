@@ -132,12 +132,12 @@ test("original chart powers replay, hides future bars and never feeds replay pri
   assert.doesNotMatch(chart, /\[feedMode, instrument\.instrumentKey/);
   assert.match(chart, /const stored = isReplay \? \(replayDrawingsRef\.current\?\.scope === drawingScope/);
 });
-test("chart entry points and header coach use shared replay on the selected timeframe", async () => {
+test("chart entry points retain replay on the selected timeframe after Coach removal", async () => {
   const dashboard = await readFile(new URL("../components/TradingDashboard.tsx", import.meta.url), "utf8");
   const coach = await readFile(new URL("../components/TradingCoach.tsx", import.meta.url), "utf8");
   const fno = await readFile(new URL("../components/FnoChartWorkspace.tsx", import.meta.url), "utf8");
   const advanced = await readFile(new URL("../components/AdvancedChartWorkspace.tsx", import.meta.url), "utf8");
-  assert.match(dashboard, /<NotificationCenter\b[^>]*\/>[\s\S]{0,150}header-coach-button/);
+  assert.doesNotMatch(dashboard, /header-coach-button|<TradingCoach\b/);
   assert.doesNotMatch(dashboard, /className="coach-launch-button"/);
   assert.match(dashboard, /instrument=\{replayInstrument\} timeframe=\{replayReviewTimeframe \?\? timeframe\}/);
   assert.match(dashboard, /setReplayReviewTimeframe\(pnlReviewTimeframe\)/);

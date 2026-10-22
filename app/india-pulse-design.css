@@ -58,3 +58,7 @@
 .terminal-shell .india-pulse-layout .india-ad-chart circle.up { fill: var(--green); }
 .terminal-shell .india-pulse-layout .india-ad-chart circle.down { fill: var(--red); }
 .terminal-shell .india-pulse-layout .india-breadth-head { border-bottom: 0; }
+
+.terminal-shell .india-breadth-counts { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin:2px 0 6px; font-variant-numeric:tabular-nums; }
+.terminal-shell .india-breadth-counts .up { color:var(--green); }
+.terminal-shell .india-breadth-counts .down { color:var(--red); }
