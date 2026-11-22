@@ -2,6 +2,46 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { appendAdTape, fiiDii, flowChartRows, flowsInRange, historyFlows, indexBreadth, indiaVix, istStamp, mergeFlows, niftyCloses, nseBreadth, putCallRatio, selectAdTape, vixBand, withNifty, FLOW_WINDOWS } from "../lib/india-pulse.ts";
+import { breadthShares, mergeBreadthSnapshot } from "../lib/india-pulse.ts";
+
+test("valid breadth remains displayable without a recorded session, including after hours", () => {
+  const now = istStamp("2026-10-12", 18, 0);
+  const incoming = { breadth: { advance: 1200, decline: 800 }, breadthCheckedAt: now, tape: [] };
+  assert.deepEqual(mergeBreadthSnapshot(null, incoming, false, now), incoming);
+  assert.deepEqual(breadthShares(incoming.breadth), { advance: 60, decline: 40, ratio: "1.50" });
+  assert.deepEqual(breadthShares({ advance: 2000, decline: 0 }), { advance: 100, decline: 0, ratio: "�" });
+  assert.deepEqual(breadthShares({ advance: 0, decline: 2000 }), { advance: 0, decline: 100, ratio: "0.00" });
+});
+
+test("temporary source failures retain counts and their original checked time", () => {
+  const now = istStamp("2026-10-12", 10, 0);
+  const previous = { breadth: { advance: 1200, decline: 800 }, breadthCheckedAt: now, tape: [{ t: now, advance: 1200, decline: 800 }] };
+  const unavailable = { breadth: null, breadthCheckedAt: null, tape: [] };
+  assert.deepEqual(mergeBreadthSnapshot(previous, unavailable, true, now + 60000), previous);
+  const restored = { breadth: { advance: 1300, decline: 700 }, breadthCheckedAt: now + 120000, tape: [{ t: now + 120000, advance: 1300, decline: 700 }] };
+  const next = mergeBreadthSnapshot(previous, restored, true, now + 120000);
+  assert.deepEqual(next.breadth, restored.breadth);
+  assert.equal(next.breadthCheckedAt, restored.breadthCheckedAt);
+  assert.equal(next.tape.length, 2);
+  assert.deepEqual(mergeBreadthSnapshot(next, previous, true, now + 180000), next);
+});
+
+test("an empty opening response clears yesterday's chart and counts", () => {
+  const yesterday = istStamp("2026-10-12", 15, 30), today = istStamp("2026-10-13", 9, 15);
+  const previous = { breadth: { advance: 1200, decline: 800 }, breadthCheckedAt: yesterday, tape: [{ t: yesterday, advance: 1200, decline: 800 }] };
+  const empty = { breadth: null, breadthCheckedAt: null, tape: [] };
+  assert.deepEqual(mergeBreadthSnapshot(previous, empty, false, today - 60000), previous);
+  assert.deepEqual(mergeBreadthSnapshot(previous, empty, true, today), empty);
+  assert.deepEqual(mergeBreadthSnapshot(previous, previous, true, today), empty);
+});
+
+test("invalid breadth cannot replace a verified snapshot", () => {
+  const now = istStamp("2026-10-12", 10, 0);
+  const previous = { breadth: { advance: 1200, decline: 800 }, breadthCheckedAt: now, tape: [] };
+  for (const breadth of [{ advance: NaN, decline: 800 }, { advance: -1, decline: 800 }, { advance: 0, decline: 0 }]) {
+    assert.deepEqual(mergeBreadthSnapshot(previous, { breadth, breadthCheckedAt: now + 60000, tape: [] }, true, now + 60000), previous);
+  }
+});
 
 test("NSE advance and decline come from the Moneycontrol bar", () => {
   const breadth = nseBreadth('<div class="advBar"><span style="width:43%;"></span></div><div class="bartxt"><span class="baradv">1,380</span><span class="bardecl">1870</span></div>');
@@ -117,3 +157,4 @@ test('breadth history survives short instance snapshots without mixing sessions 
   const path = adLinePath(merged, 'advance', n => (n - t) / 60000, n => n);
   assert.equal(path, 'M0.0,1000.0 L1.0,1100.0 M10.0,1000.0');
 });
+

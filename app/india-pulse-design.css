@@ -62,3 +62,17 @@
 .terminal-shell .india-breadth-counts { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin:2px 0 6px; font-variant-numeric:tabular-nums; }
 .terminal-shell .india-breadth-counts .up { color:var(--green); }
 .terminal-shell .india-breadth-counts .down { color:var(--red); }
+
+.terminal-shell .india-breadth-snapshot { padding: 12px 4px; }
+.terminal-shell .india-breadth-ratio, .terminal-shell .india-breadth-share-labels, .terminal-shell .india-breadth-retry { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.terminal-shell .india-breadth-ratio strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.terminal-shell .india-breadth-share-bar { display: flex; height: 18px; margin: 12px 0 8px; border-radius: 6px; overflow: hidden; }
+.terminal-shell .india-breadth-share-bar .up { background: var(--green); }
+.terminal-shell .india-breadth-share-bar .down { background: var(--red); }
+.terminal-shell .india-breadth-share-labels .up { color: var(--green); }
+.terminal-shell .india-breadth-share-labels .down { color: var(--red); }
+.terminal-shell .india-breadth-snapshot p, .terminal-shell .india-breadth-retry { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.terminal-shell .india-breadth-retry { padding: 8px 4px; }
+.terminal-shell .india-breadth-retry button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.terminal-shell .india-breadth-retry button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+

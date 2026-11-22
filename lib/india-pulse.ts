@@ -12,6 +12,23 @@ export function vixBand(price: number) {
 }
 export type CashFlow = { date: string; label: string; fii: number; dii: number };
 export type AdPoint = { t: number; advance: number; decline: number };
+export type BreadthSnapshot = { breadth: NseBreadth | null; breadthCheckedAt: number | null; tape: AdPoint[] };
+
+/** Keep usable counts on transient failures, but never carry yesterday into a live session. */
+export function mergeBreadthSnapshot(previous: BreadthSnapshot | null, incoming: BreadthSnapshot, sessionLive: boolean, now: number): BreadthSnapshot {
+  const currentSession = (at: number | null) => at !== null && Number.isFinite(at) && (!sessionLive || istDay(at) === istDay(now));
+  const valid = (breadth: NseBreadth | null) => !!breadth && Number.isFinite(breadth.advance) && Number.isFinite(breadth.decline) && breadth.advance >= 0 && breadth.decline >= 0 && breadth.advance + breadth.decline >= 50;
+  const useIncoming = valid(incoming.breadth) && currentSession(incoming.breadthCheckedAt) && (!previous?.breadthCheckedAt || incoming.breadthCheckedAt! >= previous.breadthCheckedAt);
+  const source = useIncoming ? incoming : previous && valid(previous.breadth) && currentSession(previous.breadthCheckedAt) ? previous : null;
+  const tape = mergeAdSamples(previous?.tape ?? [], incoming.tape).filter(point => !sessionLive || istDay(point.t) === istDay(now));
+  return { breadth: source?.breadth ?? null, breadthCheckedAt: source?.breadthCheckedAt ?? null, tape };
+}
+
+export function breadthShares(breadth: NseBreadth) {
+  const total = breadth.advance + breadth.decline;
+  const advance = total > 0 ? breadth.advance / total * 100 : 0;
+  return { advance, decline: total > 0 ? 100 - advance : 0, ratio: breadth.decline > 0 ? (breadth.advance / breadth.decline).toFixed(2) : breadth.advance > 0 ? "�" : "-" };
+}
 export type PutCallRatio = { value: number; putOi: number; callOi: number; expiry: string; asOf: string };
 
 export function putCallRatio(rows: unknown, expiry: string, asOf: string): PutCallRatio | null {
@@ -230,7 +247,7 @@ export function flowChartRows(rows: FlowPoint[], maxBars: number): FlowPoint[] {
   for (let i = 0; i < history.length; i += size) {
     const group = history.slice(i, i + size);
     const last = group[group.length - 1];
-    result.push({ ...last, label: group.length === 1 ? last.label : `${group[0].label} – ${last.label}`, fii: group.reduce((sum, row) => sum + row.fii, 0), dii: group.reduce((sum, row) => sum + row.dii, 0) });
+    result.push({ ...last, label: group.length === 1 ? last.label : `${group[0].label} - ${last.label}`, fii: group.reduce((sum, row) => sum + row.fii, 0), dii: group.reduce((sum, row) => sum + row.dii, 0) });
   }
   return [...result, rows[rows.length - 1]];
 }
@@ -258,3 +275,4 @@ export function mergeAdSamples(previous: AdPoint[], incoming: AdPoint[]): AdPoin
 export function adLinePath(points: AdPoint[], key: "advance" | "decline", x: (t: number) => number, y: (n: number) => number) {
   return points.map((point, i) => `${!i || point.t - points[i - 1].t > 5 * 60000 ? "M" : "L"}${x(point.t).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
 }
+

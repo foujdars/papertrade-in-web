@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { adLinePath, mergeAdSamples, FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
+import { adLinePath, mergeBreadthSnapshot, breadthShares, FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
 import { useTransientBack } from "./useTransientBack";
 import { ChevronRight } from "lucide-react";
 import { MarketGauge } from "./MarketGauge";
@@ -8,7 +8,7 @@ import { startVisiblePolling } from "@/lib/visible-polling";
 
 type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null; vixCheckedAt: number | null; breadthCheckedAt: number | null; flows: FlowPoint[]; pcr: PutCallRatio | null; sessionLive: boolean };
 
-const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
+const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
 const istDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
 const flowDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -100,7 +100,7 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
   const yFlow = (value: number) => top + (1 - (value + flowMax) / (flowMax * 2)) * (height - top - bottom);
   const mid = yFlow(0);
   const labelEvery = Math.max(1, Math.ceil(plotted.length / (width < 440 ? 4 : 6)));
-  const cashTick = (value: number) => value === 0 ? "0" : `${value < 0 ? "−" : ""}${new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 0 }).format(Math.abs(value))}`;
+  const cashTick = (value: number) => value === 0 ? "0" : `${value < 0 ? "-" : ""}${new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 0 }).format(Math.abs(value))}`;
   return <div className="india-flow-visual">
     <svg ref={chartRef} className="india-flow-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="group" aria-label="FII and DII net cash bars; choose a date for exact figures">
     {[-flowMax, 0, flowMax].map(value => <g key={value}><line className="grid" x1={left} x2={width - right} y1={yFlow(value)} y2={yFlow(value)} /><text className="flow-axis" x={left - 8} y={yFlow(value) + 4} textAnchor="end">{cashTick(value)}</text></g>)}
@@ -109,7 +109,7 @@ function FlowChart({ rows }: { rows: FlowPoint[] }) {
       const fii = Math.abs(yFlow(row.fii) - mid);
       const dii = Math.abs(yFlow(row.dii) - mid);
       return <g key={row.date} className={selected.date === row.date ? "selected" : ""} role="button" tabIndex={0} aria-pressed={selected.date === row.date} aria-label={`${row.label}: FII ${crore(row.fii)} crore, DII ${crore(row.dii)} crore`} onClick={() => setSelectedDate(row.date)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedDate(row.date); } }}>
-        <title>{row.label} · FII {crore(row.fii)} Cr · DII {crore(row.dii)} Cr</title>
+        <title>{row.label} � FII {crore(row.fii)} Cr � DII {crore(row.dii)} Cr</title>
         <rect className="flow-hit" x={x - slot / 2} y={top} width={slot} height={height - top - bottom} />
         <rect className={row.fii >= 0 ? "fii up" : "fii down"} x={x - barWidth - 1} y={row.fii >= 0 ? mid - fii : mid} width={barWidth} height={Math.max(fii, 1)} rx="1" />
         <rect className={row.dii >= 0 ? "dii up" : "dii down"} x={x + 1} y={row.dii >= 0 ? mid - dii : mid} width={barWidth} height={Math.max(dii, 1)} rx="1" />
@@ -140,14 +140,14 @@ function FlowRangeMenu({ range, onChange }: { range: (typeof FLOW_WINDOWS)[numbe
     return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("keydown", onKeyDown); };
   }, [open]);
   return <div className="india-flow-range" ref={rootRef}>
-    <button ref={triggerRef} type="button" className="india-flow-range-trigger" aria-label={`Chart timeline, ${range}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>{range}<span aria-hidden="true">⌄</span></button>
+    <button ref={triggerRef} type="button" className="india-flow-range-trigger" aria-label={`Chart timeline, ${range}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(value => !value)}>{range}<span aria-hidden="true">?</span></button>
     {open && <div className="india-flow-range-menu" role="listbox" aria-label="Chart timeline" onKeyDown={event => {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       event.preventDefault();
       const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const current = options.indexOf(document.activeElement as HTMLButtonElement);
       options[(current + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length]?.focus();
-    }}>{FLOW_WINDOWS.map(item => <button key={item.id} type="button" role="option" aria-selected={range === item.id} onClick={() => { onChange(item.id); setOpen(false); triggerRef.current?.focus(); }}>{item.label}<span aria-hidden="true">{range === item.id ? "✓" : ""}</span></button>)}</div>}
+    }}>{FLOW_WINDOWS.map(item => <button key={item.id} type="button" role="option" aria-selected={range === item.id} onClick={() => { onChange(item.id); setOpen(false); triggerRef.current?.focus(); }}>{item.label}<span aria-hidden="true">{range === item.id ? "�" : ""}</span></button>)}</div>}
   </div>;
 }
 
@@ -155,6 +155,7 @@ function usePulse(part: "breadth" | "gauges" | "flows", enabled = true) {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [observedAt, setObservedAt] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [range, setRange] = useState<(typeof FLOW_WINDOWS)[number]["id"]>("1M");
   useEffect(() => {
     if (!enabled) return;
@@ -164,20 +165,24 @@ function usePulse(part: "breadth" | "gauges" | "flows", enabled = true) {
       const body = await response.json();
       if (signal.aborted) return;
       if (!response.ok || !body?.ok) throw new Error("Pulse unavailable");
-      setFailed(false);
-      setPulse(previous => ({ breadth: body.breadth ?? null, tape: mergeAdSamples(previous?.tape ?? [], Array.isArray(body.tape) ? body.tape : []), vix: body.vix ?? null, breadthCheckedAt: Number.isFinite(body.breadthCheckedAt) ? body.breadthCheckedAt : null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }));
+      const receivedAt = Date.now();
+      setObservedAt(receivedAt);
+      setFailed(part === "breadth" && !body.breadth);
+      setPulse(previous => ({ ...mergeBreadthSnapshot(previous, { breadth: body.breadth ?? null, breadthCheckedAt: Number.isFinite(body.breadthCheckedAt) ? body.breadthCheckedAt : null, tape: Array.isArray(body.tape) ? body.tape : [] }, Boolean(body.sessionLive), receivedAt), vix: body.vix ?? null, vixCheckedAt: Number.isFinite(body.vixCheckedAt) ? body.vixCheckedAt : null, flows: Array.isArray(body.flows) ? body.flows : [], pcr: body.pcr ?? null, sessionLive: Boolean(body.sessionLive) }));
     }, part === "breadth" ? 10_000 : part === "flows" ? 5 * 60_000 : 30_000, () => setFailed(true));
-  }, [part, enabled]);
-  return { pulse, range, setRange, observedAt, failed };
+  }, [part, enabled, retry]);
+  return { pulse, range, setRange, observedAt, failed, refresh: () => setRetry(value => value + 1) };
 }
 
 export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
-  const { pulse, observedAt, failed } = usePulse("breadth");
+  const { pulse, observedAt, failed, refresh } = usePulse("breadth");
   const { pulse: gauges } = usePulse("gauges", showGauges);
   const chartId = useId();
   const [expanded, setExpanded] = useState(false);
   useTransientBack(expanded, () => setExpanded(false));
   const latestPoint = pulse?.tape[pulse.tape.length - 1];
+  const snapshot = pulse?.breadth;
+  const shares = snapshot ? breadthShares(snapshot) : null;
   const marketOpen = Boolean(pulse?.sessionLive && clock.format(observedAt) < "15:30");
   const incompleteTape = !!latestPoint && ((marketOpen ? observedAt : sessionBounds([latestPoint]).end) - latestPoint.t > 3 * 60_000);
   const sampleTime = latestPoint ? clock.format(latestPoint.t) : "";
@@ -186,34 +191,40 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
     : latestPoint ? sampleTime >= "15:25" ? "Final sample" : "Last sample" : "Chart unavailable";
   const vix = gauges?.vix;
   const band = vix ? vixBand(vix.price) : null;
-  const vixStatus = gauges?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} · checked ${checkedTime(gauges.vixCheckedAt)}` : "";
+  const vixStatus = gauges?.vixCheckedAt ? `${marketOpen ? "Market open" : "Market closed"} � checked ${checkedTime(gauges.vixCheckedAt)}` : "";
   const pcr = gauges?.pcr;
   const pcrCheckedAt = pcr ? Date.parse(pcr.asOf) : NaN;
-  const pcrStatus = Number.isFinite(pcrCheckedAt) ? `${marketOpen ? "Market open" : "Market closed"} · OI checked ${checkedTime(pcrCheckedAt)}` : "";
+  const pcrStatus = Number.isFinite(pcrCheckedAt) ? `${marketOpen ? "Market open" : "Market closed"} � OI checked ${checkedTime(pcrCheckedAt)}` : "";
   const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : null;
   const oi = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
   return <div className="india-pulse-layout">
     <section className={`home-section india-pulse india-breadth-card${expanded ? " is-expanded" : ""}`} aria-label="Indian market pulse">
-      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} · Source: Moneycontrol`}>{latestPoint ? `NSE · ${istDate.format(latestPoint.t)} · ${sampleTime} IST` : "NSE · Awaiting sample"}{failed ? " · Delayed" : incompleteTape ? " · Partial history" : ""}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
-      {pulse?.breadth && <div className="india-breadth-counts" aria-label="Latest market breadth" title={pulse.breadthCheckedAt ? `Checked ${checkedTime(pulse.breadthCheckedAt)} · Source: Moneycontrol` : "Source: Moneycontrol"}>
+      <header className="india-breadth-head"><b>Market Pulse</b><small title={`${adStatus} � Source: Moneycontrol`}>{latestPoint ? `NSE � ${istDate.format(latestPoint.t)} � ${sampleTime} IST` : pulse?.breadthCheckedAt ? `NSE � Snapshot checked ${checkedTime(pulse.breadthCheckedAt)}` : "NSE � Awaiting sample"}{failed ? " � Delayed" : incompleteTape ? " � Partial history" : ""}</small><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
+      {pulse?.breadth && <div className="india-breadth-counts" aria-label="Latest market breadth" title={pulse.breadthCheckedAt ? `Checked ${checkedTime(pulse.breadthCheckedAt)} � Source: Moneycontrol` : "Source: Moneycontrol"}>
         <span className="up">Advances <b>{pulse.breadth.advance.toLocaleString("en-IN")}</b></span><span className="down">Declines <b>{pulse.breadth.decline.toLocaleString("en-IN")}</b></span>
       </div>}
       <div className="india-ad">
-        {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : <div id={chartId} className="india-pulse-wait">{pulse?.sessionLive ? "Today's line starts with the first live sample." : pulse ? "Chart unavailable" : "Loading market pulse…"}{pulse?.sessionLive && pulse.breadth ? <span className="india-breadth-pending">Advance {pulse.breadth.advance.toLocaleString("en-IN")} · Decline {pulse.breadth.decline.toLocaleString("en-IN")}</span> : null}</div>}
+        {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : snapshot && shares ? <div id={chartId} className="india-breadth-snapshot">
+          <div className="india-breadth-ratio"><span>Advance / decline ratio</span><strong>{shares.ratio}</strong></div>
+          <div className="india-breadth-share-bar" role="img" aria-label={`Advances ${snapshot.advance}, ${shares.advance.toFixed(1)} percent; declines ${snapshot.decline}, ${shares.decline.toFixed(1)} percent`}><span className="up" style={{ width: `${shares.advance}%` }} /><span className="down" style={{ width: `${shares.decline}%` }} /></div>
+          <div className="india-breadth-share-labels"><span className="up">Advances {shares.advance.toFixed(1)}%</span><span className="down">Declines {shares.decline.toFixed(1)}%</span></div>
+          <p>Latest available counts. Session history is not available yet.</p>
+        </div> : <div id={chartId} className="india-pulse-wait">{failed ? "Market breadth is temporarily unavailable." : pulse?.sessionLive ? "Today's line starts with the first live sample." : pulse ? "No market breadth samples available yet." : "Loading market pulse."}</div>}
+        {failed && <div className="india-breadth-retry" role="status"><span>{snapshot || latestPoint ? "Refresh failed. Showing the last available data." : "Automatic refresh will try again."}</span><button type="button" onClick={refresh}>Retry market pulse</button></div>}
       </div>
     </section>
     {showGauges && <section className="home-section india-gauge-panel" aria-label="India VIX and Nifty put/call ratio">
       <div className="india-vix">
         <div className="india-gauge-heading"><h3>India VIX</h3><small>Expected 30-day volatility</small></div>
         <MarketGauge variant="vix" position={band?.position ?? null} label={vix ? `India VIX ${vix.price.toFixed(2)}, ${band!.label}; indicative bands: calm below 15, watch 15 to 20, elevated 20 to 30, high above 30` : "India VIX unavailable; indicative volatility bands"} />
-        <div className="india-vix-value"><strong>{vix ? vix.price.toFixed(2) : "—"}</strong>{vix ? <b className={vix.change < 0 ? "down" : "up"}>{vix.change > 0 ? "+" : ""}{vix.change.toFixed(2)} · {vix.changePercent > 0 ? "+" : ""}{vix.changePercent.toFixed(2)}%</b> : <small>Data unavailable</small>}</div>
-        <div className="india-gauge-foot">{band ? <b className={`india-vix-status ${band.tone}`}>{band.label}</b> : null}<InfoTip label="India VIX data details"><p>{vixStatus && <>{vixStatus}<br /></>}Source: Moneycontrol. Indicative bands · Higher VIX means more expected volatility, not market direction.</p></InfoTip></div>
+        <div className="india-vix-value"><strong>{vix ? vix.price.toFixed(2) : "-"}</strong>{vix ? <b className={vix.change < 0 ? "down" : "up"}>{vix.change > 0 ? "+" : ""}{vix.change.toFixed(2)} � {vix.changePercent > 0 ? "+" : ""}{vix.changePercent.toFixed(2)}%</b> : <small>Data unavailable</small>}</div>
+        <div className="india-gauge-foot">{band ? <b className={`india-vix-status ${band.tone}`}>{band.label}</b> : null}<InfoTip label="India VIX data details"><p>{vixStatus && <>{vixStatus}<br /></>}Source: Moneycontrol. Indicative bands � Higher VIX means more expected volatility, not market direction.</p></InfoTip></div>
       </div>
       <div className="india-pcr">
-        <div className="india-gauge-heading"><h3>Nifty put/call ratio</h3><small>{pcr ? `Nearest expiry · ${pcr.expiry}` : "Option-chain data unavailable"}</small></div>
-        <MarketGauge variant="pcr" position={pcrShare} putOi={pcr ? oi.format(pcr.putOi) : "—"} callOi={pcr ? oi.format(pcr.callOi) : "—"} label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"} />
-        <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "—"}</strong></div>
-        <div className="india-gauge-foot"><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest ÷ total call open interest for the nearest Nifty expiry.{pcrStatus && <><br />{pcrStatus}</>} The needle shows the put share of total open interest.</p></InfoTip></div>
+        <div className="india-gauge-heading"><h3>Nifty put/call ratio</h3><small>{pcr ? `Nearest expiry � ${pcr.expiry}` : "Option-chain data unavailable"}</small></div>
+        <MarketGauge variant="pcr" position={pcrShare} putOi={pcr ? oi.format(pcr.putOi) : "-"} callOi={pcr ? oi.format(pcr.callOi) : "-"} label={pcr ? `Put open interest ${pcr.putOi.toLocaleString("en-IN")}, call open interest ${pcr.callOi.toLocaleString("en-IN")}, ratio ${pcr.value.toFixed(2)}` : "Put/call ratio unavailable"} />
+        <div className="india-pcr-main"><strong>{pcr ? pcr.value.toFixed(2) : "-"}</strong></div>
+        <div className="india-gauge-foot"><InfoTip label="What is put/call ratio?"><p>Put/call ratio = total put open interest � total call open interest for the nearest Nifty expiry.{pcrStatus && <><br />{pcrStatus}</>} The needle shows the put share of total open interest.</p></InfoTip></div>
       </div>
     </section>}
   </div>;
@@ -228,10 +239,11 @@ export function IndiaFlows() {
   return <div className="india-flows-slot">
     <div className="india-flows">
       <div className="india-flow-top">
-        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate ? `Reported ${latestDate}` : "—"}</span><InfoTip label="Explain chart colors"><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></InfoTip></div>
-        <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "—"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "—"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
+        <div className="india-flow-heading"><b>FII / DII flows</b><span>{latestDate ? `Reported ${latestDate}` : "-"}</span><InfoTip label="Explain chart colors"><div className="india-flow-key"><span><i className="fii-buy" />FII buying</span><span><i className="fii-sell" />FII selling</span><span><i className="dii-buy" />DII buying</span><span><i className="dii-sell" />DII selling</span></div></InfoTip></div>
+        <div className="india-flow-summary"><div className="india-flow-stats"><div><span>FII net</span><strong className={latest && latest.fii < 0 ? "down" : "up"}>{latest ? `${crore(latest.fii)} Cr` : "-"}</strong></div><div><span>DII net</span><strong className={latest && latest.dii < 0 ? "down" : "up"}>{latest ? `${crore(latest.dii)} Cr` : "-"}</strong></div></div><FlowRangeMenu range={range} onChange={setRange} /></div>
       </div>
       {series.length ? <FlowChart rows={series} /> : <div className="india-pulse-wait">Flow data unavailable</div>}
     </div>
   </div>;
 }
+
