@@ -1,0 +1,140 @@
+/* Home's masthead groups market selection and search in the same place on every screen. */
+.terminal-shell .home-desk .home-desk-header {
+  --mast-ink: #f5faf7;
+  --mast-muted: #c2d9d3;
+  --mast-line: #567b73;
+  display: grid;
+  grid-template-areas: "heading" "markets" "search";
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(16px, 3vw, 32px);
+  border: 1px solid #315c53;
+  border-radius: 18px;
+  color: var(--mast-ink);
+  background: linear-gradient(112deg, #102e2b 8%, #1d4941 100%);
+}
+.home-desk-heading { grid-area: heading; align-self: center; min-width: 0; }
+.home-desk-heading h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 650;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+  color: var(--mast-ink);
+}
+.home-desk-date { display: block; margin-bottom: 7px; color: var(--mast-muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.home-desk-search { grid-area: search; min-width: 0; }
+.terminal-shell .home-desk .home-desk-header .home-desk-markets {
+  grid-area: markets;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  height: auto;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--mast-line);
+  border-radius: 12px;
+  background: #142f2c;
+}
+.terminal-shell .home-hub.home-desk .home-desk-header .home-desk-markets > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--mast-muted);
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.terminal-shell .home-hub.home-desk .home-desk-header .home-desk-markets > button[aria-pressed="true"] {
+  background: #d7f1dd;
+  color: #163a2e;
+}
+.terminal-shell .home-desk .home-desk-header .home-desk-markets button > svg { display: block; flex: 0 0 16px; }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-global-search {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--surface);
+  box-shadow: none;
+}
+.terminal-shell .home-hub.home-desk .home-desk-header .home-global-search input {
+  min-width: 0;
+  flex: 1;
+  font-size: 1rem;
+  color: var(--ink);
+  background: transparent;
+}
+.home-desk-header :is(button,input):focus-visible { outline: 2px solid #41b89b; outline-offset: 2px; }
+
+.terminal-shell .home-hub.home-desk .home-dashboard-scroll { gap: 14px; }
+.terminal-shell .home-hub.home-desk .home-breadth-feature { min-width: 0; }
+.terminal-shell .home-hub.home-desk .india-breadth-card { border: 1px solid var(--line); border-radius: 16px; }
+.terminal-shell .home-hub.home-desk .india-breadth-head { padding-inline: 14px; }
+.terminal-shell .home-hub.home-desk .india-breadth-counts { padding-inline: 14px; gap: 14px; }
+.terminal-shell .home-hub.home-desk .home-portfolio-card { border-radius: 16px; }
+.terminal-shell .home-hub.home-desk .home-portfolio-row { font-variant-numeric: tabular-nums; }
+.terminal-shell .home-desk .home-portfolio-actions button:focus-visible { outline: 2px solid var(--purple); }
+
+@media (min-width: 620px) {
+  .terminal-shell .home-desk .home-desk-header {
+    grid-template-columns: minmax(0,1fr) minmax(260px,.85fr);
+    grid-template-areas: "heading markets" "heading search";
+    align-items: center;
+    gap: 8px 24px;
+  }
+}
+
+/* Let the actual cards size their rows, including when index cards are disabled. */
+@media (min-width: 941px) {
+  .terminal-shell[data-platform="web"] .home-hub.home-studio.home-desk[data-market][data-desktop-tab] .home-dashboard-scroll {
+    grid-template-rows: auto auto auto;
+    grid-auto-rows: max-content;
+    gap: 16px 22px;
+    padding: 22px clamp(20px, 3vw, 44px) 44px;
+  }
+  .terminal-shell[data-platform="web"] .home-desk-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    grid-template-columns: minmax(0,1fr) minmax(280px,390px);
+  }
+  .terminal-shell[data-platform="web"] .home-desk .home-breadth-feature {
+    grid-column: 1 / 9;
+    grid-row: 4;
+  }
+  .terminal-shell[data-platform="web"] .home-desk[data-desktop-tab="overview"] .home-breadth-feature > .india-pulse-layout { display: grid; }
+  .terminal-shell[data-platform="web"] .home-hub.home-desk[data-desktop-tab="overview"][data-market="india"] .home-main-grid { grid-column: 9 / -1; grid-row: 4 / span 2; }
+  .terminal-shell[data-platform="web"] .home-hub.home-desk[data-desktop-tab="overview"] .home-movers-slot { grid-row: 5; }
+  .terminal-shell[data-platform="web"] .home-desk:is([data-desktop-tab="derivatives"],[data-desktop-tab="flows"]) .home-breadth-feature { display: none; }
+  .terminal-shell[data-platform="web"] .home-desk .desktop-explore-tabs {
+    gap: 4px;
+    align-items: center;
+    min-height: 44px;
+    border-bottom: 1px solid var(--line);
+  }
+  .terminal-shell[data-platform="web"] .home-desk .desktop-explore-tabs button {
+    min-height: 44px;
+    padding: 6px 14px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    font-size: .875rem;
+  }
+  .terminal-shell[data-platform="web"] .home-desk .desktop-explore-tabs button[aria-selected="true"] {
+    border-bottom-color: var(--purple);
+    color: var(--ink);
+  }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio.home-desk[data-market="global"] .home-dashboard-scroll { grid-template-rows: auto auto; }
+}
