@@ -9,7 +9,7 @@ test("valid breadth remains displayable without a recorded session, including af
   const incoming = { breadth: { advance: 1200, decline: 800 }, breadthCheckedAt: now, tape: [] };
   assert.deepEqual(mergeBreadthSnapshot(null, incoming, false, now), incoming);
   assert.deepEqual(breadthShares(incoming.breadth), { advance: 60, decline: 40, ratio: "1.50" });
-  assert.deepEqual(breadthShares({ advance: 2000, decline: 0 }), { advance: 100, decline: 0, ratio: "�" });
+  assert.deepEqual(breadthShares({ advance: 2000, decline: 0 }), { advance: 100, decline: 0, ratio: "∞" });
   assert.deepEqual(breadthShares({ advance: 0, decline: 2000 }), { advance: 0, decline: 100, ratio: "0.00" });
 });
 
@@ -157,4 +157,3 @@ test('breadth history survives short instance snapshots without mixing sessions 
   const path = adLinePath(merged, 'advance', n => (n - t) / 60000, n => n);
   assert.equal(path, 'M0.0,1000.0 L1.0,1100.0 M10.0,1000.0');
 });
-

@@ -75,4 +75,3 @@
 .terminal-shell .india-breadth-retry { padding: 8px 4px; }
 .terminal-shell .india-breadth-retry button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
 .terminal-shell .india-breadth-retry button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
-
