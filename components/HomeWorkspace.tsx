@@ -43,6 +43,8 @@ import { volumeLabel } from "@/lib/equity-watch";
 import { useTransientBack } from "./useTransientBack";
 import type { BoardQuote, SearchBoard } from "@/lib/search-board";
 
+const homeDate = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+
 export type HomeIndexQuote = {
   symbol: string;
   label: string;
@@ -140,9 +142,10 @@ export function HomeWorkspace({
 }) {
   const [search, setSearch] = useState("");
   const desktop = useDesktopBrowser();
-  const [desktopTab, setDesktopTab] = useState('overview');
+  const [selectedTab, setDesktopTab] = useState('overview');
+  const desktopTab = selectedTab === 'derivatives' && !cards.market ? 'overview' : selectedTab;
   const desktopScroll = useRef<HTMLDivElement>(null);
-  const desktopTabs = [{ id: 'overview', label: 'Explore' }, { id: 'breadth', label: 'Breadth & sectors' }, { id: 'derivatives', label: 'F&O insights' }, { id: 'flows', label: 'Flows & deals' }];
+  const desktopTabs = [{ id: 'overview', label: 'Explore' }, { id: 'breadth', label: 'Breadth & sectors' }, ...(cards.market ? [{ id: 'derivatives', label: 'F&O insights' }] : []), { id: 'flows', label: 'Flows & deals' }];
   const chooseDesktopTab = (tab: string) => { setDesktopTab(tab); desktopScroll.current?.scrollTo({ top: 0 }); };
   const [preview, setPreview] = useState<HomeStockOption | null>(null);
   const [quotes, setQuotes] = useState<Record<string, HomeQuote | null>>({});
@@ -220,6 +223,11 @@ export function HomeWorkspace({
   // Mask during initial storage read, preventing a flash of balances on reopen.
   const privateBalances = !preferencesReady || preferences.privateBalances;
   const activeMarket = preferences.market;
+  const chooseMarket = (market: HomePreferences['market']) => {
+    updatePreferences({ ...preferences, market });
+    setSearch('');
+    setSearchFocused(false);
+  };
   const marketOptions = useMemo(() => stockOptions.filter(stock => isGlobalInstrumentKey(stock.instrumentKey) === (activeMarket === 'global')).sort(compareMarketInstruments), [activeMarket, stockOptions]);
   const visibleAttention = attention.filter(item => !isHomeReminderHidden(preferences, item, now));
   const hiddenAttention = attention.filter(item => isHomeReminderHidden(preferences, item, now));
@@ -332,11 +340,22 @@ export function HomeWorkspace({
   const loserLines = (shelf === "mcx" ? [] : board?.losers ?? []).map(quote => quoteLine(quote, seen)).filter((line): line is NonNullable<typeof line> => !!line).slice(0, 5);
 
   return (
-    <section className="home-workspace home-hub home-studio" data-market={activeMarket} data-desktop-visuals={desktop?"true":undefined} data-desktop-tab={desktopTab} aria-label="PaperTrade home">
+    <section className="home-workspace home-hub home-studio home-desk" data-market={activeMarket} data-desktop-visuals={desktop?"true":undefined} data-desktop-tab={activeMarket === 'india' ? desktopTab : 'overview'} aria-label="PaperTrade home">
       <div className="home-dashboard-scroll" ref={desktopScroll}>
-        <h1 className="home-overview-title">{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
-        <section className="home-hero">
-          <div className="home-hero-copy">
+        <header className="home-desk-header">
+          <div className="home-desk-heading">
+            {preferencesReady && <span className="home-desk-date">{homeDate.format(now)} · IST</span>}
+            <h1>{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
+          </div>
+          <div className="home-desk-markets" role="group" aria-label="Choose market and practice wallet">
+            <button type="button" aria-pressed={activeMarket === 'india'} onClick={() => chooseMarket('india')}>
+              <Landmark size={17} aria-hidden="true" /> Indian markets
+            </button>
+            <button type="button" aria-pressed={activeMarket === 'global'} onClick={() => chooseMarket('global')}>
+              <Globe2 size={17} aria-hidden="true" /> Global markets
+            </button>
+          </div>
+          <div className="home-desk-search">
             <div className="home-global-search" onBlur={event => { const next = event.relatedTarget as Node | null; if (next && (event.currentTarget.contains(next) || sheetRef.current?.contains(next))) return; if (sheetRef.current) return; setSearchFocused(false); setSearch(""); }} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
               <Search size={18} />
               <input value={search} onFocus={() => { setSearchFocused(true); setShelf(activeMarket === "global" ? "all" : "in"); }} onChange={(event) => { setSearchFocused(true); setSearch(event.target.value); }} placeholder={activeMarket === 'global' ? 'Search US, crypto, commodities…' : 'Search stocks, indices or MCX…'} aria-label={activeMarket === 'global' ? 'Search global markets' : 'Search Indian markets'} autoComplete="off" />
@@ -378,12 +397,7 @@ export function HomeWorkspace({
               )}
             </div>
           </div>
-        </section>
-
-        <section className="home-market-chooser" aria-label="Choose market and practice wallet">
-          <button className={activeMarket === 'india' ? 'active' : ''} aria-pressed={activeMarket === 'india'} onClick={() => { updatePreferences({ ...preferences, market: 'india' }); setSearch(''); setSearchFocused(false); }}><Landmark size={19}/><span><b>Indian markets</b><small>{'Stocks · F&O · MCX'}</small></span><em>₹</em></button>
-          <button className={activeMarket === 'global' ? 'active' : ''} aria-pressed={activeMarket === 'global'} onClick={() => { updatePreferences({ ...preferences, market: 'global' }); setSearch(''); setSearchFocused(false); }}><Globe2 size={19}/><span><b>Global markets</b><small>US · Crypto · Commodities</small></span><em>$</em></button>
-        </section>
+        </header>
 
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
           <div className="home-indices-heading"><h2>Indian indices</h2><span>{indices.some(index => index.price !== null) ? feedLive && indices.every(index => index.live) ? 'Live quotes' : 'Latest quotes' : 'Awaiting quotes'}</span></div>
@@ -418,9 +432,8 @@ export function HomeWorkspace({
           chooseDesktopTab(desktopTabs[next].id); buttons[next].focus();
         }}>{desktopTabs.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={desktopTab === tab.id} tabIndex={desktopTab === tab.id ? 0 : -1} onClick={() => chooseDesktopTab(tab.id)}>{tab.label}</button>)}</nav>}
 
-        {activeMarket === "india" && <div className="home-market-pair">
-          <MarketMovers onOpen={onOpenStock} inline={desktop} />
-          {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+        {activeMarket === 'india' && <div className="home-breadth-feature">
+          <IndiaPulse showGauges={!cards.market}/>
         </div>}
 
         <div className="home-main-grid home-main-grid-clean">
@@ -457,8 +470,12 @@ export function HomeWorkspace({
             <button onClick={() => onDesktopNavigate('news')}><Bell size={17}/><span><b>Market news</b><small>Latest company headlines</small></span><ChevronRight size={16}/></button>
           </div></section>}
         </div>
+        {activeMarket === "india" && <div className="home-market-pair">
+          <MarketMovers onOpen={onOpenStock} inline={desktop} />
+          {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+        </div>}
+
         {activeMarket === "india" ? <div className={`home-market-data${cards.market ? " has-derivatives" : ""}`}>
-          <IndiaPulse showGauges={!cards.market}/>
           {cards.market && <HomeDerivatives onOpenStock={onOpenStock} onOpenInstrument={onOpenInstrument}/>}
           <SectorHeat onOpen={onOpenStock} onWatch={id => { setSectorWatch(id); setSectorTick(tick => tick + 1); }} />
         </div> : <MarketDirectory key={activeMarket} market={activeMarket} instruments={marketOptions} onOpen={onOpenStock}/> }
