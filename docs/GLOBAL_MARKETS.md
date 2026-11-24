@@ -2,7 +2,21 @@
 
 Home → Bitcoin · Gold · Brent opens the workspace. Home search supports all three symbols; saved instruments appear among Home favourites. The NSE P&L screen links to the separate global history.
 
-## Instruments and sources
+## USD reference charts
+
+Home → Global → US markets, Crypto or Commodities lists USD reference instruments above Delta contracts. These are chart and replay instruments. The header shows the provider and the latest candle time. A candle close is a market-data observation, and feeds may be delayed or show the last available session.
+
+| Instrument | Primary | Automatic fallback |
+| --- | --- | --- |
+| US-listed shares, ADRs and ETFs | Alpaca IEX | Twelve Data |
+| USD spot crypto | Coinbase Exchange | Kraken |
+| XAU/USD spot gold | Twelve Data | OANDA practice midpoint |
+
+Crypto requests use public endpoints. Configure the stock and gold feeds with the server-side variables in `.env.example`. Twelve Data requires a plan that covers XAU/USD for gold. The OANDA practice account must have access to XAU_USD. Confirm that your providers' plans permit your app's display use and cover the required intervals. Some providers limit how far back intraday history goes. IEX is a single US venue, and crypto volume is specific to the exchange. Gold spot does not include exchange volume.
+
+The provider switch applies to the same USD instrument when the first source fails or returns no usable candles. The chart reports an outage when both sources fail. Reference data does not enter the Delta order, margin or funding calculations.
+
+## Derivatives and other instruments
 
 - BTCUSD and XAUTUSD use the public, read-only Delta Exchange India REST API. Gold is **tokenised Tether Gold**, not an XAU/USD spot or MCX contract.
 - Contract size, tick, margin scaling, position limits, fees and funding interval come from live product metadata. Current small-position maximum leverage is 200× BTC / 100× XAUT; larger positions have lower limits.

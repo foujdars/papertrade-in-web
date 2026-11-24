@@ -1,4 +1,7 @@
 "use client";
+
+import { comparisonRequest } from "@/lib/chart-compare";
+import { isGlobalReferenceKey } from "@/lib/global-reference";
 import { useTransientBack } from "./useTransientBack";
 import { CandleLoader } from "./CandleLoader";
 
@@ -61,7 +64,8 @@ export function useReplayController(instrument: Instrument | null, timeframe: st
     const controller = new AbortController();
     setLoading(true); setMessage("Loading replay…"); setSelecting(true); setPlaying(false); setHasStarted(false); setShowStart(false); setStartTime(null); setCursor(0);
     const params = new URLSearchParams({ instrumentKey: key, timeframe, scope: "combined" });
-    void fetch(`/api/upstox/candles?${params}`, { cache: "no-store", signal: controller.signal }).then(async (response) => {
+    const endpoint = isGlobalReferenceKey(key) ? comparisonRequest(key, timeframe) : `/api/upstox/candles?${params}`;
+    void fetch(endpoint, { cache: "no-store", signal: controller.signal }).then(async (response) => {
       const payload = await response.json() as { candles?: Candle[] };
       if (!response.ok || !payload.candles?.length) throw new Error("Historical candles are unavailable for this instrument and timeframe.");
       const snapshot = prepareReplayCandles(payload.candles);

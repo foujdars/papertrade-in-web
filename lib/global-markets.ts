@@ -1,3 +1,4 @@
+import { GLOBAL_REFERENCE_INSTRUMENTS, isGlobalReferenceKey } from "./global-reference.ts";
 import type { PaperBot } from "./paper-bot-state";
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
@@ -47,6 +48,7 @@ export const GLOBAL_INSTRUMENTS = [
 export const isGlobalSymbol = (value: string): value is GlobalSymbol =>
   (GLOBAL_SYMBOLS as readonly string[]).includes(value);
 export const GLOBAL_CHART_INSTRUMENTS: Instrument[] = [
+  ...GLOBAL_REFERENCE_INSTRUMENTS,
   {
     symbol: "BTCUSD",
     name: "Bitcoin perpetual",
@@ -101,7 +103,7 @@ export const deltaSymbolFromInstrumentKey = (
   return isDeltaPerpSymbol(symbol) ? symbol : null;
 };
 export const isGlobalInstrumentKey = (value?: string) =>
-  Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|"));
+  Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|") || isGlobalReferenceKey(value));
 export const deltaOptionSymbolFromInstrumentKey = (value?: string): string | null => {
   const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
   return isDeltaOptionSymbol(symbol) ? symbol : null;

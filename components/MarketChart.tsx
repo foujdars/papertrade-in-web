@@ -60,6 +60,7 @@ import { compareColor, compareQuote, formatCompareDelta, formatComparePrice } fr
 import { ChartProfileOverlay } from "@/lib/chart-profile-overlay";
 import { cachedChartCandles, prependChartCandles, candleBucket, candlesEqual, nearestCandleIndex, rememberChartCandles, trailingCandleUpdate, type ChartHistoryRequest } from "@/lib/chart-history";
 import { movingAverageWarmup } from '@/lib/indicator-discovery';
+import { isGlobalReferenceKey } from "@/lib/global-reference";
 import { comparisonRequest } from "@/lib/chart-compare";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
@@ -682,7 +683,8 @@ export function MarketChart({
   useEffect(() => {if(selectedStudy&&!indicators[selectedStudy])setSelectedStudy(null);}, [indicators,selectedStudy]);
   const [studySummaries, setStudySummaries] = useState<Array<{id:string;pane:number;top:number;message?:string;value?:number;extra?:number}>>([]);
   const isReplay = replayCandles !== undefined;
-  const externalFeed = externalCandles !== undefined || instrument.instrumentKey.startsWith("DELTA|");
+  const referenceFeed = isGlobalReferenceKey(instrument.instrumentKey);
+  const externalFeed = externalCandles !== undefined || instrument.instrumentKey.startsWith("DELTA|") || referenceFeed;
   const historyRequestRef = useRef(historyRequest); historyRequestRef.current = historyRequest;
   const [historyMessage, setHistoryMessage] = useState("");
   const [olderHistory, setOlderHistory] = useState<"idle" | "loading" | "error" | "end">("idle");
@@ -1935,8 +1937,8 @@ export function MarketChart({
         ...chartInteractionOptions(activeTool === "cursor", preservePageScroll),
         kineticScroll: { mouse: true, touch: true },
         localization: {
-          locale: instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN",
-          priceFormatter: (price: number) => price.toLocaleString(instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          locale: referenceFeed || instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN",
+          priceFormatter: (price: number) => price.toLocaleString(referenceFeed || instrument.instrumentKey?.startsWith("DELTA|") || instrument.instrumentKey?.startsWith("TVC|") ? "en-US" : "en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           timeFormatter: (time: Time) => chartDisplayTime(time, timeframe),
         },
       });
@@ -2293,7 +2295,7 @@ export function MarketChart({
           const shift = usesIntradayAxisShift(timeframe) ? IST_OFFSET_SECONDS : 0;
           const interval = LIVE_TIMEFRAME_SECONDS[timeframe] ?? ({ "1D":86400, "1W":604800, "1M":2678400, "1Y":31622400 }[timeframe] ?? 86400);
           const period = profilePeriod(from-shift, to-shift, mode, dataRef.current.map(c => Number(c.time)), interval, timeframe);
-          if (isReplay || externalFeed) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} ${externalFeed?'Delta':'replay'} volume · estimated distribution` };
+          if (isReplay || externalFeed) return { candles: dataRef.current.filter(c => Number(c.time)>=period.from && Number(c.time)<=period.to).map(c=>({...c,time:Number(c.time)})), label: `${timeframe} ${referenceFeed?'reference':externalFeed?'Delta':'replay'} volume · estimated distribution` };
           // Profiles are independent of the quote feed: no profile candle can change a fill price.
           return profileClient!.read(period.from, Math.min(period.to, Math.floor(Date.now()/60000)*60), id);
         }, {timeframe,calendarOffset:externalFeed?0:IST_OFFSET_SECONDS});

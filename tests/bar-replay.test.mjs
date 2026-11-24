@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import ts from "typescript";
+import { comparisonRequest } from "../lib/chart-compare.ts";
+import { isGlobalReferenceKey } from "../lib/global-reference.ts";
 import { prepareReplayCandles, replayTrade, replayPnl, emptyReplayAccount } from "../lib/bar-replay.ts";
 
 const bar = (time, close) => ({ time, open: close, high: close + 2, low: close - 2, close, volume: 100 });
@@ -29,6 +31,8 @@ test("replay previews, confirms and starts on the chosen candle without showing 
     "./useDesktopChartBrowser": { useDesktopChartBrowser: () => false },
     "@/components/MarketChart": { MarketChart: chart, DEFAULT_CHART_INDICATORS: {} },
     "@/components/ChartFunctionMenu": {}, "@/components/CompactSelectors": {}, "@/components/StockLogo": {},
+    "@/lib/chart-compare": { comparisonRequest },
+    "@/lib/global-reference": { isGlobalReferenceKey },
     "@/lib/market": { formatInr: String },
     "@/lib/bar-replay": { emptyReplayAccount, replayTrade, prepareReplayCandles, replayPnl },
     "@/lib/chart-view-preferences": { useChartPreference: key => [preferences[key], () => {}] },

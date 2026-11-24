@@ -1,3 +1,4 @@
+import { isGlobalReferenceKey } from "./global-reference.ts";
 import { MARKET_GREEN } from "./market-colours.ts";
 import type { Candle } from "./market";
 
@@ -108,6 +109,9 @@ export function formatCompareDelta(value: number) {
 }
 
 export function comparisonRequest(instrumentKey: string, timeframe: string) {
+  if (isGlobalReferenceKey(instrumentKey)) {
+    return `/api/global-reference?${new URLSearchParams({ symbol: instrumentKey.slice(4), timeframe })}`;
+  }
   if (instrumentKey.startsWith("DELTA|")) {
     return `/api/global-markets?${new URLSearchParams({ symbol: instrumentKey.slice(6), mode: "candles", timeframe })}`;
   }
@@ -122,4 +126,4 @@ export function compareColor(index: number) {
   return COMPARE_COLORS[index % COMPARE_COLORS.length];
 }
 
-export const COMPARE_SUGGESTIONS = ["NIFTY", "BANKNIFTY", "SENSEX", "SPYXUSD", "QQQXUSD", "BTCUSD", "ETHUSD", "XAUTUSD"];
+export const COMPARE_SUGGESTIONS = ["NIFTY", "BANKNIFTY", "SENSEX", "SPY", "QQQ", "BTC-USD", "ETH-USD", "XAUUSD"];
