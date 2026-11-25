@@ -2,6 +2,7 @@ name: Android debug APK
 on:
   push:
     branches: [codex/android-vercel-url]
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
