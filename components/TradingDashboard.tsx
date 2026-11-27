@@ -69,6 +69,11 @@ import { isGlobalReferenceKey } from '@/lib/global-reference';
 import { comparisonRequest } from '@/lib/chart-compare';
 import { GLOBAL_CHART_INSTRUMENTS, deltaOptionSymbolFromInstrumentKey, deltaSymbolFromInstrumentKey, isGlobalInstrumentKey, type PerpQuote, type PerpSymbol } from '@/lib/global-markets';
 import { GlobalOptionTicket } from './GlobalOptionTicket';
+import { OptionDeskContext, type BuilderContext, type BasketOrder } from "./OptionDeskContext";
+import { StrategyDialog } from "./OptionStrategyButton";
+import { ChainOrderDialog } from "./ChainOrderDialog";
+import { fillDeltaBasket, fillIndianBasket, type IndianBook } from "@/lib/option-basket-orders";
+import type { OptionSnapshot } from "@/lib/global-option-orders";
 import { optionPnl, freshOptionQuote, moveOptionChartLevel, closeOption } from '@/lib/global-option-orders';
 import { positionPnl, freshPerpQuote, closePerp } from '@/lib/global-markets';
 import { globalChartLevels, moveGlobalChartLevel } from '@/lib/global-chart-risk';
@@ -413,12 +418,18 @@ function ApiSettings({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function TradingDashboard() {
+export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilder?: BuilderContext } = {}) {
+  const [entryBuilder, setEntryBuilder] = useState(initialOptionBuilder);
+  const [chainOrder, setChainOrder] = useState<BasketOrder | null>(null);
   const desktopBrowser = useDesktopBrowser();
   const desktopChartBrowser = useDesktopChartBrowser();
   const exchangeSession = useNseSession();
   const mcxSession = useNseSession("MCX");
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
+  const placingBasket = useRef(false);
+  const walletOwner = user?.id ?? "guest";
+  const activeWalletOwner = useRef(walletOwner);
+  useEffect(() => { activeWalletOwner.current = walletOwner; }, [walletOwner]);
   const userPreferenceKey = `${UI_PREFERENCES_STORAGE_KEY}:${user?.id ?? "guest"}`;
   const [selected, setSelected] = useState<Instrument>(instruments[0]);
   const [newsOpen, setNewsOpen] = useState(false);
@@ -2473,6 +2484,76 @@ export function TradingDashboard() {
     setIndicators((current) => ({ ...current, [name]: !current[name] }));
   }
 
+  async function submitOptionBasket(order: BasketOrder) {
+    if (placingBasket.current) throw new Error("A paper basket is already being placed.");
+    placingBasket.current = true;
+    try { await placeOptionBasket(order); } finally { placingBasket.current = false; }
+  }
+
+  async function placeOptionBasket(order: BasketOrder) {
+    const owner = walletOwner;
+    if (!order.legs.length) throw new Error("Select at least one option.");
+    if (order.market === "crypto" || order.market === "tokens") {
+      const entries = await Promise.all(order.legs.map(async ({contract}) => {
+        const resp = await fetch("/api/global-markets?" + new URLSearchParams({symbol:contract.id}), {cache:"no-store",signal:AbortSignal.timeout(12_000)});
+        const data = await resp.json();
+        if (!resp.ok || !data.ok || data.kind !== "option" || !data.spec || !data.quote) throw new Error("Fresh Delta quotes are unavailable for " + contract.id + ".");
+        return [contract.id, {spec:data.spec,quote:data.quote}] as const;
+      }));
+      if (activeWalletOwner.current !== owner) throw new Error("The paper account changed. Review the basket again.");
+      const snapshots: Record<string, OptionSnapshot> = Object.fromEntries(entries);
+      let reason = "";
+      const saved = await globalTrading.transact(account => {
+        try { return fillDeltaBasket(account, order, snapshots, Date.now()); }
+        catch (error) { reason = error instanceof Error ? error.message : "The basket could not be filled."; throw error; }
+      });
+      if (!saved) throw new Error(reason || "The USD wallet could not confirm the basket. Check your orders before retrying.");
+    } else {
+      if (!paperDataReady) throw new Error("Wait for the INR paper account to load.");
+      const sample = {instrumentKey: order.legs[0].contract.id, categories: [] as string[], underlyingSymbol: order.rootLabel};
+      const checkSession = (at: Date) => {
+        const status = indianInstrumentStatus(sample, at, exchangeSession, mcxSession);
+        if (!status.isOpen || order.expiry.slice(0,10) < indiaDateKey(at)) throw new Error("The selected option is outside its trading session.");
+      };
+      checkSession(new Date());
+      const params = new URLSearchParams({keys:order.legs.map(leg=>leg.contract.id).join(","),depth:"1"});
+      const resp = await fetch("/api/upstox/quotes?" + params, {cache:"no-store",signal:AbortSignal.timeout(12_000)});
+      const data = await resp.json();
+      if (!resp.ok || !data.ok || !data.books) throw new Error("Live Upstox order-book quotes are unavailable.");
+      if (!navigator.locks) throw new Error("The browser could not lock the paper wallet for this order.");
+      await navigator.locks.request("papertrade-inr-option-orders", () => {
+        if (activeWalletOwner.current !== owner) throw new Error("The paper account changed. Review the basket again.");
+        const now = Date.now();
+        checkSession(new Date(now));
+        const before = localStorage.getItem("papertrade-balance");
+        const currentOrders = readPaperOrders();
+        const next = fillIndianBasket(order, data.books as Record<string, IndianBook>, Number(before ?? "1000000"), now, crypto.randomUUID());
+        const nextOrders = [...next.fills].reverse().concat(currentOrders);
+        localStorage.setItem("papertrade-balance", String(next.balance));
+        try { writePaperOrders(nextOrders); }
+        catch (error) {
+          if (before === null) localStorage.removeItem("papertrade-balance"); else localStorage.setItem("papertrade-balance", before);
+          throw error;
+        }
+        setOrders(nextOrders); setBalance(next.balance);
+        const entered = next.fills.map((fill): Instrument => ({
+          symbol:fill.symbol, name:fill.instrumentName ?? fill.symbol, exchange:order.market === "metals" ? "MCX" : "NSE",
+          instrumentKey:fill.instrumentKey!, price:fill.price, change:0, categories:[], assetType:"OPTION", optionType:fill.optionType,
+          lotSize:fill.lotSize, strikePrice:fill.strikePrice, expiry:fill.expiry, underlyingKey:fill.underlyingKey, underlyingSymbol:fill.underlyingSymbol,
+        }));
+        setDerivativeInstruments(old => [...entered, ...old.filter(item => !entered.some(leg => leg.instrumentKey === item.instrumentKey))]);
+      });
+    }
+    setToast(order.legs.length === 1 ? "Paper option order filled." : "Paper strategy basket filled.");
+  }
+
+  function tradeDeltaFromChain(symbol: string, side: "BUY" | "SELL") {
+    const item = globalInstruments.find(instrument => instrument.symbol === symbol && instrument.assetType === "OPTION");
+    if (!item) { setToast("This option is no longer listed."); return; }
+    openNavigationSection("trade"); chooseTradeInstrument(item);
+    setSide(side); setOrderType("Market"); setGlobalTicketTab("Order"); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true);
+  }
+
   function chooseTradeInstrument(item: Instrument) {
     setDeltaOptionListOpen(false);
     setDesktopChartWatchlistOpen(false);
@@ -2914,7 +2995,13 @@ export function TradingDashboard() {
   };
   return (
     <StockLogoProvider instruments={tradingUniverse}>
+    <OptionDeskContext.Provider value={{ tradeDelta: tradeDeltaFromChain, placeBasket: submitOptionBasket, openIndianOrder: setChainOrder, chartMcx: item => {
+      openNavigationSection("trade"); chooseTradeInstrument(item); setWorkspaceMode("trade"); setSpotInstrument(null);
+      setDerivativeInstruments(old => [item, ...old.filter(contract => contract.instrumentKey !== item.instrumentKey)]);
+    } }}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-desktop-cleanup={desktopBrowser ? "true" : undefined} data-section={desktopBrowser && positionsOpen ? "positions" : activeNavigationSection}>
+      {entryBuilder && <StrategyDialog context={entryBuilder} onClose={() => setEntryBuilder(undefined)}/>}
+      {chainOrder && <ChainOrderDialog order={chainOrder} onClose={() => setChainOrder(null)}/>}
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
       <SessionOpenAlerts />
       <PaperTradeToneListener />
@@ -3675,6 +3762,7 @@ export function TradingDashboard() {
       )}
       {toast && <div className="toast" role="status" aria-live="polite"><Target size={18} /> {toast}</div>}
     </main>
+    </OptionDeskContext.Provider>
     </StockLogoProvider>
   );
 }

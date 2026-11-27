@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CandlestickChart } from "lucide-react";
-import { deltaOptionDirectory, deltaOptionStrikes, type ListedDeltaOption } from "@/lib/delta-option-list";
+import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { OptionChainTable } from "./OptionChainTable";
+import { OptionStrategyButton } from "./OptionStrategyButton";
+import { useOptionDesk } from "./OptionDeskContext";
+import { startVisiblePolling } from "@/lib/visible-polling";
+import { loadSpreadChain } from "@/lib/spread-chain-client";
+import type { SpreadChain, SpreadContract } from "@/lib/vertical-spread";
+import { deltaOptionDirectory, type ListedDeltaOption } from "@/lib/delta-option-list";
 
 const expiryLabel = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
-const strikeLabel = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 6 });
 
 export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selectedSymbol, onOpen }: {
   instruments: readonly ListedDeltaOption[];
@@ -22,7 +27,25 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
   const contracts = byRoot.get(root) ?? [];
   const expiries = [...new Set(contracts.map(item => item.expiry))].sort();
   const expiry = expiries.includes(requestedExpiry) ? requestedExpiry : expiries[0] ?? "";
-  const rows = deltaOptionStrikes(contracts, expiry);
+  const desk = useOptionDesk();
+  const [reload, setReload] = useState(0);
+  const [feed, setFeed] = useState<{ key: string; chain?: SpreadChain; error?: string }>();
+  const key = root + ":" + expiry;
+  const market = root === "BTC" || root === "ETH" ? "crypto" : "tokens";
+  useEffect(() => {
+    if (!root || !expiry) return;
+    return startVisiblePolling(async signal => {
+      const chain = await loadSpreadChain(market, root, undefined, expiry, signal);
+      if (!signal.aborted) setFeed({key,chain});
+    }, 20_000, () => setFeed({key,error:"Option quotes are unavailable."}));
+  }, [root, expiry, key, market, reload]);
+  const live = feed?.key === key ? feed : undefined;
+  const book = useMemo(() => {
+    const quotes = new Map(live?.chain?.contracts.map(item => [item.id, item]));
+    return (byRoot.get(root) ?? []).filter(item => item.expiry === expiry).map((item): SpreadContract =>
+      quotes.get(item.symbol) ?? { id: item.symbol, series: expiry, strike: item.strikePrice, kind: item.optionType,
+        multiplier: null, bid: null, ask: null, last: null });
+  }, [byRoot, root, expiry, live]);
   if (!roots.length) return <p className="delta-options-empty" role="status">No listed options</p>;
   return <div className="delta-options">
     <div className="delta-options-controls">
@@ -33,15 +56,12 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
         {expiries.map(value => <option key={value} value={value}>{expiryLabel.format(Date.parse(value))}</option>)}
       </select></label>
     </div>
-    <div className="delta-options-scroll" role="region" aria-label={`${root} option contracts`} tabIndex={0}>
-      <table className="delta-options-table">
-        <thead><tr><th scope="col">Call chart</th><th scope="col">Strike</th><th scope="col">Put chart</th></tr></thead>
-        <tbody>{rows.map(row => <tr key={row.strike}>
-          <td>{row.CE ? <button type="button" aria-pressed={selectedSymbol === row.CE.symbol} aria-label={`Open ${root} ${row.strike} call chart`} onClick={() => onOpen(row.CE!.symbol)}><CandlestickChart size={15} aria-hidden="true" /> Call</button> : "—"}</td>
-          <th scope="row">{strikeLabel.format(row.strike)}</th>
-          <td>{row.PE ? <button type="button" aria-pressed={selectedSymbol === row.PE.symbol} aria-label={`Open ${root} ${row.strike} put chart`} onClick={() => onOpen(row.PE!.symbol)}><CandlestickChart size={15} aria-hidden="true" /> Put</button> : "—"}</td>
-        </tr>)}</tbody>
-      </table>
+    <div className="chain-sheet-tools">
+      <OptionStrategyButton context={{initialMarket: market, initialRoot: root, initialExpiry: expiry}}/>
+      <button type="button" title="Refresh option quotes" aria-label="Refresh option quotes" onClick={() => setReload(value => value + 1)}><RefreshCw size={16}/></button>
     </div>
+    {(!live || live.error || live.chain?.quoteWarning) && <p className="delta-options-empty" role="status">{live?.error ?? live?.chain?.quoteWarning ?? "Loading quotes…"}</p>}
+    <OptionChainTable contracts={book} reference={live?.chain?.reference ?? null} currency="USD" selected={selectedSymbol} focusAtm
+      onChart={contract => onOpen(contract.id)} onSide={(contract, side) => desk?.tradeDelta(contract.id, side)}/>
   </div>;
 }

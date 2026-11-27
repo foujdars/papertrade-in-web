@@ -50,7 +50,7 @@ export function mcxSpreadDirectory(master: McxOptionMasterRow[], root: McxSpread
     const id = futureKey ? `${expiry}~${futureKey}` : expiry;
     const future = futureKey ? futures.get(futureKey) : undefined;
     series.set(id, { id, expiry, detail: future?.trading_symbol, futureKey });
-    contracts.set(key, { id: key, series: id, strike, kind, multiplier: MCX_SPREAD_PRODUCTS[root].multiplier, bid: null, ask: null, last: null });
+    contracts.set(key, { id: key, symbol: row.trading_symbol, exchangeLot: positiveQuote(row.lot_size) ?? undefined, series: id, strike, kind, multiplier: MCX_SPREAD_PRODUCTS[root].multiplier, bid: null, ask: null, last: null });
   }
 
   return {

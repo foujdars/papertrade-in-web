@@ -1,37 +1,46 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { X } from "lucide-react";
+import { ChartNoAxesCombined, X } from "lucide-react";
 import { AppDialog } from "./AppDialog";
 import { deltaOptionRoot } from "@/lib/global-contracts";
 import type { Instrument } from "@/lib/market";
+import type { BuilderContext } from "./OptionDeskContext";
 
 const Builder = dynamic(() => import("./OptionSpreadBuilder").then(module => module.OptionSpreadBuilder));
 
-function PayoffIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 4v16h18" opacity=".5" /><path d="M5 16h4l6-10h6" />
-  </svg>;
+export function StrategyDialog({ context, onClose, returnFocus }: {
+  context: BuilderContext; onClose: () => void; returnFocus?: RefObject<HTMLElement | null>;
+}) {
+  return <AppDialog className="spread-dialog" label="Option Strategy Builder" returnFocus={returnFocus} containEscape onClose={onClose}>
+    <header className="spread-dialog-heading">
+      <span className="spread-dialog-mark"><ChartNoAxesCombined size={20} aria-hidden="true"/></span>
+      <h2>Strategy builder</h2>
+      <button className="spread-close" type="button" aria-label="Close Strategy Builder" onClick={onClose}><X size={18}/></button>
+    </header>
+    <Builder embedded {...context}/>
+  </AppDialog>;
 }
 
-export function OptionStrategyButton({ option }: { option: Instrument }) {
+export function OptionStrategyButton(props: { option: Instrument } | { context: BuilderContext }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const root = option.exchange === "DELTA" ? deltaOptionRoot(option.symbol) : null;
-  const market = root ? (["BTC", "ETH"].includes(root) ? "crypto" : "tokens") : "india";
+  let context: BuilderContext;
+  if ("context" in props) context = props.context;
+  else {
+    const option = props.option;
+    const root = option.exchange === "DELTA" ? deltaOptionRoot(option.symbol) : null;
+    context = { initialMarket: root ? (["BTC", "ETH"].includes(root) ? "crypto" : "tokens") : "india",
+      initialRoot: root ?? option.underlyingKey ?? "", initialExpiry: option.expiry ?? "", initialStrike: option.strikePrice, initialKind: option.optionType };
+  }
   return <>
-    <button ref={trigger} type="button" className="option-strategy-trigger" onClick={() => setOpen(true)} title="Strategy Builder" aria-label="Open Strategy Builder" aria-haspopup="dialog" aria-expanded={open}>
-      <PayoffIcon />
+    <button ref={trigger} type="button" className="option-strategy-trigger" onClick={() => setOpen(true)}
+      title="Strategy builder" aria-label="Open Strategy Builder" aria-haspopup="dialog" aria-expanded={open}>
+      <ChartNoAxesCombined size={18} aria-hidden="true"/><span>Strategy</span>
     </button>
-    {open && createPortal(<AppDialog className="spread-dialog" label="Option Strategy Builder" returnFocus={trigger} onClose={() => setOpen(false)}>
-      <header className="spread-dialog-heading">
-        <span className="spread-dialog-mark"><PayoffIcon /></span>
-        <h2>Option Strategy Builder</h2>
-        <button className="spread-close" type="button" aria-label="Close Strategy Builder" onClick={() => setOpen(false)}><X size={18} /></button>
-      </header>
-      <Builder embedded initialMarket={market} initialRoot={root ?? option.underlyingKey ?? ""} initialExpiry={option.expiry ?? ""} initialStrike={option.strikePrice} initialKind={option.optionType} />
-    </AppDialog>, trigger.current?.closest(".terminal-shell") ?? document.body)}
+    {open && createPortal(<StrategyDialog context={context} returnFocus={trigger} onClose={() => setOpen(false)}/>,
+      trigger.current?.closest(".terminal-shell") ?? document.body)}
   </>;
 }

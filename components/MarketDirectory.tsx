@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, Bitcoin, CandlestickChart, Gem, Landmark } from "lucide-react";
 import { StockLogo } from "@/components/StockLogo";
 import { compareMarketInstruments, marketDisplayName, marketGroup, marketProductLabel, marketTicker, type DirectoryInstrument, type MarketGroup } from "@/lib/market-directory";
-import { deltaChartOptionRoot, deltaOptionDirectory, isTokenisedDelta, type ListedDeltaOption } from "@/lib/delta-option-list";
+import { deltaChartOptionRoot, deltaOptionDirectory, type ListedDeltaOption } from "@/lib/delta-option-list";
 import { DeltaOptionList } from "./DeltaOptionList";
 
 const globalTabs = [{ key: "us", label: "US markets", icon: Landmark }, { key: "crypto", label: "Crypto", icon: Bitcoin }, { key: "commodities", label: "Commodities", icon: Gem }] as const;
@@ -15,7 +15,7 @@ export function MarketDirectory({ market, instruments, onOpen }: { market: "indi
   const universe = useMemo(() => instruments.filter(item => item.assetType !== "OPTION" && !item.categories.includes("DATED_FUTURE")).sort(compareMarketInstruments), [instruments]);
   const selected = market === "india" ? "india" : group;
   const matches = universe.filter(item => marketGroup(item) === selected && (market !== "india" || (indianType === "mcx" ? item.instrumentKey?.startsWith("MCX_FO|") : indianType === "indices" ? item.assetType === "INDEX" : item.assetType !== "INDEX" && !item.instrumentKey?.startsWith("MCX_FO|"))));
-  const tokenOptions = useMemo(() => instruments.filter(item => item.assetType === "OPTION" && item.instrumentKey?.startsWith("DELTA|") && isTokenisedDelta(item)), [instruments]);
+  const tokenOptions = useMemo(() => instruments.filter(item => item.assetType === "OPTION" && item.instrumentKey?.startsWith("DELTA|")), [instruments]);
   const optionRoots = useMemo(() => deltaOptionDirectory(tokenOptions), [tokenOptions]);
   const switchGroup = (next: MarketGroup | "options") => { setGroup(next); setLimit(8); };
   return <section className="home-section market-directory" aria-label={market === "india" ? "Browse Indian markets" : "Browse global markets"}>

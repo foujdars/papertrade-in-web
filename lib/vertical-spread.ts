@@ -3,6 +3,8 @@ export type OptionKind = "CE" | "PE";
 export type SpreadContract = {
   id: string;
   series: string;
+  symbol?: string;
+  exchangeLot?: number;
   strike: number;
   kind: OptionKind;
   multiplier: number | null;

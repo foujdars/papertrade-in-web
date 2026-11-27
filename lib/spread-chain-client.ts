@@ -44,7 +44,7 @@ export function normalizeNseSpreadChain(rows: OptionChainRow[], series: string):
   return {
     contracts: rows.filter(row => row.expiry === series && positiveQuote(row.strikePrice)).flatMap(row =>
       [row.call, row.put].flatMap(contract => contract ? [{
-        id: contract.instrumentKey, series, strike: row.strikePrice, kind: contract.optionType,
+        id: contract.instrumentKey, symbol: contract.tradingSymbol, exchangeLot: contract.lotSizeVerified ? contract.lotSize : undefined, series, strike: row.strikePrice, kind: contract.optionType,
         multiplier: contract.lotSizeVerified ? contract.lotSize : null,
         ...bookPrices(contract.marketData.bidPrice, contract.marketData.askPrice, contract.marketData.bidQty, contract.marketData.askQty),
         last: positiveQuote(contract.marketData.ltp),

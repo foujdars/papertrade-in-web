@@ -204,3 +204,96 @@
   .market-directory-tabs { flex-wrap: wrap; }
   .delta-options-controls select { font-size: 16px; }
 }
+
+.terminal-shell[data-platform][data-section] .fno-chart-card.fno-chart-with-tools { grid-template-rows: max-content minmax(0,1fr); }
+.terminal-shell[data-platform][data-section] .fno-chart-card.fno-chart-with-tools > header {
+  position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0,1fr) max-content; align-items: center;
+  gap: 4px 8px; width: 100%; height: auto; min-height: 44px; box-sizing: border-box; padding: 5px 8px;
+  background: var(--surface); color: var(--ink); border-bottom: 1px solid var(--line);
+}
+.terminal-shell .fno-chart-with-tools > header > :first-child { min-width: 0; overflow: hidden; }
+.terminal-shell .fno-chart-with-tools .fno-instrument-switch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-shell .fno-chart-with-tools > header > .fno-chart-actions {
+  display: flex; flex-flow: row nowrap; align-items: center; justify-content: end; gap: 4px; min-width: 0; overflow: visible;
+}
+.terminal-shell .fno-chart-with-tools .fno-chart-actions > button, .option-strategy-trigger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; position: static;
+  width: auto; min-width: 34px; max-width: none; height: 36px; min-height: 36px; flex: 0 0 auto; padding: 0 7px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface);
+  font: inherit; font-size: 11px; font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap;
+}
+.terminal-shell .fno-chart-with-tools .fno-chart-actions .option-strategy-trigger, .option-strategy-trigger {
+  background: var(--purple-soft); color: var(--purple); border-color: color-mix(in srgb,var(--purple) 38%,var(--line));
+}
+.terminal-shell .fno-chart-actions button svg, .option-strategy-trigger svg { display: block; flex: none; visibility: visible; opacity: 1; stroke: currentColor; }
+.terminal-shell .fno-chart-actions button span { display: inline; font: inherit; color: inherit; }
+.terminal-shell .fno-chart-with-tools .fno-clean-chart { position: relative; z-index: 0; isolation: isolate; overflow: hidden; min-height: 0; }
+@media (max-width: 520px) {
+  .terminal-shell[data-platform][data-section] .fno-chart-card.fno-chart-with-tools > header { grid-template-columns: minmax(0,1fr); }
+  .terminal-shell .fno-chart-with-tools > header > :first-child { flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
+  .terminal-shell .fno-chart-with-tools > header > :first-child > span { flex: none; }
+}
+.terminal-shell .option-chain-sheet:has(.option-sheet-book) { grid-template-rows: 22px auto auto minmax(0,1fr); }
+.option-sheet-book { overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
+.chain-sheet-tools, .basket-title, .basket-total { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chain-sheet-tools { justify-content: end; padding: 4px 8px 8px; }
+.chain-sheet-tools > button { min-height: 34px; padding-inline: 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); }
+.chain-grid-scroll { position: relative; max-height: min(58dvh,580px); min-width: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 9px; }
+.option-sheet-book > .chain-grid-scroll { max-height: none; height: 100%; border-radius: 0; }
+.chain-grid { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums; text-align: center; }
+.chain-grid .chain-strike-col { width: 18%; }
+.chain-grid :is(td,th) { border: 0; border-bottom: 1px solid var(--line); padding: 5px 4px; vertical-align: middle; }
+.chain-grid thead th { position: sticky; top: 0; z-index: 1; padding-block: 7px; font-size: 13px; background: var(--surface); color: var(--ink); }
+.chain-grid th small { display: block; color: var(--muted); font-size: 10px; line-height: 1.25; font-weight: 550; }
+.chain-grid tbody th { font-size: 12px; background: var(--soft); overflow-wrap: anywhere; }
+.chain-grid tr[data-atm="true"] > th { background: var(--purple-soft); color: var(--purple); }
+.chain-grid tr[data-atm="true"] > th small { color: inherit; }
+.chain-contract { display: grid; justify-items: stretch; gap: 2px; }
+.chain-quotes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px; }
+.chain-grid .chain-quotes button { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; align-items: center; gap: 1px 4px;
+  width: 100%; min-width: 0; min-height: 35px; padding: 3px 2px; border: 1px solid transparent; border-radius: 6px;
+  font: inherit; font-size: 11px; line-height: 1.15; font-weight: 640; background: color-mix(in srgb,currentColor 9%,var(--surface)); cursor: pointer; }
+.chain-grid .chain-quotes [data-side="BUY"], .basket-leg-name [data-side="BUY"] { color: var(--green,#087957); }
+.chain-grid .chain-quotes [data-side="SELL"], .basket-leg-name [data-side="SELL"] { color: var(--red,#ac3748); }
+.chain-grid .chain-quotes button[aria-pressed="true"] { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+.chain-grid .chain-quotes button:disabled { color: var(--muted); background: var(--soft); opacity: .65; cursor: default; }
+.chain-quotes button span { min-width: 0; overflow-wrap: anywhere; }
+.chain-grid .chain-chart, .chain-last { display: inline-flex; gap: 4px; align-items: center; justify-content: center; justify-self: center; color: var(--muted); font: inherit; font-size: 10px; line-height: 1.2; }
+.chain-grid .chain-chart { min-height: 24px; padding: 2px 5px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+.chain-grid .chain-chart[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.chain-grid button:focus-visible, .chain-grid-scroll:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.basket-desk { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(0,1fr); grid-template-areas: "chain basket" "chain payoff"; gap: var(--spread-gap); align-items: start; }
+.basket-chain { grid-area: chain; }.basket-selection { grid-area: basket; }.basket-payoff { grid-area: payoff; }
+.basket-title { margin-bottom: 10px; }.basket-title h2 { margin: 0; }
+.basket-title :is(button,select) { min-height: 32px; width: auto; max-width: 59%; font-size: 12px; }
+.basket-pricing { margin-bottom: 10px; }
+.basket-views, .spread-builder .basket-mobile-review { display: none; }
+.basket-leg { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(38px,.65fr) minmax(0,1fr) 30px; align-items: center; gap: 6px; padding: 7px 0; border-top: 1px solid var(--line); }
+.basket-leg-name { min-width: 0; display: grid; justify-items: start; gap: 2px; }.basket-leg-name strong,.basket-leg-price strong { font-size: 12px; overflow-wrap: anywhere; }
+.basket-leg-name b { font-size: 11px; }.basket-leg label,.basket-leg-price small { color: var(--muted); font-size: 10px; }
+.basket-leg-price { display: grid; justify-items: end; }
+.basket-leg input[type="number"] { min-height: 32px; padding: 4px; font-size: 13px; }
+.basket-leg .basket-remove { display: grid; place-content: center; min-height: 32px; padding: 3px; color: var(--muted); background: transparent; }
+.basket-total { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.spread-builder button.basket-primary, .spread-builder button.basket-mobile-review { width: 100%; background: var(--purple); color: white; border-color: transparent; }
+.basket-confirm { display: grid; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; }
+.basket-confirm > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; }.basket-confirm small { color: var(--muted); }
+.basket-payoff .spread-risk-plan { margin-top: 12px; }
+@media (max-width: 790px) {
+  .basket-desk { display: block; }.basket-views { position: sticky; top: -1px; z-index: 2; display: grid; grid-template-columns: repeat(3,1fr); background: var(--surface); margin-bottom: 8px; padding-block: 3px; gap: 4px; }
+  .basket-views button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 2px; }
+  .basket-views b { font-size: 10px; padding-inline: 4px; }
+  .basket-desk:not([data-view="chain"]) .basket-chain, .basket-desk:not([data-view="basket"]) .basket-selection, .basket-desk:not([data-view="payoff"]) .basket-payoff { display: none; }
+  .spread-builder .basket-mobile-review { display: block; margin-top: 7px; }
+}
+@media (max-width: 450px) {
+  .chain-grid :is(td,th) { padding-inline: 2px; }.chain-grid .chain-strike-col { width: 17%; }
+  .chain-grid .chain-quotes button { flex-direction: column; min-height: 39px; font-size: 10px; }
+  .basket-chain { padding: 8px; }.basket-title h2 { font-size: 15px; }
+}
+
+.chain-order-dialog { width: min(350px,calc(100% - 24px)); padding: 18px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.chain-order-dialog h2 { margin: 0; font-size: 18px; }.chain-order-dialog p { margin: 8px 0; font-size: 13px; }
+.chain-order-dialog label { display: grid; gap: 5px; font-size: 12px; }.chain-order-dialog input { min-height: 38px; padding-inline: 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; }
+.chain-order-dialog .basket-primary { width: 100%; padding: 9px; background: var(--purple); color: white; border: 0; border-radius: 7px; }
+.chain-contract[data-current="true"] { box-shadow: inset 0 -2px var(--purple); border-radius: 4px; }
