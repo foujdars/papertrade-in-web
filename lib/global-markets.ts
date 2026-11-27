@@ -126,6 +126,7 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
           strikePrice: spec.strike,
           expiry: new Date(spec.expiry).toISOString(),
           lotSize: 1,
+          contractMultiplier: spec.lot,
           underlyingSymbol: spec.underlying,
         });
       } catch { /* Never list an option without validated contract rules. */ }

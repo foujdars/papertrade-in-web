@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { ModernSelect } from "./ModernSelect";
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
@@ -98,7 +99,9 @@ export function OptionChainSheet({
       <section className="option-chain-sheet" style={{ height: `${sheetHeight}dvh` }} role="dialog" aria-modal="true" aria-label={`${underlying.symbol} option chain`}>
         <button className="option-sheet-handle" onPointerDown={beginSheetDrag} aria-label="Drag option chain up or down"><span /></button>
         <header className="option-sheet-header">
-          <div><span className="eyebrow">NSE option chain</span><h2 className="stock-identity"><StockLogo symbol={underlying.symbol} instrumentKey={underlying.instrumentKey} size={26} />{underlying.symbol}</h2><small>Spot {spotPrice ? formatInr(spotPrice) : "—"}</small></div>
+          <div><span className="eyebrow">NSE option chain</span><h2 className="stock-identity"><StockLogo symbol={underlying.symbol} instrumentKey={underlying.instrumentKey} size={26} />{underlying.symbol}</h2><small>Spot {spotPrice ? formatInr(spotPrice) : "—"}</small>
+            <Link className="spread-entry-link" href={{ pathname: "/strategy-builder", query: { underlying: underlying.instrumentKey, expiry } }}>Strategy Builder</Link>
+          </div>
           <label>Expiry<ModernSelect hideLabel label="Expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(value=>({value,label:new Date(`${value}T00:00:00`).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}))} onChange={value=>{setLoading(true);setError("");setRows([]);setExpiry(value);}}/></label>
           <button className="icon-button" onClick={onClose} aria-label="Close option chain"><X size={20} /></button>
         </header>

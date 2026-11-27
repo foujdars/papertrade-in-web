@@ -58,11 +58,13 @@ function normalizeExpiry(value: string | number | undefined) {
 function normalizeSide(side: ChainSide | undefined, contract: UpstoxOptionContract | undefined, optionType: "CE" | "PE") {
   const instrumentKey = side?.instrument_key ?? contract?.instrument_key;
   if (!instrumentKey) return null;
+  const lotSize = finite(contract?.lot_size);
   return {
     instrumentKey,
     tradingSymbol: contract?.trading_symbol?.trim() || `${optionType} ${instrumentKey.split("|").at(-1)}`,
     optionType,
-    lotSize: Math.max(1, Math.round(finite(contract?.lot_size) || 1)),
+    lotSize: Math.max(1, Math.round(lotSize || 1)),
+    lotSizeVerified: Number.isSafeInteger(lotSize) && lotSize > 0,
     marketData: {
       ltp: finite(side?.market_data?.ltp),
       volume: finite(side?.market_data?.volume),
@@ -126,7 +128,7 @@ export async function GET(request: Request) {
       const callKey = item.call_options?.instrument_key;
       const putKey = item.put_options?.instrument_key;
       return [{
-        expiry: item.expiry || expiry,
+        expiry: normalizeExpiry(item.expiry) || expiry,
         strikePrice,
         underlyingSpotPrice: finite(item.underlying_spot_price),
         pcr: finite(item.pcr),

@@ -45,6 +45,7 @@ export type OptionContractSide = {
   tradingSymbol: string;
   optionType: "CE" | "PE";
   lotSize: number;
+  lotSizeVerified?: boolean;
   marketData: OptionMarketData;
   greeks: OptionGreeks;
 };

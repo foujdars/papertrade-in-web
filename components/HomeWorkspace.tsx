@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import type { HomeAttention } from '@/lib/home-attention';
 import { Bell, AlertCircle, Eye, EyeOff, Clock3, Globe2, Landmark, Plus } from 'lucide-react';
 import { isGlobalInstrumentKey } from '@/lib/global-markets';
@@ -346,6 +347,7 @@ export function HomeWorkspace({
           <div className="home-desk-heading">
             {preferencesReady && <span className="home-desk-date">{homeDate.format(now)} · IST</span>}
             <h1>{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
+            <Link className="spread-entry-link" href={activeMarket === "india" ? "/strategy-builder" : "/strategy-builder?market=crypto"}>Option Strategy Builder</Link>
           </div>
           <div className="home-desk-markets" role="group" aria-label="Choose market and practice wallet">
             <button type="button" aria-pressed={activeMarket === 'india'} onClick={() => chooseMarket('india')}>
