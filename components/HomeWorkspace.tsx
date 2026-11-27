@@ -427,10 +427,6 @@ export function HomeWorkspace({
           chooseDesktopTab(desktopTabs[next].id); buttons[next].focus();
         }}>{desktopTabs.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={desktopTab === tab.id} tabIndex={desktopTab === tab.id ? 0 : -1} onClick={() => chooseDesktopTab(tab.id)}>{tab.label}</button>)}</nav>}
 
-        {activeMarket === 'india' && <div className="home-breadth-feature">
-          <IndiaPulse showGauges={!cards.market}/>
-        </div>}
-
         <div className="home-main-grid home-main-grid-clean">
           {activeMarket === 'india' && cards.portfolio && <section className="home-section home-portfolio-card">
             <header><span><BriefcaseBusiness size={17} /><b>Your paper portfolio</b></span><div className="home-portfolio-actions"><button className="home-balance-toggle" disabled={!preferencesReady} aria-label={privateBalances?'Show balances on Home':'Hide balances on Home'} title="Privacy on Home only" aria-pressed={privateBalances} onClick={() => updatePreferences({...preferences,privateBalances:!privateBalances})}>{privateBalances?<Eye size={16}/>:<EyeOff size={16}/>}{privateBalances?'Show':'Hide'}</button><button onClick={onOpenPnl}>View P&amp;L <ChevronRight size={14} /></button></div></header>
@@ -468,6 +464,10 @@ export function HomeWorkspace({
         {activeMarket === "india" && <div className="home-market-pair">
           <MarketMovers onOpen={onOpenStock} inline={desktop} />
           {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+        </div>}
+
+        {activeMarket === 'india' && <div className="home-breadth-feature">
+          <IndiaPulse showGauges={!cards.market}/>
         </div>}
 
         {activeMarket === "india" ? <div className={`home-market-data${cards.market ? " has-derivatives" : ""}`}>

@@ -148,7 +148,6 @@
 @media (max-width: 940px) {
   .fundamental-workspace.navigation-page { padding: 14px; }
   .fundamental-workspace .modal-head { top: -14px; margin: -14px -14px 14px; padding: 14px; }
-  .fundamental-workspace .fa-tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); width: 100%; }
   .fundamental-workspace .fa-tabs button { padding: 7px 4px; font-size: 12px; }
   .research-peer-options { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .research-discovery-overview > div { padding: 12px; }
@@ -239,7 +238,3 @@
 .fundamental-workspace .research-matrix .research-peer-symbol.negative { color: var(--red); }
 .fundamental-workspace .research-matrix .research-peer-inspect { display: block; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: left; color: var(--muted); font-size: 10px; line-height: 1.25; }
 .research-peers .research-best-label { margin-top: 2px; padding: 1px 3px; font-size: 9px; }
-
-/* Four analysis workspaces, with readable touch targets on narrow screens. */
-.fundamental-workspace .fa-tabs { grid-template-columns: repeat(4,minmax(0,1fr)); }
-@media(max-width:560px) { .fundamental-workspace .fa-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); } }

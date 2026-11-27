@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { ChartLine, Layers2, List, RefreshCw } from "lucide-react";
 import { MCX_SPREAD_PRODUCTS } from "@/lib/mcx-spread-chain";
 import { loadSpreadChain, loadSpreadSeries, loadSpreadUnderlyings, loadTokenOptionRoots, type SpreadMarket } from "@/lib/spread-chain-client";
 import { calculateSpread, initialStrikes, SPREADS, type PremiumSource, type SpreadChain, type SpreadContract, type SpreadId } from "@/lib/vertical-spread";
 
 const marketLabels = { india: "Indian F&O", crypto: "Crypto", metals: "Gold & Silver", tokens: "Delta Tokens" };
+const marketShortLabels = { india: "Indian F&O", crypto: "Crypto", metals: "Metals", tokens: "Tokens" };
 const sources = { india: "NSE via Upstox", crypto: "Delta Exchange India", metals: "MCX via Upstox", tokens: "Delta Exchange India" };
 const crypto = [{ id: "BTC", label: "BTC · Bitcoin" }, { id: "ETH", label: "ETH · Ethereum" }];
 const metals = Object.entries(MCX_SPREAD_PRODUCTS).map(([id, product]) => ({ id, label: `${id} · ${product.label}` }));
@@ -48,7 +50,10 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry,
   const [requestedSeries, setSeries] = useState(initialExpiry);
   const india = useResource(market === "india" ? "india" : "", seriesReload, loadSpreadUnderlyings);
   const tokens = useResource(market === "tokens" ? "tokens" : "", seriesReload, loadTokenOptionRoots);
-  const choices = market === "india" ? (india.data ?? []).map(item => ({ id: item.instrumentKey, label: `${item.symbol} · ${item.name}` }))
+  const choices = market === "india" ? (india.data ?? []).map(item => ({
+    id: item.instrumentKey,
+    label: !item.name || item.name.toLowerCase() === item.symbol.toLowerCase() ? item.symbol : `${item.symbol} · ${item.name}`,
+  }))
     : market === "tokens" ? (tokens.data ?? []).map(id => ({ id, label: id === "XAUT" ? "XAUT · Tether Gold" : id }))
     : market === "crypto" ? crypto : metals;
   const root = choices.find(item => item.id === requestedRoot)?.id
@@ -74,8 +79,9 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry,
       {!embedded && <div><Link className="spread-back" href="/">← PaperTrade IN</Link>
         <h1>Option Strategy Builder</h1></div>}
       <div className="spread-market" role="group" aria-label="Market">
-        {(Object.keys(marketLabels) as SpreadMarket[]).map(value => <button type="button" key={value} aria-pressed={market === value}
-          onClick={() => { if (market !== value) { setMarket(value); setRoot(""); setSeries(""); } }}>{marketLabels[value]}</button>)}
+        {(Object.keys(marketLabels) as SpreadMarket[]).map(value => <button type="button" key={value}
+          title={marketLabels[value]} aria-label={marketLabels[value]} aria-pressed={market === value}
+          onClick={() => { if (market !== value) { setMarket(value); setRoot(""); setSeries(""); } }}>{marketShortLabels[value]}</button>)}
       </div>
     </header>
 
@@ -95,12 +101,12 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry,
           </option>)}
         </select>
       </label>
-      <button type="button" onClick={() => {
+      <button type="button" className="spread-refresh" title="Refresh quotes" aria-label="Refresh quotes" onClick={() => {
         if (error || !expiry) retrySeries(value => value + 1);
         reloadChain(value => value + 1);
-      }} disabled={loading}>{loading ? "Loading…" : "Refresh quotes"}</button>
-      <p>{sources[market]} · {metal ? metal.unit : currency}
-        {chain.data?.reference ? ` · ${market === "metals" ? "Underlying futures" : "Underlying"} ${formatter(currency).format(chain.data.reference)}` : ""}
+      }} disabled={loading}><RefreshCw size={17} aria-hidden="true" /></button>
+      <p><span>{sources[market]} · {metal ? metal.unit : currency}</span>
+        {chain.data?.reference ? <span>{market === "metals" ? "Futures" : "Underlying"} <strong>{formatter(currency).format(chain.data.reference)}</strong></span> : null}
       </p>
     </section>
 
@@ -120,6 +126,11 @@ function formatter(currency: "INR" | "USD") {
 
 type Money = ReturnType<typeof formatter>;
 type Selection = { buy: string; sell: string };
+const builderViews = [
+  { id: "build", label: "Build", icon: Layers2 },
+  { id: "payoff", label: "Payoff", icon: ChartLine },
+  { id: "chain", label: "Chain", icon: List },
+] as const;
 
 function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrategy }: {
   chain: SpreadChain; currency: "INR" | "USD"; market: SpreadMarket; initialStrike?: number; initialStrategy: SpreadId;
@@ -130,12 +141,20 @@ function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrate
   const [lots, setLots] = useState("1");
   const [manual, setManual] = useState<Record<string, string>>({});
   const [showAll, setShowAll] = useState(false);
+  const [view, setView] = useState<(typeof builderViews)[number]["id"]>("build");
+  const panelId = useId();
   const preset = SPREADS[strategy];
   const money = useMemo(() => formatter(currency), [currency]);
   const contracts = chain.contracts;
   const sides = useMemo(() => contracts.filter(leg => leg.kind === preset.kind).sort((a, b) => a.strike - b.strike), [contracts, preset.kind]);
   const buy = sides.find(leg => leg.id === chosen.buy);
   const sell = sides.find(leg => leg.id === chosen.sell);
+
+  function chooseStrategy(id: SpreadId) {
+    if (id === strategy) return;
+    setStrategy(id);
+    setSelection(initialStrikes(contracts, id, chain.reference, source));
+  }
 
   function premium(leg: SpreadContract | undefined, action: keyof Selection) {
     if (!leg) return null;
@@ -208,20 +227,25 @@ function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrate
     <small>LTP {fmt(leg.last)}</small>
   </div> : "—";
 
-  return <>
+  return <div className="spread-panels" data-view={view}>
+    <div className="spread-view-switch" role="group" aria-label="Builder view">
+      {builderViews.map(({ id, label, icon: Icon }) => <button type="button" key={id}
+        aria-controls={`${panelId}-${id}`} aria-pressed={view === id} onClick={() => setView(id)}>
+        <Icon size={16} aria-hidden="true" />{label}
+      </button>)}
+    </div>
     <div className="spread-workspace">
-      <section className="spread-card spread-setup">
+      <section className="spread-card spread-setup" id={`${panelId}-build`}>
         <h2>Configure spread</h2>
-        <div className="spread-presets" role="group" aria-label="Spread strategy">
-          {(Object.entries(SPREADS) as [SpreadId, typeof preset][]).map(([id, option]) =>
-            <button type="button" key={id} aria-pressed={id === strategy} onClick={() => {
-              if (id !== strategy) {
-                setStrategy(id);
-                setSelection(initialStrikes(contracts, id, chain.reference, source));
-              }
-            }}>
-              <strong>{option.label}</strong><span>{option.flow} spread</span>
-            </button>)}
+        <div className="spread-presets">
+          <fieldset><legend>Spread type</legend><div className="spread-segments">
+            {(["Debit", "Credit"] as const).map(flow => <button type="button" key={flow} aria-pressed={preset.flow === flow}
+              onClick={() => chooseStrategy(flow === "Debit" ? (preset.buyLower ? "bullCall" : "bearPut") : (preset.buyLower ? "bullPut" : "bearCall"))}>{flow}</button>)}
+          </div></fieldset>
+          <fieldset><legend>Strategy</legend><div className="spread-segments">
+            {(Object.entries(SPREADS) as [SpreadId, typeof preset][]).filter(([, option]) => option.flow === preset.flow).map(([id, option]) =>
+              <button type="button" key={id} aria-pressed={id === strategy} onClick={() => chooseStrategy(id)}>{option.label}</button>)}
+          </div></fieldset>
         </div>
         <div className="spread-entry">
           <label>Premium source
@@ -236,28 +260,27 @@ function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrate
           </label>
         </div>
         <div className="spread-legs">
+          <div className="spread-leg-head" aria-hidden="true"><span>Leg</span><span>Strike</span><span>Premium</span></div>
           {([{ leg: buy, role: "buy", price: buyPremium }, { leg: sell, role: "sell", price: sellPremium }] as const).map(({ leg, role, price }) =>
             <div key={role} className="spread-leg" data-side={role}>
-              <label>{role === "buy" ? "Buy" : "Sell"} {optionNames[preset.kind]} strike
-                <select value={leg?.id ?? ""} onChange={event => {
+              <span className="spread-side">{role === "buy" ? "Buy" : "Sell"} <span>{optionNames[preset.kind]}</span></span>
+              <select aria-label={`${role === "buy" ? "Buy" : "Sell"} ${optionNames[preset.kind]} strike`} value={leg?.id ?? ""} onChange={event => {
                   const selected = sides.find(contract => contract.id === event.target.value);
                   if (selected) setLeg(role, selected);
                 }}>
                   <option value="" disabled>Select strike</option>
                   {sides.map(contract => <option key={contract.id} value={contract.id} disabled={!contract.multiplier}>{fmt(contract.strike)}</option>)}
-                </select>
-              </label>
-              {source === "manual" ? <label>Premium
-                <input aria-label={`${role === "buy" ? "Buy" : "Sell"} premium`} type="number" step="any" min="0" disabled={!leg}
+              </select>
+              {source === "manual" ? <input aria-label={`${role === "buy" ? "Buy" : "Sell"} premium`} type="number" step="any" min="0" disabled={!leg}
                   value={leg ? manual[leg.id] ?? "" : ""}
                   onChange={event => { if (leg) setManual({ ...manual, [leg.id]: event.target.value }); }} />
-              </label> : <div><span>{source === "last" ? "Last traded" : role === "buy" ? "Ask" : "Bid"}</span><strong>{fmt(price)}</strong></div>}
+               : <div className="spread-leg-quote"><strong>{fmt(price)}</strong><small>{source === "last" ? "LTP" : role === "buy" ? "Ask" : "Bid"}</small></div>}
             </div>)}
         </div>
         {buy?.multiplier && buy.multiplier === sell?.multiplier ? <p className="spread-hint">Multiplier per lot <strong>{buy.multiplier}</strong></p> : null}
       </section>
 
-      <section className="spread-card spread-payoff" aria-label="Expiry payoff">
+      <section className="spread-card spread-payoff" id={`${panelId}-payoff`} aria-label="Expiry payoff">
         <h2>Expiry payoff</h2>
         {result ? <>
           <dl className="spread-metrics">
@@ -272,7 +295,7 @@ function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrate
       </section>
     </div>
 
-    <section className="spread-card spread-chain" aria-label="Option chain">
+    <section className="spread-card spread-chain" id={`${panelId}-chain`} aria-label="Option chain">
       <div className="spread-chain-heading"><h2>Option chain</h2>
         {table.length > 15 && <button type="button" aria-pressed={showAll} onClick={() => setShowAll(value => !value)}>{showAll ? "Show nearby strikes" : "Show all strikes"}</button>}
       </div>
@@ -289,7 +312,7 @@ function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrate
         </table>
       </div>
     </section>
-  </>;
+  </div>;
 }
 
 function PayoffChart({ result, money, reference }: { result: ReturnType<typeof calculateSpread>; money: Money; reference: number | null }) {
