@@ -154,3 +154,57 @@
   .market-directory-tabs { flex-wrap: wrap; }
   .delta-options-controls select { font-size: 16px; }
 }
+
+/* The builder stays within the chart dialog, with a separate scroll area for strikes. */
+.option-strategy-trigger {
+  display: inline-grid; place-items: center; flex: 0 0 auto;
+  width: 34px; min-height: 34px; padding: 0; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--purple-soft); color: var(--purple);
+  cursor: pointer;
+}
+.spread-dialog.app-dialog {
+  width: min(1060px, calc(100% - 20px)); max-width: none; max-height: 93dvh;
+  padding: 0; border-radius: 13px; overflow: auto;
+}
+.spread-dialog-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 3; padding: 8px 13px;
+  border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.spread-dialog-heading h2 { margin: 0; font-size: 17px; font-weight: 750; }
+.spread-builder-embedded { padding: 10px 12px 15px; }
+.spread-builder-embedded .spread-top { margin-bottom: 8px; }
+.spread-builder-embedded .spread-card { padding: 11px; border-radius: 10px; box-shadow: none; }
+.spread-builder-embedded :is(.spread-workspace, .spread-feed) { gap: 8px; margin-bottom: 8px; }
+.spread-builder-embedded .spread-chain { margin-top: 8px; }
+.spread-builder-embedded :is(.spread-card h2, .spread-chain-heading) { margin-bottom: 8px; }
+.spread-builder-embedded .spread-chain-heading h2 { margin: 0; }
+.spread-builder-embedded :is(.spread-entry, .spread-legs) { margin-top: 8px; }
+.spread-builder-embedded :is(button, select, input:not([type="range"])) { min-height: 34px; }
+.spread-builder .spread-chain table { min-width: 0; }
+.spread-price-pair {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px; max-width: 360px; margin: auto;
+}
+.spread-price-pair button {
+  min-height: 34px; padding: 4px; display: flex; justify-content: center; align-items: center; gap: 5px;
+  font-size: 11px; white-space: nowrap;
+}
+.spread-price-pair button[data-side="buy"] b { color: var(--spread-gain); }
+.spread-price-pair button[data-side="sell"] b { color: var(--spread-loss); }
+.spread-price-pair small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+.spread-risk-plan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0; }
+.spread-risk-plan > div { display: grid; gap: 4px; padding: 4px 7px; background: var(--soft); border-radius: 8px; }
+.spread-risk-plan > div span { color: var(--muted); font-size: 11px; }
+.spread-risk-plan input[aria-invalid="true"] { border-color: var(--spread-loss); }
+.spread-stop-line, .spread-target-line { stroke-width: 1.3; stroke-dasharray: 4 3; }
+.spread-stop-line { stroke: var(--spread-loss); }
+.spread-target-line { stroke: var(--spread-gain); }
+.spread-chart-tick { font-size: 10px; fill: var(--muted); }
+.spread-break-even { fill: var(--muted); stroke: var(--surface); stroke-width: 1; }
+@media (max-width: 520px) {
+  .spread-builder-embedded { padding-inline: 7px; }
+  .spread-price-pair { grid-template-columns: 1fr; }
+  .spread-price-pair button { min-height: 30px; }
+  .spread-builder .spread-chain :is(th, td) { padding-inline: 3px; }
+}

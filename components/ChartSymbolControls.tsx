@@ -2,6 +2,7 @@
 import { CandlestickChart, ChevronDown, Link2, Plus, Search, Star } from 'lucide-react';
 import type { Instrument } from '@/lib/market';
 import { StockLogo } from './StockLogo';
+import { OptionStrategyButton } from './OptionStrategyButton';
 
 export function ChartFavouriteButton({ instrument, saved, onClick }: { instrument: Instrument; saved: boolean; onClick: () => void }) {
   if (instrument.assetType === 'OPTION') return null;
@@ -20,6 +21,7 @@ export function ChartSymbolControls({ instrument, venue, desktop = false, expand
       <button type="button" className={`chart-compare-link ${compared ? 'active' : ''}`} onClick={onCompare} aria-label="Compare symbols" title="Compare symbols"><Plus size={desktop ? 17 : 18}/></button>
     </div>
     {onOptions && <button className="chart-derivatives-link" disabled={optionsDisabled} onClick={onOptions} aria-label={`Open ${instrument.symbol} option charts`} title="Open option charts"><Link2 size={desktop ? 16 : 19}/></button>}
+    {instrument.assetType === 'OPTION' && instrument.exchange === 'DELTA' && <OptionStrategyButton key={instrument.instrumentKey} option={instrument} />}
     <button type="button" className={`chart-style-link ${styled ? 'active' : ''}`} onClick={onStyle} aria-label="Chart type" title={desktop ? 'Candles' : 'Chart type'}><CandlestickChart size={desktop ? 17 : 18}/></button>
     {expanded && <div className={`trade-symbol-menu${desktop ? ' desktop-symbol-menu' : ''}`}>
       <label><Search size={16}/><input value={query} onChange={event => onQuery(event.target.value)} placeholder="Search stocks, BTC, gold or Brent"/></label>

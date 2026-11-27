@@ -65,6 +65,9 @@ test("Delta options are searchable in the existing chart with contract details",
   assert.equal(quote.last, 100, "mark substitutes for a missing last trade");
   assert.equal(quote.bid, 99);
   assert.equal(normalizeDeltaSettlement({ ...raw, state: "expired", settlement_price: "0" }, symbol), 0);
+  for (const settlement_price of ["", "  ", null, false, undefined]) {
+    assert.equal(normalizeDeltaSettlement({ ...raw, state: "expired", settlement_price }, symbol), null);
+  }
 });
 
 test("bought option reserves full premium, shares the USD wallet and can be sold", () => {

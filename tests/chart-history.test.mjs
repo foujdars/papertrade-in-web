@@ -45,6 +45,7 @@ test('incremental painting is allowed only when earlier candles are unchanged', 
   assert.ok(trailingCandleUpdate(candles, [...candles,bar('2024-01-03')]));
   assert.equal(trailingCandleUpdate(candles, [{...candles[0],close:13},candles[1]]),false);
   assert.equal(trailingCandleUpdate(candles, candles.slice(1)), false);
+  assert.equal(trailingCandleUpdate(candles, [candles[0], bar('2024-01-03')]), false);
 });
 
 test('a chart can reopen from the last candles before the next download', () => {

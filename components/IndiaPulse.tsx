@@ -39,7 +39,7 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
     observer.observe(chartRef.current);
     return () => observer.disconnect();
   }, []);
-  const height = expanded ? 300 : width >= 600 ? 160 : 128, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 28;
+  const height = expanded ? 300 : width >= 600 ? 138 : 112, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 26;
   const last = points[points.length - 1];
   const max = axisMax(Math.max(...points.flatMap(point => [point.advance, point.decline])));
   const bounds = sessionBounds(points);

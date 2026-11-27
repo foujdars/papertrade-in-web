@@ -33,10 +33,13 @@ function useResource<T>(key: string, refresh: number, loader: (signal: AbortSign
   return { data: current?.data, error: current?.error, loading: Boolean(key && current?.refresh !== refresh) };
 }
 
-export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry }: {
+export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry, initialStrike, initialKind, embedded = false }: {
   initialMarket: SpreadMarket;
   initialRoot: string;
   initialExpiry: string;
+  initialStrike?: number;
+  initialKind?: "CE" | "PE";
+  embedded?: boolean;
 }) {
   const [market, setMarket] = useState<SpreadMarket>(initialMarket);
   const [requestedRoot, setRoot] = useState(initialRoot);
@@ -65,10 +68,11 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
   const error = india.error ?? tokens.error ?? series.error ?? chain.error;
   const loading = india.loading || tokens.loading || series.loading || chain.loading;
 
-  return <main className="spread-builder">
+  const seeded = market === initialMarket && root === initialRoot && expiry?.id === initialExpiry;
+  return <div className={`spread-builder${embedded ? " spread-builder-embedded" : ""}`}>
     <header className="spread-top">
-      <div><Link className="spread-back" href="/">← PaperTrade IN</Link>
-        <h1>Option Strategy Builder</h1></div>
+      {!embedded && <div><Link className="spread-back" href="/">← PaperTrade IN</Link>
+        <h1>Option Strategy Builder</h1></div>}
       <div className="spread-market" role="group" aria-label="Market">
         {(Object.keys(marketLabels) as SpreadMarket[]).map(value => <button type="button" key={value} aria-pressed={market === value}
           onClick={() => { if (market !== value) { setMarket(value); setRoot(""); setSeries(""); } }}>{marketLabels[value]}</button>)}
@@ -105,8 +109,9 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
     {!loading && !error && (!expiry || !chain.data?.contracts.length) &&
       <p className="spread-message" role="status">No listed options</p>}
     {chain.data?.quoteWarning && !chain.error && <p className="spread-message" role="status">{chain.data.quoteWarning}</p>}
-    {!!chain.data?.contracts.length && <SpreadWorkspace key={chainKey} chain={chain.data} currency={currency} market={market} />}
-  </main>;
+    {!!chain.data?.contracts.length && <SpreadWorkspace key={chainKey} chain={chain.data} currency={currency} market={market}
+      initialStrike={seeded ? initialStrike : undefined} initialStrategy={seeded && initialKind === "PE" ? "bearPut" : "bullCall"} />}
+  </div>;
 }
 
 function formatter(currency: "INR" | "USD") {
@@ -116,10 +121,12 @@ function formatter(currency: "INR" | "USD") {
 type Money = ReturnType<typeof formatter>;
 type Selection = { buy: string; sell: string };
 
-function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; currency: "INR" | "USD"; market: SpreadMarket }) {
-  const [strategy, setStrategy] = useState<SpreadId>("bullCall");
+function SpreadWorkspace({ chain, currency, market, initialStrike, initialStrategy }: {
+  chain: SpreadChain; currency: "INR" | "USD"; market: SpreadMarket; initialStrike?: number; initialStrategy: SpreadId;
+}) {
+  const [strategy, setStrategy] = useState<SpreadId>(initialStrategy);
   const [source, setSource] = useState<PremiumSource>("market");
-  const [chosen, setSelection] = useState<Selection>(() => initialStrikes(chain.contracts, "bullCall", chain.reference, "market"));
+  const [chosen, setSelection] = useState<Selection>(() => initialStrikes(chain.contracts, initialStrategy, initialStrike ?? chain.reference, "market"));
   const [lots, setLots] = useState("1");
   const [manual, setManual] = useState<Record<string, string>>({});
   const [showAll, setShowAll] = useState(false);
@@ -151,12 +158,16 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
   }
 
   function setLeg(role: keyof Selection, next: SpreadContract) {
+    if (next.kind !== preset.kind) {
+      setStrategy(preset.flow === "Debit" ? (next.kind === "CE" ? "bullCall" : "bearPut") : (next.kind === "CE" ? "bearCall" : "bullPut"));
+    }
     const isBuy = role === "buy";
     const other = isBuy ? "sell" : "buy";
-    const wantHigher = isBuy === preset.buyLower;
-    const suitable = (leg: SpreadContract) => leg.multiplier === next.multiplier && (wantHigher ? leg.strike > next.strike : leg.strike < next.strike);
+    const buyLower = next.kind === preset.kind ? preset.buyLower : !preset.buyLower;
+    const wantHigher = isBuy === buyLower;
+    const suitable = (leg: SpreadContract) => leg.kind === next.kind && leg.multiplier === next.multiplier && (wantHigher ? leg.strike > next.strike : leg.strike < next.strike);
     const previous = isBuy ? sell : buy;
-    const compatible = previous && suitable(previous) ? previous : (wantHigher ? sides : [...sides].reverse()).find(suitable);
+    const compatible = previous && suitable(previous) ? previous : contracts.filter(suitable).sort((a, b) => Math.abs(next.strike - a.strike) - Math.abs(next.strike - b.strike))[0];
     setSelection({ ...chosen, [role]: next.id, [other]: compatible?.id ?? "" });
   }
 
@@ -188,6 +199,14 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
     [table, anchor]);
   const visibleRows = showAll ? table : table.filter(([strike]) => nearby.has(strike) || strike === buy?.strike || strike === sell?.strike);
   const fmt = (value: number | null | undefined) => value == null ? "—" : money.format(value);
+  const legPrices = (leg: SpreadContract | undefined) => leg ? <div className="spread-price-pair">
+    {(["buy", "sell"] as const).map(role => <button type="button" key={role} data-side={role} disabled={!leg.multiplier}
+      aria-label={`${role === "buy" ? "Buy" : "Sell"} ${optionNames[leg.kind]} at strike ${leg.strike}`}
+      aria-pressed={chosen[role] === leg.id} onClick={() => setLeg(role, leg)}>
+      <b>{role === "buy" ? "B" : "S"}</b><span>{fmt(role === "buy" ? leg.ask : leg.bid)}</span>
+    </button>)}
+    <small>LTP {fmt(leg.last)}</small>
+  </div> : "—";
 
   return <>
     <div className="spread-workspace">
@@ -247,7 +266,7 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
             <div><dt>Max profit</dt><dd className="spread-up">{fmt(result.maxProfit)}</dd></div>
             <div><dt>Max loss</dt><dd className="spread-down">{fmt(-result.maxLoss)}</dd></div>
           </dl>
-          <PayoffChart result={result} money={money} reference={chain.reference} />
+          <PayoffChart key={`${strategy}:${chosen.buy}:${chosen.sell}`} result={result} money={money} reference={chain.reference} />
         </> : <p className="spread-empty" role="status">{note}</p>}
         <p className="spread-hint">{market === "metals" ? "Before fees, delivery and devolvement costs" : "Before fees and settlement costs"}</p>
       </section>
@@ -259,18 +278,12 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
       </div>
       <div className="spread-table-scroll" tabIndex={0} role="region" aria-label="Option chain prices">
         <table>
-          <thead><tr><th scope="col">Calls Bid / Ask / LTP</th><th scope="col">Strike</th><th scope="col">Puts Bid / Ask / LTP</th><th scope="col">{optionNames[preset.kind]} legs</th></tr></thead>
+          <thead><tr><th scope="col">Calls</th><th scope="col">Strike</th><th scope="col">Puts</th></tr></thead>
           <tbody>{visibleRows.map(([strike, row]) => {
-            const contract = row[preset.kind];
             return <tr key={strike} data-selected={strike === buy?.strike || strike === sell?.strike}>
-              <td>{fmt(row.CE?.bid)} / {fmt(row.CE?.ask)} / {fmt(row.CE?.last)}</td>
+              <td>{legPrices(row.CE)}</td>
               <th scope="row">{fmt(strike)}</th>
-              <td>{fmt(row.PE?.bid)} / {fmt(row.PE?.ask)} / {fmt(row.PE?.last)}</td>
-              <td>{contract?.multiplier ? <div className="spread-chain-actions">
-                {(["buy", "sell"] as const).map(role => <button type="button" key={role} data-side={role}
-                  aria-label={`${role === "buy" ? "Buy" : "Sell"} ${optionNames[preset.kind]} at ${fmt(strike)}`}
-                  aria-pressed={chosen[role] === contract.id} onClick={() => setLeg(role, contract)}>{role === "buy" ? "Buy" : "Sell"}</button>)}
-              </div> : "—"}</td>
+              <td>{legPrices(row.PE)}</td>
             </tr>;
           })}</tbody>
         </table>
@@ -282,11 +295,19 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
 function PayoffChart({ result, money, reference }: { result: ReturnType<typeof calculateSpread>; money: Money; reference: number | null }) {
   const [scenario, setScenario] = useState<number | null>(null);
   const { lower, upper, maxProfit, maxLoss, breakEven, payoff } = result;
+  const [riskInput, setRisk] = useState<string>();
+  const [targetInput, setTarget] = useState<string>();
+  const defaultLevel = (max: number) => String(Number((max / 2).toPrecision(4)));
+  const stop = riskInput ?? defaultLevel(maxLoss);
+  const target = targetInput ?? defaultLevel(maxProfit);
+  const risk = Number(stop), reward = Number(target);
+  const validRisk = risk > 0 && risk <= maxLoss;
+  const validReward = reward > 0 && reward <= maxProfit;
   const padding = (upper - lower) * 0.65;
   const start = Math.max(0, lower - padding);
   const end = upper + padding;
   const price = Math.min(end, Math.max(start, scenario ?? reference ?? breakEven));
-  const x = (value: number) => 16 + 448 * (value - start) / (end - start);
+  const x = (value: number) => 76 + 388 * (value - start) / (end - start);
   const y = (value: number) => 13 + 128 * (maxProfit - value) / (maxProfit + maxLoss);
   const y0 = y(0);
   const points = [start, lower, breakEven, upper, end];
@@ -295,14 +316,25 @@ function PayoffChart({ result, money, reference }: { result: ReturnType<typeof c
   const first = points.slice(0, 3);
   const last = points.slice(2);
   const zone = (values: number[]) => `${x(values[0])},${y0} ${line(values)} ${x(values[values.length - 1])},${y0}`;
+  const ticks = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 2, style: "currency", currency: money.resolvedOptions().currency });
 
   return <figure className="spread-chart">
+    <div className="spread-risk-plan">
+      <label>Stop loss ({money.resolvedOptions().currency})<input type="number" min="0" max={maxLoss} step="any" value={stop} onChange={event => setRisk(event.target.value)} aria-invalid={!validRisk} /></label>
+      <label>Target ({money.resolvedOptions().currency})<input type="number" min="0" max={maxProfit} step="any" value={target} onChange={event => setTarget(event.target.value)} aria-invalid={!validReward} /></label>
+      <div><span>Risk : reward</span><strong>{validRisk && validReward ? `1 : ${(reward / risk).toLocaleString("en-IN", { maximumFractionDigits: 2 })}` : "—"}</strong></div>
+    </div>
+    {(!validRisk || !validReward) && <p className="spread-hint" role="status">Enter levels within the maximum loss and profit.</p>}
     <svg viewBox="0 0 480 154" role="img" aria-label="Profit and loss at expiry across settlement prices">
+      {[maxProfit, 0, -maxLoss].map(value => <text key={value} className="spread-chart-tick" x="70" y={y(value) + 4} textAnchor="end">{ticks.format(value)}</text>)}
       <line x1={x(start)} x2={x(end)} y1={y0} y2={y0} className="spread-zero" />
       <polygon points={zone(first)} className={ascending ? "spread-loss-zone" : "spread-profit-zone"} />
       <polygon points={zone(last)} className={ascending ? "spread-profit-zone" : "spread-loss-zone"} />
       <polyline points={line(first)} className={ascending ? "spread-loss-line" : "spread-profit-line"} />
       <polyline points={line(last)} className={ascending ? "spread-profit-line" : "spread-loss-line"} />
+      {validRisk && <line x1={x(start)} x2={x(end)} y1={y(-risk)} y2={y(-risk)} className="spread-stop-line" />}
+      {validReward && <line x1={x(start)} x2={x(end)} y1={y(reward)} y2={y(reward)} className="spread-target-line" />}
+      <circle cx={x(breakEven)} cy={y0} r="3" className="spread-break-even" />
       <line x1={x(price)} x2={x(price)} y1="5" y2="149" className="spread-marker" />
       <circle cx={x(price)} cy={y(payoff(price))} r="4.5" className="spread-point" />
     </svg>

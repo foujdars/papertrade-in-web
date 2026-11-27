@@ -125,20 +125,23 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
       if (!navigator.locks) throw new Error("Safe order storage is unavailable.");
       return await navigator.locks.request(key, async () => {
         if (activeKey.current !== key) return false;
-        if (quiet && backgroundRef.current.mode !== 'local') return false;
+        if (quiet && backgroundRef.current.mode !== 'local' && backgroundRef.current.mode !== 'cloud') return false;
         if (signedInBotOwner(owner)) {
           const data = await requestBotCloud(owner);
           if (activeKey.current !== key) return false;
           acceptCloud(data);
           if (data.record) {
-            if (quiet) return false; // Server alone advances automatic entries/exits.
+            // The bot scheduler is retired. The open client advances paper orders
+            // and protects against duplicate fills with the shared wallet version.
             for (let attempt = 0; attempt < 3; attempt++) {
               const latest = attempt ? await requestBotCloud(owner) : data;
+              if (activeKey.current !== key) return false;
               if (!latest.record) throw new Error('Shared wallet unavailable.');
-              const next = fn(readGlobalAccount(JSON.stringify(latest.record.account)), snapshotsRef.current, optionSnapshotsRef.current);
-              next.bots = next.bots?.map(bot => ({ ...bot, enabled: false }));
+              const current = readGlobalAccount(JSON.stringify(latest.record.account));
+              const next = fn(current, snapshotsRef.current, optionSnapshotsRef.current);
+              if (quiet && next === current) return false;
               try {
-                const saved = await requestBotCloud(owner, { action: 'save', version: latest.record.version, account: next });
+                const saved = await requestBotCloud(owner, { action: 'save', version: latest.record.version, account: { ...next, bots: next.bots?.map(bot => ({ ...bot, enabled: false })) } });
                 if (activeKey.current !== key) return false;
                 acceptCloud(saved); setError(''); return true;
               } catch (e) { if (!(e instanceof BotCloudError) || e.status !== 409 || attempt === 2) throw e; }
@@ -148,6 +151,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
         if (backgroundRef.current.mode !== 'local') throw new Error('Waiting for the shared wallet. Local execution is locked.');
         const current = readGlobalAccount(localStorage.getItem(key));
         const next = fn(current, snapshotsRef.current, optionSnapshotsRef.current);
+        if (quiet && next === current) return false;
         localStorage.setItem(key, JSON.stringify(next));
         setAccount(next);
         if (!quiet) setError("");
@@ -191,9 +195,9 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           }
         }));
         if (controller.signal.aborted || document.hidden) return;
+        const received = results.some(result => result.status === "fulfilled");
         setMarketError(results.some(r => r.status === "rejected") ? "Some live prices are unavailable. Retrying automatically." : "");
-        if (results.every(r => r.status === "rejected")) return; // Stale quotes cannot fill orders.
-        setLastChecked(Date.now());
+        if (received) setLastChecked(Date.now());
         snapshotsRef.current = { ...snapshotsRef.current, ...next };
         setSnapshots(snapshotsRef.current);
         optionSnapshotsRef.current = { ...optionSnapshotsRef.current, ...nextOptions };
@@ -205,8 +209,9 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
         }
         await transact(a => {
           if (document.hidden || controller.signal.aborted) return a;
+          if (!a.positions.length && !a.orders.length && !a.optionPositions?.length && !a.optionOrders?.length) return a;
           const now = Date.now();
-          const advanced = advanceOptions(advanceGlobalAccount(a, quotes, specs, now, extremesRef.current), observedOptions, now);
+          const advanced = advanceOptions(received ? advanceGlobalAccount(a, quotes, specs, now, extremesRef.current) : a, observedOptions, now);
           return advanced;
         }, true);
       } finally { running = false; }

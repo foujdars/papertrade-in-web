@@ -83,7 +83,9 @@ export function normalizeDeltaOptionQuote(raw: Record<string, any>, symbol: stri
 }
 
 export function normalizeDeltaSettlement(raw: Record<string, any>, symbol: string): number | null {
-  const value = Number(raw.settlement_price);
+  const price: unknown = raw.settlement_price;
+  if (typeof price !== "number" && (typeof price !== "string" || !price.trim())) return null;
+  const value = Number(price);
   return raw.symbol === symbol && ["expired", "settled"].includes(raw.state) &&
-    raw.settlement_price !== null && Number.isFinite(value) && value >= 0 ? value : null;
+    Number.isFinite(value) && value >= 0 ? value : null;
 }

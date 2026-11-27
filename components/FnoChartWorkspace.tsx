@@ -1,5 +1,6 @@
 "use client";
 import { AppDialog } from "./AppDialog";
+import { OptionStrategyButton } from "./OptionStrategyButton";
 import { StockLogo } from "@/components/StockLogo";
 
 import { Activity, CandlestickChart, ChevronDown, ChevronsUpDown, GitCompareArrows, StepBack, ListFilter, Minus, PenTool, Plus, SlidersHorizontal } from "lucide-react";
@@ -214,6 +215,7 @@ export function FnoChartWorkspace({
               <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChangeAvailable ? optionChange >= 0 ? "positive" : "negative" : ""} aria-label={optionChangeAvailable ? undefined : "Daily change unavailable"}>{optionChangeAvailable ? signedPercent(optionChange) : "—"}</i></span>
             </div>
             <button type="button" className="chart-replay-link" onClick={() => onReplay(option)} aria-label={`Bar replay for ${option.symbol}`} title="Bar replay"><StepBack size={17} /></button>
+            <OptionStrategyButton option={option} />
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
           </header>
           <div className="fno-clean-chart">
