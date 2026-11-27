@@ -8,8 +8,6 @@ import { MarketDirectory } from './MarketDirectory';
 import { IndiaPulse, IndiaFlows } from "./IndiaPulse";
 import { HomeDerivatives } from "./HomeDerivatives";
 import { MarketMovers } from "./MarketMovers";
-import { MarketDataStatus } from './MarketDataStatus';
-import { marketTimeLabel, type MarketDataStatus as MarketStatus } from '@/lib/market-data-status';
 import { startVisiblePolling } from '@/lib/visible-polling';
 import { EquityWatch } from "./EquityWatch";
 import { BulkDeals } from "./BulkDeals";
@@ -64,6 +62,10 @@ export type HomeStockOption = {
   categories: string[];
   instrumentKey?: string;
   assetType?: "EQUITY" | "INDEX" | "OPTION" | "FUTURE";
+  underlyingSymbol?: string;
+  expiry?: string;
+  strikePrice?: number;
+  optionType?: "CE" | "PE";
 };
 
 export type HomeCardPreferences = {
@@ -81,7 +83,6 @@ export type HomeRiskSummary = {
 
 export function HomeWorkspace({
   indices,
-  feedLive,
   globalWallet,
   globalWalletError,
   globalAvailable,
@@ -102,19 +103,17 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock, onOpenInstrument, onDesktopNavigate, preferenceOwner='guest', recentSymbols=[], onClearRecent, commoditySessionLabel,
+  onOpenStock, onOpenInstrument, onDesktopNavigate, preferenceOwner='guest', recentSymbols=[], onClearRecent,
   realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
-  commoditySessionLabel?: string;
   onOpenInstrument?: (instrument: import('@/lib/market').Instrument) => void;
   onDesktopNavigate?: (section: 'ipo' | 'news' | 'fundamentals' | 'watchlist') => void;
-  realisedToday?:number;openChangeToday?:number|null;sessionLabel?:string;sessionMessage?:string;
+  realisedToday?:number;openChangeToday?:number|null;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
   onOpenRealised?:()=>void;
   firstName?: string;
   indices: HomeIndexQuote[];
-  feedLive: boolean;
   balance: number;
   globalWallet: number | null;
   globalWalletError: string;
@@ -163,8 +162,6 @@ export function HomeWorkspace({
   const [shelf, setShelf] = useState<SearchShelfId>("all");
   const [popular, setPopular] = useState<PopularLists>(FALLBACK_POPULAR);
   const [boards, setBoards] = useState<{ in: SearchBoard; us: SearchBoard; crypto: SearchBoard } | null>(null);
-  const [boardMetadata,setBoardMetadata]=useState<Partial<Record<'in'|'us'|'crypto',MarketStatus>>>({});
-  const [boardsFailed,setBoardsFailed]=useState(false);
   const [previewFailed,setPreviewFailed]=useState(false);
   const [listQuotes, setListQuotes] = useState<Record<string, { price: number; change: number|null; volume: number; quoteAt:string }>>({});
   const sheetInput = useRef<HTMLInputElement>(null);
@@ -212,9 +209,9 @@ export function HomeWorkspace({
       const response=await fetch('/api/market/search-movers',{signal,cache:'no-store'});
       const body=await response.json();
       if(signal.aborted)return;
-      if(!response.ok||!body?.ok||!body.in||!body.us||!body.crypto){setBoardsFailed(true);return;}
-      setBoards({in:body.in,us:body.us,crypto:body.crypto});setBoardMetadata(body.metadata??{});setBoardsFailed(false);
-    },15_000,()=>setBoardsFailed(true));
+      if(!response.ok||!body?.ok||!body.in||!body.us||!body.crypto)return;
+      setBoards({in:body.in,us:body.us,crypto:body.crypto});
+    },15_000);
   },[searchFocused]);
   const updatePreferences = (next: HomePreferences) => {
     setPreferences(next);
@@ -270,17 +267,17 @@ export function HomeWorkspace({
     const digits = value >= 1 ? 2 : 4;
     return value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   };
-  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number|null; volume: number; quoteLabel?:string; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" title={line.quoteLabel} aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
+  const searchLine = (line: { key: string; symbol: string; name: string; price: number; change: number|null; volume: number; stock: HomeStockOption | null }) => <button key={line.key} type="button" className="home-pair-row" aria-label={`Open ${line.symbol} chart`} onClick={() => { if (line.stock) chooseSearch(line.stock, true); else { setSearch(""); setSearchFocused(false); onOpenStock(line.symbol); } }}>
     {line.stock?.assetType === "INDEX" ? <TrendingUp size={28} aria-hidden="true" /> : <StockLogo symbol={line.stock?.symbol ?? line.symbol} instrumentKey={line.stock?.instrumentKey} categories={line.stock?.categories} size={28} />}
     <span className="home-pair-name"><b>{line.symbol}</b><small>{line.name}</small><small className="home-pair-vol">{line.volume > 0 ? `Vol ${volumeLabel(line.volume)}` : "—"}</small></span>
-    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 && line.change!=null ? (line.change < 0 ? "down" : "up") : ""}>{line.price>0?quoteChangeText(line.change):"—"}</em>{desktop&&line.quoteLabel&&<small className="market-quote-time">{line.quoteLabel}</small>}</span>
+    <span className="home-pair-quote"><strong>{listMoney(line.price)}</strong><em className={line.price > 0 && line.change!=null ? (line.change < 0 ? "down" : "up") : ""}>{line.price>0?quoteChangeText(line.change):"—"}</em></span>
   </button>;
   const quoteLine = (quote: BoardQuote, seen: Set<string>) => {
     const stock = matchShelfInstrument(stockOptions, boardShelf, quote.symbol);
     const symbol = stock?.symbol ?? quote.symbol;
     if (seen.has(symbol)) return null;
     seen.add(symbol);
-    return { key: `${boardKey}:${symbol}`, symbol, name: stock?.name ?? quote.name, price: quote.price, change: quote.change, volume: quote.volume, quoteLabel:quote.source==='tradingview'?'Delayed scanner quote':`${quote.delayed?'Delayed · ':''}${marketTimeLabel(quote.quoteAt)}`, stock };
+    return { key: `${boardKey}:${symbol}`, symbol, name: stock?.name ?? quote.name, price: quote.price, change: quote.change, volume: quote.volume, stock };
   };
   const quoteKeys = preview?.instrumentKey ?? '';
   useEffect(() => {
@@ -326,7 +323,7 @@ export function HomeWorkspace({
   },[searchQuoteKeys]);
   const priced = (stock: HomeStockOption) => {
     const live = stock.instrumentKey ? listQuotes[stock.instrumentKey] : undefined;
-    return { price: live?.price || stock.price, change: live ? live.change : Number.isFinite(stock.changePercent)?stock.changePercent:null, volume: live?.volume ?? 0, quoteLabel:live?marketTimeLabel(live.quoteAt):'Cached instrument quote' };
+    return { price: live?.price || stock.price, change: live ? live.change : Number.isFinite(stock.changePercent)?stock.changePercent:null, volume: live?.volume ?? 0 };
   };
   const seen = new Set<string>();
   const commodityRows = rankCommodityRows(shelfRows.popular, stock => priced(stock).volume);
@@ -378,10 +375,8 @@ export function HomeWorkspace({
                     <div className="home-search-tabs" role="tablist" aria-label="Market">
                       {([["all", "All"], ["in", "IN"], ["mcx", "MCX"], ["us", "US"], ["crypto", "Crypto"]] as const).map(([id, label]) => <button type="button" key={id} role="tab" aria-selected={shelf === id} onClick={() => setShelf(id)}>{label}</button>)}
                     </div>
-                    {desktop&&!search.trim()&&shelf!=='mcx'&&<MarketDataStatus metadata={boardMetadata[boardKey]} failed={boardsFailed} now={now}/>}
                     <div className="home-search-sheet-list">
                       {search.trim() ? shelfRows.matches.length ? shelfRows.matches.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) })) : <div className="home-search-empty" role="status">No matching instruments.</div> : <>
-                        {shelf === "mcx" && <div className="home-search-group"><b>{commoditySessionLabel ?? "MCX futures"}</b></div>}
                         {shelf === "mcx" && <><div className="home-search-group"><b>{commodityRows.some(stock => priced(stock).volume > 0) ? "Most active · Volume" : "Popular commodities"}</b></div>{topCommodities.map(stock => searchLine({ key: stock.symbol, symbol: stock.symbol, name: stock.name, stock, ...priced(stock) }))}</>}
                         {!!recentLines.length && <div className="home-search-group"><b>Recently opened</b>{onClearRecent && <button type="button" onClick={onClearRecent}>Clear</button>}</div>}
                         {recentLines.map(searchLine)}
@@ -402,7 +397,7 @@ export function HomeWorkspace({
         </header>
 
         {activeMarket === 'india' && cards.market && <section className="home-section home-pulse-section home-pulse-first">
-          <div className="home-indices-heading"><h2>Indian indices</h2><span>{indices.some(index => index.price !== null) ? feedLive && indices.every(index => index.live) ? 'Live quotes' : 'Latest quotes' : 'Awaiting quotes'}</span></div>
+          <div className="home-indices-heading"><h2>Indian indices</h2></div>
           <div className="home-index-grid" aria-label="Indian market indices">
             {indices.map((index) => {
               const points = index.points;
@@ -410,7 +405,7 @@ export function HomeWorkspace({
               const known = points !== null && change !== null;
               const up = (change ?? 0) >= 0;
               return (
-                <button type="button" key={index.symbol} className="home-index-card" data-symbol={index.symbol} data-live={index.live ? "true" : "false"} data-tone={known && change !== 0 ? (up ? "up" : "down") : "flat"} onClick={() => onOpenStock(index.symbol)} aria-label={`Open ${index.label} chart`} title={index.asOf ? `Quote as of ${index.asOf}` : undefined}>
+                <button type="button" key={index.symbol} className="home-index-card" data-symbol={index.symbol} data-live={index.live ? "true" : "false"} data-tone={known && change !== 0 ? (up ? "up" : "down") : "flat"} onClick={() => onOpenStock(index.symbol)} aria-label={`Open ${index.label} chart`}>
                   <span className="home-index-name">{index.symbol === 'BANKNIFTY' ? 'Bank Nifty' : index.symbol === 'SENSEX' ? 'Sensex' : 'Nifty 50'}<small>{index.symbol === 'SENSEX' ? 'BSE' : 'NSE'}</small></span>
                   <b>{index.price === null ? "—" : index.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</b>
                   <small className={`home-index-change ${known && change !== 0 ? (up ? "positive" : "negative") : ""}`}>
@@ -462,14 +457,14 @@ export function HomeWorkspace({
             </div>
             {globalWalletError && <p className="home-global-wallet-error" role="alert">Dollar wallet unavailable: {globalWalletError}</p>}
             {!!globalPositions.length && <details className="home-global-position-details"><summary>Open positions · {globalPositions.length}</summary><div className="home-global-positions">{globalPositions.slice(0,4).map((position,index)=><button key={`${position.symbol}:${index}`} onClick={()=>onOpenStock(position.symbol)}><span><b>{position.symbol}</b><small>{position.side} · view chart</small></span><ChevronRight size={17}/></button>)}</div></details>}
-            {!globalPositions.length && <p className="home-global-empty">No global positions yet. Search an instrument above to practise in dollars.</p>}
+            {!globalPositions.length && <p className="home-global-empty">No open positions</p>}
           </section>}
 
           {desktop && activeMarket === 'india' && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
           {activeMarket === 'india' && onDesktopNavigate && <section className="desktop-home-tools home-section" aria-label="Research and tools"><header><b>Research & tools</b></header><div>
-            <button onClick={() => onDesktopNavigate('fundamentals')}><Search size={17}/><span><b>Stock analysis</b><small>Explore your research data</small></span><ChevronRight size={16}/></button>
-            <button onClick={() => onDesktopNavigate('ipo')}><Plus size={17}/><span><b>IPO discovery</b><small>Open issues and allotments</small></span><ChevronRight size={16}/></button>
-            <button onClick={() => onDesktopNavigate('news')}><Bell size={17}/><span><b>Market news</b><small>Latest company headlines</small></span><ChevronRight size={16}/></button>
+            <button onClick={() => onDesktopNavigate('fundamentals')}><Search size={17}/><span><b>Stock analysis</b></span><ChevronRight size={16}/></button>
+            <button onClick={() => onDesktopNavigate('ipo')}><Plus size={17}/><span><b>IPO discovery</b></span><ChevronRight size={16}/></button>
+            <button onClick={() => onDesktopNavigate('news')}><Bell size={17}/><span><b>Market news</b></span><ChevronRight size={16}/></button>
           </div></section>}
         </div>
         {activeMarket === "india" && <div className="home-market-pair">
@@ -495,10 +490,8 @@ export function HomeWorkspace({
         <section className="home-stock-preview" role="dialog" aria-modal="true" aria-label={`${preview.symbol} stock preview`} onClick={(event) => event.stopPropagation()}>
           <header><StockLogo symbol={preview.symbol} /><div><b>{preview.symbol}</b><small>{preview.name} · NSE</small></div><button onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></header>
           <div className="home-stock-preview-price"><span><small>LAST AVAILABLE</small><strong>{previewQuote ? formatInr(previewQuote.lastPrice) : loading ? <CandleLoader compact label="Loading quote" /> : "Quote unavailable"}</strong></span><b className={(previewQuote?.changePercent ?? 0) < 0 ? "negative" : "positive"}>{quoteChangeText(previewQuote?.changePercent)}</b></div>
-          {previewFailed&&<p role="status">Refresh failed. The last available quote is shown.</p>}
           {!loading && (!previewQuote||previewFailed) && <button onClick={() => setRetry((n) => n + 1)}>Retry quote</button>}
           <div className="home-stock-preview-tags">{preview.categories.length ? preview.categories.map((category) => <span key={category}>{category}</span>) : <span>ALL NSE</span>}</div>
-          <p>Preview the stock first, then open its remembered chart setup when you are ready.</p>
           <div className="home-stock-preview-actions"><button onClick={onOpenWatchlist}><Layers3 size={16} /> Watchlists</button><button onClick={() => onOpenStock(preview.symbol)}><CandlestickChart size={16} /> Open chart <ArrowRight size={15} /></button></div>
         </section>
       </div>}

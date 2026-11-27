@@ -8,9 +8,11 @@ const dates = { expiry: "2034-02-17", expiryMs: Date.parse("2034-02-17T14:00:00+
 const products = [
   { symbol: "C-BTC-90000-170234", contract_type: "call_options", strike_price: "90000" },
   { symbol: "C-BTC-91000-170234", contract_type: "call_options", strike_price: "91000" },
+  { symbol: "C-XAUT-4000-170234", contract_type: "call_options", strike_price: "4000" },
+  { symbol: "P-XAUT-4000-170234", contract_type: "put_options", strike_price: "4000" },
 ].map(row => ({
   ...row, state: "live", trading_status: "operational", notional_type: "vanilla", is_quanto: false,
-  contract_unit_currency: "BTC", contract_value: "0.001", tick_size: "0.1",
+  contract_unit_currency: row.symbol.split("-")[1], contract_value: "0.001", tick_size: "0.1",
   settlement_time: "2034-02-17T12:00:00Z", quoting_asset: { symbol: "USD" }, settling_asset: { symbol: "USD" },
   maker_commission_rate: "0.0001", taker_commission_rate: "0.0002", product_specs: { premium_commission_rate: 0.035 },
 }));
@@ -43,11 +45,20 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
     if (url.hostname === "api.india.delta.exchange" && url.pathname === "/v2/products") return Response.json({ success: true, result: products });
     if (url.hostname === "api.india.delta.exchange" && url.pathname === "/v2/tickers") {
       assert.equal(url.searchParams.get("expiry_date"), "17-02-2034");
-      assert.equal(url.searchParams.get("underlying_asset_symbols"), "BTC");
+      const root = url.searchParams.get("underlying_asset_symbols");
+      assert.ok(root === "BTC" || root === "XAUT");
       return Response.json({ success: true, result: [{
-        symbol: products[0].symbol, close: "1200", spot_price: "90500",
+        symbol: root === "BTC" ? products[0].symbol : products[2].symbol, close: "1200", spot_price: root === "BTC" ? "90500" : "4000",
         quotes: { best_bid: "1100", bid_size: "12", best_ask: "1300", ask_size: "0" },
       }] });
+    }
+    if (url.hostname === "api.india.delta.exchange" && url.pathname === "/v2/products/C-XAUT-4000-170234") {
+      return Response.json({ success: true, result: products[2] });
+    }
+    if (url.hostname === "api.india.delta.exchange" && url.pathname === "/v2/history/candles") {
+      assert.equal(url.searchParams.get("symbol"), "C-XAUT-4000-170234");
+      const time = Number(url.searchParams.get("end")) - 300;
+      return Response.json({ success: true, result: [{ time, open: 70, high: 72, low: 69, close: 71, volume: 2 }] });
     }
     if (url.hostname === "api.upstox.com" && url.pathname === "/v2/market-quote/quotes") {
       assert.deepEqual(new Set(url.searchParams.get("instrument_key").split(",")), new Set([goldFuture.instrument_key, goldOption.instrument_key]));
@@ -86,6 +97,17 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
   assert.equal(deltaChain.contracts[0].ask, null);
   assert.equal(deltaChain.contracts[0].bid, 1100);
   assert.equal(deltaChain.contracts[1].last, null);
+
+  const roots = await (await delta.GET(new Request("http://localhost/api/global-markets?mode=token-option-roots"))).json();
+  assert.deepEqual(roots.roots, ["XAUT"]);
+  const tokenReq = new Request(deltaReq.url.replace("BTC", "XAUT"));
+  const tokenDirectory = await (await delta.GET(tokenReq)).json();
+  const tokenChain = await (await delta.GET(new Request(`${tokenReq.url}&series=${tokenDirectory.series[0].id}`))).json();
+  assert.equal(tokenChain.reference, 4000);
+  assert.deepEqual(tokenChain.contracts.map(leg => leg.kind), ["CE", "PE"]);
+  const candles = await (await delta.GET(new Request("http://localhost/api/global-markets?mode=candles&symbol=C-XAUT-4000-170234&timeframe=5m"))).json();
+  assert.equal(candles.ok, true);
+  assert.ok(candles.candles.length > 0);
 
   const mcxReq = new Request("http://localhost/api/upstox/commodities?optionRoot=GOLD");
   const mcxDirectory = await (await commodities.GET(mcxReq)).json();

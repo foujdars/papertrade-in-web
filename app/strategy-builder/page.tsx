@@ -11,7 +11,7 @@ export default async function StrategyBuilderPage({ searchParams }: {
   searchParams: Promise<{ market?: string | string[]; underlying?: string | string[]; expiry?: string | string[] }>;
 }) {
   const query = await searchParams;
-  const initialMarket: SpreadMarket = query.market === "crypto" || query.market === "metals" ? query.market : "india";
+  const initialMarket: SpreadMarket = query.market === "crypto" || query.market === "metals" || query.market === "tokens" ? query.market : "india";
   const initialRoot = typeof query.underlying === "string" ? query.underlying : "";
   const initialExpiry = typeof query.expiry === "string" ? query.expiry : "";
   return <OptionSpreadBuilder key={JSON.stringify([initialMarket, initialRoot, initialExpiry])}

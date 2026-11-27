@@ -2,7 +2,7 @@ import type { FnoUnderlying, OptionChainRow } from "./fno";
 import { loadOptionChain, loadOptionExpiries } from "./fno-client";
 import { bookPrices, positiveQuote, type SpreadChain, type SpreadSeries } from "./vertical-spread";
 
-export type SpreadMarket = "india" | "crypto" | "metals";
+export type SpreadMarket = "india" | "crypto" | "metals" | "tokens";
 
 async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(path, { cache: "no-store", signal });
@@ -19,10 +19,15 @@ export async function loadSpreadUnderlyings(signal: AbortSignal) {
 }
 
 function providerUrl(market: Exclude<SpreadMarket, "india">, root: string, series = "") {
-  if (market === "crypto") {
+  if (market === "crypto" || market === "tokens") {
     return `/api/global-markets?${new URLSearchParams({ mode: "spread-chain", underlying: root, series })}`;
   }
   return `/api/upstox/commodities?${new URLSearchParams({ optionRoot: root, series })}`;
+}
+
+export async function loadTokenOptionRoots(signal: AbortSignal) {
+  const result = await read<{ roots: string[] }>("/api/global-markets?mode=token-option-roots", signal);
+  return result.roots;
 }
 
 export async function loadSpreadSeries(market: SpreadMarket, root: string, underlying: FnoUnderlying | undefined, signal: AbortSignal): Promise<SpreadSeries[]> {

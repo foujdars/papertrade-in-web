@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MCX_SPREAD_PRODUCTS } from "@/lib/mcx-spread-chain";
-import { loadSpreadChain, loadSpreadSeries, loadSpreadUnderlyings, type SpreadMarket } from "@/lib/spread-chain-client";
+import { loadSpreadChain, loadSpreadSeries, loadSpreadUnderlyings, loadTokenOptionRoots, type SpreadMarket } from "@/lib/spread-chain-client";
 import { calculateSpread, initialStrikes, SPREADS, type PremiumSource, type SpreadChain, type SpreadContract, type SpreadId } from "@/lib/vertical-spread";
 
-const marketLabels = { india: "Indian F&O", crypto: "Crypto", metals: "Gold & Silver" };
-const sources = { india: "NSE via Upstox", crypto: "Delta Exchange India", metals: "MCX via Upstox" };
+const marketLabels = { india: "Indian F&O", crypto: "Crypto", metals: "Gold & Silver", tokens: "Delta Tokens" };
+const sources = { india: "NSE via Upstox", crypto: "Delta Exchange India", metals: "MCX via Upstox", tokens: "Delta Exchange India" };
 const crypto = [{ id: "BTC", label: "BTC · Bitcoin" }, { id: "ETH", label: "ETH · Ethereum" }];
 const metals = Object.entries(MCX_SPREAD_PRODUCTS).map(([id, product]) => ({ id, label: `${id} · ${product.label}` }));
 const optionNames = { CE: "call", PE: "put" };
@@ -44,7 +44,9 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
   const [chainReload, reloadChain] = useState(0);
   const [requestedSeries, setSeries] = useState(initialExpiry);
   const india = useResource(market === "india" ? "india" : "", seriesReload, loadSpreadUnderlyings);
+  const tokens = useResource(market === "tokens" ? "tokens" : "", seriesReload, loadTokenOptionRoots);
   const choices = market === "india" ? (india.data ?? []).map(item => ({ id: item.instrumentKey, label: `${item.symbol} · ${item.name}` }))
+    : market === "tokens" ? (tokens.data ?? []).map(id => ({ id, label: id === "XAUT" ? "XAUT · Tether Gold" : id }))
     : market === "crypto" ? crypto : metals;
   const root = choices.find(item => item.id === requestedRoot)?.id
     ?? choices.find(item => item.id === "NSE_INDEX|Nifty 50")?.id ?? choices[0]?.id ?? "";
@@ -57,16 +59,16 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
     [market, root, underlying, expiry?.id]);
   const chainKey = expiry ? `${marketKey}:${expiry.id}` : "";
   const chain = useResource(chainKey, chainReload, loadChain);
-  const currency = market === "crypto" ? "USD" : "INR";
+  const isDelta = market === "crypto" || market === "tokens";
+  const currency = isDelta ? "USD" : "INR";
   const metal = market === "metals" ? MCX_SPREAD_PRODUCTS[root as keyof typeof MCX_SPREAD_PRODUCTS] : undefined;
-  const error = india.error ?? series.error ?? chain.error;
-  const loading = india.loading || series.loading || chain.loading;
+  const error = india.error ?? tokens.error ?? series.error ?? chain.error;
+  const loading = india.loading || tokens.loading || series.loading || chain.loading;
 
   return <main className="spread-builder">
     <header className="spread-top">
       <div><Link className="spread-back" href="/">← PaperTrade IN</Link>
-        <h1>Option Strategy Builder</h1>
-        <p>Build a two-leg credit or debit spread and see its payoff at expiry.</p></div>
+        <h1>Option Strategy Builder</h1></div>
       <div className="spread-market" role="group" aria-label="Market">
         {(Object.keys(marketLabels) as SpreadMarket[]).map(value => <button type="button" key={value} aria-pressed={market === value}
           onClick={() => { if (market !== value) { setMarket(value); setRoot(""); setSeries(""); } }}>{marketLabels[value]}</button>)}
@@ -85,12 +87,12 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
           {!expiry && <option value="">{series.loading ? "Loading expiries…" : "Choose expiry"}</option>}
           {series.data?.map(item => <option key={item.id} value={item.id}>
             {dateFormat.format(Date.parse(`${item.expiry}T00:00:00Z`))}
-            {market === "crypto" ? ` · ${timeFormat.format(Date.parse(item.id))} IST` : item.detail ? ` · ${item.detail}` : ""}
+            {isDelta ? ` · ${timeFormat.format(Date.parse(item.id))} IST` : item.detail ? ` · ${item.detail}` : ""}
           </option>)}
         </select>
       </label>
       <button type="button" onClick={() => {
-        if (india.error || series.error || chain.error || !expiry) retrySeries(value => value + 1);
+        if (error || !expiry) retrySeries(value => value + 1);
         reloadChain(value => value + 1);
       }} disabled={loading}>{loading ? "Loading…" : "Refresh quotes"}</button>
       <p>{sources[market]} · {metal ? metal.unit : currency}
@@ -98,10 +100,10 @@ export function OptionSpreadBuilder({ initialMarket, initialRoot, initialExpiry 
       </p>
     </section>
 
-    {error && !loading && <p className="spread-message" role="alert">{error}{chain.error && chain.data ? " Showing the previous option snapshot." : ""}</p>}
+    {error && !loading && <p className="spread-message" role="alert">{error}</p>}
     {chain.loading && !chain.data && <p className="spread-message" role="status">Loading option chain…</p>}
     {!loading && !error && (!expiry || !chain.data?.contracts.length) &&
-      <p className="spread-message" role="status">No active option contracts were returned. Choose another underlying or expiry.</p>}
+      <p className="spread-message" role="status">No listed options</p>}
     {chain.data?.quoteWarning && !chain.error && <p className="spread-message" role="status">{chain.data.quoteWarning}</p>}
     {!!chain.data?.contracts.length && <SpreadWorkspace key={chainKey} chain={chain.data} currency={currency} market={market} />}
   </main>;
@@ -247,7 +249,7 @@ function SpreadWorkspace({ chain, currency, market }: { chain: SpreadChain; curr
           </dl>
           <PayoffChart result={result} money={money} reference={chain.reference} />
         </> : <p className="spread-empty" role="status">{note}</p>}
-        <p className="spread-hint">Entry estimates use the selected premiums. Payoff excludes fees and {market === "metals" ? "delivery or futures devolvement costs." : "settlement costs."}</p>
+        <p className="spread-hint">{market === "metals" ? "Before fees, delivery and devolvement costs" : "Before fees and settlement costs"}</p>
       </section>
     </div>
 

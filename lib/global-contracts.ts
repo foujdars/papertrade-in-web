@@ -3,6 +3,12 @@ import type { PerpQuote } from "./global-markets";
 export const isDeltaOptionSymbol = (value: string): boolean =>
   /^[CP]-[A-Z0-9]{2,12}-\d+(?:\.\d+)?-\d{6}$/.test(value);
 
+export const isDeltaOptionRoot = (value: string): boolean => /^[A-Z0-9]{2,12}$/.test(value);
+
+export function deltaOptionRoot(symbol: string) {
+  return isDeltaOptionSymbol(symbol) ? symbol.split("-")[1] : null;
+}
+
 export const isSafeDeltaContractSymbol = (value: string): boolean =>
   /^[A-Z0-9][A-Z0-9.-]{1,47}$/.test(value);
 
@@ -33,7 +39,7 @@ export function normalizeDeltaOptionSpec(raw: Record<string, any>, symbol: strin
   const spec: DeltaOptionSpec = {
     contractType: raw.contract_type,
     symbol,
-    underlying: String(raw.contract_unit_currency ?? ""),
+    underlying: deltaOptionRoot(symbol)!,
     strike: Number(raw.strike_price),
     expiry: Date.parse(raw.settlement_time),
     lot: Number(raw.contract_value),
@@ -45,7 +51,7 @@ export function normalizeDeltaOptionSpec(raw: Record<string, any>, symbol: strin
     fetchedAt: now,
   };
   if (![spec.strike, spec.expiry, spec.lot, spec.tick].every(positive) ||
-    !/^[A-Z0-9]{2,12}$/.test(spec.underlying) ||
+    !isDeltaOptionRoot(spec.underlying) ||
     ![spec.maker, spec.taker, spec.premiumFeeCap].every(value => Number.isFinite(value) && value >= 0)) {
     throw new Error("Incomplete Delta option rules.");
   }

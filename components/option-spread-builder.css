@@ -118,3 +118,39 @@
   .spread-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .spread-builder select, .spread-builder input[type="number"] { font-size: 16px; }
 }
+
+.market-directory-actions { display: flex; gap: 6px; align-items: stretch; }
+.market-directory-actions > .market-directory-row { flex: 1; min-width: 0; }
+.market-directory-options, .delta-options-table button {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  color: var(--purple);
+  background: var(--purple-soft);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.delta-options { min-width: 0; padding: 12px 0; }
+.delta-options-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin-bottom: 13px; }
+.delta-options-controls label { display: grid; flex: 1 1 135px; gap: 5px; min-width: 0; font-size: 12px; color: var(--muted); }
+.delta-options-controls select { min-height: 38px; width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; color: var(--ink); background: var(--surface); font: inherit; }
+.delta-options-scroll { max-height: min(55dvh, 490px); overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.delta-options-table { width: 100%; border-spacing: 0; text-align: center; font-variant-numeric: tabular-nums; }
+.delta-options-table thead th { position: sticky; z-index: 1; top: 0; background: var(--soft); }
+.delta-options-table :is(th, td) { padding: 5px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.delta-options-table thead th { padding-block: 9px; color: var(--muted); }
+.delta-options-table tbody tr:last-child > * { border-bottom: 0; }
+.delta-options-table button[aria-pressed="true"] { border-color: var(--purple); }
+.delta-options-empty { margin: 12px 0; color: var(--muted); font-size: 13px; }
+.delta-option-dialog { width: min(630px, calc(100% - 24px)); max-height: 92dvh; padding: 16px; }
+.delta-option-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.delta-option-dialog > header h2 { margin: 0; font-size: 18px; }
+@media (max-width: 560px) {
+  .market-directory-tabs { flex-wrap: wrap; }
+  .delta-options-controls select { font-size: 16px; }
+}

@@ -6,7 +6,8 @@ import {
   isDeltaPerpSymbol,
   type PerpSymbol,
 } from "@/lib/global-markets";
-import { isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
+import { isDeltaOptionRoot, isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
+import { isTokenisedDelta } from "@/lib/delta-option-list";
 import { aggregateChartCandles, deltaHistoryPlan } from "@/lib/chart-history";
 import { bookPrices, positiveQuote, type SpreadContract, type SpreadSeries } from "@/lib/vertical-spread";
 export const runtime = "nodejs";
@@ -70,8 +71,8 @@ async function delta(path: string, ttl: number): Promise<any> {
 async function spreadChain(params: URLSearchParams) {
   const root = params.get("underlying") ?? "";
   const seriesId = params.get("series") ?? "";
-  if (!["BTC", "ETH"].includes(root)) {
-    return Response.json({ ok: false, error: "Select BTC or ETH." }, { status: 400 });
+  if (!isDeltaOptionRoot(root)) {
+    return Response.json({ ok: false, error: "Invalid option underlying." }, { status: 400 });
   }
   const contracts = (await getCatalogue()).filter(item =>
     item.underlyingSymbol === root && item.assetType === "OPTION" && item.expiry &&
@@ -128,6 +129,15 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
     mode = params.get("mode") ?? "snapshot";
+  if (mode === "token-option-roots") {
+    try {
+      const roots = [...new Set((await getCatalogue()).filter(item => item.assetType === "OPTION" && item.expiry &&
+        Date.parse(item.expiry) > Date.now() && isTokenisedDelta(item)).map(item => item.underlyingSymbol!))].sort();
+      return Response.json({ ok: true, roots }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return Response.json({ ok: false, error: "Delta options unavailable" }, { status: 503 });
+    }
+  }
   if (mode === "spread-chain") {
     try { return await spreadChain(params); }
     catch { return Response.json({ ok: false, error: "Delta option contracts are temporarily unavailable." }, { status: 503 }); }
