@@ -1,4 +1,5 @@
 /** Discovery order is editorial (familiar names first), not a live market-cap ranking. */
+import { isGlobalReferenceKey } from "./global-reference.ts";
 import { compareCommodityPriority } from "./commodity-discovery.ts";
 export type MarketGroup = "india" | "us" | "crypto" | "commodities";
 export type DirectoryInstrument = { symbol: string; name: string; instrumentKey?: string; categories: string[]; assetType?: string };
@@ -17,7 +18,7 @@ export function marketGroup(item: DirectoryInstrument): MarketGroup {
 }
 export function marketTicker(item: DirectoryInstrument): string {
   const group = marketGroup(item);
-  if (item.assetType === "OPTION") return item.symbol;
+  if (item.assetType === "OPTION" || isGlobalReferenceKey(item.instrumentKey)) return item.symbol;
   const root = item.symbol.replace(/USD$/, "");
   return group === "us" ? root.replace(/[XB]$/, "") : group === "india" ? item.symbol : root;
 }
@@ -28,14 +29,19 @@ export function compareMarketInstruments(a: DirectoryInstrument, b: DirectoryIns
   if (a.instrumentKey?.startsWith("MCX_FO|") && b.instrumentKey?.startsWith("MCX_FO|")) return compareCommodityPriority(a, b);
   const groupA = marketGroup(a), groupB = marketGroup(b);
   if (groupA !== groupB) return ["india", "us", "crypto", "commodities"].indexOf(groupA) - ["india", "us", "crypto", "commodities"].indexOf(groupB);
+  const referenceOrder = Number(isGlobalReferenceKey(b.instrumentKey)) - Number(isGlobalReferenceKey(a.instrumentKey));
+  if (referenceOrder) return referenceOrder;
   // Keep hundreds of strikes behind their underlying contracts in search.
   const optionOrder = Number(a.assetType === "OPTION") - Number(b.assetType === "OPTION");
   if (optionOrder) return optionOrder;
-  const rank = (item: DirectoryInstrument) => { const index = leaders[groupA].indexOf(marketTicker(item)); return index < 0 ? 1000 : index; };
+  const rank = (item: DirectoryInstrument) => { const index = leaders[groupA].indexOf(marketTicker(item).replace(/-USD$/, "")); return index < 0 ? 1000 : index; };
   return rank(a) - rank(b) || marketDisplayName(a).localeCompare(marketDisplayName(b)) || a.symbol.localeCompare(b.symbol);
 }
 export function marketProductLabel(item: DirectoryInstrument): string {
   if (item.instrumentKey?.startsWith("MCX_FO|")) return "MCX future · INR";
+  if (isGlobalReferenceKey(item.instrumentKey)) return marketGroup(item) === "us"
+    ? "US listing · USD · watch only"
+    : "Spot · USD · watch only";
   if (item.instrumentKey?.startsWith("TVC|")) return "Reference · watch only";
   if (item.assetType === "OPTION") return "Option · USD";
   if (marketGroup(item) === "india") return item.assetType === "INDEX" ? "Index · INR" : "Stock · INR";
