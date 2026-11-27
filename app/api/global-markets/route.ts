@@ -6,8 +6,10 @@ import {
   isDeltaPerpSymbol,
   type PerpSymbol,
 } from "@/lib/global-markets";
-import { isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
+import { isDeltaOptionRoot, isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
+import { isTokenisedDelta } from "@/lib/delta-option-list";
 import { aggregateChartCandles, deltaHistoryPlan } from "@/lib/chart-history";
+import { bookPrices, positiveQuote, type SpreadContract, type SpreadSeries } from "@/lib/vertical-spread";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const cache = new Map<string, { until: number; value: unknown }>();
@@ -66,10 +68,80 @@ async function delta(path: string, ttl: number): Promise<any> {
     pending.delete(path);
   }
 }
+async function spreadChain(params: URLSearchParams) {
+  const root = params.get("underlying") ?? "";
+  const seriesId = params.get("series") ?? "";
+  if (!isDeltaOptionRoot(root)) {
+    return Response.json({ ok: false, error: "Invalid option underlying." }, { status: 400 });
+  }
+  const contracts = (await getCatalogue()).filter(item =>
+    item.underlyingSymbol === root && item.assetType === "OPTION" && item.expiry &&
+    Date.parse(item.expiry) > Date.now() && item.optionType && item.contractMultiplier && item.strikePrice);
+  const seriesById = new Map<string, SpreadSeries>();
+  for (const item of contracts) {
+    const expiry = item.symbol.match(/(\d{2})(\d{2})(\d{2})$/);
+    if (expiry) {
+      const [, day, month, year] = expiry;
+      seriesById.set(item.expiry!, { id: item.expiry!, expiry: `20${year}-${month}-${day}` });
+    }
+  }
+  if (!seriesId) {
+    const series = [...seriesById.values()].sort((a, b) => a.id.localeCompare(b.id));
+    return Response.json({ ok: true, series }, { headers: { "Cache-Control": "no-store" } });
+  }
+  const selected = seriesById.get(seriesId);
+  if (!selected) return Response.json({ ok: false, error: "This option expiry is no longer available." }, { status: 404 });
+  const [year, month, day] = selected.expiry.split("-");
+  const query = new URLSearchParams({
+    contract_types: "call_options,put_options",
+    underlying_asset_symbols: root,
+    expiry_date: `${day}-${month}-${year}`,
+  });
+  let tickers: Record<string, any>[] = [];
+  let quoteWarning: string | undefined;
+  try {
+    const response = await delta(`tickers?${query}`, 2000);
+    if (!Array.isArray(response) || !response.length) throw new Error("Missing quotes");
+    tickers = response;
+  } catch {
+    quoteWarning = "Delta option quotes are unavailable. You can enter premiums manually.";
+  }
+  const tickerBySymbol = new Map(tickers.map(ticker => [ticker.symbol, ticker]));
+  let reference: number | null = null;
+  const chain: SpreadContract[] = contracts.filter(item => item.expiry === seriesId).map(item => {
+    const ticker = tickerBySymbol.get(item.symbol);
+    const quotes = ticker?.quotes;
+    reference ??= positiveQuote(ticker?.spot_price);
+    return {
+      id: item.symbol, series: seriesId, kind: item.optionType!, strike: item.strikePrice!,
+      multiplier: item.contractMultiplier!,
+      ...bookPrices(quotes?.best_bid, quotes?.best_ask, quotes?.bid_size, quotes?.ask_size),
+      last: positiveQuote(ticker?.close),
+    };
+  });
+  if (!quoteWarning && !chain.some(leg => leg.bid !== null || leg.ask !== null || leg.last !== null)) {
+    quoteWarning = "No premiums were returned for this expiry. You can enter them manually.";
+  }
+  return Response.json({ ok: true, contracts: chain, reference, quoteWarning }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
     mode = params.get("mode") ?? "snapshot";
+  if (mode === "token-option-roots") {
+    try {
+      const roots = [...new Set((await getCatalogue()).filter(item => item.assetType === "OPTION" && item.expiry &&
+        Date.parse(item.expiry) > Date.now() && isTokenisedDelta(item)).map(item => item.underlyingSymbol!))].sort();
+      return Response.json({ ok: true, roots }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return Response.json({ ok: false, error: "Delta options unavailable" }, { status: 503 });
+    }
+  }
+  if (mode === "spread-chain") {
+    try { return await spreadChain(params); }
+    catch { return Response.json({ ok: false, error: "Delta option contracts are temporarily unavailable." }, { status: 503 }); }
+  }
   if (mode === "catalog") {
     try {
       return Response.json({ ok: true, instruments: await getCatalogue() }, { headers: { "Cache-Control": "public, max-age=60" } });

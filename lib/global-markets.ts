@@ -106,8 +106,22 @@ export const deltaOptionSymbolFromInstrumentKey = (value?: string): string | nul
   const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
   return isDeltaOptionSymbol(symbol) ? symbol : null;
 };
+function deltaUnderlyingCategory(root: string, row: Record<string, any>) {
+  const tags: string[] = Array.isArray(row.product_specs?.tags) ? row.product_specs.tags.map((tag: unknown) => String(tag).toLowerCase()) : [];
+  if (["XAUT", "PAXG", "SLVON"].includes(root) || tags.includes("metal")) return "METAL";
+  if (tags.some(tag => tag === "xstock" || tag === "bstocks" || tag === "bstock")) return "US_MARKET";
+  return null;
+}
+
 export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument[] {
   const bySymbol = new Map<string, Instrument>();
+  const categoriesByRoot = new Map<string, string>();
+  for (const row of rows) {
+    if (!row || row.contract_type !== "perpetual_futures" || typeof row.symbol !== "string" || !isDeltaPerpSymbol(row.symbol)) continue;
+    const root = row.symbol.slice(0, -3);
+    const category = deltaUnderlyingCategory(root, row);
+    if (category) categoriesByRoot.set(root, category);
+  }
   for (const row of rows) {
     const symbol = row?.symbol;
     if (typeof symbol !== "string") continue;
@@ -120,12 +134,13 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
           name: `${spec.underlying} ${spec.contractType === "call_options" ? "Call" : "Put"} $${spec.strike.toLocaleString("en-US")} · ${new Date(spec.expiry).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
           exchange: "DELTA", price: 0, change: 0,
           instrumentKey: `DELTA|${symbol}`,
-          categories: ["GLOBAL", "OPTION", spec.underlying],
+          categories: ["GLOBAL", "OPTION", spec.underlying, deltaUnderlyingCategory(spec.underlying, row) ?? categoriesByRoot.get(spec.underlying) ?? "CRYPTO"],
           assetType: "OPTION",
           optionType: spec.contractType === "call_options" ? "CE" : "PE",
           strikePrice: spec.strike,
           expiry: new Date(spec.expiry).toISOString(),
           lotSize: 1,
+          contractMultiplier: spec.lot,
           underlyingSymbol: spec.underlying,
         });
       } catch { /* Never list an option without validated contract rules. */ }
@@ -142,8 +157,7 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
       const spec = normalizePerpSpec(row, symbol, Date.now());
       if (!spec.operational) continue;
     } catch { continue; }
-    const tags = Array.isArray(row.product_specs?.tags) ? row.product_specs.tags : [];
-    const category = tags.includes("xStock") ? "US_MARKET" : tags.includes("metal") ? "METAL" : "CRYPTO";
+    const category = deltaUnderlyingCategory(symbol.slice(0, -3), row) ?? "CRYPTO";
     const underlying = row.contract_unit_currency;
     bySymbol.set(symbol, {
       symbol,

@@ -63,6 +63,7 @@ import "./market-data-status.css";
 import "./algo-trading.css";
 import "./app-themes.css";
 import "./home-desk.css";
+import "../components/option-spread-builder.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

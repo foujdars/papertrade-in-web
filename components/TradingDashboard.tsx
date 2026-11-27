@@ -84,6 +84,9 @@ import { filterPnlTrades, pnlDay, pnlOutcome, summarisePnl, type PnlScope } from
 import { globalClosedTrades, deleteGlobalPnlTrades } from "@/lib/global-pnl";
 import { priceTaskError, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
+import { AppDialog } from "@/components/AppDialog";
+import { DeltaOptionList } from "@/components/DeltaOptionList";
+import { deltaChartOptionRoot, deltaOptionDirectory } from "@/lib/delta-option-list";
 import { FnoChartWorkspace } from "@/components/FnoChartWorkspace";
 import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
@@ -532,6 +535,7 @@ export function TradingDashboard() {
     if (marketsInitialGroup !== "IPO") lastScannerGroupRef.current = marketsInitialGroup;
   }, [marketsInitialGroup]);
   const [optionChainOpen, setOptionChainOpen] = useState(false);
+  const [deltaOptionListOpen, setDeltaOptionListOpen] = useState(false);
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
@@ -1717,6 +1721,9 @@ export function TradingDashboard() {
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const selectedDeltaSymbol = deltaSymbolFromInstrumentKey(selected.instrumentKey);
   const selectedDeltaOption = deltaOptionSymbolFromInstrumentKey(selected.instrumentKey);
+  const deltaOptionRoots = useMemo(() => deltaOptionDirectory(globalInstruments), [globalInstruments]);
+  const selectedDeltaOptionRoot = deltaChartOptionRoot(selected);
+  const selectedDeltaOptions = selectedDeltaOptionRoot ? deltaOptionRoots.get(selectedDeltaOptionRoot) : undefined;
   const selectedDeltaDatedFuture = selected.instrumentKey.startsWith("DELTA|") && !selectedDeltaSymbol && !selectedDeltaOption;
   const selectedDeltaChartSymbol = selectedDeltaSymbol ?? selectedDeltaOption ?? (selectedDeltaDatedFuture ? selected.symbol : null);
   useEffect(() => {
@@ -1939,6 +1946,10 @@ export function TradingDashboard() {
       categories: instrument.categories,
       instrumentKey: instrument.instrumentKey,
       assetType: instrument.assetType,
+      underlyingSymbol: instrument.underlyingSymbol,
+      expiry: instrument.expiry,
+      strikePrice: instrument.strikePrice,
+      optionType: instrument.optionType,
     };
   })], [commodityInstruments, globalInstruments, marketQuotes, stockUniverse]);
   const homeRiskSummary = useMemo(() => {
@@ -2432,6 +2443,7 @@ export function TradingDashboard() {
   }
 
   function chooseTradeInstrument(item: Instrument) {
+    setDeltaOptionListOpen(false);
     setDesktopChartWatchlistOpen(false);
     setResearchDraft(null);
     if (activeNavigationSection !== "trade" || selected.instrumentKey !== item.instrumentKey) rememberWatchlistLocation();
@@ -2863,7 +2875,7 @@ export function TradingDashboard() {
     instrument: selected, venue: selectedVenueLabel, expanded: showTradeSymbols,
     onToggle: () => setShowTradeSymbols(value => !value), compared: !!comparedSymbols.length,
     onCompare: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); },
-    onOptions: selectedFnoUnderlying ? () => void openFnoUnderlying(selectedFnoUnderlying) : undefined,
+    onOptions: selectedDeltaOptions?.length ? () => setDeltaOptionListOpen(true) : selectedFnoUnderlying ? () => void openFnoUnderlying(selectedFnoUnderlying) : undefined,
     optionsDisabled: openingUnderlyingKey === selectedFnoUnderlying?.instrumentKey, styled: chartStyle !== 'candles',
     onStyle: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); },
     query: tradeSymbolSearch, onQuery: setTradeSymbolSearch, matches: tradeSymbolMatches,
@@ -3110,6 +3122,7 @@ export function TradingDashboard() {
           <button onClick={() => openNavigationSection('home')}><Home size={19}/><span>Explore</span></button>
           <button onClick={openChartPositions}><BriefcaseBusiness size={19}/><span>Positions</span></button>
           {selectedFnoUnderlying && <button disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}><Link2 size={19}/><span>F&O chain</span></button>}
+          {!!selectedDeltaOptions?.length && <button onClick={() => setDeltaOptionListOpen(true)}><Link2 size={19}/><span>Option chain</span></button>}
           <button onClick={() => openNavigationSection('orders')}><BookOpenCheck size={19}/><span>Orders</span></button>
           <button aria-pressed={desktopChartWatchlistOpen} onClick={() => { setDesktopChartWatchlistOpen(value => !value); setDesktopTicketOpen(false); setOrderSheetOpen(false); }}><Bookmark size={19}/><span>Watchlist</span></button>
           <button onClick={() => openNavigationSection('holdings')}><BriefcaseBusiness size={19}/><span>Holdings</span></button>
@@ -3233,7 +3246,6 @@ export function TradingDashboard() {
           const hasChange=available&&quote.changeAvailable!==false&&Number.isFinite(quote.previousClose)&&quote.previousClose>0;
           return { symbol: item.symbol, label: item.label, price: available?quote.lastPrice:null, points: hasChange&&Number.isFinite(quote.netChange)?quote.netChange:null, changePercent: hasChange&&Number.isFinite(quote.changePercent)?quote.changePercent:null, live: isFresh && marketStatus.isOpen && feedStatus.mode === "live", asOf };
         })}
-        feedLive={feedStatus.mode === "live"}
         balance={balance}
         indiaFundsInUse={openPositions.reduce((sum, position) => sum + paperOrderCapitalValue(tradingUniverse.find(item => item.symbol === position.symbol)?.assetType, position.product, position.quantity, position.averagePrice), 0)}
         globalClosedCount={globalPnlTrades.length}
@@ -3249,9 +3261,6 @@ export function TradingDashboard() {
         todayPnl={todayClosedPnl+(homeOpenDayChange??0)}
         realisedToday={todayClosedPnl}
         openChangeToday={homeOpenDayChange}
-        commoditySessionLabel={mcxSession?.sessions.length ? "MCX · " + mcxSession.sessions.map(s => [s.start, s.end].map(t => new Date(t).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })).join("–")).join(", ") + " IST" : "MCX · Session closed or unconfirmed"}
-        sessionLabel={marketStatus.isOpen?'Market open':/holiday/i.test(marketStatus.message)?'Market holiday':/checking|unavailable/i.test(marketStatus.message)?'Session unconfirmed':'Market closed'}
-        sessionMessage={marketStatus.message}
         attention={[...positionAttention(openPositions,protections,orders),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
         onAttention={(item:HomeAttention)=>{if(item.target.kind==='alerts'){setHomeAlertRequest({key:Date.now(),tab:item.target.tab,id:item.target.id});}else{setHomeOpen(false);setWorkspaceMode('trade');openPositionChart(item.target.symbol);setProduct(item.target.product);}}}
         onOpenRealised={()=>{setPnlScope({...DEFAULT_PNL_SCOPE,period:'custom',start:pnlToday,end:pnlToday});setSelectedPnlDateKey(null);setPnlDrill(null);setPnlHistoryFilter('all');openNavigationSection('pnl');setPnlTab('trades');}}
@@ -3419,6 +3428,13 @@ export function TradingDashboard() {
           onScannerViewed={rememberScanner}
         />
       )}
+      {deltaOptionListOpen && selectedDeltaOptions && <AppDialog className="delta-option-dialog" label="Delta option chain" onClose={() => setDeltaOptionListOpen(false)}>
+        <header><h2>{selectedDeltaOptionRoot} option chain</h2><button type="button" className="icon-button" onClick={() => setDeltaOptionListOpen(false)} aria-label="Close option chain"><X size={20}/></button></header>
+        <DeltaOptionList instruments={selectedDeltaOptions} initialRoot={selectedDeltaOptionRoot} initialExpiry={selected.expiry} selectedSymbol={selected.symbol} onOpen={symbol => {
+          const option = globalInstruments.find(item => item.symbol === symbol && item.assetType === "OPTION");
+          if (option) chooseTradeInstrument(option);
+        }}/>
+      </AppDialog>}
       {optionChainOpen && activeFnoUnderlying && (
         <OptionChainSheet
           key={`${activeFnoUnderlying.instrumentKey}-${selected.expiry ?? ""}`}

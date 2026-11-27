@@ -22,6 +22,7 @@ export type Instrument = {
   strikePrice?: number;
   expiry?: string;
   lotSize?: number;
+  contractMultiplier?: number;
   underlyingKey?: string;
   underlyingSymbol?: string;
 };
