@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { CandlestickChart } from "lucide-react";
 import { deltaOptionDirectory, deltaOptionStrikes, type ListedDeltaOption } from "@/lib/delta-option-list";
 
@@ -33,7 +32,6 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
       <label>Expiry (IST)<select value={expiry} onChange={event => setExpiry(event.target.value)}>
         {expiries.map(value => <option key={value} value={value}>{expiryLabel.format(Date.parse(value))}</option>)}
       </select></label>
-      <Link className="spread-entry-link" href={{ pathname: "/strategy-builder", query: { market: ["BTC", "ETH"].includes(root) ? "crypto" : "tokens", underlying: root, expiry } }}>Strategy Builder</Link>
     </div>
     <div className="delta-options-scroll" role="region" aria-label={`${root} option contracts`} tabIndex={0}>
       <table className="delta-options-table">

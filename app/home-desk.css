@@ -138,3 +138,44 @@
   }
   .terminal-shell[data-platform="web"] .home-hub.home-studio.home-desk[data-market="global"] .home-dashboard-scroll { grid-template-rows: auto auto; }
 }
+
+/* Compact Home treatment shared by desktop, mobile web and the Android shell. */
+.terminal-shell .home-hub.home-desk .home-desk-header {
+  --mast-ink: var(--ink); --mast-muted: var(--muted); --mast-line: var(--line);
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px;
+  padding: 8px 11px; gap: 6px 10px;
+}
+.terminal-shell .home-desk .home-desk-heading h1 { font-size: clamp(17px, 2.5vw, 23px); letter-spacing: -.025em; }
+.terminal-shell .home-desk .home-desk-date { margin: 0 0 3px; font-size: 10px; }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-desk-markets { padding: 2px; background: var(--soft); border-radius: 8px; }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-desk-markets > button { min-height: 34px; font-size: 12px; gap: 5px; }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-desk-markets > button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-global-search { min-height: 38px; height: 38px; border-radius: 8px; }
+.terminal-shell .home-hub.home-desk .home-desk-header .home-global-search input { font-size: 14px; }
+.terminal-shell .home-hub.home-studio.home-desk[data-market][data-desktop-tab] .home-dashboard-scroll { gap: 8px 12px; }
+.terminal-shell .home-hub.home-desk :is(.home-section,.india-breadth-card,.home-portfolio-card) { border-radius: 9px; box-shadow: none; }
+.terminal-shell .home-hub.home-desk .home-index-card { padding-block: 4px; min-height: 0; gap: 2px; }
+.terminal-shell .home-hub.home-desk .home-indices-heading { padding-block: 6px 3px; }
+.terminal-shell .home-hub.home-desk :is(.home-portfolio-card,.home-market-card-v2,.home-option-pulse,.home-sector-heat) { min-height: 0; padding-block: 7px; }
+.terminal-shell .home-hub.home-desk :is(.india-breadth-counts,.india-breadth-head) { padding-block: 3px; min-height: 28px; }
+.terminal-shell .home-hub.home-desk :is(.desktop-stock-row,.market-directory-row) { min-height: 38px; padding-block: 3px; }
+.terminal-shell .home-hub.home-desk .market-directory-tabs { margin-bottom: 6px; }
+.terminal-shell .home-hub.home-desk .market-directory-tabs > button { min-height: 34px; }
+
+@media (min-width: 940px) {
+  .terminal-shell[data-platform="web"] .home-hub.home-desk .home-desk-header { grid-template-columns: minmax(145px,.6fr) minmax(230px, .75fr) minmax(250px,1fr); grid-template-areas: "heading markets search"; }
+  .terminal-shell[data-platform="web"] .home-hub.home-desk .desktop-explore-tabs,
+  .terminal-shell[data-platform="web"] .home-hub.home-desk .desktop-explore-tabs button { min-height: 34px; }
+}
+@media (max-width: 939px) {
+  .terminal-shell .home-hub.home-desk .desktop-explore-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0; }
+  .terminal-shell .home-hub.home-desk .desktop-explore-tabs button {
+    flex: 0 0 auto; min-height: 36px; padding: 3px 8px; color: var(--muted);
+    border-bottom: 2px solid transparent; font-size: 12px;
+  }
+  .terminal-shell .home-hub.home-desk .desktop-explore-tabs button[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
+  .terminal-shell .home-desk[data-desktop-tab="overview"] :is(.home-breadth-feature,.home-market-data,.india-flows-slot,.home-deal-slot),
+  .terminal-shell .home-desk[data-desktop-tab="breadth"] :is(.home-main-grid,.home-movers-slot,.home-derivatives,.india-flows-slot,.home-deal-slot),
+  .terminal-shell .home-desk[data-desktop-tab="derivatives"] :is(.home-breadth-feature,.home-main-grid,.home-market-pair,.home-sector-heat,.india-flows-slot,.home-deal-slot),
+  .terminal-shell .home-desk[data-desktop-tab="flows"] :is(.home-breadth-feature,.home-main-grid,.home-market-pair,.home-market-data) { display: none; }
+}

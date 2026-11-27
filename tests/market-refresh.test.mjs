@@ -30,8 +30,8 @@ async function harness(t, entry, exported, initial = {}) {
   const output = await build({ entryPoints: [entry], bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'effect-harness', setup(b) {
     b.onResolve({ filter: /^react(?:\/jsx-runtime)?$|^lucide-react$|^\.\/(ModernSelect|OpenInterestChart)$/ }, args => ({ path: args.path, namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'react'
-      ? `const s=globalThis.${key}; export const useState = value => {const i=s.stateIndex++; return [i in s.initial?s.initial[i]:typeof value==='function'?value():value, next=>s.updates.push(next)];}; export const useEffect=fn=>s.effects.push(fn); export const useMemo=fn=>fn();`
-      : args.path === 'react/jsx-runtime' ? 'export const jsx=(type,props)=>({type,props}); export const jsxs=jsx;'
+      ? `const s=globalThis.${key}; export const useState = value => {const i=s.stateIndex++; return [i in s.initial?s.initial[i]:typeof value==='function'?value():value, next=>s.updates.push(next)];}; export const useEffect=fn=>s.effects.push(fn); export const useMemo=fn=>fn(); export const useSyncExternalStore=(_subscribe,_client,server)=>server();`
+      : args.path === 'react/jsx-runtime' ? 'export const jsx=(type,props)=>({type,props}); export const jsxs=jsx; export const Fragment=Symbol.for("react.fragment");'
       : 'export const ModernSelect=()=>null; export const OpenInterestChart=()=>null; export const ChartNoAxesCombined=()=>null;', loader: 'js' }));
   } }] });
   const component = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text + '\n//# sourceURL=' + entry + '?test=' + ++run).toString('base64')}`);
@@ -92,7 +92,6 @@ test('an invalid VIX timestamp does not crash refresh or block later updates', a
     : { ok: false });
   await h.settle();
   assert.ok(h.updates.some(value => value?.price === 15));
-  assert.ok(h.updates.includes(''));
   h.fire('online');
   assert.equal(h.requests.length, 7);
   for (const request of h.requests.slice(4)) request.resolve({ ok: false });

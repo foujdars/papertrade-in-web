@@ -34,17 +34,21 @@ function sma(values: number[], length: number) {
 
 function finish(candles: Bar[], setups: Setup[]): StrategyPlots {
   const result: StrategyPlots = { entry: blank(candles.length), stop: blank(candles.length), target: blank(candles.length), long: blank(candles.length), short: blank(candles.length) };
-  for (const setup of setups) result[setup.side][setup.index] = setup.entry;
-  const latest = setups.at(-1);
-  if (!latest) return result;
-  for (let index = latest.index; index < candles.length; index += 1) {
-    result.entry[index] = latest.entry;
-    result.stop[index] = latest.stop;
-    result.target[index] = latest.target;
-    if (index === latest.index) continue;
+  let cursor = 0;
+  let active: Setup | undefined;
+  for (let index = setups[0]?.index ?? candles.length; index < candles.length; index += 1) {
+    if (setups[cursor]?.index === index) {
+      active = setups[cursor++];
+      result[active.side][index] = active.entry;
+    }
+    if (!active) continue;
+    result.entry[index] = active.entry;
+    result.stop[index] = active.stop;
+    result.target[index] = active.target;
+    if (index === active.index) continue;
     const bar = candles[index];
-    const hit = latest.side === "long" ? bar.low <= latest.stop || bar.high >= latest.target : bar.high >= latest.stop || bar.low <= latest.target;
-    if (hit) break;
+    const hit = active.side === "long" ? bar.low <= active.stop || bar.high >= active.target : bar.high >= active.stop || bar.low <= active.target;
+    if (hit) active = undefined;
   }
   return result;
 }

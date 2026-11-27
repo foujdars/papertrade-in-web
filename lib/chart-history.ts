@@ -37,12 +37,12 @@ export function aggregateChartCandles(candles: Candle[], timeframe: string): Can
 }
 
 export function deltaHistoryPlan(timeframe: string, params: URLSearchParams, now = Date.now()) {
+  if (!Object.hasOwn(CHART_INTERVAL_SECONDS, timeframe)) throw new Error("Unsupported timeframe.");
   const seconds = CHART_INTERVAL_SECONDS[timeframe];
-  if (!seconds) throw new Error("Unsupported timeframe.");
   const base = ({ "2m": "1m", "10m": "5m", "3H": "1H", "1W": "1D", "1M": "1D", "1Y": "1D" } as Record<string, string>)[timeframe] ?? timeframe;
   const baseSeconds = CHART_INTERVAL_SECONDS[base];
   const years = Number(params.get("years") ?? 0);
-  if (years && (![3, 5, 10].includes(years) || timeframe !== "1D")) throw new Error("History ranges require daily candles.");
+  if (params.has("years") && (![3, 5, 10].includes(years) || timeframe !== "1D")) throw new Error("Choose a 3, 5 or 10 year range on daily candles.");
   const date = params.get("date");
   const target = date ? Date.parse(date) / 1000 : null;
   if (target !== null && (!Number.isFinite(target) || target < 0 || target > now / 1000)) throw new Error("Choose a valid past date.");
@@ -86,6 +86,7 @@ export function candlesEqual(a: Candle, b: Candle) {
 /** A trailing candle update can be drawn without replacing the full series. */
 export function trailingCandleUpdate(previous: Candle[], next: Candle[]) {
   if (!previous.length || next.length < previous.length || next.length > previous.length + 1) return false;
+  if (previous.at(-1)?.time !== next[previous.length - 1]?.time) return false;
   return previous.slice(0, -1).every((c, i) => candlesEqual(c, next[i]));
 }
 

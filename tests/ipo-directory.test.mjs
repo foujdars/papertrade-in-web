@@ -143,7 +143,7 @@ test("Markets and IPO have mutually exclusive top-level screens", async () => {
   assert.match(dashboard, /key={marketsInitialGroup}/);
   assert.match(dashboard, /lastScannerGroupRef\.current/);
   assert.doesNotMatch(markets, /IpoWorkspace|useState<ScannerGroup>/);
-  assert.match(markets, /const scannerGroup = group/);
+  assert.match(markets, /saved\.scannerGroup === group/);
 });
 
 test("home omits the redundant activity feed while paper-order charts remain exact", async () => {

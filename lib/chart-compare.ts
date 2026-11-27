@@ -1,4 +1,4 @@
-import { isGlobalReferenceKey } from "./global-reference.ts";
+import { globalReferenceInstrument, isGlobalReferenceKey } from "./global-reference.ts";
 import { MARKET_GREEN } from "./market-colours.ts";
 import type { Candle } from "./market";
 
@@ -23,7 +23,8 @@ export type ComparedSymbol = {
 };
 
 export function isComparedKey(value: unknown): value is string {
-  return typeof value === "string" && COMPARE_KEY_PATTERN.test(value);
+  return typeof value === "string" && (COMPARE_KEY_PATTERN.test(value) ||
+    (isGlobalReferenceKey(value) && Boolean(globalReferenceInstrument(value.slice(4)))));
 }
 
 export function sanitizeComparedSymbols(value: unknown): ComparedSymbol[] {
@@ -55,26 +56,11 @@ export function compareChangePercent(candles: Candle[]) {
 
 /** Percent change from the first candle in the visible window. Null bounds use the whole series. */
 export function windowChangePercent(candles: Candle[], startTime: number | null, endTime: number | null) {
-  const usable = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
-  if (!usable.length) return null;
-  let from = 0;
-  let to = usable.length - 1;
-  if (startTime !== null && Number.isFinite(startTime)) {
-    const index = usable.findIndex((candle) => candle.time >= startTime);
-    if (index >= 0) from = index;
-  }
-  if (endTime !== null && Number.isFinite(endTime)) {
-    let index = -1;
-    for (let i = from; i < usable.length; i++) {
-      if (usable[i].time <= endTime) index = i;
-      else break;
-    }
-    if (index >= from) to = index;
-  }
-  const base = usable[from]?.close;
-  const last = usable[to]?.close;
-  if (!(base > 0) || !Number.isFinite(last)) return null;
-  return ((last / base) - 1) * 100;
+  const start = startTime !== null && Number.isFinite(startTime) ? startTime : -Infinity;
+  const end = endTime !== null && Number.isFinite(endTime) ? endTime : Infinity;
+  const visible = candles.filter(candle => Number.isFinite(candle.close) && candle.close > 0 && candle.time >= start && candle.time <= end);
+  const first = visible[0], last = visible.at(-1);
+  return first && last ? ((last.close / first.close) - 1) * 100 : null;
 }
 
 export function compareQuote(candles: Candle[], atTime: number | null = null) {
@@ -87,7 +73,8 @@ export function compareQuote(candles: Candle[], atTime: number | null = null) {
       if (usable[i].time <= atTime) found = i;
       else break;
     }
-    if (found >= 0) index = found;
+    if (found < 0) return null;
+    index = found;
   }
   const price = usable[index].close;
   const previous = usable[index - 1]?.close;

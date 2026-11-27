@@ -82,8 +82,10 @@ test("compare overlays sanitize keys and route global symbols to Delta candles",
     { instrumentKey: "NSE_INDEX|Nifty 50", symbol: "NIFTY", name: "Nifty 50", exchange: "NSE" },
     { instrumentKey: "javascript:alert(1)", symbol: "X", name: "X", exchange: "NSE" },
     { instrumentKey: "DELTA|SPYXUSD", symbol: "SPYXUSD", name: "S&P 500", exchange: "DELTA" },
+    { instrumentKey: "REF|SPY", symbol: "SPY", name: "S&P 500 ETF", exchange: "GLOBAL" },
+    { instrumentKey: "REF|UNKNOWN", symbol: "UNKNOWN", name: "Unknown", exchange: "GLOBAL" },
     { instrumentKey: "NSE_INDEX|Nifty 50", symbol: "NIFTY", name: "dup", exchange: "NSE" },
-  ]).map((item) => item.instrumentKey), ["NSE_INDEX|Nifty 50", "DELTA|SPYXUSD"]);
+  ]).map((item) => item.instrumentKey), ["NSE_INDEX|Nifty 50", "DELTA|SPYXUSD", "REF|SPY"]);
   assert.equal(sanitizeComparedSymbols(Array.from({ length: 12 }, (_, i) => ({ instrumentKey: `NSE_EQ|INE${i}`, symbol: `S${i}`, name: "S", exchange: "NSE" }))).length, MAX_COMPARED_SYMBOLS);
   assert.match(comparisonRequest("DELTA|SPYXUSD", "1D"), /\/api\/global-markets\?.*mode=candles/);
   assert.match(comparisonRequest("NSE_INDEX|Nifty 50", "5m"), /\/api\/upstox\/candles\?/);
@@ -100,6 +102,9 @@ test("compare overlays sanitize keys and route global symbols to Delta candles",
   assert.equal(Math.round(windowChangePercent(series, null, null) ?? 0), 20);
   assert.equal(windowChangePercent(series, 2, 3), 50);
   assert.deepEqual(compareQuote(series, 3), { price: 120, delta: 40, percent: 50 });
+  assert.equal(compareQuote(series, 0), null);
+  assert.equal(windowChangePercent(series, 4, 5), null);
+  assert.equal(windowChangePercent(series, -1, 0), null);
 });
 
 test("chart workspaces expose type and compare menus without restyling the shell", async () => {

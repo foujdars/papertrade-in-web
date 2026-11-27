@@ -269,20 +269,9 @@ test('late prior-session commits cannot roll back the active session', async () 
   assert.equal(merged.closedDay, '2026-10-12'); assert.equal(merged.closed.length, 1); assert.equal(merged.updatedAt, 20);
 });
 
-test('existing scheduler samples breadth without active trading accounts and awaits persistence', async t => {
-  let samples = 0, release;
-  const gate = new Promise(resolve => { release = resolve; });
-  globalValue(t, '__pulseScheduler', { sample: () => { samples++; return gate; }, db: { from: () => ({ select() { return this; }, eq() { return this; }, limit: async () => ({ data: [] }) }), rpc: async () => ({}) } });
-  const api = await moduleWithStubs('app/api/paper-bot/dispatch/route.ts', {
-    '@/lib/india-ad-tape': 'export const sampleNseAdTape=()=>globalThis.__pulseScheduler.sample();',
-    '@/app/api/global-markets/route': 'export const GET=()=>{throw new Error("No feed expected")};',
-    '@/lib/paper-bot-background': 'export const runBackgroundAccount=()=>{throw new Error("No accounts expected")};',
-    '@/lib/paper-bot-server': 'export const botDatabase=()=>globalThis.__pulseScheduler.db; export const requireBotScheduler=r=>{if(r.headers.get("authorization")!=="Bearer test") throw new Error("Unauthorized")}; export const botError=()=>new Response(null,{status:401}); export class BotRequestError extends Error{}; export const saveCloudBotAccount=()=>null;',
-  });
-  const request = auth => new Request('https://test.invalid/api/paper-bot/dispatch', { method: 'POST', headers: auth ? { authorization: 'Bearer test' } : {} });
-  assert.equal((await api.POST(request(false))).status, 401); assert.equal(samples, 0);
-  let finished = false;
-  const response = api.POST(request(true)).then(r => { finished = true; return r; });
-  await settle(); assert.equal(samples, 1); assert.equal(finished, false);
-  release([]); assert.equal((await response).status, 200);
+test('the retired bot scheduler no longer samples breadth or advances wallets', async () => {
+  const api = await moduleWithStubs('app/api/paper-bot/dispatch/route.ts', {});
+  const response = await api.POST(new Request('https://test.invalid/api/paper-bot/dispatch', { method: 'POST' }));
+  assert.equal(response.status, 410);
+  assert.equal((await response.json()).retired, true);
 });
