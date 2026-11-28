@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { updateHeaderPanel } from '../lib/header-panel-state.ts';
-const panels = ['notifications', 'tools', 'profile'];
+const panels = ['notifications', 'profile'];
 
 test('every header button replaces every other open panel', () => {
   for (const current of [null, ...panels]) {
@@ -16,11 +16,11 @@ test('every header button replaces every other open panel', () => {
 test('clicking the selected button toggles it closed and switching buttons opens the new panel', () => {
   const toggle = open => !open;
   let current = null;
-  for (const panel of ['profile', 'tools', 'notifications', 'profile', 'notifications', 'tools']) {
+  for (const panel of ['profile', 'notifications', 'profile', 'notifications']) {
     current = updateHeaderPanel(current, panel, toggle);
     assert.equal(current, panel);
   }
-  assert.equal(updateHeaderPanel(current, 'tools', toggle), null);
+  assert.equal(updateHeaderPanel(current, 'notifications', toggle), null);
 });
 
 test('close, backdrop and Back dismiss only their own panel; stale callbacks cannot close a newly selected panel', () => {

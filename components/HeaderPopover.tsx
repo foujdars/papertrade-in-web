@@ -16,7 +16,7 @@ export function HeaderPopover({ className, label, children }: { className: strin
       const header = trigger.closest('.topbar');
       const scrim = element.previousElementSibling;
       // Keep header controls sharp while the content behind the popup blurs.
-      if (scrim instanceof HTMLElement && scrim.matches('.more-menu-scrim, .notification-center-scrim')) {
+      if (scrim instanceof HTMLElement && scrim.matches('.notification-center-scrim')) {
         scrim.style.top = `${Math.max(viewport?.offsetTop ?? 0, header?.getBoundingClientRect().bottom ?? 0)}px`;
       }
       const nav = document.querySelector<HTMLElement>('.mobile-bottom-nav');
@@ -27,7 +27,7 @@ export function HeaderPopover({ className, label, children }: { className: strin
         top: viewport?.offsetTop ?? 0,
         width: viewport?.width ?? window.innerWidth,
         height: viewport?.height ?? window.innerHeight,
-      }, className === 'more-menu-panel' ? 330 : 390, visibleNav ? navRect.top : undefined);
+      }, 390, visibleNav ? navRect.top : undefined);
       setPosition(current => current && current.top === next.top && current.left === next.left && current.width === next.width && current.maxHeight === next.maxHeight ? current : next);
     };
     update();
@@ -45,7 +45,7 @@ export function HeaderPopover({ className, label, children }: { className: strin
       window.visualViewport?.removeEventListener('resize', update);
       window.visualViewport?.removeEventListener('scroll', update);
     };
-  }, [className]);
+  }, []);
   return <section ref={panel} className={className} aria-label={label} style={{
     position: 'fixed', top: position?.top ?? 0, left: position?.left ?? 0,
     width: position?.width ?? 0, maxHeight: position?.maxHeight ?? 0,

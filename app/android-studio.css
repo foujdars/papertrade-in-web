@@ -139,7 +139,6 @@
   .terminal-shell .brand-mark svg { width: 30px; height: 30px; }
   .terminal-shell .top-actions { gap: 6px; }
   .terminal-shell .top-actions :is(.icon-button,.notification-bell,.account-button) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: 14px; }
-  .terminal-shell .top-actions :is(.header-coach-button,.header-wallet-button,.theme-toggle) { display: none; }
   .terminal-shell .home-hub.home-studio .home-dashboard-scroll { padding: 18px 16px 80px; gap: 14px; }
   .home-overview-heading h1 { font-size: 23px; }
   .home-overview-heading > button { padding: 0 10px; }
@@ -191,7 +190,6 @@
 .terminal-shell .home-hub.home-studio .home-index-card > small em:first-child { padding: 0; background: none; }
 .terminal-shell .home-today-pnl strong { white-space: nowrap; }
 @media (max-width:760px) {
-  .terminal-shell .top-actions :is(.header-coach-button,.header-wallet-button,.theme-toggle) { display: none !important; }
   .terminal-shell .home-hub.home-studio .home-index-card > b { font-size: 18px; }
   .terminal-shell .home-hub.home-studio .home-portfolio-row { grid-template-columns: 1.6fr repeat(3,minmax(0,1fr)); }
   .terminal-shell .home-hub.home-studio .home-portfolio-row strong { font-size: 19px; }
@@ -221,12 +219,14 @@
 
 /* Header actions must not overlap: button size and slot size stay the same. */
 @media (max-width: 940px) {
-  .terminal-shell .topbar .top-actions { gap: 8px; flex: 0 0 auto; min-width: max-content; }
-  .terminal-shell .topbar .top-actions > :is(.notification-center-wrap, .more-menu-wrap) { position: relative; width: 44px; min-width: 44px; height: 44px; flex: 0 0 44px; overflow: visible; }
-  .terminal-shell .topbar .top-actions :is(.notification-center-trigger, .more-menu-trigger, .account-button) { position: relative; width: 44px; min-width: 44px; height: 44px; flex: 0 0 44px; }
+  .terminal-shell .topbar .top-actions { gap: clamp(2px, 1vw, 8px); flex: 0 0 auto; }
+  .terminal-shell .topbar .notification-center-wrap { position: relative; width: 44px; height: 44px; flex: 0 0 44px; overflow: visible; }
+  .terminal-shell .topbar .top-actions :is(.notification-center-trigger, .header-wallet-button, .theme-toggle, .account-button) { position: relative; display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; flex: 0 0 44px; padding: 0; }
   .terminal-shell .topbar .notification-center-trigger > small { top: -3px; right: -2px; z-index: 1; }
 }
-@media (max-width: 760px) {
-  .terminal-shell .topbar .top-actions > :is(.header-coach-button, .header-wallet-button, .theme-toggle) { display: none !important; }
-  .terminal-shell .more-menu-panel { padding: 12px; }
+@media (max-width: 370px) {
+  .terminal-shell .topbar { padding-inline: 6px; gap: 4px; }
+  .terminal-shell .topbar .brand { gap: 3px; padding: 0; font-size: 16px; }
+  .terminal-shell .topbar .brand-mark, .terminal-shell .topbar .brand-mark svg { width: 24px; height: 24px; flex-basis: 24px; }
+  .terminal-shell .topbar .top-actions { gap: 2px; }
 }
