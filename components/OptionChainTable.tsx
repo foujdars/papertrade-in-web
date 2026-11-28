@@ -5,11 +5,11 @@ import { CandlestickChart } from "lucide-react";
 import type { SpreadContract } from "@/lib/vertical-spread";
 import type { BasketLeg, BasketSide } from "@/lib/option-basket";
 
-export function OptionChainTable({ contracts, reference, currency, onSide, onChart, selected, legs, allowUnquoted = false, nearby = false, focusAtm = false, focusStrike, detail }: {
+export function OptionChainTable({ contracts, reference, currency, onSide, onChart, selected, legs, allowUnquoted = false, focusAtm = false, focusStrike, atmJump = 0, detail }: {
   contracts: SpreadContract[]; reference: number | null; currency: "INR" | "USD";
   onSide: (contract: SpreadContract, side: BasketSide) => void;
   onChart?: (contract: SpreadContract) => void;
-  selected?: string; legs?: BasketLeg[]; allowUnquoted?: boolean; nearby?: boolean; focusAtm?: boolean; focusStrike?: number;
+  selected?: string; legs?: BasketLeg[]; allowUnquoted?: boolean; focusAtm?: boolean; focusStrike?: number; atmJump?: number;
   detail?: "prices" | "metrics";
 }) {
   const rows = useMemo(() => {
@@ -23,17 +23,25 @@ export function OptionChainTable({ contracts, reference, currency, onSide, onCha
   }, [contracts]);
   const nearest = rows.length && reference !== null
     ? rows.reduce((best, row, i) => Math.abs(row.strike - reference) < Math.abs(rows[best].strike - reference) ? i : best, 0) : -1;
-  const focused = focusStrike === undefined ? -1 : rows.findIndex(row => row.strike === focusStrike);
-  const center = focused >= 0 ? focused : nearest < 0 ? Math.floor(rows.length / 2) : nearest;
-  const start = nearby ? Math.max(0, Math.min(rows.length - 15, center - 7)) : 0;
-  const displayed = nearby ? rows.slice(start, start + 15) : rows;
   const scroll = useRef<HTMLDivElement>(null);
+  const positioned = useRef<{ series?: string; focusStrike?: number; atmJump: number } | null>(null);
   const series = contracts[0]?.series;
-  const hasAtm = nearest >= 0;
+  const atmStrike = rows[nearest]?.strike;
   useEffect(() => {
-    const box = scroll.current, row = box?.querySelector<HTMLElement>("[data-focus='true']") ?? box?.querySelector<HTMLElement>("[data-atm='true']");
-    if (focusAtm && box && row) box.scrollTop += row.getBoundingClientRect().top - box.getBoundingClientRect().top - (box.clientHeight - row.offsetHeight) / 2;
-  }, [series, focusAtm, rows.length, hasAtm, focusStrike, nearby]);
+    const box = scroll.current;
+    if (!focusAtm || !box || !box.clientHeight) return;
+    const previous = positioned.current;
+    const sameSeries = previous && previous.series === series && previous.focusStrike === focusStrike;
+    if (sameSeries && previous.atmJump === atmJump) return;
+    const row = (!sameSeries && box.querySelector<HTMLElement>("[data-focus='true']")) || box.querySelector<HTMLElement>("[data-atm='true']");
+    if (!row) return;
+    // Short screens let the whole sheet scroll. Only move its active scrollport.
+    const port = getComputedStyle(box).overflowY === "visible" ? box.closest<HTMLElement>(".spread-builder-embedded") : box;
+    if (!port) return;
+    const headingHeight = box.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+    port.scrollTop += row.getBoundingClientRect().top - port.getBoundingClientRect().top - (port.clientHeight + headingHeight - row.offsetHeight) / 2;
+    positioned.current = { series, focusStrike, atmJump };
+  }, [series, focusAtm, focusStrike, atmStrike, atmJump]);
   const priceFormat = useMemo(() => new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
     maximumFractionDigits: currency === "USD" ? 6 : 2,
   }), [currency]);
@@ -71,7 +79,7 @@ export function OptionChainTable({ contracts, reference, currency, onSide, onCha
   return <div className="chain-grid-scroll" ref={scroll} tabIndex={0} role="region" aria-label="Option chain prices" data-detail={detail}>
     <table className="chain-grid"><colgroup><col/><col className="chain-strike-col"/><col/></colgroup>
       <thead><tr><th scope="col">{headers("CE")}</th><th scope="col">Strike <small>{currency}</small></th><th scope="col">{headers("PE")}</th></tr></thead>
-      <tbody>{displayed.map(row => <tr key={row.strike} data-focus={row.strike === focusStrike} data-atm={row.strike === rows[nearest]?.strike}>
+      <tbody>{rows.map(row => <tr key={row.strike} data-focus={row.strike === focusStrike} data-atm={row.strike === atmStrike}>
         <td>{cell(row.CE)}</td><th scope="row">{priceFormat.format(row.strike)}{row.strike === rows[nearest]?.strike && <small>ATM</small>}</th><td>{cell(row.PE)}</td>
       </tr>)}</tbody>
     </table>

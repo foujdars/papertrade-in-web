@@ -1,4 +1,4 @@
-export type HeaderPanel = 'notifications' | 'tools' | 'profile' | null;
+export type HeaderPanel = 'notifications' | 'profile' | null;
 export type HeaderPanelUpdate = boolean | ((open: boolean) => boolean);
 
 /** One selected panel means switching buttons cannot leave another panel behind. */

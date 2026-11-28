@@ -1,10 +1,11 @@
 "use client";
 
 import { useId, useMemo, useRef, useState } from "react";
-import { ChartLine, Check, ChevronDown, Layers2, List, Minus, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
-import { basketPayoff, legPrice, presetLegs, priceBasket, selectBasketLeg, volatilityPresets, type BasketLeg, type BasketPreset, type BasketSide, type PricedLeg } from "@/lib/option-basket";
-import { SPREADS, type PremiumSource, type SpreadChain, type StrategyContract } from "@/lib/vertical-spread";
+import { ChartLine, Check, Crosshair, Layers2, List, Minus, Plus, Trash2, X } from "lucide-react";
+import { basketPayoff, legPrice, presetLegs, priceBasket, selectBasketLeg, type BasketLeg, type BasketPreset, type BasketSide, type PricedLeg } from "@/lib/option-basket";
+import type { PremiumSource, SpreadChain, StrategyContract } from "@/lib/vertical-spread";
 import { OptionChainTable } from "./OptionChainTable";
+import { StrategyPresetPicker } from "./StrategyPresetPicker";
 import { BasketPayoff } from "./BasketPayoff";
 import { AppDialog } from "./AppDialog";
 import { useOptionDesk, type BasketOrder } from "./OptionDeskContext";
@@ -25,7 +26,7 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
   });
   const { legs, source, multiplier } = state;
   const [view, setView] = useState<(typeof views)[number]["id"]>("chain");
-  const [all, setAll] = useState(false);
+  const [atmJump, setAtmJump] = useState(0);
   const [detail, setDetail] = useState<"prices" | "metrics">("prices");
   const [futurePicker, setFuturePicker] = useState(false);
   const [review, setReview] = useState<PricedLeg[] | null>(null);
@@ -66,10 +67,8 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
       manual: leg.manual || String((side === "BUY" ? contract.ask : contract.bid) ?? contract.last ?? "") } : leg)});
   }
   function applyPreset(id: BasketPreset) {
-    try {
-      edit({ legs: presetLegs(chain.contracts, id, seed?.strike ?? chain.reference, source), multiplier: "1" });
-      setView("basket");
-    } catch (reason) { setError((reason as Error).message); }
+    edit({ legs: presetLegs(chain.contracts, id, seed?.strike ?? chain.reference, source), multiplier: "1" });
+    setView("basket");
   }
   function changeSource(next: PremiumSource) {
     const updated = legs.map(leg => {
@@ -128,27 +127,22 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
 
   return <div className="basket-desk" data-view={view}>
     <div className="desk-actions">
-      <label className="desk-preset"><Layers2 size={16}/><span>Pre-built strategies</span><select aria-label="Apply strategy preset" value="" disabled={sending || checking} onChange={e => applyPreset(e.target.value as BasketPreset)}>
-        <option value="">Pre-built strategies</option>
-        <optgroup label="Vertical spreads">{Object.entries(SPREADS).map(([id,p]) => <option key={id} value={id}>{p.label} · {p.flow.toLowerCase()}</option>)}</optgroup>
-        <optgroup label="Volatility strategies">{Object.entries(volatilityPresets).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</optgroup>
-      </select><ChevronDown size={13}/></label>
+      <StrategyPresetPicker underlying={rootLabel} expiry={expiry} hasLegs={!!legs.length} disabled={sending || checking} onApply={applyPreset}/>
       <button className="desk-add-future" type="button" ref={futureTrigger} disabled={sending} aria-haspopup="dialog" onClick={() => setFuturePicker(true)}>
         <Plus size={15}/>Add futures</button>
     </div>
     <nav className="basket-views" aria-label="Strategy builder views">{views.map(({id, label, icon: Icon}) =>
       <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)}><Icon size={15}/>{label}{id === "basket" && <b>{selected.length}</b>}</button>)}</nav>
     <section className="spread-card basket-chain" aria-label="Strategy option chain">
-      <div className="desk-card-head"><h2>Option chain</h2><button type="button" className="desk-filter" aria-pressed={all} onClick={() => setAll(!all)}><SlidersHorizontal size={13}/>{all ? "All strikes" : "Near ATM"}</button></div>
+      <div className="desk-card-head"><div><h2>Option chain</h2><small className="desk-count">{new Set(chain.contracts.map(c => c.strike)).size} listed strikes</small></div>
+        <button type="button" className="desk-filter" disabled={chain.reference === null} onClick={() => setAtmJump(value => value + 1)}><Crosshair size={15}/>Jump to ATM</button></div>
       <div className="desk-chain-tools"><div className="desk-toggle" role="group" aria-label="Chain data">
         <button type="button" aria-pressed={detail === "prices"} onClick={() => setDetail("prices")}>Prices</button>
         <button type="button" aria-pressed={detail === "metrics"} onClick={() => setDetail("metrics")}>Greeks &amp; OI</button></div>
         <span>{currency} per unit</span></div>
       {initialContract && !seed && <p className="spread-message">The chart contract is no longer in this chain.</p>}
-      <OptionChainTable contracts={chain.contracts} reference={chain.reference} currency={currency} legs={selected} nearby={!all} focusAtm
-        selected={seed?.id} focusStrike={seed?.strike} onSide={add} allowUnquoted={source !== "market"} detail={detail}/>
-      <div className="desk-chain-foot"><span><i/>At the money</span><span>{new Set(chain.contracts.map(c => c.strike)).size} listed strikes</span></div>
-      {!!legs.length && <button className="basket-mobile-review" type="button" onClick={() => setView("basket")}>View strategy contracts ({selected.length})</button>}
+      <OptionChainTable contracts={chain.contracts} reference={chain.reference} currency={currency} legs={selected} atmJump={atmJump} focusAtm
+        selected={seed?.id} focusStrike={initialStrike ?? seed?.strike} onSide={add} allowUnquoted={source !== "market"} detail={detail}/>
     </section>
     <div className="desk-analysis">
     <div className="desk-analysis-scroll">

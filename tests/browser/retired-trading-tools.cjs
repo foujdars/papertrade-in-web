@@ -34,15 +34,19 @@ const output=path.resolve(process.env.CHART_QA_OUTPUT_DIR||'work/retired-tools-q
  await page.getByRole('textbox',{name:'Search Indian markets',exact:true}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Open trading coach',exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'Algo Trading',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'More options',exact:true}).count(),0);
  if(width===390){
- await page.getByRole('button',{name:'More options',exact:true}).click();
- const menu=page.getByRole('region',{name:'More options',exact:true});await menu.waitFor();
- assert.equal(await menu.getByRole('button',{name:/^(Coach|Bot|Algo Trading)$/}).count(),0);
- assert.equal(await menu.getByRole('button',{name:'Wallet',exact:true}).isVisible(),true);
- await page.getByRole('button',{name:'Close tools menu',exact:true}).click();
+ const header=page.locator('.topbar');
+ assert.equal(await header.getByRole('button',{name:/^(Coach|Bot|Algo Trading)$/}).count(),0);
+ await header.getByRole('button',{name:'Practice wallet',exact:true}).click();
+ await page.getByRole('dialog',{name:'Add virtual money'}).getByRole('button',{name:'Close virtual funds'}).click();
+ const theme=await page.locator('.terminal-shell').getAttribute('data-theme');
+ await header.getByRole('button',{name:/Use .*theme/}).click();
+ assert.notEqual(await page.locator('.terminal-shell').getAttribute('data-theme'),theme);
+ await header.getByRole('button',{name:/Use .*theme/}).click();
  await page.screenshot({path:path.join(output,native?'native-home.png':'mobile-home.png')});
- }else assert.equal(await page.getByRole('button',{name:'More options',exact:true}).count(),0,'No empty desktop menu');
  }
- assert.deepEqual(errors,[]);console.log('PASS removed Algo Trading, Coach and Bot on desktop/mobile/native; remaining settings work.');
+ }
+ assert.deepEqual(errors,[]);console.log('PASS retired tools stay hidden and mobile browser and native headers expose wallet and theme.');
  }catch(error){await browser.contexts()[0]?.pages()[0]?.screenshot({path:path.join(output,'failure.png')});throw error;}finally{await browser.close();await vite.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
