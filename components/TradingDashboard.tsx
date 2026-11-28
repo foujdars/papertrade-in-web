@@ -3641,8 +3641,11 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           onScannerViewed={rememberScanner}
         />
       )}
-      {deltaOptionListOpen && selectedDeltaOptions && <AppDialog className="delta-option-dialog" label="Delta option chain" onClose={() => setDeltaOptionListOpen(false)}>
-        <header><h2>{selectedDeltaOptionRoot} option chain</h2><button type="button" className="icon-button" onClick={() => setDeltaOptionListOpen(false)} aria-label="Close option chain"><X size={20}/></button></header>
+      {deltaOptionListOpen && selectedDeltaOptions && <AppDialog className="delta-option-dialog" label="Delta option chain" initialFocus=".delta-option-close" onClose={() => setDeltaOptionListOpen(false)}>
+        <header className="delta-option-heading">
+          <h2>{selectedDeltaOptionRoot} option chain</h2>
+          <button type="button" className="delta-option-close" onClick={() => setDeltaOptionListOpen(false)} aria-label="Close option chain"><X size={20} aria-hidden="true" /></button>
+        </header>
         <DeltaOptionList instruments={selectedDeltaOptions} initialRoot={selectedDeltaOptionRoot} initialExpiry={selected.expiry} selectedSymbol={selected.symbol} onOpen={symbol => {
           const option = globalInstruments.find(item => item.symbol === symbol && item.assetType === "OPTION");
           if (option) chooseTradeInstrument(option);

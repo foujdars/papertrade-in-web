@@ -96,8 +96,10 @@ const surfaces = {
           assert.ok(await page.locator('.desktop-stock-row .negative').count(), 'Mover tabs change the displayed list');
           await page.getByRole('tab', { name: 'Gainers', exact: true }).click();
           assert.equal(await page.locator('.home-sector-heat').isVisible(), false, 'Explore avoids unrelated panels');
+          assert.ok(await page.getByRole('region', { name: 'Indian market pulse' }).isVisible(), 'Explore shows Market Pulse');
           await page.getByRole('tab', { name: 'Breadth & sectors', exact: true }).click();
           assert.ok(await page.locator('.home-sector-heat').isVisible(), 'Breadth tab exposes sectors');
+          assert.equal(await page.getByRole('region', { name: 'Indian market pulse' }).count(), 0, 'Breadth does not duplicate Market Pulse');
           assert.equal(await page.locator('.desktop-movers').isVisible(), false);
           await page.getByRole('tab', { name: 'F&O insights', exact: true }).click();
           assert.ok(await page.locator('.home-option-pulse').isVisible(), 'Options tools remain available');

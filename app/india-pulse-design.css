@@ -1,23 +1,25 @@
 /* Home indicators: a full-width breadth chart and one shared pair of live gauges. */
 .terminal-shell .india-pulse-layout { display: grid; gap: 14px; min-width: 0; }
 .terminal-shell .india-pulse-layout > .home-section { margin-top: 0; }
-.terminal-shell .india-pulse-layout .india-breadth-head { display: grid; grid-template-columns: auto minmax(0,1fr) 32px; align-items: center; gap: 8px; padding: 8px 12px 4px; min-height: 46px; }
-.terminal-shell .india-breadth-head > b { font-size: 15px; font-weight: 700; letter-spacing: -.35px; white-space: nowrap; }
-.terminal-shell .india-breadth-head > small { min-width: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
-.terminal-shell .india-breadth-expand { display: grid; place-items: center; width: 32px; min-height: 36px; padding: 0; border: 0; border-radius: 8px; color: var(--muted); background: none; cursor: pointer; }
-.terminal-shell .india-breadth-expand[aria-expanded="true"] svg { transform: rotate(90deg); }
-.terminal-shell .india-pulse-layout .india-ad { display: block; padding: 2px 10px 10px; border: 0; border-radius: 0; background: none; }
-.terminal-shell .india-pulse-layout .india-ad-chart { display: block; width: 100%; height: 180px; max-height: none; margin: 0; }
-.terminal-shell .india-pulse-layout .is-expanded .india-ad-chart { height: 300px; }
+.terminal-shell .india-pulse-layout .home-section.india-breadth-card > .india-breadth-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 14px; min-height: 49px; border-bottom: 0;
+}
+.terminal-shell .india-breadth-head > b { font-size: 15px; font-weight: 750; letter-spacing: -.02em; }
+.terminal-shell .india-breadth-expand {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 38px; padding: 0 9px;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--purple); background: var(--purple-soft);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.terminal-shell .india-breadth-expand svg { flex: none; }
+.terminal-shell .india-breadth-expand[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
+.terminal-shell .india-pulse-layout .india-ad { display: block; padding: 0 12px 12px; border: 0; border-radius: 0; background: none; }
+.terminal-shell .india-pulse-layout .india-ad-chart { display: block; width: 100%; max-height: none; margin: 0; }
 .terminal-shell .india-pulse-layout .india-ad-chart text { font-family: inherit; font-size: 10px; font-weight: 500; fill: var(--muted); }
 .terminal-shell .india-pulse-layout .india-ad-chart .grid { stroke: var(--line); stroke-width: 1; }
 .terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line.up { stroke: var(--green); }
 .terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-line.down { stroke: var(--red); }
-.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end.up { fill: var(--green); }
-.terminal-shell .india-pulse-layout .india-ad-chart .india-breadth-end.down { fill: var(--red); }
-.terminal-shell .india-breadth-pending { display: block; margin-top: 6px; }
 .terminal-shell .india-pulse-layout .india-gauge-panel { position: relative; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); padding: 12px 0; gap: 0; overflow: visible; background: var(--surface); }
 .terminal-shell .india-gauge-panel :is(.india-vix,.india-pcr) { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 0 8px; border: 0; border-radius: 0; background: none; }
 .terminal-shell .india-gauge-panel .india-pcr { border-left: 1px solid var(--line); }
@@ -52,26 +54,40 @@
 .terminal-shell .india-gauge-foot summary::-webkit-details-marker { display: none; }
 .terminal-shell .india-gauge-foot details p { position: absolute; z-index: 8; left: 10px; right: 10px; top: calc(100% + 6px); width: auto; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); box-shadow: 0 10px 28px #0002; font-size: 12px; font-weight: 500; line-height: 1.5; }
 .terminal-shell .india-gauge-foot summary:focus-visible, .terminal-shell .india-breadth-expand:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
-@media (max-width:360px) { .terminal-shell .india-breadth-head > b { font-size: 13px; } .terminal-shell .india-breadth-head > small { font-size: 9px; } .terminal-shell .india-gauge-panel :is(.india-vix,.india-pcr) { padding-inline: 6px; } }
-@media (min-width:761px) { .terminal-shell .india-pulse-layout .india-ad-chart { height: 210px; } .terminal-shell .india-breadth-head > b { font-size: 17px; } .terminal-shell .india-breadth-head > small { font-size: 12px; } }
+@media (max-width:360px) { .terminal-shell .india-breadth-head > b { font-size: 13px; } .terminal-shell .india-gauge-panel :is(.india-vix,.india-pcr) { padding-inline: 6px; } }
+@media (min-width:761px) { .terminal-shell .india-breadth-head > b { font-size: 17px; } }
 
 .terminal-shell .india-pulse-layout .india-ad-chart circle.up { fill: var(--green); }
 .terminal-shell .india-pulse-layout .india-ad-chart circle.down { fill: var(--red); }
-.terminal-shell .india-pulse-layout .india-breadth-head { border-bottom: 0; }
 
-.terminal-shell .india-breadth-counts { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin:2px 0 6px; font-variant-numeric:tabular-nums; }
-.terminal-shell .india-breadth-counts .up { color:var(--green); }
-.terminal-shell .india-breadth-counts .down { color:var(--red); }
-
-.terminal-shell .india-breadth-snapshot { padding: 12px 4px; }
-.terminal-shell .india-breadth-ratio, .terminal-shell .india-breadth-share-labels, .terminal-shell .india-breadth-retry { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; }
-.terminal-shell .india-breadth-ratio strong { font-size: 24px; font-variant-numeric: tabular-nums; }
-.terminal-shell .india-breadth-share-bar { display: flex; height: 18px; margin: 12px 0 8px; border-radius: 6px; overflow: hidden; }
+.terminal-shell .india-breadth-snapshot {
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--soft); font-variant-numeric: tabular-nums;
+}
+.terminal-shell .india-breadth-ratio { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.terminal-shell .india-breadth-ratio b { font-size: 12px; }
+.terminal-shell .india-breadth-snapshot small { color: var(--muted); font-size: 11px; font-weight: 600; }
+.terminal-shell .india-breadth-ratio strong { flex: none; font-size: 22px; line-height: 1; letter-spacing: -.04em; }
+.terminal-shell .india-breadth-ratio strong span { color: var(--muted); font-size: 13px; }
+.terminal-shell .india-breadth-share-bar {
+  position: relative; display: flex; height: 12px; margin: 11px 0; border-radius: 5px; overflow: hidden;
+}
+.terminal-shell .india-breadth-share-bar::after {
+  content: ""; position: absolute; inset-block: 0; left: 50%; width: 1px;
+  background: var(--surface); box-shadow: 0 0 0 1px rgb(0 0 0 / .28);
+}
 .terminal-shell .india-breadth-share-bar .up { background: var(--green); }
 .terminal-shell .india-breadth-share-bar .down { background: var(--red); }
-.terminal-shell .india-breadth-share-labels .up { color: var(--green); }
-.terminal-shell .india-breadth-share-labels .down { color: var(--red); }
-.terminal-shell .india-breadth-snapshot p, .terminal-shell .india-breadth-retry { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.terminal-shell .india-breadth-counts { display: flex; justify-content: space-between; gap: 8px; }
+.terminal-shell .india-breadth-counts > div { display: grid; gap: 2px; }
+.terminal-shell .india-breadth-counts > div:last-child { justify-items: end; }
+.terminal-shell .india-breadth-counts .india-breadth-key {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 750;
+}
+.terminal-shell .india-breadth-counts b { display: flex; align-items: baseline; gap: 6px; font-size: 16px; line-height: 1.15; }
+.terminal-shell .india-breadth-trend { margin-top: 10px; }
+.terminal-shell .india-breadth-trend > small { padding-bottom: 5px; text-align: right; }
+.terminal-shell .india-breadth-retry { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .terminal-shell .india-breadth-retry { padding: 8px 4px; }
 .terminal-shell .india-breadth-retry button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
 .terminal-shell .india-breadth-retry button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }

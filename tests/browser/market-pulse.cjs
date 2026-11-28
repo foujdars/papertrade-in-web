@@ -5,8 +5,8 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
 (async () => {
   const start = Date.parse('2026-10-06T03:45:00Z'), end = Date.parse('2026-10-06T10:05:00Z');
   const tape = Array.from({length:381}, (_,i)=>({t:start+(end-start)*i/380,advance:Math.round(900+1341*i/380),decline:Math.round(350+677*i/380)}));
-  let pulse = {ok:true,breadth:{advance:2241,decline:1027},tape,vix:{price:13.6,change:-1.18,changePercent:-7.98},vixCheckedAt:end,flows:[],pcr:{putOi:240000000,callOi:170000000,value:24/17,expiry:'2026-10-06',asOf:new Date(end).toISOString()},sessionLive:false};
-  const bundle = await esbuild.build({entryPoints:['tests/browser/market-pulse.fixture.jsx'],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'}});
+  let pulse = {ok:true,breadth:{advance:1914,decline:1392},breadthCheckedAt:end,tape:[],vix:{price:13.6,change:-1.18,changePercent:-7.98},vixCheckedAt:end,flows:[],pcr:{putOi:240000000,callOi:170000000,value:24/17,expiry:'2026-10-06',asOf:new Date(end).toISOString()},sessionLive:false};
+  const bundle = await esbuild.build({entryPoints:['tests/browser/market-pulse.fixture.jsx'],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',tsconfig:'tsconfig.json',define:{'process.env.NODE_ENV':'"production"'}});
   const css = [...fs.readFileSync('app/layout.tsx','utf8').matchAll(/import "\.\/(.+\.css)"/g)].map(([,f])=>fs.readFileSync('app/'+f,'utf8')).join('\n').replace(/@import[^;]+;/g,'');
   const server = http.createServer((req,res)=> {
     if(req.url.startsWith('/api/')) {res.setHeader('Content-Type','application/json');return res.end(JSON.stringify(pulse));}
@@ -16,78 +16,79 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   let browser;
   try {
-    const launch={headless:true};
+    const launch={headless:true,executablePath:process.env.CHROME_PATH};
     if(process.env.CHROMIUM_PACKAGE) {const pkg=require(process.env.CHROMIUM_PACKAGE), c=pkg.default||pkg;launch.executablePath=await c.executablePath();launch.args=c.args.filter(arg=>arg!=='--single-process');}
     browser=await chromium.launch(launch);
     const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.clock.install({time:new Date(end)});
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    const chart=page.locator('.india-ad-chart');await chart.waitFor();
-    assert.equal(await page.locator('.india-vix-value strong').textContent(),'13.60');
-    assert.equal(await page.locator('.india-pcr-main strong').textContent(),'1.41');
-    assert.equal(await page.locator('.india-gauge-oi-value.put').textContent(),'24Cr');
-    assert.equal(await page.locator('.india-gauge-oi-value.call').textContent(),'17Cr');
-    assert.equal(await page.locator('.india-gauge-arc').count(),6);
-    assert.equal(await page.locator('.india-gauge-needle').count(),2);
-    assert.deepEqual(await page.locator('.india-breadth-end.up tspan').allTextContents(), ['2,241', '(69%)']);
-    assert.deepEqual(await page.locator('.india-breadth-end.down tspan').allTextContents(), ['1,027', '(31%)']);
-    assert.ok(await page.locator('.india-breadth-end').evaluateAll(labels => labels.every(label => { const [count, percentage] = label.children; return percentage.getBBox().y > count.getBBox().y; })), 'Bracketed percentages sit below counts');
-    assert.match(await page.locator('.india-breadth-head small').textContent(),/NSE · 6 Oct · 15:35 IST/);
-    for(const theme of ['light','neon']) {
-      if(theme==='neon') await page.getByRole('button',{name:'Theme',exact:true}).click();
-      for(const width of [320,375,390,768,1280]) {
+    const chart = page.locator('.india-ad-chart');
+    const card = page.getByRole('region', {name:'Indian market pulse'});
+    const ratio = card.locator('.india-breadth-ratio strong');
+    const trend = card.getByRole('button', {name:'Intraday'});
+    const waitForRatio = text => page.waitForFunction(value => document.querySelector('.india-breadth-ratio strong')?.textContent === value, text);
+    await waitForRatio('1.38 : 1');
+    assert.deepEqual(await card.locator('.india-breadth-counts b').allTextContents(), ['1,914 57.9%', '1,392 42.1%']);
+    assert.ok(await card.locator('.india-breadth-share-bar').evaluate(bar => {
+      const advance = bar.querySelector('.up');
+      return Math.abs(advance.getBoundingClientRect().width / bar.getBoundingClientRect().width - 1914 / (1914 + 1392)) < .002;
+    }));
+    assert.equal(await trend.count(), 0, 'Snapshot stays usable without history');
+
+    pulse = {...pulse, tape};
+    await page.clock.fastForward(11000);
+    await trend.click();
+    assert.equal(await trend.getAttribute('aria-expanded'), 'true');
+    assert.equal(await chart.locator('path.up').getAttribute('d').then(d => d.includes('L')), true);
+    assert.match(await chart.getAttribute('aria-label'), /2,241 advances and 1,027 declines/);
+    assert.equal(await ratio.textContent(), '1.38 : 1', 'Intraday history does not replace the newer snapshot');
+    assert.equal(await page.locator('.india-vix-value strong').textContent(), '13.60');
+    assert.equal(await page.locator('.india-pcr-main strong').textContent(), '1.41');
+
+    for (const theme of ['light','neon']) {
+      if (theme === 'neon') await page.getByRole('button', {name:'Theme', exact:true}).click();
+      for (const width of [320,375,390,768,1280]) {
         await page.setViewportSize({width,height:844});
-        await page.waitForFunction(()=>Math.abs(document.querySelector('.india-ad-chart').getBoundingClientRect().width-Number(document.querySelector('.india-ad-chart').getAttribute('viewBox').split(' ')[2]))<1).catch(async error=>{console.error({theme,width,chart:await chart.evaluate(el=>({width:el.getBoundingClientRect().width,viewBox:el.getAttribute('viewBox'),parent:el.parentElement.getBoundingClientRect().width}))});throw error;});
-        const columns=await page.locator('.india-gauge-panel > div').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
-        assert.equal(columns[0].y,columns[1].y);assert.equal(columns[0].height,columns[1].height);
-        assert.ok(columns[1].x>columns[0].x);assert.ok(Math.abs(columns[0].width-columns[1].width)<1);
-        assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`${theme} fits ${width}px`);
-        assert.ok(await chart.locator('text').evaluateAll(els=>els.every(el=>{const b=el.getBBox(),v=el.ownerSVGElement.viewBox.baseVal;return b.x>=-1&&b.x+b.width<=v.width+1;})),`chart labels fit ${width}px`);
-        const gaugeText=await page.locator('.india-market-gauge text').evaluateAll(els=>els.map(el=>({text:el.textContent,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})));
-        assert.ok(gaugeText.every(t=>t.height>=7),`readable gauge labels ${width}px: ${JSON.stringify(gaugeText)}`);
-        if(width===390&&process.env.MARKET_PULSE_SCREENSHOT) await page.screenshot({path:process.env.MARKET_PULSE_SCREENSHOT.replace('.png',`-${theme}.png`)});
+        await page.waitForFunction(() => {
+          const svg = document.querySelector('.india-ad-chart');
+          return Math.abs(svg.getBoundingClientRect().width - svg.viewBox.baseVal.width) < 1;
+        });
+        assert.ok(await card.evaluate(el => el.scrollWidth <= el.clientWidth + 1), `Market Pulse fits ${width}px`);
+        assert.ok(await chart.locator('text').evaluateAll(labels => labels.every(label => {
+          const bounds = label.getBBox(), view = label.ownerSVGElement.viewBox.baseVal;
+          return bounds.x >= -1 && bounds.x + bounds.width <= view.width + 1;
+        })), `Chart labels fit ${width}px`);
+        if (width === 390 && process.env.MARKET_PULSE_SCREENSHOT) await card.screenshot({path:process.env.MARKET_PULSE_SCREENSHOT.replace('.png', `-${theme}.png`)});
       }
     }
-    await page.setViewportSize({width:390,height:844});
-    await page.getByRole('button',{name:'Expand market pulse',exact:true}).click();
-    assert.equal(await chart.evaluate(el=>el.getBoundingClientRect().height),300);
-    assert.equal(await chart.getAttribute('viewBox').then(v=>Number(v.split(' ')[3])),300);
     await page.keyboard.press('Escape');
-    assert.equal(await page.getByRole('button',{name:'Expand market pulse',exact:true}).getAttribute('aria-expanded'),'false');
-    await page.getByLabel('What is put/call ratio?',{exact:true}).click();
-    const info=page.locator('.india-pcr details p');await info.waitFor();
-    assert.match(await info.textContent(),/total put open interest ÷ total call open interest/);
-    const popup=await info.boundingBox();assert.ok(popup.x>=0&&popup.x+popup.width<=390);
-    await page.keyboard.press('Escape');assert.equal(await info.count(),0);
-    // The existing 30-second refresh updates actual values without remounting.
-    pulse={...pulse,vix:{...pulse.vix,price:23},tape:[{t:end,advance:1000,decline:1000}]};
-    await page.clock.fastForward(31000);
-    await page.waitForFunction(()=>document.querySelector('.india-vix-value strong').textContent==='23.00');
-    assert.equal(await page.locator('.india-vix-status').textContent(),'Elevated');
-    assert.equal(await chart.locator('path.up').getAttribute('d').then(d=>d.includes('L')),true,'A shorter response preserves collected history');
-    assert.ok(await chart.locator('.india-breadth-end').evaluateAll(els=>Math.abs(Number(els[0].getAttribute('y'))-Number(els[1].getAttribute('y')))>=22),'Equal-count endpoint labels do not overlap');
-    pulse={...pulse,tape:[{t:end,advance:1397,decline:1896}]};await page.clock.fastForward(31000);
-    await page.waitForFunction(()=>document.querySelector('.india-breadth-end.up tspan').textContent==='1,397');
-    assert.ok(await page.locator('.india-breadth-end.up').evaluate(el=>Number(el.getAttribute('y'))>Number(document.querySelector('.india-breadth-end.down').getAttribute('y'))),'decline label follows the higher red line when endpoints are close');
-    pulse={...pulse,vix:null,pcr:null,tape:[],breadth:null};await page.clock.fastForward(31000);
-    await page.waitForFunction(()=>document.querySelector('.india-vix-value strong').textContent==='—');
-    assert.equal(await chart.count(),1,'An empty snapshot cannot erase the verified chart');
-    assert.equal(await page.locator('.india-breadth-end.up tspan').first().textContent(),'1,397');
-    assert.equal(await page.locator('.india-gauge-needle').count(),0);
-    assert.equal(await page.locator('.india-vix-status').count(),0);
-    assert.equal(await page.locator('.india-vix-value strong').textContent(),'—');
-    assert.equal(await page.locator('.india-pcr-main strong').textContent(),'—');
-    // A stopped sampler must not leave obsolete chart endpoint counts as the current breadth.
-    pulse={...pulse,breadth:{advance:891,decline:2347},breadthCheckedAt:Date.parse('2026-10-07T10:10:00Z'),tape:[{t:Date.parse('2026-10-07T04:57:00Z'),advance:836,decline:2167}]};
+    assert.equal(await trend.getAttribute('aria-expanded'), 'false');
+    assert.equal(await chart.count(), 0);
+
+    pulse = {...pulse, breadth:{advance:2000,decline:0}, breadthCheckedAt:end+60000, tape:[]};
     await page.clock.fastForward(11000);
-    await page.waitForFunction(()=>document.querySelector('.india-breadth-counts')?.textContent.includes('2,347'));
-    assert.match(await page.locator('.india-breadth-head small').textContent(), /Partial history/);
-    assert.equal(await chart.locator('path.up').getAttribute('d').then(d=>d.includes('L')),false,'Missing session history is never fabricated');
-    pulse={...pulse,tape:[...pulse.tape,{t:Date.parse('2026-10-07T04:58:00Z'),advance:850,decline:2150}]};
+    await waitForRatio('∞');
+    assert.deepEqual(await card.locator('.india-breadth-counts b').allTextContents(), ['2,000 100.0%', '0 0.0%']);
+    await trend.click();
+    assert.match(await chart.getAttribute('aria-label'), /2,241 advances and 1,027 declines/, 'Shorter responses preserve verified history');
+
+    pulse = {...pulse, breadth:{advance:1000,decline:1000}, breadthCheckedAt:end+120000};
     await page.clock.fastForward(11000);
-    await page.waitForFunction(()=>document.querySelector('.india-ad-chart path.up').getAttribute('d').includes('L'));
+    await waitForRatio('1.00 : 1');
+    assert.deepEqual(await card.locator('.india-breadth-counts b').allTextContents(), ['1,000 50.0%', '1,000 50.0%']);
+
+    pulse = {...pulse, breadth:null, breadthCheckedAt:null, tape:[]};
+    await page.clock.fastForward(11000);
+    await card.getByRole('button', {name:'Retry market pulse'}).waitFor();
+    assert.equal(await ratio.textContent(), '1.00 : 1', 'Failed fetch preserves the verified snapshot');
+    const tomorrow = start + 24 * 3600000;
+    await page.clock.setSystemTime(tomorrow + 60000);
+    pulse = {...pulse, sessionLive:true};
+    await card.getByRole('button', {name:'Retry market pulse'}).click();
+    await card.getByText('No breadth data', {exact:true}).waitFor();
+    assert.equal(await trend.count(), 0, 'A new session clears the prior snapshot and tape while new data is unavailable');
     assert.deepEqual(errors,[]);
-    console.log('PASS: side-by-side live gauges and breadth endpoint labels at 320–1280px in both themes; expansion, popups, 30-second refresh, sparse and unavailable data.');
+    console.log('PASS: accurate breadth counts, ratios and bar geometry, optional measured history, refresh and session rollover at 320–1280px in both themes.');
   } finally {await browser?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

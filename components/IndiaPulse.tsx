@@ -2,7 +2,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { adLinePath, mergeBreadthSnapshot, breadthShares, FLOW_WINDOWS, flowChartRows, flowsInRange, sessionBounds, vixBand, type AdPoint, type FlowPoint, type IndiaVix, type NseBreadth, type PutCallRatio } from "@/lib/india-pulse";
 import { useTransientBack } from "./useTransientBack";
-import { ChevronRight } from "lucide-react";
+import { ChartNoAxesCombined, ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
 import { MarketGauge } from "./MarketGauge";
 import { startVisiblePolling } from "@/lib/visible-polling";
 
@@ -10,6 +10,8 @@ type Pulse = { breadth: NseBreadth | null; tape: AdPoint[]; vix: IndiaVix | null
 
 const crore = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(Math.round(value)).toLocaleString("en-IN")}`;
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" });
+const sessionDate = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const stockCount = new Intl.NumberFormat("en-IN");
 const flowDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
 function InfoTip({ label, children }: { label: string; children: ReactNode }) {
@@ -30,7 +32,7 @@ function axisMax(value: number) {
   return steps.find(step => step >= value) ?? Math.ceil(value / 1000) * 1000;
 }
 
-function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string; expanded: boolean }) {
+function SessionChart({ points }: { points: AdPoint[] }) {
   const chartRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(360);
   useEffect(() => {
@@ -39,7 +41,8 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
     observer.observe(chartRef.current);
     return () => observer.disconnect();
   }, []);
-  const height = expanded ? 300 : width >= 600 ? 138 : 112, left = 35, right = width < 440 ? 80 : 100, top = 13, bottom = 26;
+  const height = width >= 600 ? 192 : 144;
+  const left = 40, right = 8, top = 11, bottom = 26;
   const last = points[points.length - 1];
   const max = axisMax(Math.max(...points.flatMap(point => [point.advance, point.decline])));
   const bounds = sessionBounds(points);
@@ -47,24 +50,16 @@ function SessionChart({ points, id, expanded }: { points: AdPoint[]; id: string;
   const x = (t: number) => left + ((Math.min(end, Math.max(start, t)) - start) / (end - start)) * (width - left - right);
   const y = (value: number) => top + (1 - value / max) * (height - top - bottom);
   const line = (key: "advance" | "decline") => adLinePath(points, key, x, y);
-  const ticks = [start, start + (end - start) * .25, start + (end - start) * .5, start + (end - start) * .75, end];
-  const total = last.advance + last.decline;
-  const advanceShare = total ? Math.round(last.advance / total * 100) : 0;
-  const advanceY = y(last.advance), declineY = y(last.decline);
-  const closeLabels = Math.abs(advanceY - declineY) < 34;
-  const upperLabelY = Math.max(top + 7, Math.min(height - bottom - 50, (advanceY + declineY) / 2 - 17));
-  const upperKey = advanceY <= declineY ? "advance" : "decline";
-  const endpointY = (key: "advance" | "decline") => closeLabels ? upperLabelY + (key === upperKey ? 0 : 34) : Math.min(height - bottom - 16, y(last[key]));
-  return <svg id={id} ref={chartRef} className="india-ad-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`NSE advances and declines through the session. Advances ${last.advance.toLocaleString("en-IN")}, ${advanceShare} percent; declines ${last.decline.toLocaleString("en-IN")}, ${total ? 100 - advanceShare : 0} percent.`}>
-    {[0, max / 2, max].map(value => <text className="india-breadth-axis" key={value} x={left - 7} y={y(value) + 4} textAnchor="end">{Math.round(value).toLocaleString("en-IN")}</text>)}
-    <line className="grid" x1={left} x2={left} y1={top} y2={height - bottom} />
-    <line className="grid" x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} />
+  const ticks = [start, start + 105 * 60000, start + 225 * 60000, end];
+  return <svg ref={chartRef} className="india-ad-chart" style={{ height }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`NSE stock counts on ${sessionDate.format(last.t)}. Last plotted at ${clock.format(last.t)} IST, ${stockCount.format(last.advance)} advances and ${stockCount.format(last.decline)} declines.`}>
+    {[0, max / 2, max].map(value => <g key={value}>
+      <line className="grid" x1={left} x2={width - right} y1={y(value)} y2={y(value)} />
+      <text className="india-breadth-axis" x={left - 7} y={y(value) + 4} textAnchor="end">{stockCount.format(value)}</text>
+    </g>)}
     <path className="india-breadth-line down" d={line("decline")} /><path className="india-breadth-line up" d={line("advance")} />
     {points.filter((p, i) => (!i || p.t - points[i - 1].t > 5 * 60000) && (i === points.length - 1 || points[i + 1].t - p.t > 5 * 60000)).map(p => <g key={p.t}><circle className="up" cx={x(p.t)} cy={y(p.advance)} r="2" /><circle className="down" cx={x(p.t)} cy={y(p.decline)} r="2" /></g>)}
-    {(["advance", "decline"] as const).map(key => <g key={key}>
-      <circle className={key === "advance" ? "up" : "down"} cx={x(last.t)} cy={y(last[key])} r="3" />
-      <text className={`india-breadth-end ${key === "advance" ? "up" : "down"}`} x={x(last.t) + 7} y={endpointY(key) + 3}><tspan x={x(last.t) + 7}>{last[key].toLocaleString("en-IN")}</tspan><tspan x={x(last.t) + 7} dy="13">({key === "advance" ? advanceShare : total ? 100 - advanceShare : 0}%)</tspan></text>
-    </g>)}
+    <circle className="up" cx={x(last.t)} cy={y(last.advance)} r="3" />
+    <circle className="down" cx={x(last.t)} cy={y(last.decline)} r="3" />
     {ticks.map((tick, index) => <g key={tick}>
       <line className="grid" x1={x(tick)} x2={x(tick)} y1={height - bottom} y2={height - bottom + 4} />
       <text className="india-breadth-time" x={x(tick)} y={height - 6} textAnchor={index === 0 ? "start" : index === ticks.length - 1 ? "end" : "middle"}>{clock.format(tick)}</text>
@@ -169,34 +164,15 @@ function usePulse(part: "breadth" | "gauges" | "flows", enabled = true) {
   return { pulse, range, setRange, failed, refresh: () => setRetry(value => value + 1) };
 }
 
-export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
-  const { pulse, failed, refresh } = usePulse("breadth");
+export function IndiaPulse({ showBreadth = true, showGauges = true }: { showBreadth?: boolean; showGauges?: boolean }) {
   const { pulse: gauges } = usePulse("gauges", showGauges);
-  const chartId = useId();
-  const [expanded, setExpanded] = useState(false);
-  useTransientBack(expanded, () => setExpanded(false));
-  const snapshot = pulse?.breadth;
-  const shares = snapshot ? breadthShares(snapshot) : null;
   const vix = gauges?.vix;
   const band = vix ? vixBand(vix.price) : null;
   const pcr = gauges?.pcr;
   const pcrShare = pcr ? Math.max(5, Math.min(95, pcr.putOi / (pcr.putOi + pcr.callOi) * 100)) : null;
   const oi = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
   return <div className="india-pulse-layout">
-    <section className={`home-section india-pulse india-breadth-card${expanded ? " is-expanded" : ""}`} aria-label="Indian market pulse">
-      <header className="india-breadth-head"><b>Market Pulse</b><button type="button" className="india-breadth-expand" aria-label={expanded ? "Collapse market pulse" : "Expand market pulse"} aria-expanded={expanded} aria-controls={chartId} onClick={() => setExpanded(value => !value)}><ChevronRight size={18} /></button></header>
-      {pulse?.breadth && <div className="india-breadth-counts" aria-label="Market breadth">
-        <span className="up">Advances <b>{pulse.breadth.advance.toLocaleString("en-IN")}</b></span><span className="down">Declines <b>{pulse.breadth.decline.toLocaleString("en-IN")}</b></span>
-      </div>}
-      <div className="india-ad">
-        {pulse?.tape.length ? <SessionChart points={pulse.tape} id={chartId} expanded={expanded} /> : snapshot && shares ? <div id={chartId} className="india-breadth-snapshot">
-          <div className="india-breadth-ratio"><span>Advance / decline ratio</span><strong>{shares.ratio}</strong></div>
-          <div className="india-breadth-share-bar" role="img" aria-label={`Advances ${snapshot.advance}, ${shares.advance.toFixed(1)} percent; declines ${snapshot.decline}, ${shares.decline.toFixed(1)} percent`}><span className="up" style={{ width: `${shares.advance}%` }} /><span className="down" style={{ width: `${shares.decline}%` }} /></div>
-          <div className="india-breadth-share-labels"><span className="up">Advances {shares.advance.toFixed(1)}%</span><span className="down">Declines {shares.decline.toFixed(1)}%</span></div>
-        </div> : <div id={chartId} className="india-pulse-wait">{pulse || failed ? "No breadth data" : "Loading…"}</div>}
-        {failed && <div className="india-breadth-retry" role="status"><button type="button" onClick={refresh}>Retry market pulse</button></div>}
-      </div>
-    </section>
+    {showBreadth && <MarketPulse />}
     {showGauges && <section className="home-section india-gauge-panel" aria-label="India VIX and Nifty put/call ratio">
       <div className="india-vix">
         <div className="india-gauge-heading"><h3>India VIX</h3></div>
@@ -211,6 +187,49 @@ export function IndiaPulse({ showGauges = true }: { showGauges?: boolean }) {
       </div>
     </section>}
   </div>;
+}
+
+function MarketPulse() {
+  const { pulse, failed, refresh } = usePulse("breadth");
+  const [expanded, setExpanded] = useState(false);
+  const chartId = useId();
+  const tape = pulse?.tape ?? [];
+  const lastPoint = tape.at(-1);
+  const snapshot = lastPoint && lastPoint.t > (pulse?.breadthCheckedAt ?? 0) ? lastPoint : pulse?.breadth;
+  const shares = snapshot && breadthShares(snapshot);
+  const advancePercent = shares ? Math.round(shares.advance * 10) / 10 : 0;
+  const showTrend = expanded && tape.length > 1;
+  useTransientBack(showTrend, () => setExpanded(false));
+
+  return <section className="home-section india-pulse india-breadth-card" aria-label="Indian market pulse">
+    <header className="india-breadth-head">
+      <b>Market Pulse</b>
+      {tape.length > 1 && <button type="button" className="india-breadth-expand" aria-expanded={showTrend} aria-controls={chartId}
+        onClick={() => setExpanded(value => !value)}><ChartNoAxesCombined size={15} aria-hidden="true" /> Intraday <ChevronDown size={13} aria-hidden="true" /></button>}
+    </header>
+    <div className="india-ad">
+      {snapshot && shares ? <div className="india-breadth-snapshot">
+        <div className="india-breadth-ratio">
+          <div><b>Advance / decline ratio</b><small>Share of NSE stocks that moved</small></div>
+          <strong>{shares.ratio}{shares.ratio !== "∞" && <span> : 1</span>}</strong>
+        </div>
+        <div className="india-breadth-share-bar" aria-hidden="true">
+          <span className="up" style={{ width: `${shares.advance}%` }} /><span className="down" style={{ width: `${shares.decline}%` }} />
+        </div>
+        <div className="india-breadth-counts">
+          <div><span className="india-breadth-key up"><TrendingUp size={15} aria-hidden="true" /> Advances</span><b>{stockCount.format(snapshot.advance)} <small>{advancePercent.toFixed(1)}%</small></b></div>
+          <div><span className="india-breadth-key down"><TrendingDown size={15} aria-hidden="true" /> Declines</span><b>{stockCount.format(snapshot.decline)} <small>{(100 - advancePercent).toFixed(1)}%</small></b></div>
+        </div>
+      </div> : <div className="india-pulse-wait" role="status">{pulse || failed ? "No breadth data" : "Loading breadth…"}</div>}
+      <div id={chartId} hidden={!showTrend}>
+        {showTrend && lastPoint && <div className="india-breadth-trend">
+          <small>{sessionDate.format(lastPoint.t)} · IST</small>
+          <SessionChart points={tape} />
+        </div>}
+      </div>
+      {failed && <div className="india-breadth-retry" role="status"><button type="button" onClick={refresh}>Retry market pulse</button></div>}
+    </div>
+  </section>;
 }
 
 export function IndiaFlows() {

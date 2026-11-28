@@ -32,8 +32,6 @@
  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges > span { display:grid; justify-items:center; gap:3px; min-width:0; }
  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges svg { width:min(100%,190px); height:115px; }
  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .desktop-derivative-gauges b { font-size:12px; }
- .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-ad-chart { flex:none; width:100%; min-height:180px; height:210px!important; max-height:300px; }
- .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-breadth-card.is-expanded .india-ad-chart { height:300px!important; }
  .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) .home-hub.home-studio .india-flow-chart { width:100%; height:210px!important; }
  @media (max-width:1200px) {
   .terminal-shell[data-platform="web"]:has(.home-hub[data-desktop-visuals="true"]) :is(.desktop-market-table-head,.desktop-stock-row) { grid-template-columns:minmax(115px,1fr) 82px 65px 65px 120px; gap:8px; min-width:520px; }

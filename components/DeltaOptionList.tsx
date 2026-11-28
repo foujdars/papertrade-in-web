@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { OptionChainTable } from "./OptionChainTable";
 import { OptionStrategyButton } from "./OptionStrategyButton";
 import { useOptionDesk } from "./OptionDeskContext";
@@ -10,7 +10,10 @@ import { loadSpreadChain } from "@/lib/spread-chain-client";
 import type { SpreadChain, SpreadContract } from "@/lib/vertical-spread";
 import { deltaOptionDirectory, isTokenisedDelta, type ListedDeltaOption } from "@/lib/delta-option-list";
 
-const expiryLabel = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+const expiryLabel = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit",
+  hourCycle: "h23", timeZone: "Asia/Kolkata",
+});
 
 export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selectedSymbol, onOpen }: {
   instruments: readonly ListedDeltaOption[];
@@ -28,6 +31,7 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
   const expiries = [...new Set(contracts.map(item => item.expiry))].sort();
   const expiry = expiries.includes(requestedExpiry) ? requestedExpiry : expiries[0] ?? "";
   const desk = useOptionDesk();
+  const controlsId = useId();
   const [reload, setReload] = useState(0);
   const [feed, setFeed] = useState<{ key: string; chain?: SpreadChain; error?: string }>();
   const key = root + ":" + expiry;
@@ -48,17 +52,32 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
   }, [byRoot, root, expiry, live]);
   if (!roots.length) return <p className="delta-options-empty" role="status">No listed options</p>;
   return <div className="delta-options">
-    <div className="delta-options-controls">
-      <label>Underlying<select value={root} onChange={event => { setRoot(event.target.value); setExpiry(""); }}>
-        {roots.map(value => <option key={value} value={value}>{value === "XAUT" ? "XAUT · Tether Gold" : value}</option>)}
-      </select></label>
-      <label>Expiry (IST)<select value={expiry} onChange={event => setExpiry(event.target.value)}>
-        {expiries.map(value => <option key={value} value={value}>{expiryLabel.format(Date.parse(value))}</option>)}
-      </select></label>
-    </div>
-    <div className="chain-sheet-tools">
-      <OptionStrategyButton context={{initialMarket: market, initialRoot: root, initialExpiry: expiry}}/>
-      <button type="button" title="Refresh option quotes" aria-label="Refresh option quotes" onClick={() => setReload(value => value + 1)}><RefreshCw size={16}/></button>
+    <div className="delta-options-toolbar">
+      <div className="delta-options-controls">
+        <div className="delta-options-field">
+          <label htmlFor={controlsId + "-root"}>Underlying</label>
+          <span className="delta-options-select">
+            <select id={controlsId + "-root"} value={root} onChange={event => { setRoot(event.target.value); setExpiry(""); }}>
+              {roots.map(value => <option key={value} value={value}>{value === "XAUT" ? "XAUT · Tether Gold" : value}</option>)}
+            </select>
+            <ChevronDown size={15} aria-hidden="true" />
+          </span>
+        </div>
+        <div className="delta-options-field">
+          <label htmlFor={controlsId + "-expiry"}>Expiry (IST)</label>
+          <span className="delta-options-select">
+            <select id={controlsId + "-expiry"} value={expiry} onChange={event => setExpiry(event.target.value)}>
+              {expiries.map(value => <option key={value} value={value}>{expiryLabel.format(Date.parse(value))}</option>)}
+            </select>
+            <ChevronDown size={15} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+      <div className="delta-options-tools">
+        <OptionStrategyButton context={{ initialMarket: market, initialRoot: root, initialExpiry: expiry }} />
+        <button className="delta-options-refresh" type="button" title="Refresh option quotes" aria-label="Refresh option quotes"
+          onClick={() => setReload(value => value + 1)}><RefreshCw size={17} aria-hidden="true" /></button>
+      </div>
     </div>
     {(!live || live.error || live.chain?.quoteWarning) && <p className="delta-options-empty" role="status">{live?.error ?? live?.chain?.quoteWarning ?? "Loading quotes…"}</p>}
     <OptionChainTable contracts={book} reference={live?.chain?.reference ?? null} currency="USD" selected={selectedSymbol} focusAtm
