@@ -102,7 +102,7 @@ function validateProtection(plan: GlobalProtection, spec: PerpSpec | undefined, 
 const cloneProtection = (plan?: GlobalProtection): GlobalProtection | undefined => plan ? { ...plan, takeProfit: plan.takeProfit ? { ...plan.takeProfit } : undefined, stopLoss: plan.stopLoss ? { ...plan.stopLoss } : undefined } : undefined;
 export function setGlobalProtection(a: PerpAccount, symbol: PerpSymbol, plan: GlobalProtection | undefined, q: PerpQuote, now: number) {
   const p = a.positions.find(p => p.symbol === symbol);
-  if (!p || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("A position and fresh quote are required.");
+  if (!p || (p.spec.expiry && p.spec.expiry <= now) || !freshPerpQuote(q, now) || q.symbol !== symbol) throw new Error("An active position and fresh quote are required.");
   if (plan) {
     validateProtection(plan, p.spec, p.side, q.mark);
     if (!triggerValue(q, plan.source)) throw new Error("Selected trigger price is unavailable.");
@@ -128,6 +128,8 @@ function execute(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft,
 }
 export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: GlobalOrderDraft, now: number): PerpAccount {
   if (a.currency !== "USD") throw new Error("Use the dollar global wallet.");
+  if (s.expiry !== undefined && now >= s.expiry) throw new Error("This futures contract has expired.");
+  if (s.reduceOnly && !d.reduceOnly) throw new Error("Delta only allows reductions on this contract.");
   if (!freshPerpQuote(q, now) || q.symbol !== s.symbol || !s.operational || now - s.fetchedAt > 3600000 || s.fetchedAt > now + 5000) throw new Error("Waiting for fresh Delta market data and contract rules.");
   if (!GLOBAL_ORDER_TYPES.includes(d.type) || !Number.isSafeInteger(d.contracts) || d.contracts < 1 || !validPositive(d.leverage) || d.leverage < 1) throw new Error("Enter valid lots and leverage.");
   if (a.orders.length >= 20 && d.type !== "Market") throw new Error("Maximum 20 open orders.");
@@ -152,7 +154,7 @@ export function submitGlobalOrder(a: PerpAccount, s: PerpSpec, q: PerpQuote, d: 
   if (d.type === "Market" || d.type === "Limit" && marketable) return execute(a, s, q, d, now);
   // Core margin checks reserve funds for pending entries; reduce-only exits need no new margin.
   const pending = d.reduceOnly ? { ...a, orders: [...a.orders], revision: a.revision + 1 } : openPerp(a, s, q, d.side, d.contracts, d.leverage, now, undefined, undefined, roundGlobalPrice(reference, s));
-  const o: PerpOrder = { ...d, source, anchor: observed, triggered: false, protection: cloneProtection(d.protection), id: `${now}:${pending.revision}`, symbol: s.symbol, limit: reference, at: now, reserve: d.reduceOnly ? 0 : pending.orders[pending.orders.length - 1].reserve };
+  const o: PerpOrder = { ...d, source, anchor: observed, triggered: false, protection: cloneProtection(d.protection), id: `${now}:${pending.revision}`, symbol: s.symbol, ...(s.expiry ? { expiry: s.expiry } : {}), limit: reference, at: now, reserve: d.reduceOnly ? 0 : pending.orders[pending.orders.length - 1].reserve };
   if (d.reduceOnly) pending.orders.push(o); else pending.orders[pending.orders.length - 1] = o;
   return pending;
 }
@@ -176,9 +178,11 @@ function chartExtremeHit(leg: GlobalExit, extreme: ChartExtreme | undefined, abo
   }
   return hit;
 }
-export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<PerpSymbol, PerpQuote>>, specs: Partial<Record<PerpSymbol, PerpSpec>>, now: number, extremes?: Partial<Record<string, ChartExtreme>>) {
-  let n = advancePerps(a, quotes, specs, now, false);
+export function advanceGlobalAccount(a: PerpAccount, quotes: Partial<Record<PerpSymbol, PerpQuote>>, specs: Partial<Record<PerpSymbol, PerpSpec>>,
+  now: number, extremes?: Partial<Record<string, ChartExtreme>>, settlements?: Partial<Record<string, { expiry: number; price: number }>>) {
+  let n = advancePerps(a, quotes, specs, now, false, settlements);
   for (const p of [...n.positions]) {
+    if (p.spec.expiry && p.spec.expiry <= now) continue;
     const q = quotes[p.symbol], plan = cloneProtection(p.protection);
     if (!plan || !freshPerpQuote(q, now) || q.at < p.openedAt) continue;
     const observed = triggerValue(q, plan.source);

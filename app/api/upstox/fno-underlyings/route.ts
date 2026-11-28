@@ -3,7 +3,7 @@ import type { FnoUnderlying } from "@/lib/fno";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const NSE_INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
+type Exchange = "NSE" | "BSE";
 const CACHE_TTL = 6 * 60 * 60 * 1_000;
 
 type UpstoxDerivative = {
@@ -20,11 +20,12 @@ type UpstoxDerivative = {
   last_price?: number;
 };
 
-let cache: { expiresAt: number; underlyings: FnoUnderlying[] } | null = null;
+const cache = new Map<Exchange, { expiresAt: number; underlyings: FnoUnderlying[] }>();
+const pending = new Map<Exchange, Promise<FnoUnderlying[]>>();
 
-async function loadNseMaster() {
-  const response = await fetch(NSE_INSTRUMENTS_URL, { cache: "no-store" });
-  if (!response.ok || !response.body) throw new Error("Unable to download the current NSE F&O instrument master.");
+async function loadMaster(exchange: Exchange) {
+  const response = await fetch(`https://assets.upstox.com/market-quote/instruments/exchange/${exchange}.json.gz`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
+  if (!response.ok || !response.body) throw new Error(`Unable to download the ${exchange} instrument master.`);
   const decompressed = response.body.pipeThrough(new DecompressionStream("gzip"));
   return new Response(decompressed).json() as Promise<UpstoxDerivative[]>;
 }
@@ -54,15 +55,15 @@ function normalizeExpiry(value: string | number | undefined) {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 }
 
-async function loadUnderlyings() {
-  if (cache && cache.expiresAt > Date.now()) return cache.underlyings;
-  const master = await loadNseMaster();
+async function groupMaster(exchange: Exchange) {
+  const master = await loadMaster(exchange);
   const grouped = new Map<string, FnoUnderlying>();
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   for (const item of master) {
-    if (item.segment !== "NSE_FO" || !item.underlying_key || !item.underlying_symbol) continue;
+    if (item.segment !== exchange + "_FO" || !item.underlying_key || !item.underlying_symbol) continue;
     if (item.instrument_type !== "CE" && item.instrument_type !== "PE" && item.instrument_type !== "FUT") continue;
+    if (exchange === "BSE" && item.instrument_type !== "FUT") continue;
     const underlyingType = item.underlying_type === "INDEX" ? "INDEX" : "EQUITY";
     const symbol = underlyingType === "INDEX"
       ? normalizeIndexSymbol(item.underlying_symbol)
@@ -78,14 +79,14 @@ async function loadUnderlyings() {
     } satisfies FnoUnderlying;
     if (item.instrument_type === "FUT") {
       const expiry = normalizeExpiry(item.expiry);
-      if (item.instrument_key && item.trading_symbol && expiry && expiry >= todayIst) {
+      if (item.instrument_key?.startsWith(exchange + "_FO|") && item.trading_symbol && expiry && expiry >= todayIst && Number.isSafeInteger(item.lot_size) && item.lot_size! > 0) {
         current.futureContracts += 1;
         current.futures?.push({
           instrumentKey: item.instrument_key,
           tradingSymbol: item.trading_symbol.trim(),
           expiry,
-          lotSize: Math.max(1, Math.round(Number(item.lot_size) || 1)),
-          lotSizeVerified: Number.isSafeInteger(Number(item.lot_size)) && Number(item.lot_size) > 0,
+          lotSize: item.lot_size!,
+          lotSizeVerified: true,
           lastPrice: Number(item.last_price) || 0,
         });
       }
@@ -93,31 +94,35 @@ async function loadUnderlyings() {
     grouped.set(item.underlying_key, current);
   }
 
-  const priority = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
-  const underlyings = [...grouped.values()]
-    .filter((item) => item.optionContracts > 0 || item.futureContracts > 0)
-    .map((item) => ({ ...item, futures: (item.futures ?? []).sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))) }))
-    .sort((a, b) => {
-      const aPriority = priority.indexOf(a.symbol);
-      const bPriority = priority.indexOf(b.symbol);
-      if (aPriority >= 0 || bPriority >= 0) return (aPriority < 0 ? 999 : aPriority) - (bPriority < 0 ? 999 : bPriority);
-      return a.symbol.localeCompare(b.symbol);
-    });
-  cache = { expiresAt: Date.now() + CACHE_TTL, underlyings };
-  return underlyings;
+  return [...grouped.values()].filter(item => item.optionContracts || item.futureContracts)
+    .map(item => ({ ...item, futures: item.futures?.sort((a, b) => a.expiry.localeCompare(b.expiry)) }));
+}
+
+async function loadExchange(exchange: Exchange) {
+  const hit = cache.get(exchange);
+  if (hit && hit.expiresAt > Date.now()) return hit.underlyings;
+  const loading = pending.get(exchange);
+  if (loading) return loading;
+  const job = groupMaster(exchange).then(underlyings => {
+    cache.set(exchange, { expiresAt: Date.now() + CACHE_TTL, underlyings });
+    return underlyings;
+  });
+  pending.set(exchange, job);
+  try { return await job; } finally { pending.delete(exchange); }
 }
 
 export async function GET() {
-  try {
-    const underlyings = await loadUnderlyings();
-    return Response.json(
-      { ok: true, source: "Upstox NSE BOD instruments", underlyings, fetchedAt: new Date().toISOString() },
-      { headers: { "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400" } },
-    );
-  } catch (error) {
-    return Response.json(
-      { ok: false, error: { code: "FNO_MASTER_UNAVAILABLE", message: error instanceof Error ? error.message : "Unable to load NSE F&O instruments." } },
-      { status: 502, headers: { "Cache-Control": "no-store" } },
-    );
+  const exchanges = ["NSE", "BSE"] as const;
+  const results = await Promise.allSettled(exchanges.map(loadExchange));
+  const unavailableExchanges = exchanges.filter((_, i) => results[i].status === "rejected");
+  if (unavailableExchanges.length === exchanges.length) {
+    return Response.json({ ok: false, error: { code: "FNO_MASTER_UNAVAILABLE", message: "Unable to load the Indian F&O instrument masters." } },
+      { status: 502, headers: { "Cache-Control": "no-store" } });
   }
+  const priority = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
+  const rank = (symbol: string) => { const i = priority.indexOf(symbol); return i < 0 ? priority.length : i; };
+  const underlyings = results.flatMap(result => result.status === "fulfilled" ? result.value : [])
+    .sort((a, b) => rank(a.symbol) - rank(b.symbol) || a.symbol.localeCompare(b.symbol));
+  return Response.json({ ok: true, source: "Upstox exchange instrument masters", underlyings, unavailableExchanges, fetchedAt: new Date().toISOString() },
+    { headers: { "Cache-Control": unavailableExchanges.length ? "no-store" : "public, s-maxage=21600, stale-while-revalidate=86400" } });
 }

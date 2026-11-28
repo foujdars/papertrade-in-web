@@ -17,7 +17,7 @@ import {
 export type GlobalTicketTab = "Order" | "Positions" | "Open orders" | "History";
 type ExitInput = { mode: "Market" | "Limit" | "Trail"; value: string; limit: string; unit: "USD" | "%" };
 const blankExit = (): ExitInput => ({ mode: "Market", value: "", limit: "", unit: "USD" });
-const assetName = (s: PerpSymbol) => s.endsWith("USD") ? s.slice(0, -3) : s;
+const assetName = (s: PerpSymbol) => s.replace(/USD(?:_[A-Z0-9]+)?$/, "");
 const number = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 8 });
 const options = <T extends string>(values: readonly T[]) => values.map(value => ({ value, label: value }));
 function exitFromInput(input: ExitInput, target: boolean, entry: number, side: "BUY" | "SELL", spec: PerpSpec): GlobalExit | undefined {
@@ -48,7 +48,8 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
   const [size, setSize] = useState("1"), [leverage, setLeverage] = useState("5");
   const [limit, setLimit] = useState(""), [trigger, setTrigger] = useState(""), [trail, setTrail] = useState("");
   const [source, setSource] = useState<TriggerSource>("mark");
-  const [reduceOnly, setReduceOnly] = useState(false), [protectionOn, setProtectionOn] = useState(false);
+  const [reduceRequested, setReduceOnly] = useState(false), [protectionOn, setProtectionOn] = useState(false);
+  const reduceOnly = reduceRequested || spec?.reduceOnly === true;
   const [tp, setTp] = useState<ExitInput>(blankExit), [sl, setSl] = useState<ExitInput>(blankExit);
   const [notice, setNotice] = useState(""), [localError, setLocalError] = useState("");
   const [closeSize, setCloseSize] = useState<Record<string, string>>({});
@@ -75,7 +76,7 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
   const margin = reduceOnly ? 0 : Math.max(notional / Number(leverage), ((position?.contracts ?? 0) * (spec?.lot ?? 0) * entry + notional) / Number(leverage) - (position?.margin ?? 0));
   const fee = spec ? tradingFee(spec, notional, type === "Maker only", "USD") : 0;
   const available = account ? availablePerpCash(account) : 0;
-  const fresh = !!spec?.operational && freshPerpQuote(quote, clock) && clock - spec.fetchedAt <= 3600000;
+  const fresh = !!spec?.operational && (!spec.expiry || clock < spec.expiry) && freshPerpQuote(quote, clock) && clock - spec.fetchedAt <= 3600000;
   const makePlan = (): GlobalProtection | undefined => protectionOn && !reduceOnly && spec ? { source, takeProfit: exitFromInput(tp, true, entry, side, spec), stopLoss: exitFromInput(sl, false, entry, side, spec) } : undefined;
   let preview: GlobalProtection | undefined;
   try { preview = makePlan(); } catch { /* Validation appears on submit. */ }
@@ -98,7 +99,7 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
       if (ok) { setNotice(`${type} paper order accepted · ${contracts} lot${contracts === 1 ? "" : "s"}`); onTab(type === "Market" ? "Positions" : "Open orders"); }
     } catch (e) { setLocalError(e instanceof Error ? e.message : "Check the order fields."); }
   };
-  const countdown = spec && clock ? Math.ceil(((spec.fundingSeconds * 1000) - clock % (spec.fundingSeconds * 1000)) / 1000) : 0;
+  const countdown = spec?.fundingSeconds && clock ? Math.ceil(((spec.fundingSeconds * 1000) - clock % (spec.fundingSeconds * 1000)) / 1000) : 0;
   const fundingTime = [Math.floor(countdown / 3600), Math.floor(countdown % 3600 / 60), countdown % 60].map(v => String(v).padStart(2, "0")).join(":");
   return <div className="global-ticket">
     <div className="ticket-heading"><div><span className="eyebrow">Global · USD · isolated</span><h2>{symbol}</h2></div><span className="paper-badge">Paper trading</span></div>
@@ -106,7 +107,8 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
     <div className="global-wallet-line"><span>Available USD</span><b>{account ? formatUsd(available) : "Loading…"}</b></div>
     {tab === "Order" && <>
       <div className="global-quote-strip"><span>Bid <b>{quote ? formatUsd(quote.bid) : "—"}</b></span><span>Ask <b>{quote ? formatUsd(quote.ask) : "—"}</b></span><span>Mark <b>{quote ? formatUsd(quote.mark) : "—"}</b></span></div>
-      <div className="global-funding"><span>Funding {spec ? `(${spec.fundingSeconds / 3600}h)` : ""} <b>{quote ? `${(quote.funding * 100).toFixed(4)}%` : "—"}</b></span><span>{fundingTime}</span></div>
+      {spec?.expiry ? <div className="global-funding"><span>Contract expiry</span><b>{new Date(spec.expiry).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} IST</b></div>
+        : <div className="global-funding"><span>Funding {spec ? `(${spec.fundingSeconds / 3600}h)` : ""} <b>{quote ? `${(quote.funding * 100).toFixed(4)}%` : "—"}</b></span><span>{fundingTime}</span></div>}
       <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => onSide("BUY")}>Long</button><button className={side === "SELL" ? "sell-active" : ""} onClick={() => onSide("SELL")}>Short</button></div>
       <div className="global-ticket-grid"><label>Leverage · max {maxLeverage}×<div className="global-number-suffix"><input aria-label="Global leverage" inputMode="decimal" value={leverage} onChange={e => setLeverage(e.target.value)} /><span>×</span></div></label>
         <ModernSelect label="Order type" value={type} choices={options(GLOBAL_ORDER_TYPES)} onChange={value => { setType(value); setNotice(""); }} /></div>
@@ -119,7 +121,7 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
         {unit === "USD" && <small>USD is position value. Rounded down to whole lots; margin is shown below.</small>}
         {sizingError && <small role="alert" className="negative">{sizingError}</small>}
       </div>
-      <label className="global-check"><input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} /><span>Reduce only <small>Close or reduce; never reverse a position.</small></span></label>
+      <label className="global-check"><input type="checkbox" checked={reduceOnly} disabled={spec?.reduceOnly} onChange={e => setReduceOnly(e.target.checked)} /><span>Reduce only <small>{spec?.reduceOnly ? "Delta has restricted this contract to closing existing positions." : "Close or reduce an existing position."}</small></span></label>
       {!reduceOnly && <details className="global-protection" open={protectionOn} onToggle={e => setProtectionOn(e.currentTarget.open)}><summary><SlidersHorizontal size={16} /> Take profit / Stop loss <span>{protectionOn ? "−" : "+"}</span></summary>
         <ModernSelect label="TP/SL trigger source" value={source} choices={[{ value: "mark", label: "Mark price" }, { value: "last", label: "Last price" }, { value: "index", label: "Index price" }]} onChange={setSource} />
         <ExitEditor title="Take profit" value={tp} onChange={setTp} /><ExitEditor title="Stop loss" value={sl} onChange={setSl} allowTrail />
@@ -133,7 +135,7 @@ export function GlobalOrderTicket({ symbol, owner, side, onSide, trading, tab, o
       <button className={`place-order ${side.toLowerCase()}`} disabled={busy || !account || !fresh || contracts < 1 || !!sizingError || (!reduceOnly && (margin + fee > available || Number(leverage) > maxLeverage || account.fundingGap))} onClick={submit}>{busy ? "Saving…" : !fresh ? "Waiting for live Delta data" : `${reduceOnly ? "Reduce" : side === "BUY" ? "Long" : "Short"} ${contracts} lot${contracts === 1 ? "" : "s"}`}<ChevronRight size={17} /></button>
     </>}
     {tab === "Positions" && <div className="global-account-list">{!account?.positions.length && <p className="global-empty">Your global positions will appear here.</p>}{account?.positions.map(p => {
-      const q = snapshots[p.symbol]?.quote, live = freshPerpQuote(q, clock), pnl = q ? positionPnl(p, q.mark) : 0;
+      const q = snapshots[p.symbol]?.quote, live = (!p.spec.expiry || p.spec.expiry > clock) && freshPerpQuote(q, clock), pnl = q ? positionPnl(p, q.mark) : 0;
       return <article key={p.symbol}><header><b>{p.symbol} · {p.side === "BUY" ? "Long" : "Short"}</b><span>{p.leverage}×</span></header><strong className={pnl >= 0 ? "positive" : "negative"}>{q ? formatUsd(pnl) : "—"}<small> {live ? "Unrealised" : "Last available"}</small></strong>
         <div className="global-exit-preview"><span>Size <b>{number(p.contracts * p.spec.lot)} {assetName(p.symbol)}</b></span><span>Entry <b>{formatUsd(p.entry)}</b></span><span>Margin <b>{formatUsd(p.margin)}</b></span><span>Est. liquidation <b>{formatUsd(liquidationPrice(p))}</b></span></div>
         {p.protection && <small>TP: {p.protection.takeProfit ? `${p.protection.takeProfit.mode} ${formatUsd(p.protection.takeProfit.trigger ?? 0)}` : "—"} · SL: {p.protection.stopLoss ? `${p.protection.stopLoss.mode} ${formatUsd(p.protection.stopLoss.trigger ?? p.protection.stopLoss.trail ?? 0)}` : "—"}{p.protection.activeExit ? " · exit triggered" : ""}</small>}

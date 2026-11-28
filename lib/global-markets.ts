@@ -3,7 +3,7 @@ import type { PaperBot } from "./paper-bot-state";
 import type { Candle } from "./market";
 import type { Instrument } from "./market";
 import type { GlobalOrderFields, GlobalProtection } from "./global-order-engine";
-import { isDeltaOptionSymbol, normalizeDeltaOptionSpec } from "./global-contracts.ts";
+import { isDeltaDatedFutureSymbol, isDeltaOptionSymbol, normalizeDeltaOptionSpec } from "./global-contracts.ts";
 import type { OptionEvent, OptionOrder, OptionPosition } from "./global-option-orders.ts";
 
 export const GLOBAL_SYMBOLS = ["BTCUSD", "ETHUSD", "XAUTUSD", "BRENT"] as const;
@@ -100,7 +100,7 @@ export const deltaSymbolFromInstrumentKey = (
   value?: string,
 ): PerpSymbol | null => {
   const symbol = value?.startsWith("DELTA|") ? value.slice(6) : "";
-  return isDeltaPerpSymbol(symbol) ? symbol : null;
+  return isDeltaPerpSymbol(symbol) || isDeltaDatedFutureSymbol(symbol) ? symbol : null;
 };
 export const isGlobalInstrumentKey = (value?: string) =>
   Boolean(value?.startsWith("DELTA|") || value?.startsWith("TVC|") || isGlobalReferenceKey(value));
@@ -148,32 +148,27 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
       } catch { /* Never list an option without validated contract rules. */ }
       continue;
     }
-    if (row.contract_type === "futures") {
-      const expiry = Date.parse(row.settlement_time);
-      if (row.quoting_asset?.symbol !== "USD" || row.settling_asset?.symbol !== "USD" || row.notional_type !== "vanilla" || row.state !== "live" || row.trading_status !== "operational" || !Number.isFinite(expiry) || expiry <= Date.now()) continue;
-      bySymbol.set(symbol, { symbol, name: `${row.underlying_asset?.name ?? row.contract_unit_currency ?? symbol} dated future`, exchange: "DELTA", price: 0, change: 0, instrumentKey: `DELTA|${symbol}`, categories: ["GLOBAL", "DATED_FUTURE"], assetType: "FUTURE", expiry: new Date(expiry).toISOString(), underlyingSymbol: row.contract_unit_currency });
-      continue;
-    }
-    if (!isDeltaPerpSymbol(symbol)) continue;
     let spec: PerpSpec;
     try {
-      spec = normalizePerpSpec(row, symbol, Date.now());
-      if (!spec.operational) continue;
+      spec = normalizeDeltaFutureSpec(row, symbol, Date.now());
+      if (!spec.operational || spec.reduceOnly) continue;
     } catch { continue; }
-    const category = deltaUnderlyingCategory(symbol.slice(0, -3), row) ?? "CRYPTO";
-    const underlying = row.contract_unit_currency;
+    const underlying = row.contract_unit_currency ?? symbol.replace(/USD(?:_[A-Z0-9]+)?$/, "");
+    const category = deltaUnderlyingCategory(underlying, row) ?? categoriesByRoot.get(underlying) ?? "CRYPTO";
+    const name = row.underlying_asset?.name ?? underlying;
     bySymbol.set(symbol, {
       symbol,
-      name: typeof row.underlying_asset?.name === "string" ? `${row.underlying_asset.name} perpetual` : symbol,
+      name: name + (spec.expiry ? " dated future" : " perpetual"),
       exchange: "DELTA",
       price: 0,
       change: 0,
       instrumentKey: `DELTA|${symbol}`,
-      categories: ["GLOBAL", category],
+      categories: spec.expiry ? ["GLOBAL", category, "DATED_FUTURE"] : ["GLOBAL", category],
+      ...(spec.expiry ? { expiry: new Date(spec.expiry).toISOString() } : {}),
       assetType: "FUTURE",
       lotSize: 1,
       contractMultiplier: spec.lot,
-      underlyingSymbol: typeof underlying === "string" ? underlying : symbol.slice(0, -3),
+      underlyingSymbol: underlying,
     });
   }
   return [...bySymbol.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
@@ -182,6 +177,8 @@ export const USD_INR = 85;
 export const PERP_SEED_INR = 100000;
 export type PerpSpec = {
   symbol: PerpSymbol;
+  expiry?: number;
+  reduceOnly?: boolean;
   lot: number;
   tick: number;
   initial: number;
@@ -217,9 +214,17 @@ export function normalizePerpSpec(
   symbol: PerpSymbol,
   now: number,
 ): PerpSpec {
+  if (!isDeltaPerpSymbol(symbol)) throw new Error("Unexpected Delta perpetual contract.");
+  return normalizeDeltaFutureSpec(raw, symbol, now);
+}
+
+export function normalizeDeltaFutureSpec(raw: Record<string, any>, symbol: string, now: number): PerpSpec {
+  const dated = raw.contract_type === "futures";
+  const expiry = dated ? Date.parse(raw.settlement_time) : undefined;
   if (
     raw.symbol !== symbol ||
-    raw.contract_type !== "perpetual_futures" ||
+    (dated ? !isDeltaDatedFutureSymbol(symbol) || raw.settling_asset?.symbol !== "USD" || !positive(expiry) ||
+      raw.contract_unit_currency !== symbol.split("USD_")[0] : raw.contract_type !== "perpetual_futures" || !isDeltaPerpSymbol(symbol)) ||
     raw.is_quanto ||
     raw.notional_type !== "vanilla" ||
     raw.quoting_asset?.symbol !== "USD"
@@ -227,6 +232,7 @@ export function normalizePerpSpec(
     throw new Error("Unexpected Delta contract. Trading disabled.");
   const spec: PerpSpec = {
     symbol,
+    ...(dated ? { expiry } : {}),
     lot: Number(raw.contract_value),
     tick: Number(raw.tick_size),
     initial: Number(raw.initial_margin) / 100,
@@ -238,11 +244,11 @@ export function normalizePerpSpec(
     maker: Number(raw.maker_commission_rate),
     taker: Number(raw.taker_commission_rate),
     liquidation: Number(raw.product_specs?.isolated_liq_penalty_factor),
-    fundingSeconds: Number(raw.product_specs?.rate_exchange_interval),
+    fundingSeconds: dated ? 0 : Number(raw.product_specs?.rate_exchange_interval),
+    ...(raw.product_specs?.only_reduce_only_orders_allowed ? { reduceOnly: true } : {}),
     operational:
       raw.state === "live" &&
-      raw.trading_status === "operational" &&
-      !raw.product_specs?.only_reduce_only_orders_allowed,
+      raw.trading_status === "operational" && (expiry === undefined || expiry > now),
     fetchedAt: now,
   };
   if (
@@ -253,7 +259,6 @@ export function normalizePerpSpec(
       spec.maintenance,
       spec.scalingThreshold,
       spec.maxNotional,
-      spec.fundingSeconds,
     ].every(positive) ||
     ![
       spec.maker,
@@ -264,7 +269,7 @@ export function normalizePerpSpec(
     ].every((n) => Number.isFinite(n) && n >= 0) ||
     spec.maintenance >= spec.initial ||
     spec.initial > 1 ||
-    !Number.isInteger(spec.fundingSeconds)
+    (!dated && (!Number.isSafeInteger(spec.fundingSeconds) || spec.fundingSeconds <= 0))
   )
     throw new Error("Incomplete contract rules. Trading disabled.");
   return spec;
@@ -282,7 +287,7 @@ export function normalizePerpQuote(
     ask: Number(raw.quotes?.best_ask),
     bidSize: Number(raw.quotes?.bid_size),
     askSize: Number(raw.quotes?.ask_size),
-    funding: Number(raw.funding_rate) / 100,
+    funding: isDeltaDatedFutureSymbol(symbol) ? 0 : Number(raw.funding_rate) / 100,
     change: Number(raw.ltp_change_24h),
     at: Number(raw.timestamp) / 1000,
     operational: raw.product_trading_status === "operational",
@@ -366,6 +371,7 @@ export type PerpPosition = {
 export type PerpOrder = GlobalOrderFields & {
   id: string;
   symbol: PerpSymbol;
+  expiry?: number;
   side: "BUY" | "SELL";
   contracts: number;
   leverage: number;
@@ -380,7 +386,7 @@ export type PerpEvent = {
   id: string;
   symbol: PerpSymbol;
   at: number;
-  kind: "OPEN" | "CLOSE" | "LIQUIDATION" | "FUNDING" | "CANCEL";
+  kind: "OPEN" | "CLOSE" | "LIQUIDATION" | "FUNDING" | "CANCEL" | "SETTLEMENT";
   contracts: number;
   price: number;
   pnl: number;
@@ -436,20 +442,21 @@ export function readPerpAccount(text: string | null): PerpAccount {
     );
   for (const p of a.positions)
     if (
-      !isDeltaPerpSymbol(p.symbol) ||
+      !(p.spec?.expiry === undefined
+        ? isDeltaPerpSymbol(p.symbol) && positive(p.nextFunding) && positive(p.spec?.fundingSeconds)
+        : isDeltaDatedFutureSymbol(p.symbol) && Number.isSafeInteger(p.spec.expiry) && p.spec.expiry > p.openedAt &&
+          p.nextFunding === 0 && p.spec.fundingSeconds === 0) ||
       !["BUY", "SELL"].includes(p.side) ||
       !Number.isSafeInteger(p.contracts) ||
       p.contracts <= 0 ||
       ![
         p.entry,
         p.leverage,
-        p.nextFunding,
         p.openedAt,
         p.spec?.lot,
         p.spec?.tick,
         p.spec?.maintenance,
         p.spec?.initial,
-        p.spec?.fundingSeconds,
         p.spec?.maxNotional,
       ].every(positive) ||
       !Number.isFinite(p.margin) ||
@@ -468,7 +475,7 @@ export function readPerpAccount(text: string | null): PerpAccount {
       throw new Error("Practice position data is invalid.");
   for (const o of a.orders)
     if (
-    !isDeltaPerpSymbol(o.symbol) ||
+      !(o.expiry === undefined ? isDeltaPerpSymbol(o.symbol) : isDeltaDatedFutureSymbol(o.symbol) && Number.isSafeInteger(o.expiry) && o.expiry > o.at) ||
       !["BUY", "SELL"].includes(o.side) ||
       !Number.isSafeInteger(o.contracts) ||
       o.contracts <= 0 ||
@@ -489,11 +496,12 @@ export function readPerpAccount(text: string | null): PerpAccount {
       (e) =>
         !e ||
         typeof e.id !== "string" ||
-        !isDeltaPerpSymbol(e.symbol) ||
-        !["OPEN", "CLOSE", "LIQUIDATION", "FUNDING", "CANCEL"].includes(
+        !(isDeltaPerpSymbol(e.symbol) || isDeltaDatedFutureSymbol(e.symbol)) ||
+        !["OPEN", "CLOSE", "LIQUIDATION", "FUNDING", "CANCEL", "SETTLEMENT"].includes(
           e.kind,
         ) ||
-        ![e.at, e.price, e.contracts].every(positive) ||
+        ![e.at, e.contracts].every(positive) ||
+        !(e.kind === "SETTLEMENT" ? isDeltaDatedFutureSymbol(e.symbol) && Number.isFinite(e.price) && e.price >= 0 : positive(e.price)) ||
         ![e.pnl, e.fee].every(Number.isFinite) ||
         e.fee < 0,
     )
@@ -558,12 +566,13 @@ function validateTrade(
   stop?: number,
   target?: number,
 ) {
+  if (s.reduceOnly) throw new Error("Delta only allows reductions on this contract.");
   if (
     !freshPerpQuote(q, now) ||
     q.symbol !== s.symbol ||
     now - s.fetchedAt > 3600000 ||
     s.fetchedAt > now + 5000 ||
-    !s.operational
+    !s.operational || (s.expiry !== undefined && now >= s.expiry)
   )
     throw new Error("A fresh quote and operational contract are required.");
   if (!Number.isSafeInteger(contracts) || contracts < 1)
@@ -643,6 +652,7 @@ export function openPerp(
     n.orders.push({
       id: `${now}:${n.revision}`,
       symbol: s.symbol,
+      ...(s.expiry ? { expiry: s.expiry } : {}),
       side,
       contracts,
       leverage,
@@ -681,7 +691,7 @@ export function openPerp(
       openedAt: now,
       stop,
       target,
-      nextFunding:
+      nextFunding: s.expiry ? 0 :
         (Math.floor(now / (s.fundingSeconds * 1000)) + 1) *
         s.fundingSeconds *
         1000,
@@ -712,6 +722,7 @@ export function closePerp(
 ): PerpAccount {
   const p = a.positions.find((p) => p.symbol === symbol);
   if (!p) throw new Error("No position to close.");
+  if (p.spec.expiry && now >= p.spec.expiry) throw new Error("Waiting for the exchange settlement price.");
   if (q.symbol !== symbol || !freshPerpQuote(q, now))
     throw new Error("Fresh market data is required to close.");
   if (
@@ -728,9 +739,12 @@ export function closePerp(
     throw new Error(
       "Close exceeds visible liquidity. Use a smaller partial close.",
     );
-  const n = copy(a),
-    price = p.side === "BUY" ? q.bid : q.ask,
-    share = contracts / p.contracts;
+  return closeAtPrice(a, p, p.side === "BUY" ? q.bid : q.ask, contracts, now, kind, detail, maker);
+}
+
+function closeAtPrice(a: PerpAccount, p: PerpPosition, price: number, contracts: number, now: number,
+  kind: "CLOSE" | "LIQUIDATION" | "SETTLEMENT", detail: string, maker = false): PerpAccount {
+  const n = copy(a), symbol = p.symbol, share = contracts / p.contracts;
   const fee =
     tradingFee(p.spec, price * contracts * p.spec.lot, maker, a.currency) +
     (kind === "LIQUIDATION"
@@ -766,6 +780,7 @@ export function cancelPerpOrder(
   a: PerpAccount,
   id: string,
   now: number,
+  detail = "Pending order cancelled",
 ): PerpAccount {
   const o = a.orders.find((o) => o.id === id);
   if (!o) return a;
@@ -779,7 +794,7 @@ export function cancelPerpOrder(
     price: o.limit,
     pnl: 0,
     fee: 0,
-    detail: "Pending order cancelled",
+    detail,
   });
   return n;
 }
@@ -790,14 +805,25 @@ export function advancePerps(
   specs: Partial<Record<PerpSymbol, PerpSpec>>,
   now: number,
   manageOrders = true,
+  settlements: Partial<Record<string, { expiry: number; price: number }>> = {},
 ): PerpAccount {
   let n = a;
+  for (const order of a.orders) {
+    if (order.expiry && order.expiry <= now) n = cancelPerpOrder(n, order.id, now, "Contract expired");
+    else if (!order.reduceOnly && specs[order.symbol]?.reduceOnly) n = cancelPerpOrder(n, order.id, now, "Contract is now reduce only");
+  }
   for (const p of [...n.positions]) {
+    if (p.spec.expiry && now >= p.spec.expiry) {
+      const settlement = settlements[p.symbol];
+      if (settlement?.expiry === p.spec.expiry && Number.isFinite(settlement.price) && settlement.price >= 0)
+        n = closeAtPrice(n, p, settlement.price, p.contracts, p.spec.expiry, "SETTLEMENT", "Delta published futures settlement price");
+      continue;
+    }
     const q = quotes[p.symbol];
     if (!freshPerpQuote(q, now)) continue;
     if (q.at < p.openedAt) continue;
     const continuous = a.lastChecked > 0 && now - a.lastChecked < 30000;
-    if (p.nextFunding <= now) {
+    if (!p.spec.expiry && p.nextFunding <= now) {
       if (!continuous || now - p.nextFunding > 30000) {
         if (!n.fundingGap) n = { ...copy(n), fundingGap: true };
       } else if (!n.fundingGap) {

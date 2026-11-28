@@ -91,9 +91,9 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const instrumentKey = url.searchParams.get("instrumentKey")?.trim() ?? "";
     const expiry = url.searchParams.get("expiry")?.trim() ?? "";
-    if (!isSupportedNseInstrumentKey(instrumentKey) || instrumentKey.startsWith("NSE_FO|")) {
+    if (!isSupportedNseInstrumentKey(instrumentKey) || !/^(NSE|BSE)_(INDEX|EQ)\|/.test(instrumentKey)) {
       return Response.json(
-        { ok: false, error: { code: "INVALID_UNDERLYING", message: "Select a supported NSE index or equity underlying." } },
+        { ok: false, error: { code: "INVALID_UNDERLYING", message: "Select a supported Indian index or equity underlying." } },
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }

@@ -39,6 +39,8 @@ export function compareMarketInstruments(a: DirectoryInstrument, b: DirectoryIns
 }
 export function marketProductLabel(item: DirectoryInstrument): string {
   if (item.instrumentKey?.startsWith("MCX_FO|")) return "MCX future · INR";
+  if (item.assetType === "FUTURE" && /^(NSE|BSE)_FO\|/.test(item.instrumentKey ?? "")) return item.instrumentKey!.slice(0,3) + " future · INR";
+  if (item.categories.includes("DATED_FUTURE")) return "Dated future · USD";
   if (isGlobalReferenceKey(item.instrumentKey)) return marketGroup(item) === "us"
     ? "US listing · USD · watch only"
     : "Spot · USD · watch only";

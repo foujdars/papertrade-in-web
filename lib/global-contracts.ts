@@ -5,12 +5,14 @@ export const isDeltaOptionSymbol = (value: string): boolean =>
 
 export const isDeltaOptionRoot = (value: string): boolean => /^[A-Z0-9]{2,12}$/.test(value);
 
+export const isDeltaDatedFutureSymbol = (value: string) => /^[A-Z0-9]{1,24}USD_[A-Z0-9]{4,12}$/.test(value);
+
 export function deltaOptionRoot(symbol: string) {
   return isDeltaOptionSymbol(symbol) ? symbol.split("-")[1] : null;
 }
 
 export const isSafeDeltaContractSymbol = (value: string): boolean =>
-  /^[A-Z0-9][A-Z0-9.-]{1,47}$/.test(value);
+  /^[A-Z0-9][A-Z0-9._-]{1,47}$/.test(value);
 
 export type DeltaOptionSpec = {
   contractType: "call_options" | "put_options";

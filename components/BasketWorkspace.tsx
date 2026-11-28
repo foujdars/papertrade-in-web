@@ -8,6 +8,7 @@ import { OptionChainTable } from "./OptionChainTable";
 import { StrategyPresetPicker } from "./StrategyPresetPicker";
 import { BasketPayoff } from "./BasketPayoff";
 import { AppDialog } from "./AppDialog";
+import { formatFuturesExpiry } from "@/lib/listed-futures";
 import { useOptionDesk, type BasketOrder } from "./OptionDeskContext";
 
 const views = [{ id: "chain", label: "Chain", icon: List }, { id: "basket", label: "Contracts", icon: Layers2 }, { id: "payoff", label: "Payoff", icon: ChartLine }] as const;
@@ -37,17 +38,17 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
   const futureTrigger = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const futures = useMemo(() => chain.futures ?? (chain.future ? [chain.future] : []), [chain.futures, chain.future]);
   const byId = useMemo(() => {
     const items = new Map<string, StrategyContract>(chain.contracts.map(c => [c.id,c]));
-    if (chain.future) items.set(chain.future.id, chain.future);
+    for (const future of futures) items.set(future.id, future);
     return items;
-  }, [chain.contracts, chain.future]);
+  }, [chain.contracts, futures]);
   const locale = currency === "INR" ? "en-IN" : "en-US";
   const money = useMemo(() => new Intl.NumberFormat(locale, {style: "currency", currency, maximumFractionDigits: currency === "USD" ? 6 : 2}), [locale, currency]);
   const number = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }), [locale]);
   const label = (c: StrategyContract) => c.kind === "FUT" ? c.symbol : number.format(c.strike) + (c.kind === "CE" ? " Call" : " Put");
   const selected = legs.filter(leg => leg.enabled !== false);
-  const future = chain.future;
 
   function edit(change: Partial<BasketDraft>) {
     if (submitting.current) return;
@@ -163,7 +164,7 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
         const price = c ? legPrice(leg,c,source) : null;
         return <div key={leg.id} className="desk-leg" data-enabled={leg.enabled !== false}>
           <label className="desk-check"><input id={id+leg.id} type="checkbox" checked={leg.enabled !== false} aria-label={"Include " + name} disabled={sending || checking} onChange={e => update(leg.id,{enabled:e.target.checked})}/></label>
-          <label className="desk-leg-contract" htmlFor={id+leg.id}><strong>{name}</strong><small>{c?.kind === "FUT" ? c.futureExpiry ?? "Perpetual" : rootLabel} · {c?.multiplier ? number.format(c.multiplier) + " / lot" : "Lot unavailable"}</small></label>
+          <label className="desk-leg-contract" htmlFor={id+leg.id}><strong>{name}</strong><small>{c?.kind === "FUT" ? formatFuturesExpiry(c.futureExpiry) : rootLabel} · {c?.multiplier ? number.format(c.multiplier) + " / lot" : "Lot unavailable"}</small></label>
           <button type="button" className="desk-side" data-side={leg.side} aria-label={"Change side for " + name} disabled={sending}
             onClick={() => update(leg.id, {side: leg.side === "BUY" ? "SELL" : "BUY"})}>{leg.side === "BUY" ? "Buy" : "Sell"}</button>
           <label className="desk-lots">Lots<input aria-label={"Lots for " + name} type="number" min={1} max={100000} step={1} disabled={sending} value={leg.lots} onChange={e => update(leg.id,{lots:e.target.value})}/></label>
@@ -200,18 +201,18 @@ export function BasketWorkspace({ chain, currency, market, root, rootLabel, expi
     </div>
     {futurePicker && <AppDialog className="desk-future-dialog" label="Add futures contract" containEscape returnFocus={futureTrigger} onClose={() => setFuturePicker(false)}>
       <div className="desk-card-head"><h2>Add futures contract</h2><button type="button" aria-label="Close futures picker" className="desk-remove" onClick={() => setFuturePicker(false)}><X size={18}/></button></div>
-      {future ? <><div className="desk-future-name"><strong>{future.symbol}</strong><small>{future.futureExpiry ?? "Perpetual"} · {number.format(future.multiplier!)} / lot</small></div>
+      {futures.length ? <div className="desk-future-list">{futures.map(future => <div key={future.id}><div className="desk-future-name"><strong>{future.symbol}</strong><small>{formatFuturesExpiry(future.futureExpiry)} · {number.format(future.multiplier!)} / lot</small></div>
         <div className="desk-future-quotes">{(["BUY","SELL"] as const).map(side => {
           const quote = side === "BUY" ? future.ask : future.bid;
           const existing = legs.find(leg => leg.id === future.id);
           const active = existing?.side === side && existing.enabled !== false;
-          return <button type="button" key={side} data-side={side} aria-pressed={active} disabled={source === "market" && quote === null && !active}
+          return <button type="button" key={side} data-side={side} aria-label={`${side === "BUY" ? "Buy" : "Sell"} future ${future.symbol}`} aria-pressed={active} disabled={source === "market" && quote === null && !active}
             onClick={() => {
               if (existing) update(future.id,{side,enabled:true}); else add(future,side);
               setFuturePicker(false); setView("basket");
             }}>
             <span>{active && <Check size={14}/>} {side === "BUY" ? "Buy future" : "Sell future"}</span><strong>{quote === null ? "—" : money.format(quote)}</strong></button>;
-        })}</div></> : <p>No matching futures contract is listed for this underlying and expiry.</p>}
+        })}</div></div>)}</div> : <p>No matching futures contract is listed for this underlying and expiry.</p>}
     </AppDialog>}
   </div>;
 }

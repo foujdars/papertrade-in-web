@@ -12,7 +12,7 @@ export function MarketDirectory({ market, instruments, onOpen }: { market: "indi
   const [optionRoot, setOptionRoot] = useState("");
   const [indianType, setIndianType] = useState("stocks");
   const [limit, setLimit] = useState(8);
-  const universe = useMemo(() => instruments.filter(item => item.assetType !== "OPTION" && !item.categories.includes("DATED_FUTURE")).sort(compareMarketInstruments), [instruments]);
+  const universe = useMemo(() => instruments.filter(item => item.assetType !== "OPTION").sort(compareMarketInstruments), [instruments]);
   const selected = market === "india" ? "india" : group;
   const matches = universe.filter(item => marketGroup(item) === selected && (market !== "india" || (indianType === "mcx" ? item.instrumentKey?.startsWith("MCX_FO|") : indianType === "indices" ? item.assetType === "INDEX" : item.assetType !== "INDEX" && !item.instrumentKey?.startsWith("MCX_FO|"))));
   const tokenOptions = useMemo(() => instruments.filter(item => item.assetType === "OPTION" && item.instrumentKey?.startsWith("DELTA|")), [instruments]);

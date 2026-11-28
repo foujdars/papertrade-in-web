@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const now = new Date();
   const exchange = new URL(request.url).searchParams.get("exchange") ?? "NSE";
-  if (exchange !== "NSE" && exchange !== "MCX") return Response.json({ ok: false }, { status: 400 });
+  if (exchange !== "NSE" && exchange !== "MCX" && exchange !== "BSE") return Response.json({ ok: false }, { status: 400 });
   const requested = new URL(request.url).searchParams.get("date");
   if (requested && (!/^\d{4}-\d{2}-\d{2}$/.test(requested) || !Number.isFinite(Date.parse(`${requested}T00:00:00Z`)))) return Response.json({ ok: false }, { status: 400 });
   const date = requested || nseDate(now);
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
     const scheduledOpen = sessions.some(s => now.getTime() >= s.start && now.getTime() < s.end);
     session = { ...session, status: liveStatus ? validOpen ? liveStatus.status : "UNAVAILABLE" : scheduledOpen ? "NORMAL_OPEN" : "NORMAL_CLOSE", sessions, source: liveStatus ? `${exchange} exchange status via Upstox` : `${exchange} dated session calendar via Upstox` };
   } catch { /* Never enable orders from a guessed weekday session after a feed failure. */ }
-  const market = exchange === "MCX" ? indianInstrumentStatus({ instrumentKey: "MCX_FO|session", categories: [] }, now, null, session) : getNseMarketStatus(now, session);
+  const market = exchange === "NSE" ? getNseMarketStatus(now, session) :
+    indianInstrumentStatus({ instrumentKey: exchange + "_FO|session", categories: [] }, now, null, session, session);
   return Response.json({ ok: true, session, market }, { headers: { "Cache-Control": "no-store" } });
 }

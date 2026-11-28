@@ -179,6 +179,7 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
         const next: Partial<Record<PerpSymbol, GlobalSnapshot>> = {};
         const nextOptions: Record<string, OptionSnapshot> = {};
         const observedOptions: Record<string, OptionObservation> = {};
+        const settlements: Record<string, {expiry: number; price: number}> = {};
         const results = await Promise.allSettled(monitorSymbols.split(",").map(async symbol => {
           const r = await fetch(`/api/global-markets?symbol=${symbol}`, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
           const data = await r.json();
@@ -188,8 +189,10 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
             if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta option quote unavailable.");
             nextOptions[symbol] = { spec: data.spec, quote: data.quote };
             observedOptions[symbol] = { snapshot: nextOptions[symbol] };
+          } else if (data.kind === "dated-future" && Number.isFinite(data.settlement) && Number.isFinite(data.expiry)) {
+            settlements[symbol] = {expiry: data.expiry, price: data.settlement};
           } else {
-            if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta perpetual quote unavailable.");
+            if (data.spec?.symbol !== symbol || data.quote?.symbol !== symbol) throw new Error("Delta futures quote unavailable.");
             next[symbol] = { spec: data.spec, quote: data.quote };
 
           }
@@ -211,7 +214,8 @@ export function useGlobalTrading(owner: string, selected: PerpSymbol | null, sel
           if (document.hidden || controller.signal.aborted) return a;
           if (!a.positions.length && !a.orders.length && !a.optionPositions?.length && !a.optionOrders?.length) return a;
           const now = Date.now();
-          const advanced = advanceOptions(received ? advanceGlobalAccount(a, quotes, specs, now, extremesRef.current) : a, observedOptions, now);
+          const hasExpiredOrders = a.orders.some(order => order.expiry && order.expiry <= now);
+          const advanced = advanceOptions(received || hasExpiredOrders ? advanceGlobalAccount(a, quotes, specs, now, extremesRef.current, settlements) : a, observedOptions, now);
           return advanced;
         }, true);
       } finally { running = false; }

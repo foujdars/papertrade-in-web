@@ -66,16 +66,17 @@ export function normalizeNseSpreadChain(rows: OptionChainRow[], series: string):
 export async function loadSpreadChain(market: SpreadMarket, root: string, underlying: FnoUnderlying | undefined, series: string, signal: AbortSignal): Promise<SpreadChain> {
   if (market !== "india") return read<SpreadChain>(providerUrl(market, root, series), signal);
   if (!underlying) return { contracts: [], reference: null };
-  const listed = underlying.futures?.find(item => item.expiry >= series && item.lotSizeVerified);
-  async function readFuture(): Promise<SpreadFuture | undefined> {
-    if (!listed) return;
-    const id = listed.instrumentKey;
-    const params = new URLSearchParams({ keys: id, depth: "1" });
+  const listed = (underlying.futures ?? []).filter(item => item.expiry >= series && item.lotSizeVerified);
+  async function readFutures(): Promise<SpreadFuture[]> {
+    if (!listed.length) return [];
+    const params = new URLSearchParams({ keys: listed.map(contract => contract.instrumentKey).join(","), depth: "1" });
     const result = await read<{ books?: Record<string, IndianBook>; quotes?: Record<string, { lastPrice: number }> }>(`/api/upstox/quotes?${params}`, signal).catch(() => undefined);
-    const book = result?.books?.[id];
-    return { id, series, kind: "FUT", symbol: listed.tradingSymbol, futureExpiry: listed.expiry, multiplier: listed.lotSize, exchangeLot: listed.lotSize,
-      ...bookPrices(book?.bid, book?.ask, book?.bidSize, book?.askSize), last: positiveQuote(result?.quotes?.[id]?.lastPrice) };
+    return listed.map(contract => {
+      const id = contract.instrumentKey, book = result?.books?.[id];
+      return { id, series, kind: "FUT", symbol: contract.tradingSymbol, futureExpiry: contract.expiry, multiplier: contract.lotSize, exchangeLot: contract.lotSize,
+        ...bookPrices(book?.bid, book?.ask, book?.bidSize, book?.askSize), last: positiveQuote(result?.quotes?.[id]?.lastPrice) };
+    });
   }
-  const [rows, future] = await Promise.all([loadOptionChain(underlying, series, signal), readFuture()]);
-  return { ...normalizeNseSpreadChain(rows, series), future };
+  const [rows, futures] = await Promise.all([loadOptionChain(underlying, series, signal), readFutures()]);
+  return { ...normalizeNseSpreadChain(rows, series), future: futures[0], futures };
 }

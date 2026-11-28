@@ -102,11 +102,12 @@ export function HomeWorkspace({
   onOpenPositions,
   onOpenTradeHistory,
   onOpenPnl,
-  onOpenStock, onOpenInstrument, onDesktopNavigate, preferenceOwner='guest', recentSymbols=[], onClearRecent,
+  onOpenStock, onOpenInstrument, onOpenFutures, onDesktopNavigate, preferenceOwner='guest', recentSymbols=[], onClearRecent,
   realisedToday: _realisedToday = 0, openChangeToday = 0, attention = [], onAttention, onOpenRealised: _onOpenRealised,
 }: {
   preferenceOwner?:string;favouriteSymbols?:string[];recentSymbols?:string[];onClearRecent?:()=>void;
   onOpenInstrument?: (instrument: import('@/lib/market').Instrument) => void;
+  onOpenFutures?: (market: "india" | "global") => void;
   onDesktopNavigate?: (section: 'ipo' | 'news' | 'fundamentals' | 'watchlist') => void;
   realisedToday?:number;openChangeToday?:number|null;
   attention?:HomeAttention[];onAttention?:(item:HomeAttention)=>void;
@@ -342,7 +343,8 @@ export function HomeWorkspace({
         <header className="home-desk-header">
           <div className="home-desk-heading">
             {preferencesReady && <span className="home-desk-date">{homeDate.format(now)} · IST</span>}
-            <h1>{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
+            <div className="home-futures-heading"><h1>{activeMarket === 'india' ? 'Market overview' : 'Global overview'}</h1>
+              {onOpenFutures && <button type="button" onClick={() => onOpenFutures(activeMarket)}>Trade futures<ChevronRight size={14}/></button>}</div>
           </div>
           <div className="home-desk-markets" role="group" aria-label="Choose market and practice wallet">
             <button type="button" aria-pressed={activeMarket === 'india'} onClick={() => chooseMarket('india')}>

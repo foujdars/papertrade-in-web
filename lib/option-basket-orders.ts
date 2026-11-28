@@ -2,6 +2,7 @@ import { basketPayoff, type PricedLeg, type BasketSide } from "./option-basket.t
 import { executeOption, type OptionSnapshot } from "./global-option-orders.ts";
 import type { PerpAccount, PerpSpec, PerpQuote } from "./global-markets.ts";
 import { submitGlobalOrder } from "./global-order-engine.ts";
+import { isDeltaDatedFutureSymbol } from "./global-contracts.ts";
 import { futureFillCashDelta, paperOrderCapitalValue, type PaperOrder } from "./paper-trading.ts";
 import { calculateUpstoxTradingCharges } from "./trading-charges.ts";
 import { bookPrices } from "./vertical-spread.ts";
@@ -25,7 +26,10 @@ export function fillDeltaBasket(account: PerpAccount, order: BasketVenue, snapsh
       throw new Error("A selected Delta contract has changed. Refresh the chain.");
     checkPrice(side, side === "BUY" ? snap.quote.ask : snap.quote.bid, premium);
     if (contract.kind === "FUT") {
-      if ("contractType" in snap.spec || contract.futureExpiry !== null || contract.id !== order.root + "USD")
+      if ("contractType" in snap.spec || (contract.futureExpiry === null
+        ? snap.spec.expiry !== undefined || contract.id !== order.root + "USD"
+        : !isDeltaDatedFutureSymbol(contract.id) || !contract.id.startsWith(order.root + "USD_") ||
+          snap.spec.expiry !== Date.parse(contract.futureExpiry) || snap.spec.expiry < Date.parse(order.expiry)))
         throw new Error("The hedge no longer matches this Delta underlying.");
       return submitGlobalOrder(next, snap.spec, snap.quote, {type:"Market", side, contracts:lots, leverage:1}, now);
     }

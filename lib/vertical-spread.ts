@@ -28,7 +28,7 @@ export type SpreadFuture = Omit<SpreadContract, "kind" | "strike"> & {
 };
 export type StrategyContract = SpreadContract | SpreadFuture;
 export type SpreadSeries = { id: string; expiry: string; detail?: string };
-export type SpreadChain = { contracts: SpreadContract[]; reference: number | null; quoteWarning?: string; future?: SpreadFuture };
+export type SpreadChain = { contracts: SpreadContract[]; reference: number | null; quoteWarning?: string; future?: SpreadFuture; futures?: SpreadFuture[] };
 
 export const SPREADS = {
   bullCall: { label: "Bull call", flow: "Debit", kind: "CE", buyLower: true },
