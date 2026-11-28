@@ -85,6 +85,7 @@ async function loadUnderlyings() {
           tradingSymbol: item.trading_symbol.trim(),
           expiry,
           lotSize: Math.max(1, Math.round(Number(item.lot_size) || 1)),
+          lotSizeVerified: Number.isSafeInteger(Number(item.lot_size)) && Number(item.lot_size) > 0,
           lastPrice: Number(item.last_price) || 0,
         });
       }

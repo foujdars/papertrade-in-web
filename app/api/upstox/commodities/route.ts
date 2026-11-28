@@ -1,7 +1,7 @@
 import { mcxInstruments } from "@/lib/mcx";
 import { isMcxSpreadRoot, mcxSpreadDirectory, mcxSpreadQuote, type McxOptionMasterRow, type McxOptionQuote, type McxSpreadRoot } from "@/lib/mcx-spread-chain";
 import { upstoxFetch } from "@/lib/upstox-server";
-import { positiveQuote, type SpreadChain } from "@/lib/vertical-spread";
+import { bookPrices, positiveQuote, type SpreadChain } from "@/lib/vertical-spread";
 import type { Instrument } from "@/lib/market";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +49,18 @@ async function mcxOptionChain(master: McxOptionMasterRow[], root: McxSpreadRoot,
       if (quote.instrument_token) quotes.set(quote.instrument_token, quote);
     }
   }
+  const futureRow = found.futureKey ? master.find(row => row.instrument_key === found.futureKey) : undefined;
+  const future = futureRow && mcxInstruments([futureRow])[0];
+  const futureQuote = found.futureKey ? quotes.get(found.futureKey) : undefined;
+  const bid = futureQuote?.depth?.buy?.[0], ask = futureQuote?.depth?.sell?.[0];
   const chain: SpreadChain = {
     contracts: contracts.map(contract => mcxSpreadQuote(contract, quotes.get(contract.id))),
-    reference: found.futureKey ? positiveQuote(quotes.get(found.futureKey)?.last_price) : null,
+    reference: positiveQuote(futureQuote?.last_price),
+    future: future?.expiry && future.lotSize && future.expiry >= found.expiry && positiveQuote(futureRow?.lot_size) ? {
+      id: future.instrumentKey, symbol: future.symbol, kind: "FUT", series: seriesId, futureExpiry: future.expiry,
+      multiplier: future.lotSize, exchangeLot: futureRow!.lot_size,
+      ...bookPrices(bid?.price, ask?.price, bid?.quantity, ask?.quantity), last: positiveQuote(futureQuote?.last_price),
+    } : undefined,
   };
   if (!chain.contracts.some(leg => leg.bid !== null || leg.ask !== null || leg.last !== null)) {
     chain.quoteWarning = "MCX option quotes are unavailable. You can enter premiums manually.";

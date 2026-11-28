@@ -1,6 +1,6 @@
 import { nseDate } from "./market-hours.ts";
 import type { McxMasterRow } from "./mcx.ts";
-import { bookPrices, positiveQuote, type SpreadContract, type SpreadSeries } from "./vertical-spread.ts";
+import { bookPrices, finiteQuote, positiveQuote, type SpreadContract, type SpreadSeries } from "./vertical-spread.ts";
 
 export const MCX_SPREAD_PRODUCTS = {
   GOLD: { label: "Gold", multiplier: 100, unit: "₹ per 10 g" },
@@ -18,6 +18,7 @@ type DepthLevel = { price?: number; quantity?: number };
 export type McxOptionQuote = {
   instrument_token?: string;
   last_price?: number;
+  oi?: number;
   depth?: { buy?: DepthLevel[]; sell?: DepthLevel[] };
 };
 
@@ -63,5 +64,6 @@ export function mcxSpreadQuote(contract: SpreadContract, quote?: McxOptionQuote)
   if (!quote || quote.instrument_token !== contract.id) return contract;
   const bid = quote.depth?.buy?.[0];
   const ask = quote.depth?.sell?.[0];
-  return { ...contract, ...bookPrices(bid?.price, ask?.price, bid?.quantity, ask?.quantity), last: positiveQuote(quote.last_price) };
+  return { ...contract, ...bookPrices(bid?.price, ask?.price, bid?.quantity, ask?.quantity), bidSize: finiteQuote(bid?.quantity),
+    askSize: finiteQuote(ask?.quantity), oi: finiteQuote(quote.oi), last: positiveQuote(quote.last_price) };
 }

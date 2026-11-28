@@ -1,6 +1,7 @@
 import type { FnoUnderlying, OptionChainRow } from "./fno";
 import { loadOptionChain, loadOptionExpiries } from "./fno-client";
-import { bookPrices, positiveQuote, type SpreadChain, type SpreadSeries } from "./vertical-spread";
+import { bookPrices, positiveQuote, reportedGreeks, type SpreadChain, type SpreadSeries, type SpreadFuture } from "./vertical-spread";
+import type { IndianBook } from "./option-basket-orders";
 
 export type SpreadMarket = "india" | "crypto" | "metals" | "tokens";
 
@@ -30,6 +31,11 @@ export async function loadTokenOptionRoots(signal: AbortSignal) {
   return result.roots;
 }
 
+export async function loadCryptoOptionRoots(signal: AbortSignal) {
+  const result = await read<{ roots: string[] }>("/api/global-markets?mode=crypto-option-roots", signal);
+  return result.roots;
+}
+
 export async function loadSpreadSeries(market: SpreadMarket, root: string, underlying: FnoUnderlying | undefined, signal: AbortSignal): Promise<SpreadSeries[]> {
   if (market !== "india") {
     const result = await read<{ series: SpreadSeries[] }>(providerUrl(market, root), signal);
@@ -47,6 +53,10 @@ export function normalizeNseSpreadChain(rows: OptionChainRow[], series: string):
         id: contract.instrumentKey, symbol: contract.tradingSymbol, exchangeLot: contract.lotSizeVerified ? contract.lotSize : undefined, series, strike: row.strikePrice, kind: contract.optionType,
         multiplier: contract.lotSizeVerified ? contract.lotSize : null,
         ...bookPrices(contract.marketData.bidPrice, contract.marketData.askPrice, contract.marketData.bidQty, contract.marketData.askQty),
+        bidSize: positiveQuote(contract.marketData.bidQty), askSize: positiveQuote(contract.marketData.askQty),
+        iv: positiveQuote(contract.greeks?.iv) ? contract.greeks.iv! / 100 : null,
+        greeks: reportedGreeks(contract.greeks),
+        oi: contract.marketData.oiAvailable ? contract.marketData.oi : null,
         last: positiveQuote(contract.marketData.ltp),
       }] : [])),
     reference: positiveQuote(rows.find(row => row.expiry === series && row.underlyingSpotPrice > 0)?.underlyingSpotPrice),
@@ -56,5 +66,16 @@ export function normalizeNseSpreadChain(rows: OptionChainRow[], series: string):
 export async function loadSpreadChain(market: SpreadMarket, root: string, underlying: FnoUnderlying | undefined, series: string, signal: AbortSignal): Promise<SpreadChain> {
   if (market !== "india") return read<SpreadChain>(providerUrl(market, root, series), signal);
   if (!underlying) return { contracts: [], reference: null };
-  return normalizeNseSpreadChain(await loadOptionChain(underlying, series, signal), series);
+  const listed = underlying.futures?.find(item => item.expiry >= series && item.lotSizeVerified);
+  async function readFuture(): Promise<SpreadFuture | undefined> {
+    if (!listed) return;
+    const id = listed.instrumentKey;
+    const params = new URLSearchParams({ keys: id, depth: "1" });
+    const result = await read<{ books?: Record<string, IndianBook>; quotes?: Record<string, { lastPrice: number }> }>(`/api/upstox/quotes?${params}`, signal).catch(() => undefined);
+    const book = result?.books?.[id];
+    return { id, series, kind: "FUT", symbol: listed.tradingSymbol, futureExpiry: listed.expiry, multiplier: listed.lotSize, exchangeLot: listed.lotSize,
+      ...bookPrices(book?.bid, book?.ask, book?.bidSize, book?.askSize), last: positiveQuote(result?.quotes?.[id]?.lastPrice) };
+  }
+  const [rows, future] = await Promise.all([loadOptionChain(underlying, series, signal), readFuture()]);
+  return { ...normalizeNseSpreadChain(rows, series), future };
 }

@@ -14,7 +14,7 @@ export type ListedDeltaOption = {
 export type DeltaOption = ListedDeltaOption & { instrumentKey: string; expiry: string; strikePrice: number; optionType: "CE" | "PE" };
 
 export const isTokenisedDelta = (item: ListedDeltaOption) =>
-  item.categories.some(tag => tag === "METAL" || tag === "GOLD" || tag === "US_MARKET") ||
+  item.categories?.some(tag => tag === "METAL" || tag === "GOLD" || tag === "US_MARKET") ||
   ["XAUT", "PAXG", "SLVON"].includes(item.underlyingSymbol ?? deltaOptionRoot(item.symbol) ?? item.symbol.replace(/USD$/, ""));
 
 export function deltaChartOptionRoot(item: ListedDeltaOption) {

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { basketPayoff, selectBasketLeg } from "../lib/option-basket.ts";
+import { basketPayoff, legGreek, presetLegs, priceBasket, selectBasketLeg, targetPayoff } from "../lib/option-basket.ts";
+import { optionBuilderContext } from "../lib/option-builder-context.ts";
 import { calculateSpread, SPREADS } from "../lib/vertical-spread.ts";
 import { fillIndianBasket, fillDeltaBasket } from "../lib/option-basket-orders.ts";
 import { readGlobalAccount } from "../lib/global-order-engine.ts";
@@ -8,6 +9,75 @@ import { readGlobalAccount } from "../lib/global-order-engine.ts";
 const series = "2030-12-27";
 const contract = (strike, kind = "CE", multiplier = 1) => ({id: kind + strike, kind, strike, series, multiplier, bid: 2, ask: 3, last: 2.5});
 const leg = (c, side, premium, lots = 1) => ({contract: c, side, premium, lots});
+const future = { id:"NSE_FO|123", symbol:"NIFTY DEC FUT", kind:"FUT", series, futureExpiry:series, multiplier:25, exchangeLot:25, bid:99, ask:100, last:100 };
+
+test("chart context preserves the exact listing across NSE, MCX, crypto and token options", () => {
+  const nse = {exchange:"NSE", instrumentKey:"NSE_FO|1", underlyingKey:"NSE_INDEX|Nifty 50", optionType:"PE", strikePrice:100, expiry:series};
+  assert.equal(optionBuilderContext(nse).initialRoot, nse.underlyingKey);
+  const metal = optionBuilderContext({...nse, exchange:"MCX", instrumentKey:"MCX_FO|2", underlyingSymbol:"GOLDM", underlyingKey:"MCX_FO|3"});
+  assert.deepEqual([metal.initialMarket,metal.initialRoot,metal.initialExpiry,metal.initialContract],["metals","GOLDM",series+"~MCX_FO|3","MCX_FO|2"]);
+  for (const root of ["BTC","ETH","SOL","XAUT"]) {
+    const symbol = "P-"+root+"-100-271230";
+    const c = optionBuilderContext({symbol,instrumentKey:"DELTA|"+symbol,exchange:"DELTA",categories:["GLOBAL","OPTION"]});
+    assert.deepEqual([c.initialMarket,c.initialContract,c.initialExpiry,c.initialKind,c.initialStrike],[root === "XAUT" ? "tokens" : "crypto",symbol,series,"PE",100]);
+  }
+});
+
+test("a futures hedge offsets call tail risk without adding its notional to net premium", () => {
+  const legs = [leg(future,"BUY",100),leg(contract(110,"CE",25),"SELL",3)];
+  const payoff = basketPayoff(legs);
+  assert.deepEqual([payoff.debit,payoff.maxProfit,payoff.maxLoss,payoff.breakEvens],[-75,325,2425,[97]]);
+  assert.equal(payoff.payoff(1_000_000),325);
+  assert.equal(basketPayoff([leg(future,"SELL",100)]).maxLoss,Infinity);
+  assert.equal(legGreek(legs[0],"delta"),25);
+  assert.equal(legGreek(legs[0],"vega"),0);
+  assert.equal(legGreek(legs[1],"gamma"),null);
+  assert.equal(legGreek(leg({...contract(110,"CE",25),greeks:{delta:.4}},"SELL",3,2),"delta"),-20);
+});
+
+test("one set of enabled, scaled lots drives the review and the payoff", () => {
+  const contracts = new Map([[future.id,future]]);
+  const rows = [{id:future.id,side:"BUY",lots:"2",manual:"86"},{id:"delisted",enabled:false,lots:"",side:"SELL",manual:""}];
+  const priced = priceBasket(rows,contracts,"manual",3);
+  assert.equal(priced.length,1);
+  assert.equal(priced[0].lots,6);
+  assert.equal(basketPayoff(priced).payoff(87),150);
+  assert.throws(()=>priceBasket(rows,contracts,"market",0));
+  assert.throws(()=>priceBasket([{...rows[0],lots:"0.5"}],contracts,"market",2));
+  assert.throws(()=>basketPayoff(priceBasket(rows,contracts,"market",100000)));
+});
+
+test("volatility presets use listed equal-size legs surrounding the reference", () => {
+  const contracts = [80,90,100,110,120].flatMap(k => [contract(k),contract(k,"PE")]);
+  const ids = preset => presetLegs(contracts,preset,100,"market").map(l=>[l.id,l.side]);
+  assert.deepEqual(ids("straddle"),[["CE100","BUY"],["PE100","BUY"]]);
+  assert.deepEqual(ids("strangle"),[["PE90","BUY"],["CE110","BUY"]]);
+  assert.deepEqual(ids("condor"),[["PE80","BUY"],["PE90","SELL"],["CE110","SELL"],["CE120","BUY"]]);
+  assert.throws(()=>presetLegs(contracts.slice(0,3),"condor",100,"market"));
+});
+
+test("target values converge at expiry and require IV for each option before expiry", () => {
+  const call = leg({...contract(100),iv:.2},"BUY",0);
+  assert.ok(Math.abs(targetPayoff([call],100,1)-7.965567) < .00002);
+  const put = leg({...contract(100,"PE"),iv:.2},"BUY",0);
+  assert.ok(Math.abs(targetPayoff([call],105,.5)-targetPayoff([put],105,.5)-5) < 1e-8);
+  const mixed = [leg(future,"SELL",102),call,put];
+  for (const spot of [0,95,100,150]) assert.equal(targetPayoff(mixed,spot,0),basketPayoff(mixed).payoff(spot));
+  assert.equal(targetPayoff([leg(contract(100),"BUY",2)],100,1),null);
+});
+
+test("INR hedge fills release the prior futures margin when closed", () => {
+  const now = Date.parse("2030-12-01T06:00:00Z");
+  const order = {market:"india",root:"NSE_INDEX|Nifty 50",rootLabel:"NIFTY",expiry:series,legs:[leg(future,"BUY",100)]};
+  const books = {[future.id]:{bid:99,ask:100,bidSize:25,askSize:25,at:new Date(now).toISOString()}};
+  const first = fillIndianBasket(order,books,2000,now,"one");
+  assert.equal(first.fills[0].assetType,"FUTURE");
+  assert.ok(first.fills[0].cashDelta < -500);
+  const second = fillIndianBasket({...order,legs:[leg(future,"SELL",99)]},books,first.balance,now+1000,"two",first.fills);
+  assert.ok(second.fills[0].cashDelta > 400);
+  assert.ok(Math.abs(2000-second.balance-25-first.fills[0].charges.total-second.fills[0].charges.total) < 1e-8);
+  assert.throws(()=>fillIndianBasket({...order,legs:[leg({...future,futureExpiry:"2029-01-01"},"BUY",100)]},books,2000,now,"three"));
+});
 
 test("selecting a new call, put or side preserves other strikes and quantities", () => {
   const first = [{id:"CE100",side:"BUY",lots:"3",manual:"1.5"}];
@@ -15,6 +85,7 @@ test("selecting a new call, put or side preserves other strikes and quantities",
   const reversed = selectBasketLeg(second,"PE100","BUY");
   assert.deepEqual(reversed.map(l => [l.id,l.side,l.lots]), [["CE100","BUY","3"],["PE100","BUY","1"]]);
   assert.deepEqual(selectBasketLeg(reversed,"PE100","BUY"),first);
+  assert.deepEqual(selectBasketLeg([{...first[0],enabled:false}],"CE100","BUY"),[{...first[0],enabled:true}]);
 });
 
 for (const [id,p] of Object.entries(SPREADS)) test(id + " expiry P&L matches the vertical spread model", () => {
@@ -71,6 +142,16 @@ test("Delta commits all legs together and leaves the input wallet untouched when
   const wallet=readGlobalAccount(null), serialized=JSON.stringify(wallet);
   const result=fillDeltaBasket(wallet,order,snapshots,now);
   assert.equal(result.optionPositions.length,2);
+  const perp = {...future, id:"BTCUSD",symbol:"BTCUSD",futureExpiry:null,series:expiry,multiplier:.001};
+  const perpSnapshot = {
+    spec:{symbol:"BTCUSD",lot:.001,tick:.5,initial:.005,maintenance:.0025,initialScale:0,maintenanceScale:0,scalingThreshold:100000,maxNotional:5000000,maker:.0002,taker:.0005,liquidation:.0005,fundingSeconds:28800,operational:true,fetchedAt:now},
+    quote:{...snapshots[orders[0].contract.id].quote,symbol:"BTCUSD",bid:84999,ask:85000,last:85000,mark:85000},
+  };
+  const hedged = {...order,legs:[leg(perp,"BUY",85000),...orders]};
+  const hedgedResult = fillDeltaBasket(wallet,hedged,{...snapshots,BTCUSD:perpSnapshot},now);
+  assert.equal(hedgedResult.positions[0].entry,85000);
+  assert.equal(hedgedResult.optionPositions.length,2);
+  assert.throws(()=>fillDeltaBasket(wallet,hedged,{...snapshots,BTCUSD:{...perpSnapshot,quote:{...perpSnapshot.quote,askSize:0}}},now));
   const id=orders[1].contract.id, second=snapshots[id];
   for(const changed of [{...second,quote:{...second.quote,bid:98}},{...second,quote:{...second.quote,bidSize:0}},{...second,spec:{...second.spec,strike:123}}])
     assert.throws(()=>fillDeltaBasket(wallet,order,{...snapshots,[id]:changed},now));

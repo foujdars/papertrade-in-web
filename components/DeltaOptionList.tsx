@@ -8,7 +8,7 @@ import { useOptionDesk } from "./OptionDeskContext";
 import { startVisiblePolling } from "@/lib/visible-polling";
 import { loadSpreadChain } from "@/lib/spread-chain-client";
 import type { SpreadChain, SpreadContract } from "@/lib/vertical-spread";
-import { deltaOptionDirectory, type ListedDeltaOption } from "@/lib/delta-option-list";
+import { deltaOptionDirectory, isTokenisedDelta, type ListedDeltaOption } from "@/lib/delta-option-list";
 
 const expiryLabel = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
 
@@ -31,7 +31,7 @@ export function DeltaOptionList({ instruments, initialRoot, initialExpiry, selec
   const [reload, setReload] = useState(0);
   const [feed, setFeed] = useState<{ key: string; chain?: SpreadChain; error?: string }>();
   const key = root + ":" + expiry;
-  const market = root === "BTC" || root === "ETH" ? "crypto" : "tokens";
+  const market = contracts[0] && isTokenisedDelta(contracts[0]) ? "tokens" : "crypto";
   useEffect(() => {
     if (!root || !expiry) return;
     return startVisiblePolling(async signal => {

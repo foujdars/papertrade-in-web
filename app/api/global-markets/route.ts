@@ -9,7 +9,7 @@ import {
 import { isDeltaOptionRoot, isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
 import { isTokenisedDelta } from "@/lib/delta-option-list";
 import { aggregateChartCandles, deltaHistoryPlan } from "@/lib/chart-history";
-import { bookPrices, positiveQuote, type SpreadContract, type SpreadSeries } from "@/lib/vertical-spread";
+import { bookPrices, finiteQuote, positiveQuote, reportedGreeks, type SpreadContract, type SpreadSeries, type SpreadFuture } from "@/lib/vertical-spread";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const cache = new Map<string, { until: number; value: unknown }>();
@@ -74,7 +74,8 @@ async function spreadChain(params: URLSearchParams) {
   if (!isDeltaOptionRoot(root)) {
     return Response.json({ ok: false, error: "Invalid option underlying." }, { status: 400 });
   }
-  const contracts = (await getCatalogue()).filter(item =>
+  const catalogue = await getCatalogue();
+  const contracts = catalogue.filter(item =>
     item.underlyingSymbol === root && item.assetType === "OPTION" && item.expiry &&
     Date.parse(item.expiry) > Date.now() && item.optionType && item.contractMultiplier && item.strikePrice);
   const seriesById = new Map<string, SpreadSeries>();
@@ -99,6 +100,8 @@ async function spreadChain(params: URLSearchParams) {
   });
   let tickers: Record<string, any>[] = [];
   let quoteWarning: string | undefined;
+  const perp = catalogue.find(item => item.assetType === "FUTURE" && item.underlyingSymbol === root && item.symbol === root + "USD" && item.contractMultiplier);
+  const perpTicker = perp ? delta(`tickers/${encodeURIComponent(perp.symbol)}`, 2000).catch(() => null) : null;
   try {
     const response = await delta(`tickers?${query}`, 2000);
     if (!Array.isArray(response) || !response.length) throw new Error("Missing quotes");
@@ -116,23 +119,33 @@ async function spreadChain(params: URLSearchParams) {
       id: item.symbol, series: seriesId, kind: item.optionType!, strike: item.strikePrice!,
       multiplier: item.contractMultiplier!,
       ...bookPrices(quotes?.best_bid, quotes?.best_ask, quotes?.bid_size, quotes?.ask_size),
+      bidSize: finiteQuote(quotes?.bid_size), askSize: finiteQuote(quotes?.ask_size),
+      mark: positiveQuote(ticker?.mark_price), iv: positiveQuote(quotes?.mark_iv ?? ticker?.mark_vol),
+      oi: finiteQuote(ticker?.oi_contracts), greeks: reportedGreeks(ticker?.greeks),
       last: positiveQuote(ticker?.close),
     };
   });
   if (!quoteWarning && !chain.some(leg => leg.bid !== null || leg.ask !== null || leg.last !== null)) {
     quoteWarning = "No premiums were returned for this expiry. You can enter them manually.";
   }
-  return Response.json({ ok: true, contracts: chain, reference, quoteWarning }, { headers: { "Cache-Control": "no-store" } });
+  const ticker = await perpTicker;
+  const book = ticker?.symbol === perp?.symbol ? ticker?.quotes : undefined;
+  const future: SpreadFuture | undefined = perp ? {
+    kind: "FUT", id: perp.symbol, symbol: perp.symbol, series: seriesId, futureExpiry: null, multiplier: perp.contractMultiplier!,
+    ...bookPrices(book?.best_bid, book?.best_ask, book?.bid_size, book?.ask_size),
+    last: ticker?.symbol === perp.symbol ? positiveQuote(ticker.close) : null,
+  } : undefined;
+  return Response.json({ ok: true, contracts: chain, reference, future, quoteWarning }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams,
     symbol = params.get("symbol") ?? "BTCUSD",
     mode = params.get("mode") ?? "snapshot";
-  if (mode === "token-option-roots") {
+  if (mode === "token-option-roots" || mode === "crypto-option-roots") {
     try {
       const roots = [...new Set((await getCatalogue()).filter(item => item.assetType === "OPTION" && item.expiry &&
-        Date.parse(item.expiry) > Date.now() && isTokenisedDelta(item)).map(item => item.underlyingSymbol!))].sort();
+        Date.parse(item.expiry) > Date.now() && isTokenisedDelta(item) === (mode === "token-option-roots")).map(item => item.underlyingSymbol!))].sort();
       return Response.json({ ok: true, roots }, { headers: { "Cache-Control": "no-store" } });
     } catch {
       return Response.json({ ok: false, error: "Delta options unavailable" }, { status: 503 });

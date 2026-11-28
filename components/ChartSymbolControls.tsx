@@ -24,7 +24,7 @@ export function ChartSymbolControls({ instrument, venue, desktop = false, expand
     </div>
     {onOptions && <button className="chart-derivatives-link" disabled={optionsDisabled} onClick={onOptions} aria-label={`Open ${instrument.symbol} option charts`} title="Open option charts"><Link2 size={desktop ? 16 : 19}/></button>}
     {instrument.exchange === 'MCX' && instrument.underlyingSymbol && isMcxSpreadRoot(instrument.underlyingSymbol) && <MetalChainButton key={instrument.underlyingSymbol} root={instrument.underlyingSymbol}/>}
-    {instrument.assetType === 'OPTION' && instrument.exchange === 'DELTA' && <OptionStrategyButton key={instrument.instrumentKey} option={instrument} />}
+    {instrument.assetType === 'OPTION' && <OptionStrategyButton key={instrument.instrumentKey} option={instrument} />}
     <button type="button" className={`chart-style-link ${styled ? 'active' : ''}`} onClick={onStyle} aria-label="Chart type" title={desktop ? 'Candles' : 'Chart type'}><CandlestickChart size={desktop ? 17 : 18}/></button>
     {expanded && <div className={`trade-symbol-menu${desktop ? ' desktop-symbol-menu' : ''}`}>
       <label><Search size={16}/><input value={query} onChange={event => onQuery(event.target.value)} placeholder="Search stocks, BTC, gold or Brent"/></label>
