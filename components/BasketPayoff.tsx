@@ -12,6 +12,10 @@ const targetFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "
 const views = ["P&L chart", "P&L table", "Greeks"] as const;
 const greeks: Greek[] = ["delta","gamma","theta","vega"];
 
+function axisLabel(value: number) {
+  return value !== 0 && Math.abs(value) < 1 ? String(Number(value.toPrecision(3))) : compact.format(value);
+}
+
 export function BasketPayoff({ result, legs, contracts, money, reference, asOf, expiryAt }: {
   result: ReturnType<typeof basketPayoff>; legs: PricedLeg[]; contracts: SpreadContract[]; money: Intl.NumberFormat;
   reference: number | null; asOf: number; expiryAt?: number;
@@ -46,8 +50,10 @@ export function BasketPayoff({ result, legs, contracts, money, reference, asOf, 
   const risk = Number(stop), reward = Number(target);
   const validRisk = Number.isFinite(risk) && risk > 0 && risk <= maxLoss;
   const validReward = Number.isFinite(reward) && reward > 0 && reward <= maxProfit;
-  const floor = Math.min(0,...expiryValues,...modelValues,validRisk ? -risk : 0);
-  const ceiling = Math.max(0,...expiryValues,...modelValues,validReward ? reward : 0);
+  const showStop = riskInput !== undefined && validRisk;
+  const showTarget = targetInput !== undefined && validReward;
+  const floor = Math.min(0,...expiryValues,...modelValues,showStop ? -risk : 0);
+  const ceiling = Math.max(0,...expiryValues,...modelValues,showTarget ? reward : 0);
   const left = 53, right = 471, top = 14, bottom = 142;
   const x = (value: number) => left+(right-left)*(value-start)/(end-start);
   const y = (value: number) => ceiling === floor ? (top+bottom)/2 : top+(bottom-top)*(ceiling-value)/(ceiling-floor);
@@ -84,12 +90,12 @@ export function BasketPayoff({ result, legs, contracts, money, reference, asOf, 
     </dl>
     <div className="desk-analysis-tabs" role="group" aria-label="Payoff views">{views.map(tab => <button type="button" key={tab} aria-pressed={view === tab} onClick={() => setView(tab)}>{tab}</button>)}</div>
     {view === "P&L chart" && <figure className="desk-payoff-chart">
-      <div className="desk-legend"><span className="legend-expiry">At expiry</span>{modelReady && <span className="legend-target">Target date</span>}{reference !== null && <span className="legend-spot">Ref {compact.format(reference)}</span>}</div>
+      <div className="desk-legend"><span className="legend-expiry">At expiry</span>{modelReady && <span className="legend-target">Target date</span>}{reference !== null && <span className="legend-spot">Ref {axisLabel(reference)}</span>}</div>
       <svg viewBox={`0 0 480 ${drawOi ? 238 : 169}`} role="img" aria-label="Strategy profit and loss by underlying price"
         onPointerMove={event => { if (event.pointerType === "mouse" && event.buttons === 0) moveScenario(event); }}
         onPointerDown={moveScenario}>
         <title>Payoff in {currency} at expiry{modelReady ? " and on the target date" : ""}</title>
-        {[...new Set([floor,(floor+ceiling)/2,ceiling])].map(value => <g key={value}><line className="desk-gridline" x1={left} x2={right} y1={y(value)} y2={y(value)}/><text x={left-6} y={y(value)+3} textAnchor="end">{compact.format(value)}</text></g>)}
+        {[...new Set([floor,(floor+ceiling)/2,ceiling])].map(value => <g key={value}><line className="desk-gridline" x1={left} x2={right} y1={y(value)} y2={y(value)}/><text x={left-6} y={y(value)+3} textAnchor="end">{axisLabel(value)}</text></g>)}
         {points.slice(1).map((r,i) => {
           const l = points[i], a = payoff(l), b = payoff(r), positive = payoff((l+r)/2) >= 0;
           return <g key={r}><polygon className={positive ? "spread-profit-zone" : "spread-loss-zone"} points={`${x(l)},${y(0)} ${x(l)},${y(a)} ${x(r)},${y(b)} ${x(r)},${y(0)}`}/>
@@ -98,11 +104,11 @@ export function BasketPayoff({ result, legs, contracts, money, reference, asOf, 
         <line className="spread-zero" x1={left} x2={right} y1={y(0)} y2={y(0)}/>
         {reference !== null && <line className="desk-ref-line" x1={x(reference)} x2={x(reference)} y1={top} y2={bottom}/>}
         {modelReady && <polyline className="desk-model-line" points={modelPoints.map(p => x(p.spot)+","+y(p.value)).join(" ")}/>}
-        {riskInput !== undefined && validRisk && <line x1={left} x2={right} y1={y(-risk)} y2={y(-risk)} className="spread-stop-line"/>}
-        {targetInput !== undefined && validReward && <line x1={left} x2={right} y1={y(reward)} y2={y(reward)} className="spread-target-line"/>}
+        {showStop && <line x1={left} x2={right} y1={y(-risk)} y2={y(-risk)} className="spread-stop-line"/>}
+        {showTarget && <line x1={left} x2={right} y1={y(reward)} y2={y(reward)} className="spread-target-line"/>}
         {breakEvens.map(value => <circle key={value} cx={x(value)} cy={y(0)} r="2.6" className="spread-break-even"/>)}
         <circle cx={x(price)} cy={y(payoff(price))} r="3.7" className="spread-point"/>
-        {[start,(start+end)/2,end].map((s,i) => <text key={s} x={x(s)} y={bottom+17} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"}>{compact.format(s)}</text>)}
+        {[start,(start+end)/2,end].map((s,i) => <text key={s} x={x(s)} y={bottom+17} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"}>{axisLabel(s)}</text>)}
         {drawOi && <g><text x={left} y="182">Open interest · calls / puts</text><text x={right} y="182" textAnchor="end">Max {compact.format(maxOi)}</text>
           {oi.map(c => <rect key={c.id} x={x(c.strike)+(c.kind === "CE" ? -barWidth : 0)} y={229-40*c.oi!/maxOi}
             width={barWidth} height={40*c.oi!/maxOi} fill={c.kind === "CE" ? "var(--spread-gain)" : "var(--spread-loss)"}><title>{c.strike} {c.kind} · OI {c.oi}</title></rect>)}</g>}

@@ -91,6 +91,14 @@ async function intercept(page, market) {
         const picker=page.getByRole("dialog",{name:"Add futures contract",exact:true});
         await picker.getByRole("button",{name:/Buy future/}).click();
         await ui.getByRole("button",{name:"Payoff",exact:true}).click();
+        // With inactive planning levels the axis follows the displayed curves, even for a futures leg.
+        await ui.getByRole("slider",{name:"Target date"}).press("End");
+        const coversPlot = await ui.locator(".desk-payoff-chart svg").evaluate(svg => {
+          const ys = [...svg.querySelectorAll(".spread-profit-line,.spread-loss-line")].flatMap(line=>[line.y1.baseVal.value,line.y2.baseVal.value]);
+          const grid = [...svg.querySelectorAll(".desk-gridline")].map(line=>line.y1.baseVal.value);
+          return Math.abs(Math.min(...ys)-Math.min(...grid)) < .01 && Math.abs(Math.max(...ys)-Math.max(...grid)) < .01;
+        });
+        assert.ok(coversPlot,"unentered stop or target must not flatten the payoff curve");
         await ui.getByRole("button",{name:"P&L table",exact:true}).click();
         assert.ok(await ui.getByRole("columnheader",{name:"Target P&L"}).isVisible());
         await ui.getByRole("button",{name:"Greeks",exact:true}).click();
