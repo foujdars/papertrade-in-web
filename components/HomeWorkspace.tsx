@@ -468,8 +468,8 @@ export function HomeWorkspace({
           {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
         </div>}
 
-        {activeMarket === 'india' && <div className="home-breadth-feature">
-          <IndiaPulse showGauges={!cards.market}/>
+        {activeMarket === 'india' && (desktopTab === 'overview' || (desktopTab === 'breadth' && !cards.market)) && <div className="home-breadth-feature">
+          <IndiaPulse showBreadth={desktopTab === 'overview'} showGauges={!cards.market}/>
         </div>}
 
         {activeMarket === "india" ? <div className={`home-market-data${cards.market ? " has-derivatives" : ""}`}>

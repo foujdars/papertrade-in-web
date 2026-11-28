@@ -83,8 +83,6 @@
 .terminal-shell .home-hub.home-desk .home-dashboard-scroll { gap: 14px; }
 .terminal-shell .home-hub.home-desk .home-breadth-feature { min-width: 0; }
 .terminal-shell .home-hub.home-desk .india-breadth-card { border: 1px solid var(--line); border-radius: 16px; }
-.terminal-shell .home-hub.home-desk .india-breadth-head { padding-inline: 14px; }
-.terminal-shell .home-hub.home-desk .india-breadth-counts { padding-inline: 14px; gap: 14px; }
 .terminal-shell .home-hub.home-desk .home-portfolio-card { border-radius: 16px; }
 .terminal-shell .home-hub.home-desk .home-portfolio-row { font-variant-numeric: tabular-nums; }
 .terminal-shell .home-desk .home-portfolio-actions button:focus-visible { outline: 2px solid var(--purple); }
@@ -115,10 +113,9 @@
     grid-column: 1 / 9;
     grid-row: 4;
   }
-  .terminal-shell[data-platform="web"] .home-desk[data-desktop-tab="overview"] .home-breadth-feature > .india-pulse-layout { display: grid; }
+  .terminal-shell[data-platform="web"] .home-hub.home-desk[data-desktop-tab="breadth"]:not(:has(.home-breadth-feature)) .home-sector-heat { grid-row: 4 / 7; }
   .terminal-shell[data-platform="web"] .home-hub.home-desk[data-desktop-tab="overview"][data-market="india"] .home-main-grid { grid-column: 9 / -1; grid-row: 4 / span 2; }
   .terminal-shell[data-platform="web"] .home-hub.home-desk[data-desktop-tab="overview"] .home-movers-slot { grid-row: 5; }
-  .terminal-shell[data-platform="web"] .home-desk:is([data-desktop-tab="derivatives"],[data-desktop-tab="flows"]) .home-breadth-feature { display: none; }
   .terminal-shell[data-platform="web"] .home-desk .desktop-explore-tabs {
     gap: 4px;
     align-items: center;
@@ -157,7 +154,6 @@
 .terminal-shell .home-hub.home-desk .home-index-card { padding-block: 4px; min-height: 0; gap: 2px; }
 .terminal-shell .home-hub.home-desk .home-indices-heading { padding-block: 6px 3px; }
 .terminal-shell .home-hub.home-desk :is(.home-portfolio-card,.home-market-card-v2,.home-option-pulse,.home-sector-heat) { min-height: 0; padding-block: 7px; }
-.terminal-shell .home-hub.home-desk :is(.india-breadth-counts,.india-breadth-head) { padding-block: 3px; min-height: 28px; }
 .terminal-shell .home-hub.home-desk :is(.desktop-stock-row,.market-directory-row) { min-height: 38px; padding-block: 3px; }
 .terminal-shell .home-hub.home-desk .market-directory-tabs { margin-bottom: 6px; }
 .terminal-shell .home-hub.home-desk .market-directory-tabs > button { min-height: 34px; }
@@ -168,7 +164,6 @@
   .terminal-shell[data-platform="web"] .home-hub.home-desk .desktop-explore-tabs button { min-height: 34px; }
 }
 @media (max-width: 940px) {
-  .terminal-shell .home-hub.home-desk .india-breadth-head { display: flex; justify-content: space-between; align-items: center; }
   .terminal-shell .home-hub.home-desk .desktop-explore-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0; }
   .terminal-shell .home-hub.home-desk .desktop-explore-tabs button {
     flex: 0 0 auto; min-height: 36px; padding: 3px 8px; color: var(--muted);
@@ -177,6 +172,6 @@
   .terminal-shell .home-hub.home-desk .desktop-explore-tabs button[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
   .terminal-shell .home-desk[data-desktop-tab="overview"] :is(.home-market-data,.india-flows-slot,.home-deal-slot),
   .terminal-shell .home-desk[data-desktop-tab="breadth"] :is(.home-main-grid,.home-movers-slot,.home-derivatives,.india-flows-slot,.home-deal-slot),
-  .terminal-shell .home-desk[data-desktop-tab="derivatives"] :is(.home-breadth-feature,.home-main-grid,.home-market-pair,.home-sector-heat,.india-flows-slot,.home-deal-slot),
-  .terminal-shell .home-desk[data-desktop-tab="flows"] :is(.home-breadth-feature,.home-main-grid,.home-market-pair,.home-market-data) { display: none; }
+  .terminal-shell .home-desk[data-desktop-tab="derivatives"] :is(.home-main-grid,.home-market-pair,.home-sector-heat,.india-flows-slot,.home-deal-slot),
+  .terminal-shell .home-desk[data-desktop-tab="flows"] :is(.home-main-grid,.home-market-pair,.home-market-data) { display: none; }
 }

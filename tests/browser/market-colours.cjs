@@ -17,7 +17,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
  try{
   const launch={headless:true};if(process.env.CHROMIUM_PACKAGE){const pkg=require(process.env.CHROMIUM_PACKAGE),c=pkg.default||pkg;launch.executablePath=await c.executablePath();launch.args=c.args;}
   browser=await chromium.launch(launch);const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaSeries?.data().length===120);await page.locator('.india-ad-chart').waitFor();
+  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>window.qaSeries?.data().length===120);await page.getByRole('button',{name:'Intraday',exact:true}).click();await page.locator('.india-ad-chart').waitFor();
   const gainText='.up,.positive,.buy-tag,.buy-active,.advanced-buy,.news-positive,.fa-badge.review,.pnl-calendar-day.profit';
   const lossText='.down,.negative,.sell-tag,.sell-active,.advanced-sell,.news-negative,.fa-badge.rejected,.pnl-calendar-day.loss';
   const gainButtons='.chart-trade-buttons .buy,.fno-trade-actions>button.buy,.place-order.buy,.chart-buy-button,.chart-order-buttons .compact-buy';
