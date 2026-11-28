@@ -67,6 +67,7 @@ export function derivePreviousClose(lastPrice: number, netChange: number, fallba
 }
 
 export type UpstoxQuote = {
+  depth?: { buy?: { price?: number; quantity?: number }[]; sell?: { price?: number; quantity?: number }[] };
   instrument_token?: string;
   symbol?: string;
   last_price?: number | string | null;

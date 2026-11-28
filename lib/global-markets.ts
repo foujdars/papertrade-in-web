@@ -155,8 +155,9 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
       continue;
     }
     if (!isDeltaPerpSymbol(symbol)) continue;
+    let spec: PerpSpec;
     try {
-      const spec = normalizePerpSpec(row, symbol, Date.now());
+      spec = normalizePerpSpec(row, symbol, Date.now());
       if (!spec.operational) continue;
     } catch { continue; }
     const category = deltaUnderlyingCategory(symbol.slice(0, -3), row) ?? "CRYPTO";
@@ -171,6 +172,7 @@ export function normalizeDeltaCatalogue(rows: Record<string, any>[]): Instrument
       categories: ["GLOBAL", category],
       assetType: "FUTURE",
       lotSize: 1,
+      contractMultiplier: spec.lot,
       underlyingSymbol: typeof underlying === "string" ? underlying : symbol.slice(0, -3),
     });
   }

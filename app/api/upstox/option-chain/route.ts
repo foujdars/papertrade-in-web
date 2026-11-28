@@ -1,5 +1,6 @@
 import { isSupportedNseInstrumentKey } from "@/lib/upstox";
 import { upstoxErrorResponse, upstoxFetch } from "@/lib/upstox-server";
+import { finiteQuote, reportedGreeks } from "@/lib/vertical-spread";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,12 +79,9 @@ function normalizeSide(side: ChainSide | undefined, contract: UpstoxOptionContra
       askQty: finite(side?.market_data?.ask_qty),
     },
     greeks: {
-      delta: finite(side?.option_greeks?.delta),
-      gamma: finite(side?.option_greeks?.gamma),
-      theta: finite(side?.option_greeks?.theta),
-      vega: finite(side?.option_greeks?.vega),
-      iv: finite(side?.option_greeks?.iv),
-      pop: finite(side?.option_greeks?.pop),
+      ...reportedGreeks(side?.option_greeks),
+      iv: finiteQuote(side?.option_greeks?.iv),
+      pop: finiteQuote(side?.option_greeks?.pop),
     },
   };
 }

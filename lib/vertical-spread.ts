@@ -1,18 +1,34 @@
 export type OptionKind = "CE" | "PE";
+export type Greek = "delta" | "gamma" | "theta" | "vega";
+export type ChainGreeks = Partial<Record<Greek, number | null>>;
 
 export type SpreadContract = {
   id: string;
   series: string;
+  symbol?: string;
+  exchangeLot?: number;
   strike: number;
   kind: OptionKind;
   multiplier: number | null;
   bid: number | null;
   ask: number | null;
   last: number | null;
+  mark?: number | null;
+  iv?: number | null; // Annualized volatility as a fraction.
+  oi?: number | null;
+  greeks?: ChainGreeks;
+  bidSize?: number | null;
+  askSize?: number | null;
 };
 
+export type SpreadFuture = Omit<SpreadContract, "kind" | "strike"> & {
+  kind: "FUT";
+  symbol: string;
+  futureExpiry: string | null; // A null date identifies a perpetual.
+};
+export type StrategyContract = SpreadContract | SpreadFuture;
 export type SpreadSeries = { id: string; expiry: string; detail?: string };
-export type SpreadChain = { contracts: SpreadContract[]; reference: number | null; quoteWarning?: string };
+export type SpreadChain = { contracts: SpreadContract[]; reference: number | null; quoteWarning?: string; future?: SpreadFuture };
 
 export const SPREADS = {
   bullCall: { label: "Bull call", flow: "Debit", kind: "CE", buyLower: true },
@@ -23,6 +39,16 @@ export const SPREADS = {
 
 export type SpreadId = keyof typeof SPREADS;
 export type PremiumSource = "market" | "last" | "manual";
+
+export function finiteQuote(value: unknown): number | null {
+  if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function reportedGreeks(raw?: Partial<Record<Greek, unknown>>): ChainGreeks {
+  return { delta: finiteQuote(raw?.delta), gamma: finiteQuote(raw?.gamma), theta: finiteQuote(raw?.theta), vega: finiteQuote(raw?.vega) };
+}
 
 export function positiveQuote(value: unknown) {
   const number = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;

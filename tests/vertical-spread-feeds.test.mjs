@@ -21,7 +21,7 @@ const nifty = "NSE_INDEX|Nifty 50";
 const nseOption = { instrument_key: "NSE_FO|2", instrument_type: "CE", strike_price: 24000, expiry: dates.expiry, lot_size: 75 };
 const nseMissingSpec = { instrument_key: "NSE_FO|3", market_data: { ltp: 40, bid_price: 38, bid_qty: 75, ask_price: 42, ask_qty: 75 } };
 
-const goldFuture = { segment: "MCX_FO", instrument_type: "FUT", instrument_key: "MCX_FO|100", underlying_symbol: "GOLD", trading_symbol: "GOLD 05 APR 34", expiry: dates.expiryMs, qty_multiplier: 100 };
+const goldFuture = { segment: "MCX_FO", instrument_type: "FUT", instrument_key: "MCX_FO|100", underlying_symbol: "GOLD", trading_symbol: "GOLD 05 APR 34", expiry: dates.expiryMs, qty_multiplier: 100, lot_size: 1 };
 const goldOption = { ...goldFuture, instrument_key: "MCX_FO|101", instrument_type: "CE", strike_price: 160000, underlying_key: goldFuture.instrument_key };
 
 test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", async t => {
@@ -49,7 +49,8 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
       assert.ok(root === "BTC" || root === "XAUT");
       return Response.json({ success: true, result: [{
         symbol: root === "BTC" ? products[0].symbol : products[2].symbol, close: "1200", spot_price: root === "BTC" ? "90500" : "4000",
-        quotes: { best_bid: "1100", bid_size: "12", best_ask: "1300", ask_size: "0" },
+        greeks: {delta: "0.51", theta: "-2.2", gamma: "0"}, oi_contracts: "0", mark_price: "1201",
+        quotes: { best_bid: "1100", bid_size: "12", best_ask: "1300", ask_size: "0", mark_iv: "0.41" },
       }] });
     }
     if (url.hostname === "api.india.delta.exchange" && url.pathname === "/v2/products/C-XAUT-4000-170234") {
@@ -76,7 +77,7 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
       assert.equal(url.searchParams.get("expiry_date"), dates.expiry);
       return Response.json({ status: "success", data: [{
         expiry: dates.expiry, strike_price: 24000, underlying_spot_price: 24100,
-        call_options: { ...nseMissingSpec, instrument_key: nseOption.instrument_key }, put_options: nseMissingSpec,
+        call_options: { ...nseMissingSpec, instrument_key: nseOption.instrument_key, option_greeks: { iv: 18.8, delta: 0 } }, put_options: nseMissingSpec,
       }] });
     }
     assert.fail(`Unexpected request to ${url}`);
@@ -96,6 +97,9 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
   assert.equal(deltaChain.contracts[0].multiplier, 0.001);
   assert.equal(deltaChain.contracts[0].ask, null);
   assert.equal(deltaChain.contracts[0].bid, 1100);
+  assert.equal(deltaChain.contracts[0].iv, .41);
+  assert.equal(deltaChain.contracts[0].oi, 0);
+  assert.deepEqual(deltaChain.contracts[0].greeks, { delta:.51, theta:-2.2, gamma:0, vega:null });
   assert.equal(deltaChain.contracts[1].last, null);
 
   const roots = await (await delta.GET(new Request("http://localhost/api/global-markets?mode=token-option-roots"))).json();
@@ -117,12 +121,18 @@ test("spread feeds join verified contracts and quotes from NSE, Delta and MCX", 
   assert.equal(mcxChain.reference, 159000);
   assert.equal(mcxChain.contracts[0].ask, 1300);
   assert.equal(mcxChain.contracts[0].multiplier, 100);
+  assert.equal(mcxChain.future.id, goldFuture.instrument_key);
+  assert.equal(mcxChain.future.last, 159000);
+  assert.equal(mcxChain.future.ask, null);
   const nseParams = new URLSearchParams({ instrumentKey: nifty, expiry: dates.expiry });
   const nseChain = await (await nse.GET(new Request(`http://localhost/api/upstox/option-chain?${nseParams}`))).json();
   assert.equal(nseChain.rows[0].call.lotSizeVerified, true);
   const normalized = client.normalizeNseSpreadChain(nseChain.rows, dates.expiry);
   assert.equal(normalized.reference, 24100);
   assert.deepEqual(normalized.contracts.map(leg => leg.multiplier), [75, null]);
+  assert.equal(normalized.contracts[0].iv, .188);
+  assert.equal(normalized.contracts[0].greeks.delta, 0);
+  assert.equal(normalized.contracts[1].greeks.delta, null);
 
   delete process.env.UPSTOX_ACCESS_TOKEN;
   const manualOnly = await (await commodities.GET(mcxChainRequest)).json();

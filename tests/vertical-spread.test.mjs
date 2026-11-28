@@ -82,6 +82,6 @@ test("MCX option series and multipliers are based on the listed contract and its
   assert.equal(directory.contracts[0].multiplier, 5);
   assert.equal(mcxSpreadDirectory([gold], "GOLDM", now).contracts[0].multiplier, 10);
   const quote = { instrument_token: call.instrument_key, last_price: 70, depth: { buy: [{ price: 69, quantity: 4 }], sell: [{ price: 71, quantity: 0 }] } };
-  assert.deepEqual(mcxSpreadQuote(directory.contracts[0], quote), { ...directory.contracts[0], last: 70, bid: 69, ask: null });
+  assert.deepEqual(mcxSpreadQuote(directory.contracts[0], quote), { ...directory.contracts[0], last: 70, bid: 69, ask: null, bidSize: 4, askSize: 0, oi: null });
   assert.equal(mcxSpreadQuote(directory.contracts[1], quote).last, null);
 });

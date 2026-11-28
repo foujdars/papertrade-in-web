@@ -15,6 +15,7 @@ export type FutureContract = {
   tradingSymbol: string;
   expiry: string;
   lotSize: number;
+  lotSizeVerified?: boolean;
   lastPrice: number;
 };
 
@@ -31,14 +32,7 @@ export type OptionMarketData = {
   askQty: number;
 };
 
-export type OptionGreeks = {
-  delta: number;
-  gamma: number;
-  theta: number;
-  vega: number;
-  iv: number;
-  pop: number;
-};
+export type OptionGreeks = Partial<Record<"delta" | "gamma" | "theta" | "vega" | "iv" | "pop", number | null>>;
 
 export type OptionContractSide = {
   instrumentKey: string;

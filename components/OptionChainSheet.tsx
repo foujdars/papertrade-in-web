@@ -3,16 +3,16 @@ import { ModernSelect } from "./ModernSelect";
 import { CandleLoader } from "./CandleLoader";
 import { StockLogo } from "@/components/StockLogo";
 
+import { OptionChainTable } from "./OptionChainTable";
+import { OptionStrategyButton } from "./OptionStrategyButton";
+import { normalizeNseSpreadChain } from "@/lib/spread-chain-client";
+import { startVisiblePolling } from "@/lib/visible-polling";
+import { useOptionDesk } from "./OptionDeskContext";
 import { X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { optionToInstrument, underlyingToInstrument, type FnoUnderlying, type OptionChainRow, type OptionContractSide } from "@/lib/fno";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { optionToInstrument, underlyingToInstrument, type FnoUnderlying, type OptionChainRow } from "@/lib/fno";
 import { loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, type Instrument } from "@/lib/market";
-
-function optionChange(contract: OptionContractSide | null) {
-  if (!contract?.marketData.closePrice) return 0;
-  return ((contract.marketData.ltp - contract.marketData.closePrice) / contract.marketData.closePrice) * 100;
-}
 
 export function OptionChainSheet({
   underlying,
@@ -25,13 +25,14 @@ export function OptionChainSheet({
   onSelect: (option: Instrument, spot: Instrument) => void;
   onClose: () => void;
 }) {
+  const desk = useOptionDesk();
   const [expiries, setExpiries] = useState<string[]>([]);
   const [expiry, setExpiry] = useState(currentOption?.expiry ?? "");
   const [rows, setRows] = useState<OptionChainRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sheetHeight, setSheetHeight] = useState(72);
-  const atmRef = useRef<HTMLDivElement | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,7 +40,8 @@ export function OptionChainSheet({
     void loadOptionExpiries(underlying, controller.signal)
       .then((items) => {
         setExpiries(items);
-        setExpiry(items.includes(preferredExpiry) ? preferredExpiry : items[0]);
+        setExpiry(items.includes(preferredExpiry) ? preferredExpiry : items[0] ?? "");
+        if (!items.length) setLoading(false);
       })
       .catch((reason) => {
         if (!controller.signal.aborted) {
@@ -52,27 +54,22 @@ export function OptionChainSheet({
 
   useEffect(() => {
     if (!expiry) return;
-    const controller = new AbortController();
-    void loadOptionChain(underlying, expiry, controller.signal)
-      .then((items) => setRows(items))
-      .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Option chain is unavailable."); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [expiry, underlying]);
+    return startVisiblePolling(async signal => {
+      const items = await loadOptionChain(underlying, expiry, signal);
+      if (!signal.aborted) { setRows(items); setLoading(false); setError(""); }
+    }, 20_000, () => { setRows([]); setError("Option chain quotes are unavailable."); setLoading(false); });
+  }, [expiry, underlying, refresh]);
 
   const atmRow = useMemo(() => nearestAtmRow(rows), [rows]);
   const spotPrice = atmRow?.underlyingSpotPrice ?? 0;
 
-  useEffect(() => {
-    if (!atmRef.current || !rows.length) return;
-    const frame = window.requestAnimationFrame(() => atmRef.current?.scrollIntoView({ block: "center" }));
-    return () => window.cancelAnimationFrame(frame);
-  }, [expiry, rows.length]);
-
-  function selectContract(contract: OptionContractSide | null, row: OptionChainRow) {
-    if (!contract || contract.marketData.ltp <= 0) return;
-    onSelect(optionToInstrument(contract, row, underlying), underlyingToInstrument(underlying, row.underlyingSpotPrice));
+  const contracts = useMemo(() => normalizeNseSpreadChain(rows, expiry).contracts, [rows, expiry]);
+  function selectContract(id: string) {
+    const row = rows.find(item => item.call?.instrumentKey === id || item.put?.instrumentKey === id);
+    const contract = row?.call?.instrumentKey === id ? row.call : row?.put;
+    if (!row || !contract) return;
     onClose();
+    onSelect(optionToInstrument(contract, row, underlying), underlyingToInstrument(underlying, row.underlyingSpotPrice));
   }
 
   function beginSheetDrag(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -103,27 +100,19 @@ export function OptionChainSheet({
           <label>Expiry<ModernSelect hideLabel label="Expiry" value={expiry} disabled={!expiries.length} choices={expiries.map(value=>({value,label:new Date(`${value}T00:00:00`).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}))} onChange={value=>{setLoading(true);setError("");setRows([]);setExpiry(value);}}/></label>
           <button className="icon-button" onClick={onClose} aria-label="Close option chain"><X size={20} /></button>
         </header>
-        <div className="option-sheet-legend"><span>CALL</span><span>STRIKE</span><span>PUT</span></div>
-        <div className="option-sheet-columns"><span>CHG% <b>LTP</b></span><span>Strike</span><span><b>LTP</b> CHG%</span></div>
-        <div className="option-sheet-list">
-          {rows.map((row) => {
-            const isAtm = row.strikePrice === atmRow?.strikePrice;
-            const callChange = optionChange(row.call);
-            const putChange = optionChange(row.put);
-            const selectedCall = currentOption?.instrumentKey === row.call?.instrumentKey;
-            const selectedPut = currentOption?.instrumentKey === row.put?.instrumentKey;
-            return (
-              <div key={row.strikePrice} ref={isAtm ? atmRef : undefined} className={`option-sheet-row ${isAtm ? "atm" : ""}`}>
-                <button className={selectedCall ? "selected" : ""} disabled={!row.call || row.call.marketData.ltp <= 0} onClick={() => selectContract(row.call, row)}>
-                  <small className={callChange >= 0 ? "positive" : "negative"}>{callChange >= 0 ? "+" : ""}{callChange.toFixed(1)}%</small><b>{row.call ? row.call.marketData.ltp.toFixed(2) : "—"}</b>
-                </button>
-                <span><b>{row.strikePrice.toLocaleString("en-IN")}</b>{isAtm && <small>ATM</small>}</span>
-                <button className={selectedPut ? "selected" : ""} disabled={!row.put || row.put.marketData.ltp <= 0} onClick={() => selectContract(row.put, row)}>
-                  <b>{row.put ? row.put.marketData.ltp.toFixed(2) : "—"}</b><small className={putChange >= 0 ? "positive" : "negative"}>{putChange >= 0 ? "+" : ""}{putChange.toFixed(1)}%</small>
-                </button>
-              </div>
-            );
-          })}
+        <div className="chain-sheet-tools">
+          <OptionStrategyButton context={{ initialMarket: "india", initialRoot: underlying.instrumentKey, initialExpiry: expiry }}/>
+          <button type="button" disabled={loading || !expiry} onClick={() => { setLoading(true); setRefresh(value => value + 1); }}>Refresh</button>
+        </div>
+        <div className="option-sheet-list option-sheet-book">
+          {contracts.length > 0 && <OptionChainTable contracts={contracts} reference={spotPrice || null} currency="INR" selected={currentOption?.instrumentKey} focusAtm
+            onChart={contract => selectContract(contract.id)} onSide={(contract, side) => {
+              const premium = side === "BUY" ? contract.ask : contract.bid;
+              if (!desk || premium === null) return;
+              onClose();
+              desk.openIndianOrder({ market: "india", root: underlying.instrumentKey, rootLabel: underlying.symbol, expiry,
+                legs: [{ contract, side, lots: 1, premium }] });
+            }}/>}
           {loading && !rows.length && <CandleLoader label="Loading live option chain" />}
           {!loading && error && <div className="positions-empty"><b>Option chain unavailable</b><span>{error}</span></div>}
           {!loading && !error && !rows.length && <div className="positions-empty"><b>No active contracts</b><span>Select another expiry.</span></div>}

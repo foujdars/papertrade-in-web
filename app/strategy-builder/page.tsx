@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { OptionSpreadBuilder } from "@/components/OptionSpreadBuilder";
+import { TradingDashboard } from "@/components/TradingDashboard";
+import { AuthProvider } from "@/components/AuthProvider";
 import type { SpreadMarket } from "@/lib/spread-chain-client";
 
 export const metadata: Metadata = {
@@ -14,6 +15,6 @@ export default async function StrategyBuilderPage({ searchParams }: {
   const initialMarket: SpreadMarket = query.market === "crypto" || query.market === "metals" || query.market === "tokens" ? query.market : "india";
   const initialRoot = typeof query.underlying === "string" ? query.underlying : "";
   const initialExpiry = typeof query.expiry === "string" ? query.expiry : "";
-  return <OptionSpreadBuilder key={JSON.stringify([initialMarket, initialRoot, initialExpiry])}
-    initialMarket={initialMarket} initialRoot={initialRoot} initialExpiry={initialExpiry} />;
+  return <AuthProvider><TradingDashboard key={JSON.stringify([initialMarket, initialRoot, initialExpiry])}
+    initialOptionBuilder={{initialMarket, initialRoot, initialExpiry}}/></AuthProvider>;
 }

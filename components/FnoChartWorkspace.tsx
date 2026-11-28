@@ -163,7 +163,7 @@ export function FnoChartWorkspace({
         className="fno-focus-charts"
         style={{ gridTemplateRows: `minmax(0, ${splitPercent}fr) 16px minmax(0, ${100 - splitPercent}fr)` }}
       >
-        <section className="fno-chart-card">
+        <section className="fno-chart-card fno-chart-with-tools">
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={!canToggleFuture} onClick={(event) => { event.stopPropagation(); onToggleTopMode(); }}>
@@ -171,10 +171,12 @@ export function FnoChartWorkspace({
               </button>
               <span>{topPrice > 0 ? topPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={topChangeAvailable ? topChange >= 0 ? "positive" : "negative" : ""} aria-label={topChangeAvailable ? undefined : "Daily change unavailable"}>{topChangeAvailable ? signedPercent(topChange) : "—"}</i></span>
             </div>
+            <div className="fno-chart-actions">
             <button className="fno-symbol-list-link" onClick={(event) => { event.stopPropagation(); onOpenSymbols(); }} aria-label="Open indices and F&O symbols"><ListFilter size={15} /></button>
-            <button type="button" className="chart-replay-link" onClick={() => onReplay(topInstrument)} aria-label={`Bar replay for ${topInstrument.symbol}`} title="Bar replay"><History size={19} aria-hidden="true" /></button>
-            <button className="fno-option-chain-link" onClick={(event) => { event.stopPropagation(); onOptionChain(); }}>Option Chain</button>
+            <button type="button" className="chart-replay-link" onClick={() => onReplay(topInstrument)} aria-label={`Bar replay for ${topInstrument.symbol}`} title="Bar replay"><History size={17} aria-hidden="true" /><span>Replay</span></button>
+            <button className="fno-option-chain-link" onClick={(event) => { event.stopPropagation(); onOptionChain(); }} aria-label="Open option chain">Chain</button>
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
+            </div>
           </header>
           <div className="fno-clean-chart">
             <MarketChart
@@ -206,7 +208,7 @@ export function FnoChartWorkspace({
 
         <button className="fno-window-slider" onPointerDown={onSplitPointerDown} aria-label="Drag to resize both chart windows"><span /></button>
 
-        <section className="fno-chart-card">
+        <section className="fno-chart-card fno-chart-with-tools">
           <header>
             <div>
               <button className="fno-instrument-switch" disabled={optionSwitching} onClick={(event) => { event.stopPropagation(); onToggleOptionType(); }}>
@@ -214,9 +216,11 @@ export function FnoChartWorkspace({
               </button>
               <span>{optionPrice > 0 ? optionPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"} <i className={optionChangeAvailable ? optionChange >= 0 ? "positive" : "negative" : ""} aria-label={optionChangeAvailable ? undefined : "Daily change unavailable"}>{optionChangeAvailable ? signedPercent(optionChange) : "—"}</i></span>
             </div>
-            <button type="button" className="chart-replay-link" onClick={() => onReplay(option)} aria-label={`Bar replay for ${option.symbol}`} title="Bar replay"><History size={19} aria-hidden="true" /></button>
+            <div className="fno-chart-actions">
+            <button type="button" className="chart-replay-link" onClick={() => onReplay(option)} aria-label={`Bar replay for ${option.symbol}`} title="Bar replay"><History size={17} aria-hidden="true" /><span>Replay</span></button>
             <OptionStrategyButton option={option} />
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
+            </div>
           </header>
           <div className="fno-clean-chart">
             <MarketChart
