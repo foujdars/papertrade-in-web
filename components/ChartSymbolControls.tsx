@@ -17,9 +17,16 @@ export function ChartSymbolControls({ instrument, venue, desktop = false, expand
   styled: boolean; onStyle: () => void; query: string; onQuery: (value: string) => void;
   matches: Instrument[]; onChoose: (instrument: Instrument) => void; venueLabel: (instrument: Instrument) => string;
 }) {
+  const compactSymbol = instrument.assetType === 'OPTION' ? instrument.underlyingSymbol : undefined;
   return <>
     <div className="chart-symbol-search">
-      {desktop ? <button className="desktop-symbol-trigger" onClick={onToggle} aria-expanded={expanded}><StockLogo {...instrument} size={24}/><span>{instrument.symbol}</span><small>{venue}</small><ChevronDown size={15}/></button> : <button className="trade-symbol-trigger" onClick={onToggle} aria-expanded={expanded}><div className="title-line"><StockLogo {...instrument} size={28}/><h1>{instrument.symbol}</h1><span>{venue}</span><ChevronDown size={16}/></div><p>{instrument.name}</p></button>}
+      {desktop ? <button type="button" className="desktop-symbol-trigger" onClick={onToggle} aria-expanded={expanded} title={instrument.symbol}
+        aria-label={`Change chart symbol (${instrument.symbol})`}>
+        <StockLogo {...instrument} size={24}/>
+        <span className="chart-symbol-full">{instrument.symbol}</span>
+        {compactSymbol && <span className="chart-symbol-compact">{compactSymbol}</span>}
+        <small>{venue}</small><ChevronDown size={15}/>
+      </button> : <button className="trade-symbol-trigger" onClick={onToggle} aria-expanded={expanded}><div className="title-line"><StockLogo {...instrument} size={28}/><h1>{instrument.symbol}</h1><span>{venue}</span><ChevronDown size={16}/></div><p>{instrument.name}</p></button>}
       <button type="button" className={`chart-compare-link ${compared ? 'active' : ''}`} onClick={onCompare} aria-label="Compare symbols" title="Compare symbols"><Plus size={desktop ? 17 : 18}/></button>
     </div>
     {onOptions && <button className="chart-derivatives-link" disabled={optionsDisabled} onClick={onOptions} aria-label={`Open ${instrument.symbol} option charts`} title="Open option charts"><Link2 size={desktop ? 16 : 19}/></button>}

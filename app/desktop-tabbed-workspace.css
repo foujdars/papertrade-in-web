@@ -110,8 +110,7 @@
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="overview"] :is(.home-market-data,.home-derivatives,.home-sector-heat,.india-flows-slot,.home-deal-slot) { display: none; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] :is(.home-portfolio-card,.home-movers-slot,.home-derivatives,.india-flows-slot,.home-deal-slot) { display: none; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] .home-main-grid { grid-row: 4 / 7; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] #equity-watch { grid-row: 4; }
-  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] .desktop-home-tools { grid-row: 5; }
+  .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="breadth"] .desktop-home-tools { grid-row: 4; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="derivatives"] :is(.home-main-grid,.home-market-pair,.home-movers-slot,#equity-watch,.desktop-home-tools,.india-pulse-layout,.home-sector-heat,.india-flows-slot,.home-deal-slot) { display: none; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-desktop-tab="flows"] :is(.home-main-grid,.home-market-pair,.home-movers-slot,#equity-watch,.desktop-home-tools,.india-pulse-layout,.home-sector-heat,.home-derivatives) { display: none; }
   .terminal-shell[data-platform="web"] .home-hub.home-studio[data-market="global"] .home-dashboard-scroll { grid-template-rows: 48px auto; }

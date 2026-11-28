@@ -456,7 +456,7 @@ export function HomeWorkspace({
             {!globalPositions.length && <p className="home-global-empty">No open positions</p>}
           </section>}
 
-          {desktop && activeMarket === 'india' && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+          {desktop && activeMarket === 'india' && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} showCard={desktopTab === 'overview'} />}
           {activeMarket === 'india' && onDesktopNavigate && <section className="desktop-home-tools home-section" aria-label="Research and tools"><header><b>Research & tools</b></header><div>
             <button onClick={() => onDesktopNavigate('fundamentals')}><Search size={17}/><span><b>Stock analysis</b></span><ChevronRight size={16}/></button>
             <button onClick={() => onDesktopNavigate('ipo')}><Plus size={17}/><span><b>IPO discovery</b></span><ChevronRight size={16}/></button>
@@ -465,7 +465,7 @@ export function HomeWorkspace({
         </div>
         {activeMarket === "india" && <div className="home-market-pair">
           <MarketMovers onOpen={onOpenStock} inline={desktop} />
-          {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} />}
+          {!desktop && <EquityWatch onOpen={onOpenStock} focusIndex={sectorWatch} focusTick={sectorTick} showCard={desktopTab === 'overview'} />}
         </div>}
 
         {activeMarket === 'india' && (desktopTab === 'overview' || (desktopTab === 'breadth' && !cards.market)) && <div className="home-breadth-feature">

@@ -43,7 +43,8 @@ function samePixels(a,b,label){const left=PNG.sync.read(a),right=PNG.sync.read(b
  assert.ok(await page.locator('.home-dashboard-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Desktop fits the viewport');
  await page.screenshot({path:`outputs/desktop-visuals-${width}-${theme}.png`});
  }
- await page.getByRole('tab',{name:'Breadth & sectors',exact:true}).click();await page.getByRole('img',{name:/Nifty 50 rising share/}).waitFor();
+ await page.getByRole('img',{name:/Nifty 50 rising share/}).waitFor();
+ await page.getByRole('tab',{name:'Breadth & sectors',exact:true}).click();assert.equal(await page.locator('#equity-watch').count(),0);
  await page.getByRole('tab',{name:'F&O insights',exact:true}).click();await page.locator('.desktop-derivative-gauges svg').first().waitFor();assert.equal(await page.locator('.desktop-derivative-gauges svg').count(),2);
  }
  assert.deepEqual(errors,[]);await page.close();
