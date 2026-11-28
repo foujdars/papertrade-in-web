@@ -3,18 +3,25 @@ import type { PaperOrder } from "./paper-trading";
 import type { ClosedPaperTrade } from "./trade-analytics";
 import type { TradeJournalEntry } from "./trading-coach";
 
-export type PnlScope = { period: "all" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "india" | "stocks" | "fno" | "global"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
+export type PnlScope = { period: "all" | "today" | "7d" | "month" | "30d" | "custom"; start: string; end: string; asset: "all" | "india" | "stocks" | "fno" | "global"; product: "all" | "INTRADAY" | "DELIVERY"; day?: string | null };
 export const DEFAULT_PNL_SCOPE: PnlScope = { period: "all", start: "", end: "", asset: "all", product: "all" };
 export type PnlDimension = "Symbol" | "Strategy" | "Market" | "Product" | "Direction" | "Entry time" | "Holding duration";
 export const PNL_DIMENSIONS: PnlDimension[] = ["Symbol", "Strategy", "Market", "Product", "Direction", "Entry time", "Holding duration"];
-export const pnlDay = (time: number) => Number.isFinite(time) && time > 0 ? new Date(time + 19_800_000).toISOString().slice(0, 10) : "";
-export const pnlOutcome = (value: number) => Math.round(value * 100) > 0 ? "profit" : Math.round(value * 100) < 0 ? "loss" : "breakeven";
+export const pnlDay = (time: number) => time > 0 && time <= 8.64e15 - 19_800_000 ? new Date(time + 19_800_000).toISOString().slice(0, 10) : "";
+export function pnlOutcome(value: number) {
+  const cents = Math.sign(value) * Math.round(Math.abs(value) * 100);
+  return cents > 0 ? "profit" : cents < 0 ? "loss" : "breakeven";
+}
 export function validPnlDate(value: string) { const time = Date.parse(`${value}T00:00:00Z`); return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value; }
 export function pnlBounds(scope: PnlScope, now: number) {
   const today = pnlDay(now);
   if (scope.period === "custom") return { start: scope.start, end: scope.end, valid: validPnlDate(scope.start) && validPnlDate(scope.end) && scope.start <= scope.end };
   if (scope.period === "month") return { start: `${today.slice(0, 7)}-01`, end: today, valid: true };
-  if (scope.period === "30d") return { start: pnlDay(now - 29 * 86400000), end: today, valid: true };
+  if (scope.period === "today") return { start: today, end: today, valid: true };
+  if (scope.period === "30d" || scope.period === "7d") {
+    const days = scope.period === "30d" ? 30 : 7;
+    return { start: pnlDay(now - (days - 1) * 86400000), end: today, valid: true };
+  }
   return { start: "", end: "", valid: true };
 }
 export function tradeAsset(trade: ClosedPaperTrade, ordersById: Map<string, PaperOrder>) {
@@ -24,7 +31,7 @@ export function tradeAsset(trade: ClosedPaperTrade, ordersById: Map<string, Pape
   if (asset) return asset === "OPTION" || asset === "FUTURE" ? "fno" : asset === "EQUITY" ? "stocks" : "unknown";
   // Older orders omit assetType; the exchange segment is still authoritative.
   const key = sources.map(order => order?.instrumentKey).find(Boolean) ?? "";
-  return /^(NSE|BSE)_EQ\|/.test(key) ? "stocks" : /^(NSE|BSE)_FO\|/.test(key) ? "fno" : "unknown";
+  return /^(NSE|BSE)_EQ\|/.test(key) ? "stocks" : /^(NSE|BSE|MCX)_FO\|/.test(key) ? "fno" : "unknown";
 }
 export function filterPnlTrades(trades: ClosedPaperTrade[], orders: PaperOrder[], scope: PnlScope, now: number) {
   const bounds = pnlBounds(scope, now), lookup = new Map(orders.map(o => [o.id, o]));
@@ -39,7 +46,7 @@ export function summarisePnl(trades: ClosedPaperTrade[]) {
   const sum = (items: ClosedPaperTrade[], key: "netPnl" | "grossPnl" | "charges") => items.reduce((total, t) => total + t[key], 0);
   const gains = sum(winners, "netPnl"), losses = -sum(losers, "netPnl"), net = sum(trades, "netPnl");
   const values = trades.map(t => t.netPnl).sort((a, b) => a - b), mid = Math.floor(values.length / 2);
-  return { count: trades.length, net, charges: sum(trades, "charges"), wins: winners.length, losses: losers.length, breakevens: trades.length - winners.length - losers.length,
+  return { count: trades.length, net, charges: sum(trades, "charges"), netLosses: losses, wins: winners.length, losses: losers.length, breakevens: trades.length - winners.length - losers.length,
     winRate: trades.length ? winners.length / trades.length * 100 : null,
     profitFactor: losses ? gains / losses : gains ? Infinity : null,
     average: trades.length ? net / trades.length : null, averageWin: winners.length ? gains / winners.length : null, averageLoss: losers.length ? -losses / losers.length : null,
@@ -61,6 +68,23 @@ export function pnlCurve(trades: ClosedPaperTrade[]) {
   });
   const recoveredAt = troughIndex >= 0 ? points.slice(troughIndex + 1).find(p => p.value >= peakValue)?.time ?? null : null;
   return { points, maxDrawdown, currentDrawdown: points.at(-1)?.drawdown ?? 0, worstPeakAt, troughAt: points[troughIndex]?.time ?? null, recoveredAt, undated: trades.length - dated.length };
+}
+
+export type PnlSession = { day: string; time: number; net: number; fees: number; ids: string[] };
+
+/** One bar and one drill-down per IST trading day, including flat sessions. */
+export function pnlSessions(trades: ClosedPaperTrade[]) {
+  const byDay = new Map<string, PnlSession>();
+  for (const trade of trades) {
+    const day = pnlDay(trade.closedAt);
+    if (!day || !Number.isFinite(trade.netPnl)) continue;
+    const session = byDay.get(day) ?? { day, time: Date.parse(day + "T12:00:00+05:30"), net: 0, fees: 0, ids: [] };
+    session.net += trade.netPnl;
+    session.fees += trade.charges;
+    session.ids.push(trade.id);
+    byDay.set(day, session);
+  }
+  return [...byDay.values()].sort((a, b) => a.time - b.time);
 }
 export function rollingPnl(trades: ClosedPaperTrade[], windowSize = 10) {
   const ordered = pnlCurve(trades).points;
@@ -95,7 +119,9 @@ export function groupPnl(trades: ClosedPaperTrade[], orders: PaperOrder[], journ
       case "Holding duration": { const minutes = (trade.closedAt - trade.openedAt) / 60000; label = !pnlDay(trade.openedAt) || !pnlDay(trade.closedAt) || minutes < 0 ? "Duration unavailable" : minutes < 30 ? "Under 30 minutes" : minutes < 120 ? "30 minutes–2 hours" : minutes < 1440 ? "2 hours–1 day" : minutes < 10080 ? "1–7 days" : "7+ days"; break; }
       default: label = trade.symbol;
     }
-    groups.set(label, [...(groups.get(label) ?? []), trade]);
+    const group = groups.get(label);
+    if (group) group.push(trade);
+    else groups.set(label, [trade]);
   }
   return [...groups].map(([label, items]) => ({ label, trades: items, ...summarisePnl(items) })).sort((a, b) => b.net - a.net || a.label.localeCompare(b.label));
 }

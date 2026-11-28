@@ -8,6 +8,20 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const resetFilters=async()=>{for(const [field,value] of [['period','All time'],['market','All markets'],['product','All products']]){await page.getByRole('button',{name:'P&L '+field,exact:true}).click();await page.getByRole('option',{name:new RegExp('^'+value)}).click();}};
   await page.goto('http://127.0.0.1:3226');await page.getByTestId('pnl-count').waitFor();assert.equal(await page.getByTestId('pnl-count').textContent(),'20');assert.equal(await page.getByTestId('pnl-net').textContent(),'₹175.00');
+  const quick=page.getByRole('group',{name:'Reporting period'});
+  await quick.getByRole('button',{name:'7 days',exact:true}).click();
+  assert.equal(await page.getByTestId('pnl-count').textContent(),'6');
+  await quick.getByRole('button',{name:'Today',exact:true}).click();
+  assert.equal(await page.getByTestId('pnl-count').textContent(),'0');
+  assert.ok(await page.getByRole('heading',{name:'No exits in this selection'}).isVisible());
+  await quick.getByRole('button',{name:'All time',exact:true}).click();
+  await page.getByLabel('Calendar month').fill('2026-08');
+  assert.equal(await page.getByTestId('pnl-count').textContent(),'20','browsing months preserves the period');
+  await page.getByRole('button',{name:'Daily',exact:true}).click();
+  const daily=page.getByRole('img',{name:/Daily net P&L/});await daily.focus();await page.keyboard.press('Home');
+  assert.match(await page.locator('.pnl-chart-readout').first().textContent(),/29 Aug/);
+  await page.getByRole('button',{name:'Drawdown',exact:true}).click();assert.ok(await page.getByText('Maximum decline',{exact:false}).first().isVisible());
+  await page.getByRole('button',{name:'Cumulative',exact:true}).click();
   await page.getByRole('img',{name:/Cumulative realised/}).focus();await page.keyboard.press('ArrowLeft');await page.locator('.pnl-chart-readout button').first().click();assert.deepEqual(JSON.parse(await page.locator('[data-testid="drill"] output').textContent()),['t18']);
   await page.getByRole('tab',{name:'Overview',exact:true}).click();await page.getByRole('button',{name:'P&L market',exact:true}).click();await page.getByRole('option',{name:/^F&O/}).click();assert.equal(await page.getByTestId('pnl-count').textContent(),'5');
   await page.getByRole('button',{name:'P&L product',exact:true}).click();await page.getByRole('option',{name:/^Delivery \/ carry/}).click();assert.equal(await page.getByTestId('pnl-count').textContent(),'2');
@@ -21,7 +35,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await page.getByRole('tab',{name:'Overview',exact:true}).click();await page.getByRole('button',{name:'P&L period',exact:true}).click();await page.getByRole('option',{name:/^Custom dates/}).click();await page.getByLabel('From',{exact:true}).fill('2026-09-20');await page.getByRole('alert').waitFor();assert.equal(await page.getByTestId('pnl-count').textContent(),'0');await resetFilters();
   for(const theme of ['light','neon'])for(const width of [320,390,768,1280]){
    await page.evaluate(t=>window.qaTheme(t),theme);await page.setViewportSize({width,height:844});
-   for(const tab of ['Overview','Insights']){await page.getByRole('tab',{name:tab,exact:true}).click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${theme} ${width} ${tab} overflow`);assert.ok(await page.locator(tab==='Overview'?'.pnl-summary-six':'.pnl-finding-list').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length===3),'three compact columns');const bad=await page.locator('.pnl-analytics svg').evaluateAll(es=>es.some(e=>/NaN|Infinity/.test(e.outerHTML)));assert.equal(bad,false);if(process.env.PNL_SCREENSHOTS&&[390,1280].includes(width))await page.screenshot({path:`outputs/pnl-${theme}-${width}-${tab.toLowerCase()}.png`,fullPage:true});}
+   for(const tab of ['Overview','Insights']){await page.getByRole('tab',{name:tab,exact:true}).click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${theme} ${width} ${tab} overflow`);assert.ok(await page.locator(tab==='Overview'?'.pnl-chart-modes':'.pnl-finding-list').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'controls fit the report');const bad=await page.locator('.pnl-analytics svg').evaluateAll(es=>es.some(e=>/NaN|Infinity/.test(e.outerHTML)));assert.equal(bad,false);if(process.env.PNL_SCREENSHOTS&&[390,1280].includes(width))await page.screenshot({path:`outputs/pnl-${theme}-${width}-${tab.toLowerCase()}.png`,fullPage:true});}
   }
   await page.evaluate(()=>window.qaCombined(true));await page.getByRole('tab',{name:'Overview',exact:true}).click();
   assert.equal(await page.getByTestId('pnl-count').textContent(),'21');assert.equal(await page.getByTestId('pnl-global-net').textContent(),'$125.00');assert.equal(await page.getByTestId('pnl-india-net').textContent(),'₹175.00');assert.equal(await page.getByTestId('pnl-net').textContent(),'₹10,800.00');
@@ -33,7 +47,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
   await resetFilters();await page.getByRole('tab',{name:'Overview',exact:true}).click();await page.locator('.pnl-market-result').first().click();assert.equal(await page.getByTestId('pnl-count').textContent(),'20');assert.equal(await page.evaluate(()=>window.qaScope.asset),'india');
   await resetFilters();await page.getByRole('tab',{name:'Insights',exact:true}).click();await page.getByRole('button',{name:'Group by',exact:true}).click();await page.getByRole('option',{name:'Market',exact:true}).click();await page.locator('.pnl-ranked-row').filter({hasText:'Global'}).click();assert.deepEqual(JSON.parse(await page.locator('[data-testid="drill"] output').textContent()),['global:perp:qa1']);
   await page.evaluate(()=>window.qaCombined(false));await resetFilters();
-  await page.evaluate(()=>window.qaEmpty(true));await page.getByRole('tab',{name:'Overview',exact:true}).click();assert.equal(await page.getByTestId('pnl-count').textContent(),'0');assert.equal(await page.locator('.pnl-chart-empty').count(),2);assert.equal(errors.length,0,errors.join('\n'));
+  await page.evaluate(()=>window.qaEmpty(true));await page.getByRole('tab',{name:'Overview',exact:true}).click();assert.equal(await page.getByTestId('pnl-count').textContent(),'0');assert.ok(await page.getByRole('heading',{name:'No closed trades yet'}).isVisible());assert.equal(await page.locator('.pnl-performance-card').count(),0);assert.equal(errors.length,0,errors.join('\n'));
   console.log('P&L: exact totals, intersecting filters, calendar breakeven/day selection, keyboard points, strategy/histogram/best-trade drill-down, invalid dates, empty states and two themes at four widths pass');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
