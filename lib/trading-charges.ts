@@ -70,14 +70,15 @@ export function calculateUpstoxOptionCharges({ side, quantity, price }: Omit<Equ
   };
 }
 
-export function calculateUpstoxFutureCharges({ side, quantity, price }: Omit<EquityChargeInput, "product">, exchange: "NSE" | "BSE" = "NSE"): EquityChargeBreakdown {
+export function calculateUpstoxFutureCharges({ side, quantity, price }: Omit<EquityChargeInput, "product">, exchange: "NSE" | "BSE" | "CDS" | "BCD" = "NSE"): EquityChargeBreakdown {
   const turnover = Math.max(0, quantity * price);
+  const currency = exchange === "CDS" || exchange === "BCD";
   const brokerage = Math.min(20, turnover * 0.0005);
-  const stt = side === "SELL" ? turnover * 0.0005 : 0;
-  const transactionCharges = exchange === "BSE" ? 0 : turnover * 0.0000173;
-  const ipftCharges = exchange === "BSE" ? 0 : turnover * 0.000001;
+  const stt = !currency && side === "SELL" ? turnover * 0.0005 : 0;
+  const transactionCharges = turnover * { NSE:.0000173, BSE:0, CDS:.0000035, BCD:.0000045 }[exchange];
+  const ipftCharges = turnover * { NSE:.000001, BSE:0, CDS:.0000005, BCD:0 }[exchange];
   const sebiCharges = turnover * 0.000001;
-  const stampDuty = side === "BUY" ? turnover * 0.00002 : 0;
+  const stampDuty = side === "BUY" ? turnover * (currency ? .000001 : .00002) : 0;
   const dpCharges = 0;
   const gst = (brokerage + transactionCharges + ipftCharges) * 0.18;
   const values = { brokerage, stt, transactionCharges, ipftCharges, sebiCharges, gst, stampDuty, dpCharges };
@@ -101,18 +102,21 @@ export function calculateUpstoxTradingCharges(
   underlyingSymbol?: string,
 ): EquityChargeBreakdown {
   if (assetType === "FUTURE" && instrumentKey?.startsWith("MCX_FO|")) return calculateMcxFutureCharges(input, underlyingSymbol);
+  if (assetType === "FUTURE" && instrumentKey?.startsWith("NSE_COM|")) return calculateMcxFutureCharges(input, underlyingSymbol, "NSE");
+  if (assetType === "FUTURE" && instrumentKey?.startsWith("NCD_FO|")) return calculateUpstoxFutureCharges(input, "CDS");
+  if (assetType === "FUTURE" && instrumentKey?.startsWith("BCD_FO|")) return calculateUpstoxFutureCharges(input, "BCD");
   if (assetType === "OPTION") return calculateUpstoxOptionCharges(input);
   if (assetType === "FUTURE") return calculateUpstoxFutureCharges(input, instrumentKey?.startsWith("BSE_FO|") ? "BSE" : "NSE");
   return calculateUpstoxEquityCharges(input);
 }
 
 /** Paper estimates for commodity futures; NSE rates remain unchanged. */
-export function calculateMcxFutureCharges({ side, quantity, price }: EquityChargeInput, root = ""): EquityChargeBreakdown {
+export function calculateMcxFutureCharges({ side, quantity, price }: EquityChargeInput, root = "", exchange: "MCX" | "NSE" = "MCX"): EquityChargeBreakdown {
   const turnover = Math.max(0, quantity * price);
   const agri = /^(COTTON|COTTONCNDY|COTTONOIL|KAPAS|MENTHAOIL|CARDAMOM|CPO|CASTORSEED|RUBBER)$/.test(root);
   const brokerage = Math.min(20, turnover * .0005);
   const stt = side === "SELL" && !agri ? turnover * .0001 : 0;
-  const transactionCharges = turnover * (agri ? .00006 : .000021);
+  const transactionCharges = turnover * (exchange === "NSE" ? .000001 : agri ? .00006 : .000021);
   const sebiCharges = turnover * .000001;
   const stampDuty = side === "BUY" ? turnover * .00002 : 0;
   const gst = (brokerage + transactionCharges) * .18;

@@ -5,8 +5,14 @@ import { Search, X } from "lucide-react";
 import { AppDialog } from "./AppDialog";
 import type { Instrument } from "@/lib/market";
 import { formatFuturesExpiry, futuresRootKey, type FuturesScope } from "@/lib/listed-futures";
+import { currencyLotLabel, isCurrencyFuture } from "@/lib/indian-futures";
 
 const lotFormat = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 10 });
+function lotLabel(item: Instrument) {
+  if (item.exchange === "DELTA") return lotFormat.format(item.contractMultiplier!) + " " + item.underlyingSymbol;
+  if (isCurrencyFuture(item.instrumentKey)) return currencyLotLabel(item.underlyingSymbol,item.lotSize!);
+  return lotFormat.format(item.lotSize!) + " units";
+}
 
 export function FuturesTradeDialog({ scope, instruments, loading, warning, onClose, onRetry, onTrade }: {
   scope: FuturesScope; instruments: Instrument[]; loading: boolean; warning?: string; onClose: () => void; onRetry: () => void;
@@ -18,13 +24,14 @@ export function FuturesTradeDialog({ scope, instruments, loading, warning, onClo
   const indian = scope.market === "india";
   const title = scope.label ? scope.label + " futures" : "Trade futures";
   const matches = useMemo(() => {
-    const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const terms = query.toLowerCase().replaceAll("/","").trim().split(/\s+/).filter(Boolean);
     return instruments.filter(item => {
       const market = item.exchange === "DELTA" ? "global" : "india";
       if (market !== scope.market || (scope.rootKey && futuresRootKey(item) !== scope.rootKey)) return false;
       if (group === "Indices" && !item.categories.includes("INDEX")) return false;
       if (group === "Stocks" && !item.categories.includes("EQUITY")) return false;
-      if (group === "MCX" && item.exchange !== "MCX") return false;
+      if (group === "FX" && !isCurrencyFuture(item.instrumentKey)) return false;
+      if (group === "Commodities" && !item.categories.includes("COMMODITY")) return false;
       const description = [item.symbol, item.underlyingSymbol, item.name, item.exchange, item.expiry || "perpetual"].join(" ").toLowerCase();
       return terms.every(term => description.includes(term));
     });
@@ -35,14 +42,14 @@ export function FuturesTradeDialog({ scope, instruments, loading, warning, onClo
     {!scope.rootKey && <div className="futures-filters">
       <label className="futures-search"><Search size={17}/><input aria-label="Search futures contracts" placeholder="Search underlying or contract" value={query}
         onChange={e => { setQuery(e.target.value); setLimit(35); }}/></label>
-      {indian && <div role="group" aria-label="Futures market">{["All","Indices","Stocks","MCX"].map(value =>
+      {indian && <div role="group" aria-label="Futures market">{["All","Indices","Stocks","FX","Commodities"].map(value =>
         <button type="button" key={value} aria-pressed={group === value} onClick={() => { setGroup(value); setLimit(35); }}>{value}</button>)}</div>}
     </div>}
     {warning && <p role="status">{warning} <button type="button" className="futures-more" onClick={onRetry}>Retry</button></p>}
     <div className="futures-contracts">
       {matches.slice(0,limit).map(item => <article key={item.instrumentKey}>
         <div><small>{item.exchange} · {formatFuturesExpiry(item.expiry)}</small>
-          <strong>{item.symbol}</strong><span>1 lot = {lotFormat.format((item.exchange === "DELTA" ? item.contractMultiplier : item.lotSize)!)} {item.exchange === "DELTA" ? item.underlyingSymbol : "units"}</span></div>
+          <strong>{item.symbol}</strong><span>1 lot = {lotLabel(item)}</span></div>
         {(["BUY","SELL"] as const).map(side => <button type="button" data-side={side} key={side} aria-label={`${side === "BUY" ? "Buy" : "Sell"} ${item.symbol}`}
           onClick={() => onTrade(item,side)}>{side === "BUY" ? "Buy" : "Sell"}</button>)}
       </article>)}

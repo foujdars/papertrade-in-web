@@ -108,7 +108,7 @@ export const FUTURE_PAPER_MARGIN_RATE = 0.2;
 
 /** Reserve estimated margin on entry; release it and realise full price P&L on exit. */
 export function futureFillCashDelta(orders: PaperOrder[], fill: PaperOrder) {
-  if (fill.assetType !== "FUTURE" || !/^(NSE_FO|BSE_FO|MCX_FO)\|/.test(fill.instrumentKey ?? "") ||
+  if (fill.assetType !== "FUTURE" || !/^(NSE_FO|BSE_FO|MCX_FO|NCD_FO|BCD_FO|NSE_COM)\|/.test(fill.instrumentKey ?? "") ||
     !Number.isFinite(fill.quantity) || fill.quantity <= 0 || !Number.isFinite(fill.price) || fill.price <= 0)
     throw new Error("A valid Indian futures fill is required.");
   const product = fill.product ?? "DELIVERY";

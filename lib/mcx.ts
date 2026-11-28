@@ -1,10 +1,9 @@
 import type { Instrument } from "./market.ts";
 import { getNseMarketStatus, nseDate, nseSquareOffMinute, type NseSession } from "./market-hours.ts";
+import { currencyExpiryTime, isCurrencyFuture, listingExchange } from "./indian-futures.ts";
 
 export const isMcx = (instrument: { instrumentKey?: string }) => Boolean(instrument.instrumentKey?.startsWith("MCX_FO|"));
-export function futuresExchange(instrument: { instrumentKey?: string }) {
-  return isMcx(instrument) ? "MCX" : instrument.instrumentKey?.startsWith("BSE_") ? "BSE" : "NSE";
-}
+export const futuresExchange = listingExchange;
 const lateAgri = new Set(["COTTON", "COTTONCNDY", "COTTONOIL", "KAPAS"]);
 const agri = new Set([...lateAgri, "MENTHAOIL", "CARDAMOM", "CPO", "CASTORSEED", "RUBBER"]);
 
@@ -47,6 +46,13 @@ export function indianInstrumentStatus(instrument: Pick<Instrument, "instrumentK
   if (!isMcx(instrument)) return getNseMarketStatus(date, nse);
   const status = getNseMarketStatus(date, mcxContractSession(instrument, mcx));
   return { ...status, message: status.isOpen ? "MCX is open · Paper trading enabled" : !mcx || mcx.status === "UNAVAILABLE" ? "Checking MCX session · Trading temporarily disabled" : "MCX session closed · Trading disabled" };
+}
+
+export function instrumentTradingSession(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">, session: NseSession | null) {
+  if (isMcx(instrument)) return mcxContractSession(instrument, session);
+  if (!session || !isCurrencyFuture(instrument.instrumentKey) || session.date !== instrument.expiry) return session;
+  const cutoff = currencyExpiryTime(session.date);
+  return { ...session, sessions: session.sessions.map(s => ({start:s.start,end:Math.min(s.end,cutoff)})).filter(s=>s.start<s.end) };
 }
 export function indianSquareOffMinute(instrument: Pick<Instrument, "instrumentKey" | "categories" | "underlyingSymbol">, date: Date, nse: NseSession | null, mcx: NseSession | null, bse: NseSession | null = null) {
   const session = isMcx(instrument) ? mcxContractSession(instrument, mcx) : futuresExchange(instrument) === "BSE" ? bse : nse;

@@ -1,4 +1,6 @@
 import type { FnoUnderlying } from "@/lib/fno";
+import type { Instrument } from "@/lib/market";
+import { segmentFuture } from "@/lib/indian-futures";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +18,15 @@ type UpstoxDerivative = {
   instrument_key?: string;
   trading_symbol?: string;
   expiry?: string | number;
+  last_trading_date?: string | number;
+  qty_multiplier?: number;
   lot_size?: number;
   last_price?: number;
 };
 
-const cache = new Map<Exchange, { expiresAt: number; underlyings: FnoUnderlying[] }>();
-const pending = new Map<Exchange, Promise<FnoUnderlying[]>>();
+type Catalogue = { underlyings: FnoUnderlying[]; segmentFutures: Instrument[] };
+const cache = new Map<Exchange, { expiresAt: number; catalogue: Catalogue }>();
+const pending = new Map<Exchange, Promise<Catalogue>>();
 
 async function loadMaster(exchange: Exchange) {
   const response = await fetch(`https://assets.upstox.com/market-quote/instruments/exchange/${exchange}.json.gz`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
@@ -58,9 +63,16 @@ function normalizeExpiry(value: string | number | undefined) {
 async function groupMaster(exchange: Exchange) {
   const master = await loadMaster(exchange);
   const grouped = new Map<string, FnoUnderlying>();
+  const segmentFutures: Instrument[] = [];
   const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
   for (const item of master) {
+    if (item.instrument_type === "FUT" && ["NCD_FO","BCD_FO","NSE_COM"].includes(item.segment ?? "")) {
+      const expiry = normalizeExpiry(item.last_trading_date ?? item.expiry);
+      const future = expiry >= todayIst ? segmentFuture(item, exchange, expiry) : undefined;
+      if (future) segmentFutures.push(future);
+      continue;
+    }
     if (item.segment !== exchange + "_FO" || !item.underlying_key || !item.underlying_symbol) continue;
     if (item.instrument_type !== "CE" && item.instrument_type !== "PE" && item.instrument_type !== "FUT") continue;
     if (exchange === "BSE" && item.instrument_type !== "FUT") continue;
@@ -94,18 +106,19 @@ async function groupMaster(exchange: Exchange) {
     grouped.set(item.underlying_key, current);
   }
 
-  return [...grouped.values()].filter(item => item.optionContracts || item.futureContracts)
+  const underlyings = [...grouped.values()].filter(item => item.optionContracts || item.futureContracts)
     .map(item => ({ ...item, futures: item.futures?.sort((a, b) => a.expiry.localeCompare(b.expiry)) }));
+  return { underlyings, segmentFutures };
 }
 
 async function loadExchange(exchange: Exchange) {
   const hit = cache.get(exchange);
-  if (hit && hit.expiresAt > Date.now()) return hit.underlyings;
+  if (hit && hit.expiresAt > Date.now()) return hit.catalogue;
   const loading = pending.get(exchange);
   if (loading) return loading;
-  const job = groupMaster(exchange).then(underlyings => {
-    cache.set(exchange, { expiresAt: Date.now() + CACHE_TTL, underlyings });
-    return underlyings;
+  const job = groupMaster(exchange).then(catalogue => {
+    cache.set(exchange, { expiresAt: Date.now() + CACHE_TTL, catalogue });
+    return catalogue;
   });
   pending.set(exchange, job);
   try { return await job; } finally { pending.delete(exchange); }
@@ -121,8 +134,9 @@ export async function GET() {
   }
   const priority = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50"];
   const rank = (symbol: string) => { const i = priority.indexOf(symbol); return i < 0 ? priority.length : i; };
-  const underlyings = results.flatMap(result => result.status === "fulfilled" ? result.value : [])
+  const catalogues = results.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+  const underlyings = catalogues.flatMap(item => item.underlyings)
     .sort((a, b) => rank(a.symbol) - rank(b.symbol) || a.symbol.localeCompare(b.symbol));
-  return Response.json({ ok: true, source: "Upstox exchange instrument masters", underlyings, unavailableExchanges, fetchedAt: new Date().toISOString() },
+  return Response.json({ ok: true, source: "Upstox exchange instrument masters", underlyings, segmentFutures: catalogues.flatMap(item => item.segmentFutures), unavailableExchanges, fetchedAt: new Date().toISOString() },
     { headers: { "Cache-Control": unavailableExchanges.length ? "no-store" : "public, s-maxage=21600, stale-while-revalidate=86400" } });
 }

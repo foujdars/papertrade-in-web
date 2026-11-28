@@ -1,4 +1,5 @@
 import type { Instrument } from "./market";
+import { isCurrencyFuture } from "./indian-futures.ts";
 export type DrawingAlertSource = { id: string; type: "horizontal-ray" | "horizontal-line"; text?: string };
 export type PriceRequest = { instrument: Instrument; price: number; mode?: "alert" | "order"; drawing?: DrawingAlertSource; side?: "BUY" | "SELL"; orderType?: "Market" | "Limit" | "SL"; quantity?: number; product?: "DELIVERY" | "INTRADAY" };
 export type PriceTask = {
@@ -9,7 +10,10 @@ export type PriceTask = {
   completedAt?: number; triggeredPrice?: number;
 };
 export function priceTaskError(task: Pick<PriceTask, "instrument" | "price" | "quantity" | "kind">) {
-  if (!Number.isFinite(task.price) || task.price < 0.01 || Math.abs(task.price * 100 - Math.round(task.price * 100)) > 0.00001) return "Enter a positive price with no more than two decimal places.";
+  const currency = isCurrencyFuture(task.instrument.instrumentKey);
+  const ticks = task.price * (currency ? 400 : 100);
+  if (!Number.isFinite(task.price) || ticks < 1 || Math.abs(ticks-Math.round(ticks)) > 0.00001)
+    return currency ? "Enter a positive INR price in increments of 0.0025." : "Enter a positive price with no more than two decimal places.";
   if (task.kind === "alert") return null;
   if (task.instrument.assetType === "INDEX") return "Indices cannot be traded directly. Select a stock or derivative.";
   const lot = Math.max(1, task.instrument.lotSize ?? 1);

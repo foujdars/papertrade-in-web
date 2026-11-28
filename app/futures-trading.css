@@ -15,7 +15,8 @@
 .futures-filters { display: grid; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .futures-search { display: flex; gap: 8px; align-items: center; min-height: 42px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); background: var(--soft); }
 .futures-search input { width: 100%; min-width: 0; background: transparent; border: 0; color: var(--ink); font: inherit; font-size: 16px; }
-.futures-filters [role="group"] { display: grid; grid-template-columns: repeat(4,1fr); gap: 3px; }
+.futures-filters [role="group"] { display: flex; gap: 3px; overflow-x: auto; }
+.futures-filters [role="group"] button { flex: 1 0 auto; padding-inline: 7px; }
 .futures-filters button { min-height: 38px; border: 1px solid transparent; border-radius: 8px; background: var(--soft); color: var(--muted); font-size: 12px; font-weight: 600; }
 .futures-filters button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); border-color: color-mix(in srgb, var(--purple) 42%, var(--line)); }
 .futures-contracts { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 14px 8px; }

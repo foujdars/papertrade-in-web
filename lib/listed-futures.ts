@@ -1,6 +1,7 @@
 import type { Instrument } from "./market";
 import { isDeltaPerpSymbol } from "./global-markets.ts";
 import { isDeltaDatedFutureSymbol } from "./global-contracts.ts";
+import { currencyExpiryTime, isCurrencyFuture, listingExchange } from "./indian-futures.ts";
 
 export type FuturesScope = { market: "india" | "global"; rootKey?: string; label?: string };
 
@@ -10,6 +11,8 @@ export function formatFuturesExpiry(expiry: string | null | undefined) {
 }
 
 export function futuresRootKey(item: Instrument): string {
+  if (isCurrencyFuture(item.instrumentKey) || item.instrumentKey.startsWith("NSE_COM|"))
+    return item.instrumentKey.split("|")[0] + "|" + item.underlyingSymbol;
   if (item.exchange === "DELTA" || item.exchange === "MCX") {
     return item.underlyingSymbol ? item.exchange + "|" + item.underlyingSymbol : "";
   }
@@ -22,8 +25,9 @@ export function isListedFuture(item: Instrument, tradingDate: string, now: numbe
     if (!Number.isFinite(item.contractMultiplier) || !(item.contractMultiplier! > 0) || item.instrumentKey !== "DELTA|" + item.symbol) return false;
     return item.expiry ? isDeltaDatedFutureSymbol(item.symbol) && Date.parse(item.expiry) > now : isDeltaPerpSymbol(item.symbol);
   }
-  return item.instrumentKey.startsWith(item.exchange + "_FO|") && /^(NSE_FO|BSE_FO|MCX_FO)\|\d+$/.test(item.instrumentKey) &&
+  return item.exchange === listingExchange(item) && /^(NSE_FO|BSE_FO|MCX_FO|NCD_FO|BCD_FO|NSE_COM)\|\d+$/.test(item.instrumentKey) &&
     !!item.expiry && /^\d{4}-\d{2}-\d{2}$/.test(item.expiry) && Number.isFinite(Date.parse(item.expiry)) && item.expiry >= tradingDate &&
+    (!isCurrencyFuture(item.instrumentKey) || currencyExpiryTime(item.expiry) > now) &&
     Number.isSafeInteger(item.lotSize) && item.lotSize! > 0;
 }
 

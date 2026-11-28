@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 const FundamentalWorkspace = dynamic(() => import("./FundamentalWorkspace").then(module => module.FundamentalWorkspace));
 import { holdingPerformance } from "@/lib/holding-performance";
 import { CandleLoader } from "./CandleLoader";
-import { useNseSession } from "./useNseSession";
+import { useExchangeSessions } from "./useNseSession";
 import { TradeExecutionSummary } from "./TradeExecutionSummary";
 import { TradeReviewDialog } from "./TradeReviewDialog";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
@@ -99,8 +99,9 @@ import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
-import { getNseMarketStatus, type NseSession } from "@/lib/market-hours";
-import { futuresExchange, isMcx, mcxContractSession, indianInstrumentStatus, indianSquareOffMinute } from "@/lib/mcx";
+import { getNseMarketStatus, nseSquareOffMinute, type NseSession } from "@/lib/market-hours";
+import { futuresExchange, isMcx, instrumentTradingSession } from "@/lib/mcx";
+import { currencyLotLabel, currencyPrecision, isCurrencyFuture, isContractPricedFuture, sessionExchange } from "@/lib/indian-futures";
 import {
   calculatePosition,
   getDeliveryHoldingQuantity,
@@ -423,9 +424,6 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [chainOrder, setChainOrder] = useState<BasketOrder | null>(null);
   const desktopBrowser = useDesktopBrowser();
   const desktopChartBrowser = useDesktopChartBrowser();
-  const exchangeSession = useNseSession();
-  const mcxSession = useNseSession("MCX");
-  const bseSession = useNseSession("BSE");
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const placingBasket = useRef(false);
   const walletOwner = user?.id ?? "guest";
@@ -439,13 +437,12 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [commodityInstruments, setCommodityInstruments] = useState<Instrument[]>([]);
-  function instrumentSession(instrument: Instrument, at = new Date()) { return indianInstrumentStatus(instrument, at, exchangeSession, mcxSession, bseSession); }
-  function instrumentCutoff(instrument: Instrument, at = new Date()) { return indianSquareOffMinute(instrument, at, exchangeSession, mcxSession, bseSession); }
   const [globalInstruments, setGlobalInstruments] = useState<Instrument[]>(GLOBAL_CHART_INSTRUMENTS);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
   const [fnoUnderlying, setFnoUnderlying] = useState<FnoUnderlying | null>(null);
   const [fnoUnderlyings, setFnoUnderlyings] = useState<FnoUnderlying[]>([]);
+  const [segmentFutures, setSegmentFutures] = useState<Instrument[]>([]);
   const [fnoFutureInstrument, setFnoFutureInstrument] = useState<Instrument | null>(null);
   const [fnoTopMode, setFnoTopMode] = useState<"SPOT" | "FUTURE">("SPOT");
   const [fnoSwitchingOption, setFnoSwitchingOption] = useState(false);
@@ -527,6 +524,19 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [indicators, setIndicators] = usePersistentChartIndicators(user?.id);
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
+  const sessionCodes = useMemo(() => Array.from(new Set(["NSE","NFO","MCX",
+    sessionExchange(selected), ...orders.map(sessionExchange), ...priceTasks.filter(task=>task.status === "pending").map(task=>sessionExchange(task.instrument)),
+  ])).sort().join(","), [selected.instrumentKey, orders, priceTasks]);
+  const sessions = useExchangeSessions(sessionCodes);
+  const exchangeSession = sessions.NSE ?? null;
+  function calendarFor(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">) {
+    return instrumentTradingSession(instrument, sessions[sessionExchange(instrument)] ?? null);
+  }
+  function instrumentSession(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">, at = new Date()) {
+    const status = getNseMarketStatus(at, calendarFor(instrument));
+    return {...status,message:status.message.replace("NSE",futuresExchange(instrument))};
+  }
+  function instrumentCutoff(instrument: Instrument, at = new Date()) { return nseSquareOffMinute(at,calendarFor(instrument)); }
   const [protections, setProtections] = useState<PaperProtection[]>([]);
   const [paperDataReady, setPaperDataReady] = useState(false);
   const [nativeProtectionTriggers, setNativeProtectionTriggers] = useState<NativeTriggeredPriceAlert[]>([]);
@@ -1105,9 +1115,10 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     const controller = new AbortController();
     void fetch("/api/upstox/fno-underlyings", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[]; unavailableExchanges?: string[] };
+        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[]; segmentFutures?: Instrument[]; unavailableExchanges?: string[] };
         if (!response.ok || !payload.ok) throw new Error("Indian futures catalogue unavailable.");
         setFnoUnderlyings(payload.underlyings ?? []);
+        setSegmentFutures(payload.segmentFutures ?? []);
         setFuturesFeed(old => ({ ...old, india: payload.unavailableExchanges?.length ? payload.unavailableExchanges.join(", ") + " futures listings are unavailable." : "" }));
       })
       .catch(() => { if (!controller.signal.aborted) setFuturesFeed(old => ({ ...old, india: "NSE and BSE futures listings are unavailable." })); });
@@ -1115,9 +1126,9 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   }, [futuresRefresh]);
 
   const futureTradingDate = indiaDateKey(clock ?? new Date());
-  const indianFutures = useMemo(() => fnoUnderlyings.flatMap(underlying => (underlying.futures ?? [])
+  const indianFutures = useMemo(() => [...segmentFutures.filter(item => item.expiry && item.expiry >= futureTradingDate), ...fnoUnderlyings.flatMap(underlying => (underlying.futures ?? [])
     .filter(contract => contract.lotSizeVerified && contract.expiry >= futureTradingDate && Number.isSafeInteger(contract.lotSize) && contract.lotSize > 0)
-    .map(contract => futureToInstrument(contract, underlying))), [fnoUnderlyings, futureTradingDate]);
+    .map(contract => futureToInstrument(contract, underlying)))], [fnoUnderlyings, segmentFutures, futureTradingDate]);
   const listedFutures = useMemo(() => {
     const now = Date.now();
     return [...indianFutures, ...commodityInstruments, ...globalInstruments].filter(item => isListedFuture(item, futureTradingDate, now)).sort(compareFutures);
@@ -1484,10 +1495,10 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     void Promise.all(pending.map(async (item) => {
       let cutoffMinute = item.cutoffMinute;
       if (item.sessionDate !== currentIndiaDate) {
-        const historical = await fetch(`/api/market/session?date=${item.sessionDate}&exchange=${futuresExchange(item.instrument)}`, { cache: "no-store" })
+        const historical = await fetch(`/api/market/session?date=${item.sessionDate}&exchange=${sessionExchange(item.instrument)}`, { cache: "no-store" })
           .then(response => response.json()).catch(() => null) as { session?: NseSession } | null;
         if (!historical?.session?.sessions.length) return { ...item, resolvedPrice: undefined };
-        cutoffMinute = indianSquareOffMinute(item.instrument, new Date(`${item.sessionDate}T00:00:00+05:30`), historical.session, historical.session, historical.session);
+        cutoffMinute = nseSquareOffMinute(new Date(`${item.sessionDate}T00:00:00+05:30`), instrumentTradingSession(item.instrument,historical.session));
       }
       return { ...item, cutoffMinute, resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate, cutoffMinute).catch(() => undefined) };
     })).then((resolved) => {
@@ -1550,18 +1561,17 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     }).finally(() => {
       autoSquareOffInFlightRef.current = false;
     });
-  }, [balance, clock, exchangeSession, mcxSession, bseSession, marketQuotes, orders, tradingUniverse]);
+  }, [balance, clock, sessions, marketQuotes, orders, tradingUniverse]);
 
   useEffect(() => {
     if (!clock || !orders.length || futureExpiryInFlightRef.current || autoSquareOffInFlightRef.current || Date.now() < futureExpiryRetryAtRef.current) return;
     const today = indiaDateKey(clock);
-    const canSettle = (order: PaperOrder) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && (order.underlyingKey || isMcx(order));
+    const canSettle = (order: PaperOrder) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && (order.underlyingKey || isContractPricedFuture(order.instrumentKey));
     const candidates = [...new Set(orders.filter(canSettle).map((order) => order.symbol))]
       .flatMap((symbol) => {
         const contract = orders.find((order) => order.symbol === symbol && canSettle(order));
         if (!contract?.expiry || contract.expiry > today) return [];
-        const session = isMcx(contract) ? mcxContractSession({ categories: [], underlyingSymbol: contract.underlyingSymbol }, mcxSession) :
-          futuresExchange(contract) === "BSE" ? bseSession : exchangeSession;
+        const session = calendarFor({ ...contract, instrumentKey:contract.instrumentKey!, categories:[] });
         const end = session?.date === contract.expiry ? session.sessions.at(-1)?.end : undefined;
         if (contract.expiry === today && (!end || clock.getTime() < end)) return [];
         const position = calculatePosition(orders, symbol, contract.price, "DELIVERY");
@@ -1572,12 +1582,12 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     void Promise.all(candidates.map(async ({ contract, end }) => {
       try {
         if (!end) {
-          const calendar = await fetch(`/api/market/session?date=${contract.expiry}&exchange=${futuresExchange(contract)}`, { cache: "no-store" });
+          const calendar = await fetch(`/api/market/session?date=${contract.expiry}&exchange=${sessionExchange(contract)}`, { cache: "no-store" });
           const {session} = await calendar.json() as { session?: NseSession };
-          if (session?.date === contract.expiry) end = (isMcx(contract) ? mcxContractSession({ categories: [], underlyingSymbol: contract.underlyingSymbol }, session ?? null) : session)?.sessions.at(-1)?.end;
+          if (session?.date === contract.expiry) end = instrumentTradingSession({...contract, instrumentKey:contract.instrumentKey!, categories:[]}, session ?? null)?.sessions.at(-1)?.end;
         }
         if (!end) return { contract, price: undefined, end };
-        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(isMcx(contract) ? contract.instrumentKey! : contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
+        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(isContractPricedFuture(contract.instrumentKey) ? contract.instrumentKey! : contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
         const candle = response.ok && payload.ok ? payload.candles?.find((item) => indiaDateKey(item.time * 1000) === contract.expiry) : undefined;
         return { contract, price: candle?.close, end };
@@ -1614,7 +1624,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       });
       setToast(`${settled.length} future${settled.length === 1 ? "" : "s"} paper-settled at the expiry-day close. No physical delivery.`);
     }).finally(() => { futureExpiryInFlightRef.current = false; });
-  }, [balance, clock, bseSession, exchangeSession, mcxSession, orders]);
+  }, [balance, clock, sessions, orders]);
 
   useEffect(() => {
     if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
@@ -1757,7 +1767,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
-  }, [balance, clock, exchangeSession, mcxSession, bseSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
+  }, [balance, clock, sessions, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const referenceKey = isGlobalReferenceKey(selected.instrumentKey) ? selected.instrumentKey : null;
   const referenceScope = referenceKey ? `${referenceKey}:${timeframe}` : "";
@@ -1958,7 +1968,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const selectedOrderTicketAvailable = !selectedIsWatchOnly && selected.assetType !== "INDEX" && (selectedDeltaChartSymbol ? selectedQuoteIsFresh : true);
   const afterHoursDeliveryEstimate = orderEstimatePrice;
   const afterHoursDeliveryCanQueue = !selectedIsWatchOnly && !selectedDeltaChartSymbol && !marketOrdersAllowed && product === "DELIVERY" && (selected.assetType === "EQUITY" || !selected.assetType) && Number.isFinite(afterHoursDeliveryEstimate) && afterHoursDeliveryEstimate > 0;
-  const orderButtonPriceLabel = verifiedLivePrice?.toFixed(2) ?? (afterHoursDeliveryEstimate > 0 ? `${afterHoursDeliveryEstimate.toFixed(2)} est.` : "—");
+  const priceDecimals = currencyPrecision(selected.instrumentKey);
+  const orderButtonPriceLabel = verifiedLivePrice?.toFixed(priceDecimals) ?? (afterHoursDeliveryEstimate > 0 ? `${afterHoursDeliveryEstimate.toFixed(2)} est.` : "—");
   const selectedGlobalPosition = globalTrading.account?.positions.find(p => p.symbol === selectedDeltaSymbol);
   const selectedGlobalQuote = selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.quote : undefined;
   const selectedOptionPosition = globalTrading.account?.optionPositions?.find(p => p.symbol === selectedDeltaOption);
@@ -2572,7 +2583,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       if (!paperDataReady) throw new Error("Wait for the INR paper account to load.");
       const sample = {instrumentKey: order.legs[0].contract.id, categories: [] as string[], underlyingSymbol: order.rootLabel};
       const checkSession = (at: Date) => {
-        const status = indianInstrumentStatus(sample, at, exchangeSession, mcxSession, bseSession);
+        const status = instrumentSession(sample,at);
         if (!status.isOpen || order.expiry.slice(0,10) < indiaDateKey(at)) throw new Error("The selected option is outside its trading session.");
       };
       checkSession(new Date());
@@ -3191,7 +3202,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
             {referenceKey ? <div className="quote-block">
               <strong>{lastReferenceBar ? formatUsd(lastReferenceBar.close) : "—"}</strong>
               <span>{lastReferenceBar && activeReference ? `${activeReference.source} · Candle ${new Date(lastReferenceBar.time * 1000).toLocaleString("en-IN", ["1D", "1W", "1M", "1Y"].includes(timeframe) ? { dateStyle: "medium", timeZone: "UTC" } : { dateStyle: "short", timeStyle: "short" })}` : "Waiting for market data"}</span>
-            </div> : <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedChangeAvailable ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : selectedQuoteIsFresh ? "Daily change unavailable" : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>}
+            </div> : <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: priceDecimals, maximumFractionDigits: priceDecimals }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedChangeAvailable ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : selectedQuoteIsFresh ? "Daily change unavailable" : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>}
             {!referenceKey && <><div className="trade-day-range">
               <header><span>DAY RANGE</span><b>{selectedQuoteIsFresh ? `${Math.round(selectedDayRangeProgress)}%` : "—"}</b></header>
               <div><i style={{ left: `${selectedDayRangeProgress}%` }} /></div>
@@ -3337,8 +3348,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: orderEstimatePrice, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit", quantity, product }); } }}>{type}</button>)}</div>
           <div className="input-grid">
-            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
-            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
+            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {isCurrencyFuture(selected.instrumentKey) ? currencyLotLabel(selected.underlyingSymbol,quantityStep) : quantityStep + " units"} per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
+            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(priceDecimals) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
             <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onChange={(event) => { setTargetPrice(event.target.value); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>

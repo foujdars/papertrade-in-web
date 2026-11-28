@@ -4,7 +4,9 @@ import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
 import { isListedFuture, futuresRootKey, compareFutures } from "../lib/listed-futures.ts";
 import { futureToInstrument } from "../lib/fno.ts";
-import { futuresExchange, indianInstrumentStatus } from "../lib/mcx.ts";
+import { futuresExchange, indianInstrumentStatus, instrumentTradingSession } from "../lib/mcx.ts";
+import { currencyExpiryTime, currencyLotLabel, segmentFuture, sessionExchange } from "../lib/indian-futures.ts";
+import { priceTaskError } from "../lib/price-actions.ts";
 import { normalizeDeltaCatalogue, normalizeDeltaFutureSpec, normalizePerpQuote, deltaSymbolFromInstrumentKey, availablePerpCash } from "../lib/global-markets.ts";
 import { readGlobalAccount, advanceGlobalAccount, submitGlobalOrder } from "../lib/global-order-engine.ts";
 import { fillDeltaBasket } from "../lib/option-basket-orders.ts";
@@ -40,6 +42,8 @@ test("NSE and BSE masters load independently, retain every verified expiry and n
     const rows = exchange === "NSE" ? [...futures("NSE","RELIANCE","NSE_EQ|INE002A01018","EQUITY"), ...futures("NSE","NIFTY","NSE_INDEX|Nifty 50","INDEX")] :
       futures("BSE","SENSEX","BSE_INDEX|SENSEX","INDEX");
     rows.push({...rows[0],expiry:"2020-01-01"}, {...rows[0],lot_size:0}, {...rows[0],lot_size:undefined}, {...rows[0],instrument_key:"NSE_EQ|INE002A01018"});
+    const segment = exchange === "BSE" ? "BCD_FO" : "NCD_FO";
+    rows.push({segment,instrument_type:"FUT",instrument_key:segment+"|501",underlying_symbol:"USDINR",trading_symbol:"USDINR FUT DEC",qty_multiplier:1000,expiry:"2098-12-26"});
     return new Response(gzipSync(JSON.stringify(rows)));
   });
   const partial = await (await GET()).json();
@@ -48,6 +52,7 @@ test("NSE and BSE masters load independently, retain every verified expiry and n
   bseAvailable = true;
   const full = await (await GET()).json();
   assert.deepEqual(full.unavailableExchanges,[]);
+  assert.deepEqual(full.segmentFutures.map(item=>item.symbol).sort(),["USDINR FUT DEC (BSE)","USDINR FUT DEC (NSE)"]);
   assert.deepEqual(calls,{NSE:1,BSE:2});
   for (const root of full.underlyings) {
     assert.equal(root.futureContracts,2);
@@ -130,6 +135,34 @@ test("a Delta futures contract that enters reduce-only mode still allows a posit
   assert.throws(()=>submitGlobalOrder(a,restricted,quote,entry,now),/reductions/);
   const reduced = submitGlobalOrder(a,restricted,quote,{...entry,side:"SELL",reduceOnly:true},now);
   assert.equal(reduced.positions.length,0);
+});
+
+test("currency and NSE commodity listings preserve the quotation unit, exchange session and contract identity", () => {
+  const expiryDate = "2098-12-26";
+  const row = {segment:"NCD_FO",instrument_type:"FUT",instrument_key:"NCD_FO|123",qty_multiplier:1000,trading_symbol:"JPYINR FUT DEC",underlying_symbol:"JPYINR"};
+  const nse = segmentFuture(row,"NSE",expiryDate);
+  const bse = segmentFuture({...row,segment:"BCD_FO",instrument_key:"BCD_FO|123"},"BSE",expiryDate);
+  const commodity = segmentFuture({...row,segment:"NSE_COM",instrument_key:"NSE_COM|123",underlying_symbol:"GOLD",trading_symbol:"GOLD FUT DEC",qty_multiplier:100},"NSE",expiryDate);
+  assert.deepEqual([sessionExchange(nse),sessionExchange(bse),sessionExchange(commodity)],["CDS","BCD","NSCOM"]);
+  assert.deepEqual([sessionExchange({instrumentKey:"NSE_FO|1"}),sessionExchange({instrumentKey:"BSE_FO|1"})],["NFO","BFO"]);
+  assert.ok([nse,bse,commodity].every(item=>isListedFuture(item,today,now)));
+  assert.notEqual(nse.symbol,bse.symbol);
+  assert.notEqual(futuresRootKey(nse),futuresRootKey(bse));
+  assert.equal(currencyLotLabel(nse.underlyingSymbol,nse.lotSize),"1,00,000 JPY");
+  assert.equal(segmentFuture({...row,qty_multiplier:undefined},"NSE",expiryDate),undefined);
+  assert.equal(segmentFuture({...row,underlying_symbol:"EURUSD"},"NSE",expiryDate),undefined);
+  const cutoff = currencyExpiryTime(expiryDate);
+  const clipped = instrumentTradingSession(nse,{date:expiryDate,sessions:[{start:cutoff-3600000,end:cutoff+4*3600000}]});
+  assert.equal(clipped.sessions[0].end,cutoff);
+  assert.equal(isListedFuture(nse,expiryDate,cutoff),false);
+  assert.equal(isListedFuture(nse,expiryDate,cutoff-1),true);
+  const ticket = {kind:"order",quantity:1000,instrument:nse,price:58.6725};
+  assert.equal(priceTaskError(ticket),null);
+  assert.match(priceTaskError({...ticket,price:58.6721}),/0.0025/);
+  const order = {side:"SELL",product:"DELIVERY",quantity:1000,price:100};
+  const charges = [nse,bse,commodity].map(item=>calculateUpstoxTradingCharges("FUTURE",order,item.instrumentKey,item.underlyingSymbol));
+  assert.deepEqual(charges.map(c=>c.transactionCharges),[.35,.45,.1]);
+  assert.deepEqual(charges.map(c=>c.stt),[0,0,10]);
 });
 
 test("an Indian option chain offers every covering expiry with each future's own book and contract lot", async t => {

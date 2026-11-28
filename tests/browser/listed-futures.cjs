@@ -15,8 +15,13 @@ const roots = [
 ];
 const btc = {symbol:"BTCUSD", name:"Bitcoin perpetual", instrumentKey:"DELTA|BTCUSD", exchange:"DELTA", assetType:"FUTURE", price:0, change:0, contractMultiplier:.001, lotSize:1, underlyingSymbol:"BTC", categories:["GLOBAL","CRYPTO"]};
 const gold = {symbol:"GOLD-20261204", name:"Gold 04 Dec 26", instrumentKey:"MCX_FO|141", exchange:"MCX", assetType:"FUTURE", price:0, change:0, lotSize:100, underlyingSymbol:"GOLD", expiry:"2026-12-04", categories:["MCX","COMMODITY"]};
-const india = [...roots.flatMap(root => root.futures.map(contract => ({...contract, symbol:contract.tradingSymbol}))), gold];
+const currencies = ["NSE","BSE"].map((exchange,i)=>({symbol:"USDINR FUT 29 DEC 26 ("+exchange+")",name:"USDINR FUT 29 DEC 26",
+  instrumentKey:(i ? "BCD_FO|151" : "NCD_FO|151"),exchange,assetType:"FUTURE",price:0,change:0,lotSize:1000,underlyingSymbol:"USDINR",expiry:expiries[0],categories:["Futures","CURRENCY"]}));
+const nseGold = {...gold,symbol:"GOLD FUT 04 DEC 26 (NSE)",name:"GOLD FUT 04 DEC 26",instrumentKey:"NSE_COM|141",exchange:"NSE"};
+const segmentFutures = [...currencies,nseGold];
+const india = [...roots.flatMap(root => root.futures.map(contract => ({...contract, symbol:contract.tradingSymbol}))), gold,...segmentFutures];
 const prices = new Map(india.map((contract, i) => [contract.instrumentKey, 100 + i * 15]));
+for (const contract of currencies) prices.set(contract.instrumentKey,91.2525);
 const quote = (key, price) => ({instrumentKey:key, symbol:india.find(row=>row.instrumentKey === key)?.symbol || key, lastPrice:price, previousClose:price-1, previousCloseAt:asOf,
   netChange:1, changePercent:1, changeAvailable:true, open:price, high:price+1, low:price-2, lastTradeAt:asOf, updatedAt:asOf});
 async function mockMarket(page) {
@@ -25,7 +30,7 @@ async function mockMarket(page) {
     const url = new URL(route.request().url()), params = url.searchParams;
     const send = fields => route.fulfill({json:{ok:true,...fields}});
     if (url.pathname.endsWith("/market/session")) return send({session:{date:"2026-11-30", checkedAt:now, status:"NORMAL_OPEN", sessions:[{start:now-3600000,end:now+4*3600000}], source:"test exchange session"}});
-    if (url.pathname.endsWith("/fno-underlyings")) return send({underlyings:roots});
+    if (url.pathname.endsWith("/fno-underlyings")) return send({underlyings:roots,segmentFutures});
     if (url.pathname.endsWith("/commodities")) return send({instruments:[gold]});
     if (url.pathname.endsWith("/global-markets") && params.get("mode") === "catalog") return send({instruments:[btc]});
     if (url.pathname.endsWith("/global-markets") && params.get("symbol") === "BTCUSD" && !params.get("mode")) return send({
@@ -44,7 +49,8 @@ async function mockMarket(page) {
   const browser = await chromium.launch({headless:true});
   try {
     for (const [group, contract, side] of [
-      ["Indices",india[1],"BUY"], ["Stocks",india[3],"SELL"], ["Indices",india[5],"SELL"], ["MCX",gold,"BUY"], ["Global",btc,"SELL"],
+      ["Indices",india[1],"BUY"], ["Stocks",india[3],"SELL"], ["Indices",india[5],"SELL"], ["Commodities",gold,"BUY"],
+      ["FX",currencies[0],"BUY"], ["FX",currencies[1],"SELL"], ["Commodities",nseGold,"SELL"], ["Global",btc,"SELL"],
     ]) {
       const page = await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
       const errors = [];
