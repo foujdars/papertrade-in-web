@@ -38,7 +38,12 @@ export function compareMarketInstruments(a: DirectoryInstrument, b: DirectoryIns
   return rank(a) - rank(b) || marketDisplayName(a).localeCompare(marketDisplayName(b)) || a.symbol.localeCompare(b.symbol);
 }
 export function marketProductLabel(item: DirectoryInstrument): string {
+  if (item.instrumentKey?.startsWith("NSE_COM|")) return "NSE commodity future · INR";
+  if (item.instrumentKey?.startsWith("NCD_FO|")) return "NSE currency future · INR";
+  if (item.instrumentKey?.startsWith("BCD_FO|")) return "BSE currency future · INR";
   if (item.instrumentKey?.startsWith("MCX_FO|")) return "MCX future · INR";
+  if (item.assetType === "FUTURE" && /^(NSE|BSE)_FO\|/.test(item.instrumentKey ?? "")) return item.instrumentKey!.slice(0,3) + " future · INR";
+  if (item.categories.includes("DATED_FUTURE")) return "Dated future · USD";
   if (isGlobalReferenceKey(item.instrumentKey)) return marketGroup(item) === "us"
     ? "US listing · USD · watch only"
     : "Spot · USD · watch only";

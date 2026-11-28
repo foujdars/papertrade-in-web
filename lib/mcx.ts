@@ -1,7 +1,9 @@
 import type { Instrument } from "./market.ts";
 import { getNseMarketStatus, nseDate, nseSquareOffMinute, type NseSession } from "./market-hours.ts";
+import { currencyExpiryTime, isCurrencyFuture, listingExchange } from "./indian-futures.ts";
 
 export const isMcx = (instrument: { instrumentKey?: string }) => Boolean(instrument.instrumentKey?.startsWith("MCX_FO|"));
+export const futuresExchange = listingExchange;
 const lateAgri = new Set(["COTTON", "COTTONCNDY", "COTTONOIL", "KAPAS"]);
 const agri = new Set([...lateAgri, "MENTHAOIL", "CARDAMOM", "CPO", "CASTORSEED", "RUBBER"]);
 
@@ -36,12 +38,23 @@ export function mcxContractSession(instrument: Pick<Instrument, "categories" | "
   const end = Date.parse(`${session.date}T${cap}:00+05:30`);
   return { ...session, sessions: session.sessions.map(s => ({ start: s.start, end: Math.min(s.end, end) })).filter(s => s.end > s.start) };
 }
-export function indianInstrumentStatus(instrument: Pick<Instrument, "instrumentKey" | "categories" | "underlyingSymbol">, date: Date, nse: NseSession | null, mcx: NseSession | null) {
+export function indianInstrumentStatus(instrument: Pick<Instrument, "instrumentKey" | "categories" | "underlyingSymbol">, date: Date, nse: NseSession | null, mcx: NseSession | null, bse: NseSession | null = null) {
+  if (futuresExchange(instrument) === "BSE") {
+    const status = getNseMarketStatus(date, bse);
+    return { ...status, message: status.message.replace("NSE", "BSE") };
+  }
   if (!isMcx(instrument)) return getNseMarketStatus(date, nse);
   const status = getNseMarketStatus(date, mcxContractSession(instrument, mcx));
   return { ...status, message: status.isOpen ? "MCX is open · Paper trading enabled" : !mcx || mcx.status === "UNAVAILABLE" ? "Checking MCX session · Trading temporarily disabled" : "MCX session closed · Trading disabled" };
 }
-export function indianSquareOffMinute(instrument: Pick<Instrument, "instrumentKey" | "categories" | "underlyingSymbol">, date: Date, nse: NseSession | null, mcx: NseSession | null) {
-  const session = isMcx(instrument) ? mcxContractSession(instrument, mcx) : nse;
+
+export function instrumentTradingSession(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">, session: NseSession | null) {
+  if (isMcx(instrument)) return mcxContractSession(instrument, session);
+  if (!session || !isCurrencyFuture(instrument.instrumentKey) || session.date !== instrument.expiry) return session;
+  const cutoff = currencyExpiryTime(session.date);
+  return { ...session, sessions: session.sessions.map(s => ({start:s.start,end:Math.min(s.end,cutoff)})).filter(s=>s.start<s.end) };
+}
+export function indianSquareOffMinute(instrument: Pick<Instrument, "instrumentKey" | "categories" | "underlyingSymbol">, date: Date, nse: NseSession | null, mcx: NseSession | null, bse: NseSession | null = null) {
+  const session = isMcx(instrument) ? mcxContractSession(instrument, mcx) : futuresExchange(instrument) === "BSE" ? bse : nse;
   return isMcx(instrument) && !session?.sessions.length ? 24 * 60 : nseSquareOffMinute(date, session);
 }

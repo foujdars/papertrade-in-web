@@ -4,9 +4,9 @@ import { build } from 'esbuild';
 
 // Run actual component effects with controlled HTTP promises; no broker or account writes.
 let run = 0;
-async function harness(t, entry, exported, initial = {}) {
+async function harness(t, entry, exported, initial = {}, hookArgs = []) {
   const effects = [], updates = [], events = new Map(), timers = [], requests = [], deadlines = [];
-  const state = { effects, updates, initial, stateIndex: 0 };
+  const state = { effects, updates, values: { ...initial }, stateIndex: 0 };
   const key = '__marketRefreshTest';
   const restorers = [];
   let cleanup = [];
@@ -30,15 +30,27 @@ async function harness(t, entry, exported, initial = {}) {
   const output = await build({ entryPoints: [entry], bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'effect-harness', setup(b) {
     b.onResolve({ filter: /^react(?:\/jsx-runtime)?$|^lucide-react$|^\.\/(ModernSelect|OpenInterestChart)$/ }, args => ({ path: args.path, namespace: 'stub' }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'react'
-      ? `const s=globalThis.${key}; export const useState = value => {const i=s.stateIndex++; return [i in s.initial?s.initial[i]:typeof value==='function'?value():value, next=>s.updates.push(next)];}; export const useEffect=fn=>s.effects.push(fn); export const useMemo=fn=>fn(); export const useSyncExternalStore=(_subscribe,_client,server)=>server();`
+      ? `const s=globalThis.${key};
+         export const useState = initial => {
+           const i = s.stateIndex++;
+           if (!(i in s.values)) s.values[i] = typeof initial === 'function' ? initial() : initial;
+           return [s.values[i], next => {
+             s.values[i] = typeof next === 'function' ? next(s.values[i]) : next;
+             s.updates.push(s.values[i]);
+           }];
+         };
+         export const useEffect=fn=>s.effects.push(fn); export const useMemo=fn=>fn(); export const useSyncExternalStore=(_subscribe,_client,server)=>server();`
       : args.path === 'react/jsx-runtime' ? 'export const jsx=(type,props)=>({type,props}); export const jsxs=jsx; export const Fragment=Symbol.for("react.fragment");'
       : 'export const ModernSelect=()=>null; export const OpenInterestChart=()=>null; export const ChartNoAxesCombined=()=>null;', loader: 'js' }));
   } }] });
   const component = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text + '\n//# sourceURL=' + entry + '?test=' + ++run).toString('base64')}`);
-  if (exported === 'useNseSession') component[exported]();
-  else component[exported]({ onOpenStock() {} });
+  const render = () => {
+    state.stateIndex = 0;
+    return exported.startsWith('use') ? component[exported](...hookArgs) : component[exported]({ onOpenStock() {} });
+  };
+  render();
   cleanup = effects.map(effect => effect());
-  return { requests, updates, deadlines, timers, async settle() { await new Promise(resolve => setImmediate(resolve)); }, fire(name) { events.get(name)?.forEach(fn => fn()); }, events };
+  return { render, requests, updates, deadlines, timers, async settle() { await new Promise(resolve => setImmediate(resolve)); }, fire(name) { events.get(name)?.forEach(fn => fn()); }, events };
 }
 
 test('exchange session polling times out stuck requests and retries when connectivity returns', async t => {
@@ -52,7 +64,22 @@ test('exchange session polling times out stuck requests and retries when connect
   assert.equal(h.requests.length, 2, 'A stalled fetch must not permanently hold the pending flag');
   h.requests[1].resolve({ session: { status: 'OPEN', sessions: [] } });
   await h.settle();
-  assert.equal(h.updates.at(-1).status, 'OPEN');
+  assert.equal(h.render().status, 'OPEN');
+});
+
+test('currency venues recover independently and keep desk sessions tied to the requested exchange', async t => {
+  const h = await harness(t, 'components/useNseSession.ts', 'useExchangeSessions', {}, ['CDS,BCD']);
+  assert.deepEqual(h.requests.map(r => r.url), ['/api/market/session?exchange=CDS','/api/market/session?exchange=BCD']);
+  h.deadlines[0].controller.abort();
+  h.requests[1].resolve({session:{status:'NORMAL_CLOSE',sessions:[]}});
+  await h.settle();
+  assert.deepEqual(h.render(), {CDS:null, BCD:{status:'NORMAL_CLOSE',sessions:[]}});
+  h.fire('online');
+  h.requests[2].resolve({session:{status:'NORMAL_OPEN',sessions:[{start:1,end:2}]}});
+  h.requests[3].resolve({session:{status:'NORMAL_CLOSE',sessions:[]}});
+  await h.settle();
+  assert.equal(h.render().CDS.status,'NORMAL_OPEN');
+  assert.equal(h.render().BCD.status,'NORMAL_CLOSE');
 });
 
 test('Home derivatives immediately refresh on resume and bound every market request', async t => {

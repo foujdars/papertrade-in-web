@@ -65,6 +65,7 @@ import "./app-themes.css";
 import "./home-desk.css";
 import "../components/option-spread-builder.css";
 import "../components/strategy-desk.css";
+import "./futures-trading.css";
 
 const productionUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/+$/, "")

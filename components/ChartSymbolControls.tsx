@@ -11,9 +11,9 @@ export function ChartFavouriteButton({ instrument, saved, onClick }: { instrumen
   return <button type="button" className={`chart-watchlist-star chart-floating-favourite ${saved ? 'saved' : ''}`} onClick={onClick} aria-label={`Add ${instrument.symbol} to a custom watchlist`} title="Add to custom watchlist"><Star size={18} fill={saved ? 'currentColor' : 'none'}/></button>;
 }
 
-export function ChartSymbolControls({ instrument, venue, desktop = false, expanded, onToggle, compared, onCompare, onOptions, optionsDisabled, styled, onStyle, query, onQuery, matches, onChoose, venueLabel }: {
+export function ChartSymbolControls({ instrument, venue, desktop = false, expanded, onToggle, compared, onCompare, onOptions, onFutures, optionsDisabled, styled, onStyle, query, onQuery, matches, onChoose, venueLabel }: {
   instrument: Instrument; venue: string; desktop?: boolean; expanded: boolean; onToggle: () => void;
-  compared: boolean; onCompare: () => void; onOptions?: () => void; optionsDisabled: boolean;
+  compared: boolean; onCompare: () => void; onOptions?: () => void; onFutures?: () => void; optionsDisabled: boolean;
   styled: boolean; onStyle: () => void; query: string; onQuery: (value: string) => void;
   matches: Instrument[]; onChoose: (instrument: Instrument) => void; venueLabel: (instrument: Instrument) => string;
 }) {
@@ -23,6 +23,7 @@ export function ChartSymbolControls({ instrument, venue, desktop = false, expand
       <button type="button" className={`chart-compare-link ${compared ? 'active' : ''}`} onClick={onCompare} aria-label="Compare symbols" title="Compare symbols"><Plus size={desktop ? 17 : 18}/></button>
     </div>
     {onOptions && <button className="chart-derivatives-link" disabled={optionsDisabled} onClick={onOptions} aria-label={`Open ${instrument.symbol} option charts`} title="Open option charts"><Link2 size={desktop ? 16 : 19}/></button>}
+    {onFutures && <button type="button" className="chart-derivatives-link chart-futures-link" onClick={onFutures} aria-label={`Trade ${instrument.underlyingSymbol ?? instrument.symbol} futures`} title="Trade futures">Fut</button>}
     {instrument.exchange === 'MCX' && instrument.underlyingSymbol && isMcxSpreadRoot(instrument.underlyingSymbol) && <MetalChainButton key={instrument.underlyingSymbol} root={instrument.underlyingSymbol}/>}
     {instrument.assetType === 'OPTION' && <OptionStrategyButton key={instrument.instrumentKey} option={instrument} />}
     <button type="button" className={`chart-style-link ${styled ? 'active' : ''}`} onClick={onStyle} aria-label="Chart type" title={desktop ? 'Candles' : 'Chart type'}><CandlestickChart size={desktop ? 17 : 18}/></button>

@@ -33,6 +33,7 @@ export function FnoChartWorkspace({
   topInstrument,
   topMode,
   canToggleFuture,
+  onFutures,
   option,
   timeframe,
   topPrice,
@@ -75,6 +76,7 @@ export function FnoChartWorkspace({
   topInstrument: Instrument;
   topMode: "SPOT" | "FUTURE";
   canToggleFuture: boolean;
+  onFutures?: () => void;
   option: Instrument;
   timeframe: string;
   topPrice: number;
@@ -174,6 +176,7 @@ export function FnoChartWorkspace({
             <div className="fno-chart-actions">
             <button className="fno-symbol-list-link" onClick={(event) => { event.stopPropagation(); onOpenSymbols(); }} aria-label="Open indices and F&O symbols"><ListFilter size={15} /></button>
             <button type="button" className="chart-replay-link" onClick={() => onReplay(topInstrument)} aria-label={`Bar replay for ${topInstrument.symbol}`} title="Bar replay"><History size={17} aria-hidden="true" /><span>Replay</span></button>
+            {onFutures && <button type="button" className="fno-option-chain-link" onClick={onFutures} aria-label={`Trade ${underlyingSymbol} futures`}>Futures</button>}
             <button className="fno-option-chain-link" onClick={(event) => { event.stopPropagation(); onOptionChain(); }} aria-label="Open option chain">Chain</button>
             <button className="fno-timeframe-trigger" onClick={openTimeMenu}>{timeframe}<SlidersHorizontal size={15} /></button>
             </div>

@@ -57,7 +57,7 @@ export function underlyingToInstrument(underlying: FnoUnderlying, price = 0): In
   return {
     symbol: underlying.symbol,
     name: underlying.name,
-    exchange: "NSE",
+    exchange: underlying.instrumentKey.startsWith("BSE_") ? "BSE" : "NSE",
     price,
     change: 0,
     instrumentKey: underlying.instrumentKey,
@@ -95,11 +95,11 @@ export function futureToInstrument(contract: FutureContract, underlying: FnoUnde
   return {
     symbol: contract.tradingSymbol,
     name: `${underlying.symbol} Future · ${new Date(`${contract.expiry}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
-    exchange: "NSE",
+    exchange: contract.instrumentKey.startsWith("BSE_FO|") ? "BSE" : "NSE",
     price: contract.lastPrice,
     change: 0,
     instrumentKey: contract.instrumentKey,
-    categories: ["F&O", "Futures"],
+    categories: ["F&O", "Futures", underlying.underlyingType],
     assetType: "FUTURE",
     expiry: contract.expiry,
     lotSize: contract.lotSize,

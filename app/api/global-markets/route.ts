@@ -2,9 +2,7 @@ import {
   normalizeGlobalCandles,
   normalizeDeltaCatalogue,
   normalizePerpQuote,
-  normalizePerpSpec,
-  isDeltaPerpSymbol,
-  type PerpSymbol,
+  normalizeDeltaFutureSpec,
 } from "@/lib/global-markets";
 import { isDeltaOptionRoot, isSafeDeltaContractSymbol, normalizeDeltaOptionQuote, normalizeDeltaOptionSpec, normalizeDeltaSettlement } from "@/lib/global-contracts";
 import { isTokenisedDelta } from "@/lib/delta-option-list";
@@ -100,8 +98,14 @@ async function spreadChain(params: URLSearchParams) {
   });
   let tickers: Record<string, any>[] = [];
   let quoteWarning: string | undefined;
-  const perp = catalogue.find(item => item.assetType === "FUTURE" && item.underlyingSymbol === root && item.symbol === root + "USD" && item.contractMultiplier);
-  const perpTicker = perp ? delta(`tickers/${encodeURIComponent(perp.symbol)}`, 2000).catch(() => null) : null;
+  const hedges = catalogue.filter(item => item.assetType === "FUTURE" && item.underlyingSymbol === root && item.contractMultiplier &&
+    (!item.expiry || Date.parse(item.expiry) >= Date.parse(seriesId))).sort((a,b) => (a.expiry ?? "").localeCompare(b.expiry ?? ""));
+  const futuresRequest = Promise.all(hedges.map(async (item): Promise<SpreadFuture> => {
+    const ticker = await delta(`tickers/${encodeURIComponent(item.symbol)}`, 2000).catch(() => null);
+    const book = ticker?.symbol === item.symbol ? ticker.quotes : undefined;
+    return { kind: "FUT", id: item.symbol, symbol: item.symbol, series: seriesId, futureExpiry: item.expiry ?? null, multiplier: item.contractMultiplier!,
+      ...bookPrices(book?.best_bid, book?.best_ask, book?.bid_size, book?.ask_size), last: ticker?.symbol === item.symbol ? positiveQuote(ticker.close) : null };
+  }));
   try {
     const response = await delta(`tickers?${query}`, 2000);
     if (!Array.isArray(response) || !response.length) throw new Error("Missing quotes");
@@ -128,14 +132,8 @@ async function spreadChain(params: URLSearchParams) {
   if (!quoteWarning && !chain.some(leg => leg.bid !== null || leg.ask !== null || leg.last !== null)) {
     quoteWarning = "No premiums were returned for this expiry. You can enter them manually.";
   }
-  const ticker = await perpTicker;
-  const book = ticker?.symbol === perp?.symbol ? ticker?.quotes : undefined;
-  const future: SpreadFuture | undefined = perp ? {
-    kind: "FUT", id: perp.symbol, symbol: perp.symbol, series: seriesId, futureExpiry: null, multiplier: perp.contractMultiplier!,
-    ...bookPrices(book?.best_bid, book?.best_ask, book?.bid_size, book?.ask_size),
-    last: ticker?.symbol === perp.symbol ? positiveQuote(ticker.close) : null,
-  } : undefined;
-  return Response.json({ ok: true, contracts: chain, reference, future, quoteWarning }, { headers: { "Cache-Control": "no-store" } });
+  const futures = await futuresRequest;
+  return Response.json({ ok: true, contracts: chain, reference, future: futures[0], futures, quoteWarning }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET(request: Request) {
@@ -210,20 +208,19 @@ export async function GET(request: Request) {
       return Response.json({ ok: true, kind: "option", spec, quote: normalizeDeltaOptionQuote(ticker, symbol) }, { headers: { "Cache-Control": "no-store" } });
     }
     if (kind === "futures") {
-      if (product.state !== "live" || product.trading_status !== "operational") throw new Error("Dated future is not live.");
-      const ticker = await delta(`tickers/${symbol}`, 2000);
-      return Response.json({ ok: true, kind: "dated-future", quote: normalizeDeltaOptionQuote(ticker, symbol) }, { headers: { "Cache-Control": "no-store" } });
+      const settlement = normalizeDeltaSettlement(product, symbol), expiry = Date.parse(product.settlement_time);
+      if (settlement !== null && Number.isFinite(expiry) && expiry <= Date.now())
+        return Response.json({ ok: true, kind: "dated-future", settlement, expiry }, { headers: { "Cache-Control": "no-store" } });
     }
-    if (!isDeltaPerpSymbol(symbol)) throw new Error("Unsupported perpetual symbol.");
-    const spec = normalizePerpSpec(product, symbol as PerpSymbol, Date.now());
+    const spec = normalizeDeltaFutureSpec(product, symbol, Date.now());
     if (!spec.operational) throw new Error("Contract is not currently available for trading.");
     const ticker = await delta(`tickers/${symbol}`, 2000);
     return Response.json(
       {
         ok: true,
-        kind: "perpetual",
+        kind: spec.expiry ? "dated-future" : "perpetual",
         spec,
-        quote: normalizePerpQuote(ticker, symbol as PerpSymbol),
+        quote: normalizePerpQuote(ticker, symbol),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -37,7 +37,7 @@ export function isSupportedChartInstrumentKey(key: string) {
 export function isSupportedNseInstrumentKey(key: string) {
   return ALLOWED_UPSTOX_KEYS.has(key) ||
     /^(?:NSE_EQ|BSE_EQ)\|INE[A-Z0-9]+$/.test(key) ||
-    /^(?:NSE_FO|MCX_FO)\|[A-Z0-9]+$/.test(key) ||
+    /^(?:NSE_FO|BSE_FO|MCX_FO|NCD_FO|BCD_FO|NSE_COM)\|[A-Z0-9]+$/.test(key) ||
     /^(?:NSE_INDEX|BSE_INDEX)\|[A-Za-z0-9 .&_-]+$/.test(key);
 }
 

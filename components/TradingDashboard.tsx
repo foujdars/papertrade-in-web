@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 const FundamentalWorkspace = dynamic(() => import("./FundamentalWorkspace").then(module => module.FundamentalWorkspace));
 import { holdingPerformance } from "@/lib/holding-performance";
 import { CandleLoader } from "./CandleLoader";
-import { useNseSession } from "./useNseSession";
+import { useExchangeSessions } from "./useNseSession";
 import { TradeExecutionSummary } from "./TradeExecutionSummary";
 import { TradeReviewDialog } from "./TradeReviewDialog";
 import { StockLogo, StockLogoProvider } from "@/components/StockLogo";
@@ -70,6 +70,8 @@ import { GLOBAL_CHART_INSTRUMENTS, deltaOptionSymbolFromInstrumentKey, deltaSymb
 import { GlobalOptionTicket } from './GlobalOptionTicket';
 import { OptionDeskContext, type BuilderContext, type BasketOrder } from "./OptionDeskContext";
 import { StrategyDialog } from "./OptionStrategyButton";
+import { FuturesTradeDialog } from "./FuturesTradeDialog";
+import { compareFutures, futuresRootKey, isListedFuture, type FuturesScope } from "@/lib/listed-futures";
 import { ChainOrderDialog } from "./ChainOrderDialog";
 import { fillDeltaBasket, fillIndianBasket, type DeltaBasketSnapshot, type IndianBook } from "@/lib/option-basket-orders";
 import { optionPnl, freshOptionQuote, moveOptionChartLevel, closeOption } from '@/lib/global-option-orders';
@@ -97,8 +99,9 @@ import { FnoListsWorkspace } from "@/components/FnoListsWorkspace";
 import { futureToInstrument, optionToInstrument, underlyingToInstrument, type FnoUnderlying } from "@/lib/fno";
 import { defaultOptionSide, loadOptionChain, loadOptionExpiries, nearestAtmRow } from "@/lib/fno-client";
 import { formatInr, formatSignedMarketMove, instruments, mergeInstrumentUniverse, type Candle, type Instrument } from "@/lib/market";
-import { getNseMarketStatus, type NseSession } from "@/lib/market-hours";
-import { isMcx, mcxContractSession, indianInstrumentStatus, indianSquareOffMinute } from "@/lib/mcx";
+import { getNseMarketStatus, nseSquareOffMinute, type NseSession } from "@/lib/market-hours";
+import { futuresExchange, isMcx, instrumentTradingSession } from "@/lib/mcx";
+import { currencyLotLabel, currencyPrecision, isCurrencyFuture, isContractPricedFuture, sessionExchange } from "@/lib/indian-futures";
 import {
   calculatePosition,
   getDeliveryHoldingQuantity,
@@ -233,7 +236,7 @@ function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
   return {
     symbol: order.symbol,
     name: order.instrumentName || order.symbol,
-    exchange: order.instrumentKey?.startsWith("MCX_FO|") ? "MCX" : "NSE",
+    exchange: futuresExchange(order),
     price: order.price,
     change: 0,
     instrumentKey: order.instrumentKey,
@@ -249,10 +252,10 @@ function derivativeInstrumentFromOrder(order: PaperOrder): Instrument | null {
 }
 
 function instrumentFromPaperOrder(order: PaperOrder, universe: Instrument[]): Instrument {
-  return universe.find((item) => item.instrumentKey === order.instrumentKey || item.symbol === order.symbol) ?? {
+  return universe.find((item) => order.instrumentKey ? item.instrumentKey === order.instrumentKey : item.symbol === order.symbol) ?? {
     symbol: order.symbol,
     name: order.instrumentName || order.symbol,
-    exchange: order.instrumentKey?.startsWith("MCX_FO|") ? "MCX" : "NSE",
+    exchange: futuresExchange(order),
     price: order.price,
     change: 0,
     instrumentKey: order.instrumentKey || order.symbol,
@@ -421,8 +424,6 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [chainOrder, setChainOrder] = useState<BasketOrder | null>(null);
   const desktopBrowser = useDesktopBrowser();
   const desktopChartBrowser = useDesktopChartBrowser();
-  const exchangeSession = useNseSession();
-  const mcxSession = useNseSession("MCX");
   const { configured: authConfigured, user, syncStatus, signOut, deleteAccount } = useAuth();
   const placingBasket = useRef(false);
   const walletOwner = user?.id ?? "guest";
@@ -436,13 +437,12 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [globalTicketTab, setGlobalTicketTab] = useState<GlobalTicketTab>("Order");
   const [stockUniverse, setStockUniverse] = useState<Instrument[]>(instruments);
   const [commodityInstruments, setCommodityInstruments] = useState<Instrument[]>([]);
-  function instrumentSession(instrument: Instrument, at = new Date()) { return indianInstrumentStatus(instrument, at, exchangeSession, mcxSession); }
-  function instrumentCutoff(instrument: Instrument, at = new Date()) { return indianSquareOffMinute(instrument, at, exchangeSession, mcxSession); }
   const [globalInstruments, setGlobalInstruments] = useState<Instrument[]>(GLOBAL_CHART_INSTRUMENTS);
   const [derivativeInstruments, setDerivativeInstruments] = useState<Instrument[]>([]);
   const [spotInstrument, setSpotInstrument] = useState<Instrument | null>(null);
   const [fnoUnderlying, setFnoUnderlying] = useState<FnoUnderlying | null>(null);
   const [fnoUnderlyings, setFnoUnderlyings] = useState<FnoUnderlying[]>([]);
+  const [segmentFutures, setSegmentFutures] = useState<Instrument[]>([]);
   const [fnoFutureInstrument, setFnoFutureInstrument] = useState<Instrument | null>(null);
   const [fnoTopMode, setFnoTopMode] = useState<"SPOT" | "FUTURE">("SPOT");
   const [fnoSwitchingOption, setFnoSwitchingOption] = useState(false);
@@ -524,6 +524,19 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const [indicators, setIndicators] = usePersistentChartIndicators(user?.id);
   const [exitQuantity, setExitQuantity] = useState("1");
   const [orders, setOrders] = useState<PaperOrder[]>([]);
+  const sessionCodes = useMemo(() => Array.from(new Set(["NSE","NFO","MCX",
+    sessionExchange(selected), ...orders.map(sessionExchange), ...priceTasks.filter(task=>task.status === "pending").map(task=>sessionExchange(task.instrument)),
+  ])).sort().join(","), [selected.instrumentKey, orders, priceTasks]);
+  const sessions = useExchangeSessions(sessionCodes);
+  const exchangeSession = sessions.NSE ?? null;
+  function calendarFor(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">) {
+    return instrumentTradingSession(instrument, sessions[sessionExchange(instrument)] ?? null);
+  }
+  function instrumentSession(instrument: Pick<Instrument,"instrumentKey" | "categories" | "underlyingSymbol" | "expiry">, at = new Date()) {
+    const status = getNseMarketStatus(at, calendarFor(instrument));
+    return {...status,message:status.message.replace("NSE",futuresExchange(instrument))};
+  }
+  function instrumentCutoff(instrument: Instrument, at = new Date()) { return nseSquareOffMinute(at,calendarFor(instrument)); }
   const [protections, setProtections] = useState<PaperProtection[]>([]);
   const [paperDataReady, setPaperDataReady] = useState(false);
   const [nativeProtectionTriggers, setNativeProtectionTriggers] = useState<NativeTriggeredPriceAlert[]>([]);
@@ -548,6 +561,9 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   }, [marketsInitialGroup]);
   const [optionChainOpen, setOptionChainOpen] = useState(false);
   const [deltaOptionListOpen, setDeltaOptionListOpen] = useState(false);
+  const [futuresScope, setFuturesScope] = useState<FuturesScope | null>(null);
+  const [futuresRefresh, setFuturesRefresh] = useState(0);
+  const [futuresFeed, setFuturesFeed] = useState<Record<"india" | "global" | "mcx", string | null>>({ india: null, global: null, mcx: null });
   const [openingUnderlyingKey, setOpeningUnderlyingKey] = useState("");
   const [optionSplitPercent, setOptionSplitPercent] = useState(50);
   const [fnoTradeDockOpen, setFnoTradeDockOpen] = useState(false);
@@ -1018,13 +1034,15 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       try {
         const response = await fetch("/api/upstox/commodities", { cache: "no-store", signal: controller.signal });
         const body = await response.json();
-        if (response.ok && body.ok && Array.isArray(body.instruments)) setCommodityInstruments(body.instruments);
-      } catch { /* Existing charts remain usable during a catalogue outage. */ }
+        if (!response.ok || !body.ok || !Array.isArray(body.instruments)) throw new Error("MCX futures catalogue unavailable.");
+        setCommodityInstruments(body.instruments);
+        setFuturesFeed(old => ({ ...old, mcx: "" }));
+      } catch { if (!controller.signal.aborted) setFuturesFeed(old => ({ ...old, mcx: "MCX futures listings are unavailable." })); }
     };
     void load();
     const timer = window.setInterval(() => void load(), 30 * 60_000);
     return () => { controller.abort(); window.clearInterval(timer); };
-  }, []);
+  }, [futuresRefresh]);
 
   const loadInstrumentUniverse = useCallback(async ({ force = false, signal }: { force?: boolean; signal?: AbortSignal } = {}) => {
     try {
@@ -1079,7 +1097,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     void fetch("/api/global-markets?mode=catalog", { signal: controller.signal })
       .then(async response => {
         const payload = await response.json() as { ok?: boolean; instruments?: Instrument[] };
-        if (!response.ok || !payload.ok || !Array.isArray(payload.instruments)) return;
+        if (!response.ok || !payload.ok || !Array.isArray(payload.instruments)) throw new Error("Delta futures catalogue unavailable.");
+        setFuturesFeed(old => ({ ...old, global: "" }));
         const merged = [...new Map([...GLOBAL_CHART_INSTRUMENTS, ...payload.instruments].map(item => [item.instrumentKey, item])).values()];
         setGlobalInstruments(merged);
         const pending = pendingChartRestoreRef.current;
@@ -1088,34 +1107,44 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           if (target) { setSelected(target); setSpotInstrument(null); setFnoUnderlying(null); setWorkspaceMode("trade"); }
         }
       })
-      .catch(() => undefined);
+      .catch(() => { if (!controller.signal.aborted) setFuturesFeed(old => ({ ...old, global: "Delta futures listings are unavailable." })); });
     return () => controller.abort();
-  }, []);
+  }, [futuresRefresh]);
 
   useEffect(() => {
     const controller = new AbortController();
     void fetch("/api/upstox/fno-underlyings", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[] };
-        if (response.ok && payload.ok) setFnoUnderlyings(payload.underlyings ?? []);
+        const payload = await response.json() as { ok?: boolean; underlyings?: FnoUnderlying[]; segmentFutures?: Instrument[]; unavailableExchanges?: string[] };
+        if (!response.ok || !payload.ok) throw new Error("Indian futures catalogue unavailable.");
+        setFnoUnderlyings(payload.underlyings ?? []);
+        setSegmentFutures(payload.segmentFutures ?? []);
+        setFuturesFeed(old => ({ ...old, india: payload.unavailableExchanges?.length ? payload.unavailableExchanges.join(", ") + " futures listings are unavailable." : "" }));
       })
-      .catch(() => undefined);
+      .catch(() => { if (!controller.signal.aborted) setFuturesFeed(old => ({ ...old, india: "NSE and BSE futures listings are unavailable." })); });
     return () => controller.abort();
-  }, []);
+  }, [futuresRefresh]);
 
   const futureTradingDate = indiaDateKey(clock ?? new Date());
-  const stockFutureInstruments = useMemo(() => fnoUnderlyings
-    .filter((underlying) => underlying.underlyingType === "EQUITY")
-    .flatMap((underlying) => (underlying.futures ?? []).filter((contract) => contract.expiry >= futureTradingDate).map((contract) => futureToInstrument(contract, underlying))), [fnoUnderlyings, futureTradingDate]);
+  const indianFutures = useMemo(() => [...segmentFutures.filter(item => item.expiry && item.expiry >= futureTradingDate), ...fnoUnderlyings.flatMap(underlying => (underlying.futures ?? [])
+    .filter(contract => contract.lotSizeVerified && contract.expiry >= futureTradingDate && Number.isSafeInteger(contract.lotSize) && contract.lotSize > 0)
+    .map(contract => futureToInstrument(contract, underlying)))], [fnoUnderlyings, segmentFutures, futureTradingDate]);
+  const listedFutures = useMemo(() => {
+    const now = Date.now();
+    return [...indianFutures, ...commodityInstruments, ...globalInstruments].filter(item => isListedFuture(item, futureTradingDate, now)).sort(compareFutures);
+  }, [indianFutures, commodityInstruments, globalInstruments, futureTradingDate]);
+  const chartFuturesRoot = futuresRootKey(selected);
+  const pickerFeeds = futuresScope?.market === "global" ? [futuresFeed.global] : [futuresFeed.india, futuresFeed.mcx];
+  const hasChartFutures = Boolean(chartFuturesRoot && listedFutures.some(item => futuresRootKey(item) === chartFuturesRoot));
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const customList = customWatchlists.find((list) => `custom:${list.id}` === watchlist);
     const standardList = watchlistTabs.find((tab) => tab === watchlist);
     const universe = customList
-      ? [...new Map([...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
+      ? [...new Map([...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...indianFutures, ...globalInstruments].map((item) => [item.instrumentKey, item])).values()]
       : term
-        ? [...stockUniverse, ...commodityInstruments, ...stockFutureInstruments, ...globalInstruments]
+        ? [...stockUniverse, ...commodityInstruments, ...indianFutures, ...globalInstruments]
         : stockUniverse;
     return universe.filter((item) => {
       const matchesList = Boolean(term)
@@ -1124,7 +1153,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
         || (standardList !== undefined && item.categories.includes(standardList));
       return matchesList && (!term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term));
     });
-  }, [customWatchlists, derivativeInstruments, globalInstruments, search, stockFutureInstruments, commodityInstruments, stockUniverse, watchlist]);
+  }, [customWatchlists, derivativeInstruments, globalInstruments, search, indianFutures, commodityInstruments, stockUniverse, watchlist]);
   useEffect(() => {
     const term = search.trim();
     if (term.length < 2 || filtered.length || watchlistLoading) return;
@@ -1141,11 +1170,11 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   }, [filtered.length, loadInstrumentUniverse, search, watchlistLoading]);
   const tradeSymbolMatches = useMemo(() => {
     const term = tradeSymbolSearch.trim().toLowerCase();
-    return [...stockUniverse, ...commodityInstruments, ...stockFutureInstruments, ...globalInstruments]
+    return [...stockUniverse, ...commodityInstruments, ...indianFutures, ...globalInstruments]
       .filter((item) => !term || item.symbol.toLowerCase().includes(term) || item.name.toLowerCase().includes(term))
       .sort((a, b) => (term ? Number(isGlobalInstrumentKey(b.instrumentKey)) - Number(isGlobalInstrumentKey(a.instrumentKey)) : 0) || compareMarketInstruments(a, b))
       .slice(0, 120);
-  }, [globalInstruments, stockFutureInstruments, commodityInstruments, stockUniverse, tradeSymbolSearch]);
+  }, [globalInstruments, indianFutures, commodityInstruments, stockUniverse, tradeSymbolSearch]);
   const positionSymbols = useMemo(() => [...new Set(orders.map((order) => order.symbol))].filter((symbol) => {
     const lastFill = orders.find((order) => order.symbol === symbol);
     return calculatePosition(orders, symbol, lastFill?.price ?? 0, "INTRADAY").quantity > 0 || calculatePosition(orders, symbol, lastFill?.price ?? 0, "DELIVERY").quantity > 0;
@@ -1153,9 +1182,9 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const visibleInstruments = filtered.slice(0, watchlistLimit);
   const tradingUniverse = useMemo(() => {
     const byKey = new Map<string, Instrument>();
-    for (const item of [...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...stockFutureInstruments, ...globalInstruments]) byKey.set(item.instrumentKey, item);
+    for (const item of [...stockUniverse, ...commodityInstruments, ...derivativeInstruments, ...indianFutures, ...globalInstruments]) byKey.set(item.instrumentKey, item);
     return [...byKey.values()];
-  }, [derivativeInstruments, globalInstruments, stockFutureInstruments, commodityInstruments, stockUniverse]);
+  }, [derivativeInstruments, globalInstruments, indianFutures, commodityInstruments, stockUniverse]);
   const volumeShockerWatch = useMemo(() => selectVolumeShockerWatch({ watchlist, customWatchlists, instruments: stockUniverse }), [customWatchlists, stockUniverse, watchlist]);
 
   useEffect(() => {
@@ -1466,10 +1495,10 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     void Promise.all(pending.map(async (item) => {
       let cutoffMinute = item.cutoffMinute;
       if (item.sessionDate !== currentIndiaDate) {
-        const historical = await fetch(`/api/market/session?date=${item.sessionDate}&exchange=${isMcx(item.instrument) ? "MCX" : "NSE"}`, { cache: "no-store" })
+        const historical = await fetch(`/api/market/session?date=${item.sessionDate}&exchange=${sessionExchange(item.instrument)}`, { cache: "no-store" })
           .then(response => response.json()).catch(() => null) as { session?: NseSession } | null;
         if (!historical?.session?.sessions.length) return { ...item, resolvedPrice: undefined };
-        cutoffMinute = indianSquareOffMinute(item.instrument, new Date(`${item.sessionDate}T00:00:00+05:30`), historical.session, historical.session);
+        cutoffMinute = nseSquareOffMinute(new Date(`${item.sessionDate}T00:00:00+05:30`), instrumentTradingSession(item.instrument,historical.session));
       }
       return { ...item, cutoffMinute, resolvedPrice: await fetchSquareOffPrice(item.instrument.instrumentKey, item.sessionDate, cutoffMinute).catch(() => undefined) };
     })).then((resolved) => {
@@ -1532,44 +1561,50 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     }).finally(() => {
       autoSquareOffInFlightRef.current = false;
     });
-  }, [balance, clock, exchangeSession, mcxSession, marketQuotes, orders, tradingUniverse]);
+  }, [balance, clock, sessions, marketQuotes, orders, tradingUniverse]);
 
   useEffect(() => {
     if (!clock || !orders.length || futureExpiryInFlightRef.current || autoSquareOffInFlightRef.current || Date.now() < futureExpiryRetryAtRef.current) return;
     const today = indiaDateKey(clock);
-    const afterClose = getNseMarketStatus(clock).minutesFromMidnight >= 15 * 60 + 30;
-    const candidates = [...new Set(orders.filter((order) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey).map((order) => order.symbol))]
+    const canSettle = (order: PaperOrder) => order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && (order.underlyingKey || isContractPricedFuture(order.instrumentKey));
+    const candidates = [...new Set(orders.filter(canSettle).map((order) => order.symbol))]
       .flatMap((symbol) => {
-        const contract = orders.find((order) => order.symbol === symbol && order.assetType === "FUTURE" && order.product === "DELIVERY" && order.expiry && order.underlyingKey);
-        if (!contract?.expiry || !contract.underlyingKey) return [];
-        const mcxClose = isMcx(contract) ? mcxContractSession({ categories: [], underlyingSymbol: contract.underlyingSymbol }, mcxSession)?.sessions.at(-1)?.end : undefined;
-        const sessionEnded = isMcx(contract) ? mcxClose !== undefined && clock.getTime() >= mcxClose : afterClose;
-        if (!(contract.expiry < today || (contract.expiry === today && sessionEnded))) return [];
+        const contract = orders.find((order) => order.symbol === symbol && canSettle(order));
+        if (!contract?.expiry || contract.expiry > today) return [];
+        const session = calendarFor({ ...contract, instrumentKey:contract.instrumentKey!, categories:[] });
+        const end = session?.date === contract.expiry ? session.sessions.at(-1)?.end : undefined;
+        if (contract.expiry === today && (!end || clock.getTime() < end)) return [];
         const position = calculatePosition(orders, symbol, contract.price, "DELIVERY");
-        return position.quantity > 0 ? [{ contract, position }] : [];
+        return position.quantity > 0 ? [{ contract, end }] : [];
       });
     if (!candidates.length) return;
     futureExpiryInFlightRef.current = true;
-    void Promise.all(candidates.map(async ({ contract }) => {
+    void Promise.all(candidates.map(async ({ contract, end }) => {
       try {
-        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(isMcx(contract) ? contract.instrumentKey! : contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
+        if (!end) {
+          const calendar = await fetch(`/api/market/session?date=${contract.expiry}&exchange=${sessionExchange(contract)}`, { cache: "no-store" });
+          const {session} = await calendar.json() as { session?: NseSession };
+          if (session?.date === contract.expiry) end = instrumentTradingSession({...contract, instrumentKey:contract.instrumentKey!, categories:[]}, session ?? null)?.sessions.at(-1)?.end;
+        }
+        if (!end) return { contract, price: undefined, end };
+        const response = await fetch(`/api/upstox/candles?instrumentKey=${encodeURIComponent(isContractPricedFuture(contract.instrumentKey) ? contract.instrumentKey! : contract.underlyingKey!)}&timeframe=1D&scope=combined`, { cache: "no-store" });
         const payload = await response.json() as { ok?: boolean; candles?: Candle[] };
         const candle = response.ok && payload.ok ? payload.candles?.find((item) => indiaDateKey(item.time * 1000) === contract.expiry) : undefined;
-        return { contract, price: candle?.close };
-      } catch { return { contract, price: undefined }; }
+        return { contract, price: candle?.close, end };
+      } catch { return { contract, price: undefined, end }; }
     })).then((resolved) => {
       let nextOrders = readPaperOrders();
       const storedBalance = localStorage.getItem("papertrade-balance");
       const parsedBalance = Number(storedBalance);
       let nextBalance = storedBalance !== null && Number.isFinite(parsedBalance) ? parsedBalance : balance;
       const settled: PaperOrder[] = [];
-      for (const { contract, price } of resolved) {
-        if (!price || !Number.isFinite(price) || price <= 0 || !contract.expiry) continue;
+      for (const { contract, price, end } of resolved) {
+        if (!price || !Number.isFinite(price) || price <= 0 || !contract.expiry || !end) continue;
         const position = calculatePosition(nextOrders, contract.symbol, price, "DELIVERY");
         if (!position.quantity) continue;
         const side = position.side === "LONG" ? "SELL" : "BUY";
-        const at = Date.parse(`${contract.expiry}T15:30:00+05:30`);
-        const charges = calculateUpstoxTradingCharges("FUTURE", { side, product: "DELIVERY", quantity: position.quantity, price });
+        const at = end;
+        const charges = calculateUpstoxTradingCharges("FUTURE", { side, product: "DELIVERY", quantity: position.quantity, price }, contract.instrumentKey, contract.underlyingSymbol);
         const fill: PaperOrder = { ...contract, id: `future-expiry:${contract.instrumentKey}:${contract.expiry}`, side, quantity: position.quantity, price, time: squareOffTimeLabel(at), createdAt: at, charges, exitReason: "EXPIRY", priceSource: "UPSTOX_CANDLE" };
         fill.cashDelta = futureFillCashDelta(nextOrders, fill).cashDelta;
         nextBalance += fill.cashDelta;
@@ -1589,7 +1624,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       });
       setToast(`${settled.length} future${settled.length === 1 ? "" : "s"} paper-settled at the expiry-day close. No physical delivery.`);
     }).finally(() => { futureExpiryInFlightRef.current = false; });
-  }, [balance, clock, mcxSession, orders]);
+  }, [balance, clock, sessions, orders]);
 
   useEffect(() => {
     if (!orders.length || autoSquareOffRepairInFlightRef.current) return;
@@ -1732,7 +1767,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       ? `${triggeredOrders[0].symbol} exited: ${triggeredOrders[0].exitReason === "TARGET" ? "target reached" : "stop-loss reached"} at ${formatInr(triggeredOrders[0].price)}`
       : `${triggeredOrders.length} positions exited by ${[...new Set(reasons)].join(" / ")}`;
     setToast(alertSummary);
-  }, [balance, clock, exchangeSession, mcxSession, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
+  }, [balance, clock, sessions, marketQuoteUpdatedAt, marketQuotes, nativeProtectionTriggers, orders, protections, selected.symbol, tradingUniverse]);
   const handleFeedStatus = useCallback((status: FeedStatus) => setFeedStatus(status), []);
   const referenceKey = isGlobalReferenceKey(selected.instrumentKey) ? selected.instrumentKey : null;
   const referenceScope = referenceKey ? `${referenceKey}:${timeframe}` : "";
@@ -1933,7 +1968,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const selectedOrderTicketAvailable = !selectedIsWatchOnly && selected.assetType !== "INDEX" && (selectedDeltaChartSymbol ? selectedQuoteIsFresh : true);
   const afterHoursDeliveryEstimate = orderEstimatePrice;
   const afterHoursDeliveryCanQueue = !selectedIsWatchOnly && !selectedDeltaChartSymbol && !marketOrdersAllowed && product === "DELIVERY" && (selected.assetType === "EQUITY" || !selected.assetType) && Number.isFinite(afterHoursDeliveryEstimate) && afterHoursDeliveryEstimate > 0;
-  const orderButtonPriceLabel = verifiedLivePrice?.toFixed(2) ?? (afterHoursDeliveryEstimate > 0 ? `${afterHoursDeliveryEstimate.toFixed(2)} est.` : "—");
+  const priceDecimals = currencyPrecision(selected.instrumentKey);
+  const orderButtonPriceLabel = verifiedLivePrice?.toFixed(priceDecimals) ?? (afterHoursDeliveryEstimate > 0 ? `${afterHoursDeliveryEstimate.toFixed(2)} est.` : "—");
   const selectedGlobalPosition = globalTrading.account?.positions.find(p => p.symbol === selectedDeltaSymbol);
   const selectedGlobalQuote = selectedDeltaSymbol ? globalTrading.snapshots[selectedDeltaSymbol]?.quote : undefined;
   const selectedOptionPosition = globalTrading.account?.optionPositions?.find(p => p.symbol === selectedDeltaOption);
@@ -1976,7 +2012,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       instrumentKey: instrument.instrumentKey,
       assetType: "EQUITY" as const,
     };
-  }), ...commodityInstruments.map(instrument => ({ symbol: instrument.symbol, name: instrument.name, price: marketQuotes[instrument.instrumentKey]?.lastPrice ?? 0, changePercent: marketQuotes[instrument.instrumentKey]?.changePercent ?? 0, categories: instrument.categories, instrumentKey: instrument.instrumentKey, assetType: instrument.assetType })), ...globalInstruments.map((instrument) => {
+  }), ...[...indianFutures, ...commodityInstruments].map(instrument => ({ symbol: instrument.symbol, name: instrument.name, price: marketQuotes[instrument.instrumentKey]?.lastPrice ?? 0, changePercent: marketQuotes[instrument.instrumentKey]?.changePercent ?? 0, categories: instrument.categories, instrumentKey: instrument.instrumentKey, assetType: instrument.assetType })), ...globalInstruments.map((instrument) => {
     const quote = marketQuotes[instrument.instrumentKey] ?? marketQuotes[instrument.symbol];
     return {
       symbol: instrument.symbol,
@@ -1991,7 +2027,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       strikePrice: instrument.strikePrice,
       optionType: instrument.optionType,
     };
-  })], [commodityInstruments, globalInstruments, marketQuotes, stockUniverse]);
+  })], [indianFutures, commodityInstruments, globalInstruments, marketQuotes, stockUniverse]);
   const homeRiskSummary = useMemo(() => {
     const topHolding = holdings.reduce((largest, holding) => holding.marketValue > largest.marketValue ? holding : largest, { symbol: "—", marketValue: 0 });
     const topConcentration = holdingsSummary.current > 0 ? topHolding.marketValue / holdingsSummary.current * 100 : 0;
@@ -2317,6 +2353,10 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   function placeOrder() {
     if (referenceKey) return;
     if (isGlobalInstrumentKey(selected.instrumentKey)) { setOrderSheetOpen(true); setGlobalTicketTab("Order"); return; }
+    if (selected.assetType === "FUTURE" && !isListedFuture(selected, indiaDateKey(new Date()), Date.now())) {
+      setToast("Choose an active futures contract with a verified lot size.");
+      return;
+    }
     if (researchDraft && researchDraft.instrument.instrumentKey !== selected.instrumentKey) { setResearchDraft(null); setToast("Select the research instrument again to load its trade plan."); return; }
     if (researchDraft && (orderType !== "Market" || side !== "BUY" || product !== "DELIVERY")) { setToast("This research draft uses a delivery market buy. Clear the research draft to start a different order."); return; }
     if (orderType !== "Market") {
@@ -2336,10 +2376,6 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     if (!Number.isFinite(quantity) || quantity < 1) return;
     if ((selected.assetType === "OPTION" || selected.assetType === "FUTURE") && quantity % quantityStep !== 0) {
       setToast(`F&O quantity must be a multiple of the ${quantityStep}-unit lot size.`);
-      return;
-    }
-    if (selected.assetType === "FUTURE" && (!selected.expiry || selected.expiry < indiaDateKey(new Date()))) {
-      setToast("This futures contract has expired. Choose an active expiry.");
       return;
     }
     const executionPrice = verifiedLivePrice;
@@ -2526,7 +2562,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       const entries = await Promise.all(order.legs.map(async ({contract}) => {
         const resp = await fetch("/api/global-markets?" + new URLSearchParams({symbol:contract.id}), {cache:"no-store",signal:AbortSignal.timeout(12_000)});
         const data = await resp.json();
-        const kind = contract.kind === "FUT" ? "perpetual" : "option";
+        const kind = contract.kind !== "FUT" ? "option" : contract.futureExpiry ? "dated-future" : "perpetual";
         if (!resp.ok || !data.ok || data.kind !== kind || !data.spec || !data.quote) throw new Error("Fresh Delta quotes are unavailable for " + contract.id + ".");
         return [contract.id, {spec:data.spec,quote:data.quote}] as const;
       }));
@@ -2547,7 +2583,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       if (!paperDataReady) throw new Error("Wait for the INR paper account to load.");
       const sample = {instrumentKey: order.legs[0].contract.id, categories: [] as string[], underlyingSymbol: order.rootLabel};
       const checkSession = (at: Date) => {
-        const status = indianInstrumentStatus(sample, at, exchangeSession, mcxSession);
+        const status = instrumentSession(sample,at);
         if (!status.isOpen || order.expiry.slice(0,10) < indiaDateKey(at)) throw new Error("The selected option is outside its trading session.");
       };
       checkSession(new Date());
@@ -2589,11 +2625,25 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     return 0;
   }
 
+  function openFuturesForUnderlying(underlying: FnoUnderlying) {
+    setFuturesScope({ market: "india", rootKey: underlying.instrumentKey, label: underlying.symbol });
+  }
+
+  function openFuturesForChart() {
+    setFuturesScope({ market: selected.exchange === "DELTA" ? "global" : "india", rootKey: chartFuturesRoot, label: selected.underlyingSymbol ?? selected.symbol });
+  }
+
+  function openContractTicket(item: Instrument, side: "BUY" | "SELL") {
+    openNavigationSection("trade");
+    chooseTradeInstrument(item);
+    setSide(side); setOrderType("Market"); setGlobalTicketTab("Order");
+    setOrderSheetOpen(true); setDesktopOrderPanelOpen(true);
+  }
+
   function tradeDeltaFromChain(symbol: string, side: "BUY" | "SELL") {
     const item = globalInstruments.find(instrument => instrument.symbol === symbol && instrument.assetType === "OPTION");
     if (!item) { setToast("This option is no longer listed."); return; }
-    openNavigationSection("trade"); chooseTradeInstrument(item);
-    setSide(side); setOrderType("Market"); setGlobalTicketTab("Order"); setOrderSheetOpen(true); setDesktopOrderPanelOpen(true);
+    openContractTicket(item, side);
   }
 
   function chooseTradeInstrument(item: Instrument) {
@@ -2950,7 +3000,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     const currentCash = Number.isFinite(storedCash) ? storedCash : balance;
     const position = calculatePosition(currentOrders, instrument.symbol, executionPrice, task.product);
     const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
-    if (instrument.expiry && Date.parse(instrument.expiry) < new Date().setHours(0, 0, 0, 0)) return "The derivative has expired.";
+    if (instrument.assetType === "FUTURE" && !isListedFuture(instrument, indiaDateKey(new Date()), Date.now())) return "This futures contract is expired or its lot size is unavailable.";
+    if (instrument.expiry && instrument.expiry.slice(0,10) < indiaDateKey(new Date())) return "The derivative has expired.";
     if (task.product === "DELIVERY" && task.side === "SELL" && !["OPTION", "FUTURE"].includes(instrument.assetType ?? "")) {
       const error = validateDeliverySell(currentOrders, instrument.symbol, task.quantity); if (error) return error;
     }
@@ -2972,6 +3023,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
 
   function validateQueuedPriceOrder(task: PriceTask): string | null {
     if (isGlobalInstrumentKey(task.instrument.instrumentKey)) return "Use the Global USD order ticket for this instrument.";
+    if (task.instrument.assetType === "FUTURE" && !isListedFuture(task.instrument, indiaDateKey(new Date()), Date.now())) return "Choose an active futures contract with a verified lot size.";
     if (!paperDataReady) return "Please wait for your paper account to load.";
     const position = calculatePosition(orders, task.instrument.symbol, task.price, task.product);
     const reduces = position.quantity >= task.quantity && ((position.side === "LONG" && task.side === "SELL") || (position.side === "SHORT" && task.side === "BUY"));
@@ -3029,7 +3081,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
     instrument: selected, venue: selectedVenueLabel, expanded: showTradeSymbols,
     onToggle: () => setShowTradeSymbols(value => !value), compared: !!comparedSymbols.length,
     onCompare: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowChartStyleMenu(false); setShowComparePicker(true); },
-    onOptions: selectedDeltaOptions?.length ? () => setDeltaOptionListOpen(true) : selectedFnoUnderlying ? () => void openFnoUnderlying(selectedFnoUnderlying) : undefined,
+    onOptions: selectedDeltaOptions?.length ? () => setDeltaOptionListOpen(true) : selectedFnoUnderlying?.optionContracts ? () => void openFnoUnderlying(selectedFnoUnderlying) : undefined,
+    onFutures: hasChartFutures ? openFuturesForChart : undefined,
     optionsDisabled: openingUnderlyingKey === selectedFnoUnderlying?.instrumentKey, styled: chartStyle !== 'candles',
     onStyle: () => { setShowTimeframeMenu(false); setShowChartFunctions(false); setShowComparePicker(false); setShowChartStyleMenu(true); },
     query: tradeSymbolSearch, onQuery: setTradeSymbolSearch, matches: tradeSymbolMatches,
@@ -3043,6 +3096,13 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       setDerivativeInstruments(old => [item, ...old.filter(contract => contract.instrumentKey !== item.instrumentKey)]);
     } }}>
     <main className="terminal-shell" data-theme={theme} data-density={uiDensity} data-motion={uiPreferencesReady && motionEnabled ? "full" : "reduced"} data-platform={isAndroidApp ? "android" : "web"} data-desktop-cleanup={desktopBrowser ? "true" : undefined} data-section={desktopBrowser && positionsOpen ? "positions" : activeNavigationSection}>
+      {futuresScope && <FuturesTradeDialog scope={futuresScope} instruments={listedFutures} loading={pickerFeeds.includes(null)}
+        onRetry={() => { setFuturesFeed({ india: null, global: null, mcx: null }); setFuturesRefresh(count => count + 1); }}
+        warning={pickerFeeds.filter(Boolean).join(" ")} onClose={() => setFuturesScope(null)} onTrade={(item, side) => {
+          const now = new Date();
+          if (!isListedFuture(item, indiaDateKey(now), now.getTime())) { setToast("This contract has expired."); return; }
+          setFuturesScope(null); openContractTicket(item, side);
+        }}/>}
       {entryBuilder && <StrategyDialog context={entryBuilder} onClose={() => setEntryBuilder(undefined)}/>}
       {chainOrder && <ChainOrderDialog order={chainOrder} onClose={() => setChainOrder(null)}/>}
       <PushNotificationBridge userId={user?.id} reviewCount={closedTrades.filter(trade => indiaDateKey(trade.closedAt) === indiaDateKey(clock || Date.now())).length} />
@@ -3096,7 +3156,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           {!sidebarOpen && <div className="watchlist-selector-row"><CompactSelectorButton label="Current watchlist" value={`${activeWatchlistName} · ${activeWatchlistCount}`} onClick={() => setShowWatchlistSelector(true)} /></div>}
           {!sidebarOpen && showWatchlistSelector && <WatchlistSelector activeId={watchlist} choices={watchlistChoices} onSelect={(id) => { setWatchlist(id); setWatchlistLimit(60); if (id === "Indices" || id === "F&O") setSearch(""); setShowWatchlistSelector(false); }} onNewList={() => { setShowWatchlistSelector(false); openWatchlistPicker(null); }} onClose={() => setShowWatchlistSelector(false)} />}
           {activeCustomList && <div className="custom-list-bar"><b>{activeCustomList.name}</b><span>{activeCustomList.symbols.length} stocks</span><button onClick={() => openWatchlistPicker(null)}>Edit list</button></div>}
-          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={underlying => { const nearest = underlying.futures?.find(contract => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} /> : <div className="instrument-list">
+          {derivativeList && sidebarOpen ? <FnoListsWorkspace key={derivativeList} list={derivativeList} quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={openFuturesForUnderlying} onStar={openFnoWatchlistPicker} /> : <div className="instrument-list">
             {visibleInstruments.map((item) => {
               const quote = marketQuotes[item.instrumentKey] ?? marketQuotes[item.symbol];
               const price = quote?.lastPrice ?? 0;
@@ -3142,7 +3202,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
             {referenceKey ? <div className="quote-block">
               <strong>{lastReferenceBar ? formatUsd(lastReferenceBar.close) : "—"}</strong>
               <span>{lastReferenceBar && activeReference ? `${activeReference.source} · Candle ${new Date(lastReferenceBar.time * 1000).toLocaleString("en-IN", ["1D", "1W", "1M", "1Y"].includes(timeframe) ? { dateStyle: "medium", timeZone: "UTC" } : { dateStyle: "short", timeStyle: "short" })}` : "Waiting for market data"}</span>
-            </div> : <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedChangeAvailable ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : selectedQuoteIsFresh ? "Daily change unavailable" : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>}
+            </div> : <div className="quote-block"><strong>{verifiedLivePrice ? verifiedLivePrice.toLocaleString("en-IN", { minimumFractionDigits: priceDecimals, maximumFractionDigits: priceDecimals }) : "—"}</strong><span className={selectedChange >= 0 ? "positive" : "negative"}>{selectedChangeAvailable ? `${selectedNetChange >= 0 ? "+" : ""}${selectedNetChange.toFixed(2)} (${selectedChange >= 0 ? "+" : ""}${selectedChange.toFixed(2)}%)` : selectedQuoteIsFresh ? "Daily change unavailable" : `Waiting for ${selectedVenueLabel === "NSE" ? "Upstox" : selectedVenueLabel}`}</span></div>}
             {!referenceKey && <><div className="trade-day-range">
               <header><span>DAY RANGE</span><b>{selectedQuoteIsFresh ? `${Math.round(selectedDayRangeProgress)}%` : "—"}</b></header>
               <div><i style={{ left: `${selectedDayRangeProgress}%` }} /></div>
@@ -3272,7 +3332,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
         <nav className="desktop-chart-rail" aria-label="Chart workspace panels">
           <button onClick={() => openNavigationSection('home')}><Home size={19}/><span>Explore</span></button>
           <button onClick={openChartPositions}><BriefcaseBusiness size={19}/><span>Positions</span></button>
-          {selectedFnoUnderlying && <button disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}><Link2 size={19}/><span>F&O chain</span></button>}
+          {!!selectedFnoUnderlying?.optionContracts && <button disabled={openingUnderlyingKey === selectedFnoUnderlying.instrumentKey} onClick={() => void openFnoUnderlying(selectedFnoUnderlying)}><Link2 size={19}/><span>F&O chain</span></button>}
           {!!selectedDeltaOptions?.length && <button onClick={() => setDeltaOptionListOpen(true)}><Link2 size={19}/><span>Option chain</span></button>}
           <button onClick={() => openNavigationSection('orders')}><BookOpenCheck size={19}/><span>Orders</span></button>
           <button aria-pressed={desktopChartWatchlistOpen} onClick={() => { setDesktopChartWatchlistOpen(value => !value); setDesktopTicketOpen(false); setOrderSheetOpen(false); }}><Bookmark size={19}/><span>Watchlist</span></button>
@@ -3288,8 +3348,8 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           <div className="side-switch"><button className={side === "BUY" ? "buy-active" : ""} onClick={() => activateRiskTool("BUY")}>Buy</button><button className={side === "SELL" ? "sell-active" : ""} disabled={isCashDeliveryOrder && deliveryHoldingQuantity <= 0} title={isCashDeliveryOrder && deliveryHoldingQuantity <= 0 ? "Buy delivery shares before selling" : undefined} onClick={() => activateRiskTool("SELL")}>Sell</button></div>
           <div className="order-type-tabs">{["Market", "Limit", "SL"].map((type) => <button key={type} className={orderType === type ? "active" : ""} onClick={() => { if (type === "Market") setOrderType(type); else { setOrderSheetOpen(false); setPriceRequest({ instrument: selected, price: orderEstimatePrice, mode: "order", side, orderType: type === "SL" ? "SL" : "Limit", quantity, product }); } }}>{type}</button>)}</div>
           <div className="input-grid">
-            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {quantityStep} units per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
-            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(2) ?? ""} readOnly /></label>}
+            <label><span className="quantity-heading"><span>{selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? "Quantity (lot multiples)" : "Quantity"}</span><span className="quantity-margin"><small>{isCashDeliveryOrder ? "Est. funds" : "Est. margin"}</small><b>{verifiedLivePrice ? formatInr(estimatedFundsRequired) : "—"}</b></span></span><div className="stepper"><button onClick={() => setQuantityInput(String(Math.max(quantityStep, quantity - quantityStep)))}><Minus size={15} /></button><input type="text" inputMode="numeric" value={quantityInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantityInput(event.target.value.replace(/\D/g, ""))} onBlur={() => setQuantityInput(String(selected.assetType === "OPTION" || selected.assetType === "FUTURE" ? Math.max(quantityStep, Math.round(quantity / quantityStep) * quantityStep) : quantity))} aria-label="Order quantity" /><button onClick={() => setQuantityInput(String(quantity + quantityStep))}><Plus size={15} /></button></div>{(selected.assetType === "OPTION" || selected.assetType === "FUTURE") && <small className="lot-helper">{Number.isInteger(orderLots) ? orderLots : orderLots.toFixed(2)} lot{orderLots === 1 ? "" : "s"} · {isCurrencyFuture(selected.instrumentKey) ? currencyLotLabel(selected.underlyingSymbol,quantityStep) : quantityStep + " units"} per lot{selected.assetType === "FUTURE" ? " · margin is a 20% paper estimate" : ""}</small>}</label>
+            {orderType !== "Market" && <label>Price (₹)<input className="text-input" type="number" value={verifiedLivePrice?.toFixed(priceDecimals) ?? ""} readOnly /></label>}
           </div>
           <div className="protection-grid">
             <label>Target (₹)<input type="number" min="0.01" step="0.05" value={targetPrice} onChange={(event) => { setTargetPrice(event.target.value); }} placeholder={verifiedLivePrice ? (side === "BUY" ? `Above ${verifiedLivePrice.toFixed(2)}` : `Below ${verifiedLivePrice.toFixed(2)}`) : "Waiting for live price"} /></label>
@@ -3342,6 +3402,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           topInstrument={fnoTopInstrument}
           topMode={fnoTopMode}
           canToggleFuture={Boolean(fnoFutureInstrument)}
+          onFutures={hasChartFutures ? openFuturesForChart : undefined}
           option={selected}
           timeframe={timeframe}
           topPrice={verifiedTopPrice}
@@ -3377,7 +3438,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
         />
       )}
 
-      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={(underlying) => { const nearest = underlying.futures?.find((contract) => contract.expiry >= futureTradingDate); if (!nearest) { setToast("No active stock future is available for this symbol."); return; } openNavigationSection("trade"); chooseTradeInstrument(futureToInstrument(nearest, underlying)); }} onStar={openFnoWatchlistPicker} onClose={() => {
+      {activeNavigationSection === "fno" && fnoListOpen && <FnoListsWorkspace quotes={marketQuotes} starredSymbols={customWatchlistSymbols} onQuoteKeysChange={setFnoListQuoteKeys} onSelect={openFnoNormalChart} onFutureSelect={openFuturesForUnderlying} onStar={openFnoWatchlistPicker} onClose={() => {
         if (selected.assetType === "OPTION" && spotInstrument) setFnoListOpen(false);
         else closeFnoWorkspace();
       }} />}
@@ -3434,6 +3495,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           setTradeSelection(null);
         }}
         onOpenPnl={() => openNavigationSection("pnl")}
+        onOpenFutures={market => setFuturesScope({market})}
         onOpenInstrument={instrument => { openNavigationSection("trade"); chooseTradeInstrument(instrument); }}
         onOpenStock={(symbol) => {
           const globalInstrument = globalInstruments.find((item) => item.symbol === symbol);
@@ -3448,7 +3510,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
           if (stock) chooseTradeInstrument(stock);
           else if (index) {
             const quote = marketQuotes[index.instrumentKey] ?? marketQuotes[index.symbol];
-            chooseTradeInstrument({ symbol: index.symbol, name: index.name, exchange: "NSE", price: quote?.lastPrice ?? 0, change: quote?.changePercent ?? 0, instrumentKey: index.instrumentKey, categories: [], assetType: "INDEX" });
+            chooseTradeInstrument({ symbol: index.symbol, name: index.name, exchange: index.instrumentKey.startsWith("BSE_") ? "BSE" : "NSE", price: quote?.lastPrice ?? 0, change: quote?.changePercent ?? 0, instrumentKey: index.instrumentKey, categories: [], assetType: "INDEX" });
           }
         }}
       />}
