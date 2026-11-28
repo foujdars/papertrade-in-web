@@ -12,7 +12,7 @@ import type { SpreadChain, SpreadSeries } from "@/lib/vertical-spread";
 
 export function MetalChainButton({ root }: { root: string }) {
   const [open, setOpen] = useState(false);
-  return <><button type="button" className="option-strategy-trigger" title="Metal option chain" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+  return <><button type="button" className="option-strategy-trigger" title="Metal option chain" aria-label="Metal option chain" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
     <Layers2 size={17}/><span>Chain</span></button>{open && <MetalOptionChain key={root} root={root} close={() => setOpen(false)}/>}</>;
 }
 

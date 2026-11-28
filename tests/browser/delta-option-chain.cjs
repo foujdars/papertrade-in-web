@@ -5,6 +5,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || "playwright")
 const origin = process.env.TEST_BASE_URL || "http://127.0.0.1:3000";
 const expiries = ["2034-11-28T12:00:00.000Z", "2034-12-05T12:00:00.000Z"];
 const strikes = Array.from({ length: 25 }, (_, index) => 57_000 + index * 200);
+const future = { symbol: "BTCUSD", name: "Bitcoin perpetual", exchange: "DELTA", instrumentKey: "DELTA|BTCUSD",
+  assetType: "FUTURE", underlyingSymbol: "BTC", categories: ["GLOBAL", "CRYPTO"], price: 59_400, change: 0, contractMultiplier: .001 };
 const listings = expiries.flatMap((expiry, index) => strikes.flatMap(strike => ["CE", "PE"].map(optionType => {
   const symbol = (optionType === "CE" ? "C" : "P") + "-BTC-" + strike + "-" + (index ? "051234" : "281134");
   return { symbol, name: symbol, exchange: "DELTA", instrumentKey: "DELTA|" + symbol, assetType: "OPTION",
@@ -14,7 +16,7 @@ const listings = expiries.flatMap((expiry, index) => strikes.flatMap(strike => [
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH });
   try {
-    for (const [width, height] of [[320, 568], [390, 844], [768, 900], [1440, 900]]) {
+    for (const [width, height] of [[320, 568], [360, 800], [390, 844], [560, 844], [561, 844], [768, 900], [1440, 900]]) {
       const page = await browser.newPage({ viewport: { width, height }, isMobile: width < 900, hasTouch: width < 900 });
       page.setDefaultTimeout(12_000);
       const errors = [];
@@ -23,7 +25,7 @@ const listings = expiries.flatMap((expiry, index) => strikes.flatMap(strike => [
         const { searchParams } = new URL(route.request().url());
         const mode = searchParams.get("mode");
         const send = data => route.fulfill({ json: { ok: true, ...data } });
-        if (mode === "catalog") return send({ instruments: listings });
+        if (mode === "catalog") return send({ instruments: [...listings, future] });
         if (mode === "crypto-option-roots") return send({ roots: ["BTC"] });
         if (mode === "token-option-roots") return send({ roots: [] });
         if (mode === "spread-chain") {
@@ -49,6 +51,39 @@ const listings = expiries.flatMap((expiry, index) => strikes.flatMap(strike => [
       if (width === 390) await page.getByRole("button", { name: "Use neon dark theme" }).click();
       const nav = page.locator(width < 941 ? ".mobile-bottom-nav" : ".main-nav");
       await nav.getByRole("button", { name: "Charts", exact: true }).click();
+      const toolbar = page.locator(".trade-cockpit .chart-controls");
+      await toolbar.getByRole("button", { name: "Trade BTC futures" }).waitFor();
+      if (width < 941) {
+        const layout = await toolbar.evaluate(el => {
+          const bounds = el.getBoundingClientRect();
+          const search = el.querySelector(".chart-symbol-search");
+          const ticker = el.querySelector(".chart-symbol-compact").getClientRects().length
+            ? el.querySelector(".chart-symbol-compact") : el.querySelector(".chart-symbol-full");
+          const plot = el.closest(".trade-cockpit").nextElementSibling.getBoundingClientRect();
+          const controls = [...el.querySelectorAll("button")].filter(button => button.getClientRects().length).map(button => button.getBoundingClientRect());
+          return {
+            ticker: ticker.getBoundingClientRect().width >= 24,
+            search: search.scrollWidth <= search.clientWidth + 1,
+            chartStartsBelowToolbar: plot.top >= bounds.bottom - 1,
+            allInBounds: controls.every(box => box.left >= bounds.left && box.right <= bounds.right && box.top >= bounds.top && box.bottom <= bounds.bottom),
+            overlap: controls.some((a, i) => controls.slice(i + 1).some(b => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)),
+          };
+        });
+        assert.deepEqual(layout, { ticker: true, search: true, chartStartsBelowToolbar: true, allInBounds: true, overlap: false }, `Readable, separate chart controls at ${width}px`);
+      }
+      if (width === 390) {
+        await toolbar.getByRole("button", { name: /Change chart symbol/ }).click();
+        await toolbar.getByPlaceholder("Search stocks, BTC, gold or Brent").waitFor();
+        await toolbar.getByRole("button", { name: /Change chart symbol/ }).click();
+        await toolbar.getByRole("button", { name: "Trade BTC futures" }).click();
+        await page.getByRole("dialog", { name: "BTC futures" }).waitFor();
+        await page.keyboard.press("Escape");
+        await page.getByRole("dialog", { name: "BTC futures" }).waitFor({ state: "hidden" });
+        await toolbar.getByRole("button", { name: "Open Strategy Builder" }).click();
+        await page.getByRole("dialog", { name: "Option Strategy Builder" }).waitFor();
+        await page.keyboard.press("Escape");
+        await page.getByRole("dialog", { name: "Option Strategy Builder" }).waitFor({ state: "hidden" });
+      }
       const trigger = page.getByRole("button", { name: /Open .* option charts/ }).first();
       await trigger.click();
 
@@ -102,7 +137,7 @@ const listings = expiries.flatMap((expiry, index) => strikes.flatMap(strike => [
       assert.deepEqual(errors, []);
       await page.close();
     }
-    console.log("PASS: Delta option dialog placement, alignment, scrolling, expiry, refresh, Strategy Builder and chart selection at 320–1440px.");
+    console.log("PASS: Delta chart toolbar and option dialog placement, alignment, scrolling, expiry, refresh, Strategy Builder and chart selection at 320–1440px.");
   } finally {
     await browser.close();
   }

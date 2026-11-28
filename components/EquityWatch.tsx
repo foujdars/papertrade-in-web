@@ -20,7 +20,7 @@ function percent(change: number) {
   return `${change > 0 ? "+" : ""}${change.toFixed(2)}%`;
 }
 
-export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOpen: (symbol: string) => void; focusIndex?: string | null; focusTick?: number }) {
+export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0, showCard = true }: { onOpen: (symbol: string) => void; focusIndex?: string | null; focusTick?: number; showCard?: boolean }) {
   const desktop=useDesktopBrowser();
   const [index, setIndex] = useState<WatchIndexId>("nifty50");
   const [sort, setSort] = useState<WatchSort>("change");
@@ -32,6 +32,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   const [bankBreadth, setBankBreadth] = useState<WatchQuote[] | null>(null);
   const [itBreadth, setItBreadth] = useState<WatchQuote[] | null>(null);
   useEffect(() => {
+    if (!showCard) return;
     return startVisiblePolling(async signal => {
       await Promise.allSettled(([['nifty50',setNiftyBreadth],['bank',setBankBreadth],['it',setItBreadth]] as const).map(async ([indexId,apply]) => {
         const response = await fetch(`/api/market/equity-watch?index=${indexId}`, {signal,cache:"no-store"});
@@ -39,7 +40,7 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
         if (!signal.aborted && response.ok && body?.ok && Array.isArray(body.rows)) apply(body.rows);
       }));
     }, 15_000);
-  }, []);
+  }, [showCard]);
   useEffect(() => {
     if (!focusTick || !focusIndex || !WATCH_INDICES.some(item => item.id === focusIndex)) return;
     setIndex(focusIndex as WatchIndexId);
@@ -78,12 +79,14 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
   };
   const niftyRising = niftyBreadth?.filter(row => row.change > 0).length ?? 0;
   const niftyFalling = niftyBreadth?.filter(row => row.change < 0).length ?? 0;
-  return <div id="equity-watch" className="home-market-slot">
-    <button type="button" className="home-market-card home-market-card-v2" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
-      <span className="home-market-card-copy"><span className="home-market-card-title"><b>Equity watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
-      <span className="home-market-subtitle">Constituent breadth</span>
-      <span className="home-breadth-previews">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
-    </button>
+  return <>
+    {showCard && <div id="equity-watch" className="home-market-slot">
+      <button type="button" className="home-market-card home-market-card-v2" data-kind="equity" onClick={() => setOpen(true)} aria-label={niftyBreadth ? `Open equity market. Nifty 50 ${niftyRising} rising, ${niftyFalling} falling` : "Open equity market"}>
+        <span className="home-market-card-copy"><span className="home-market-card-title"><b>Equity watch</b></span><ChevronRight size={17} aria-hidden="true" /></span>
+        <span className="home-market-subtitle">Constituent breadth</span>
+        <span className="home-breadth-previews">{breadthLine("Nifty 50", niftyBreadth)}{breadthLine("Bank Nifty", bankBreadth)}{breadthLine("IT", itBreadth)}</span>
+      </button>
+    </div>}
     {open && typeof document !== "undefined" && createPortal(<>
       <button type="button" className="home-search-backdrop" aria-label="Close equity market" onClick={() => setOpen(false)} />
       <div className="home-side-sheet home-market-sheet" role="dialog" aria-modal="true" aria-label="Equity market watch">
@@ -97,5 +100,5 @@ export function EquityWatch({ onOpen, focusIndex = null, focusTick = 0 }: { onOp
         </button>)}</div> : <div className="india-pulse-wait">{rows || failed ? "No names in this index right now" : "Loading equity market watch"}</div>}
       </div>
     </>, document.querySelector(".terminal-shell") ?? document.body)}
-  </div>;
+  </>;
 }

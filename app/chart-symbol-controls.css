@@ -65,3 +65,32 @@
   .terminal-shell .trade-cockpit .chart-symbol-search :is(.desktop-symbol-trigger,.trade-symbol-trigger,.chart-compare-link) { height:28px; min-height:28px; }
   .terminal-shell .trade-cockpit .chart-symbol-search .chart-compare-link { width:28px; min-width:28px; flex-basis:28px; }
 }
+
+.chart-symbol-compact { display: none; }
+
+@media (max-width: 560px) {
+  .terminal-shell .trade-cockpit .chart-controls:has(.desktop-chart-symbol .option-strategy-trigger) {
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px;
+    height: auto; min-height: 0; flex-basis: auto; padding: 4px 6px; overflow: visible;
+  }
+  .terminal-shell .trade-cockpit .chart-controls:has(.desktop-chart-symbol .option-strategy-trigger) .desktop-chart-symbol {
+    grid-column: 1 / -1; gap: 4px; height: 36px;
+  }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol:has(.option-strategy-trigger) .chart-symbol-search {
+    flex: 1 1 auto; width: auto; max-width: none; height: 36px; min-height: 36px;
+  }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol:has(.option-strategy-trigger) .desktop-symbol-trigger { margin: 0; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol:has(.option-strategy-trigger) .desktop-symbol-trigger:has(.chart-symbol-compact) .chart-symbol-full { display: none; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol:has(.option-strategy-trigger) .chart-symbol-compact { display: block; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol:has(.option-strategy-trigger) > button { margin: 0; height: 36px; }
+  .terminal-shell .trade-cockpit .chart-controls:has(.desktop-chart-symbol .option-strategy-trigger) > :is(.chart-tools-trigger,.compact-selector-trigger) {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    width: 100%; min-width: 0; height: 34px; min-height: 34px; padding: 0 5px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--soft); color: var(--ink);
+  }
+}
+
+@media (max-width: 360px) {
+  .terminal-shell .trade-cockpit .desktop-chart-symbol .option-strategy-trigger { min-width: 36px; padding-inline: 0; }
+  .terminal-shell .trade-cockpit .desktop-chart-symbol .option-strategy-trigger > span { display: none; }
+}

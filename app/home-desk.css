@@ -171,7 +171,7 @@
   }
   .terminal-shell .home-hub.home-desk .desktop-explore-tabs button[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
   .terminal-shell .home-desk[data-desktop-tab="overview"] :is(.home-market-data,.india-flows-slot,.home-deal-slot),
-  .terminal-shell .home-desk[data-desktop-tab="breadth"] :is(.home-main-grid,.home-movers-slot,.home-derivatives,.india-flows-slot,.home-deal-slot),
+  .terminal-shell .home-desk[data-desktop-tab="breadth"] :is(.home-main-grid,.home-market-pair,.home-derivatives,.india-flows-slot,.home-deal-slot),
   .terminal-shell .home-desk[data-desktop-tab="derivatives"] :is(.home-main-grid,.home-market-pair,.home-sector-heat,.india-flows-slot,.home-deal-slot),
   .terminal-shell .home-desk[data-desktop-tab="flows"] :is(.home-main-grid,.home-market-pair,.home-market-data) { display: none; }
 }
