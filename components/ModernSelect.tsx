@@ -1,14 +1,14 @@
 "use client";
 
 import { Check, ChevronDown, X } from "lucide-react";
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AppDialog } from "./AppDialog";
 
 export type SelectChoice<T extends string> = { value: T; label: string; description?: string; disabled?: boolean };
 
 /** Native dialog supplies modality/focus containment; the options stay app-themed on Android. */
-export function ModernSelect<T extends string>({ label, ariaLabel = label, value, choices, onChange, hideLabel = false, disabled = false }: {
-  label: string; ariaLabel?: string; value: T; choices: readonly SelectChoice<T>[]; onChange: (value: T) => void; hideLabel?: boolean; disabled?: boolean;
+export function ModernSelect<T extends string>({ label, ariaLabel = label, value, choices, onChange, hideLabel = false, disabled = false, triggerLabel }: {
+  label: string; ariaLabel?: string; value: T; choices: readonly SelectChoice<T>[]; onChange: (value: T) => void; hideLabel?: boolean; disabled?: boolean; triggerLabel?: ReactNode;
 }) {
   const id = useId(), trigger = useRef<HTMLButtonElement>(null), options = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false), [position, setPosition] = useState<CSSProperties>({});
@@ -52,7 +52,7 @@ export function ModernSelect<T extends string>({ label, ariaLabel = label, value
 
   return <div className="modern-select">
     {!hideLabel && <span className="modern-select-label" id={`${id}-label`}>{label}</span>}
-    <button ref={trigger} type="button" disabled={disabled} className="modern-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={`${id}-dialog`} onClick={openChoices} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openChoices(); } }}><span>{chosen?.label ?? "Choose"}</span><ChevronDown size={15} aria-hidden="true" /></button>
+    <button ref={trigger} type="button" disabled={disabled} className="modern-select-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-controls={`${id}-dialog`} onClick={openChoices} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openChoices(); } }}><span>{triggerLabel ?? chosen?.label ?? "Choose"}</span><ChevronDown size={15} aria-hidden="true" /></button>
     {open && <AppDialog id={`${id}-dialog`} className="modern-select-dialog" style={position} labelledBy={`${id}-title`} returnFocus={trigger} initialFocus='[aria-selected="true"]:not(:disabled)' onClose={() => setOpen(false)}>
       <div className="modern-select-content">
         <div className="modern-select-handle" aria-hidden="true" />

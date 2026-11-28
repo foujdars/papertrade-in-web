@@ -32,7 +32,7 @@ import {
   LogOut, Mail, MessageCircle, Search, Send, Star, Target, Trash2, UserRound,
   TrendingDown, Bookmark, Percent, Trophy, WalletCards, X, Pencil,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -62,7 +62,7 @@ import { playPaperTradeTone } from "@/lib/papertrade-tone";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { homeOpenChange, positionAttention, type HomeAlertSnapshot, type HomeAlertRequest, type HomeAttention } from '@/lib/home-attention';
 import { homePreferenceKey } from '@/lib/home-preferences';
-import { isGlobalPnlTrade } from "@/lib/pnl-reporting";
+import { isGlobalPnlTrade, pnlHistoryReady, pnlReportingTrades, type OpenPnlMark } from "@/lib/pnl-reporting";
 import { DEFAULT_PNL_SCOPE } from '@/lib/pnl-analytics';
 import { HomeWorkspace } from "@/components/HomeWorkspace";
 import { isGlobalReferenceKey } from '@/lib/global-reference';
@@ -86,7 +86,7 @@ import { GlobalOrderTicket, type GlobalTicketTab } from './GlobalOrderTicket';
 import { PriceActions } from "@/components/PriceActions";
 import { PnlAnalytics, type PnlTab } from "@/components/PnlAnalytics";
 import { PNL_SCOPE_KEY, readPnlScope, writePreference } from "@/lib/interface-preferences";
-import { filterPnlTrades, pnlDay, pnlOutcome, summarisePnl, type PnlScope } from "@/lib/pnl-analytics";
+import { filterPnlTrades, pnlBounds, pnlDay, pnlOutcome, pnlSessions, summarisePnl, type PnlScope } from "@/lib/pnl-analytics";
 import { globalClosedTrades, deleteGlobalPnlTrades } from "@/lib/global-pnl";
 import { priceTaskError, type PriceRequest, type PriceTask } from "@/lib/price-actions";
 import { OptionChainSheet } from "@/components/OptionChainSheet";
@@ -212,7 +212,7 @@ type NavigationSection = "home" | "trade" | "fno" | "watchlist" | "holdings" | "
 type HomeCardId = "market" | "recent" | "portfolio";
 type HomeCardPreferences = Record<HomeCardId, boolean>;
 type UiDensity = "comfortable" | "compact";
-type PnlHistoryFilter = ClosedTradeOutcome;
+type PnlHistoryFilter = ClosedTradeOutcome | "breakeven";
 const DEFAULT_HOME_CARDS: HomeCardPreferences = { market: true, recent: true, portfolio: true };
 
 type ChartHistorySnapshot = {
@@ -653,6 +653,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   const tradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const desktopTradeSymbolPickerRef = useRef<HTMLDivElement>(null);
   const pnlTradeListRef = useRef<HTMLDivElement>(null);
+  const pnlModalRef = useRef<HTMLElement>(null);
   const pendingChartRestoreRef = useRef<{ symbol: string; timeframe: string } | null>({ symbol: "__PENDING__", timeframe: "5m" });
   const autoSquareOffInFlightRef = useRef(false);
   const autoSquareOffRetryAtRef = useRef(0);
@@ -2015,12 +2016,41 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
   // Scheduled portfolio reviews are delivered by the server, never on app resume.
   const pnlToday = pnlDay(clock?.getTime() ?? Date.now());
   const pnlNow = Date.parse(`${pnlToday}T12:00:00+05:30`);
+  const showPnlHistory = pnlOpen && (pnlHistoryOnly || pnlTab === "trades") &&
+    pnlHistoryReady(pnlScope.asset, paperDataReady, Boolean(globalTrading.account)) && pnlBounds(pnlScope, pnlNow).valid;
+  const pnlOpenMarks = useMemo<OpenPnlMark[]>(() => {
+    if (!pnlOpen) return [];
+    const marks = openPositions.map((pos): OpenPnlMark => {
+      const instrument = tradingUniverse.find(item => item.symbol === pos.symbol);
+      const order = orders.find(item => item.symbol === pos.symbol && (item.product ?? "INTRADAY") === pos.product);
+      const type = instrument?.assetType ?? order?.assetType, key = instrument?.instrumentKey ?? order?.instrumentKey ?? "";
+      const asset = type === "OPTION" || type === "FUTURE" || /^(NSE|BSE|MCX)_FO\|/.test(key) ? "fno"
+        : type === "EQUITY" || /^(NSE|BSE)_EQ\|/.test(key) ? "stocks" : "unknown";
+      return {symbol: pos.symbol, asset, product: pos.product, value: pos.quoteAvailable ? pos.unrealizedPnl : null};
+    });
+    for (const pos of globalTrading.account?.positions ?? []) {
+      const quote = globalTrading.snapshots[pos.symbol]?.quote;
+      marks.push({symbol: pos.symbol, asset: "global", product: pnlDay(pos.openedAt) === pnlToday ? "INTRADAY" : "DELIVERY", value: freshPerpQuote(quote, globalTrading.clock) ? positionPnl(pos, quote.mark) : null});
+    }
+    for (const pos of globalTrading.account?.optionPositions ?? []) {
+      const quote = globalTrading.optionSnapshots[pos.symbol]?.quote;
+      marks.push({symbol: pos.symbol, asset: "global", product: pnlDay(pos.openedAt) === pnlToday ? "INTRADAY" : "DELIVERY", value: freshOptionQuote(quote, globalTrading.clock) ? optionPnl(pos, quote.mark) : null});
+    }
+    return marks;
+  }, [pnlOpen, openPositions, orders, tradingUniverse, globalTrading.account, globalTrading.snapshots, globalTrading.optionSnapshots, globalTrading.clock, pnlToday]);
   const globalPnlTrades = useMemo(() => globalClosedTrades(globalTrading.account), [globalTrading.account]);
   const pnlCalendarTrades = useMemo(() => filterPnlTrades([...closedTrades, ...globalPnlTrades], orders, { ...pnlScope, day: null }, pnlNow).sort((a, b) => b.closedAt - a.closedAt || a.id.localeCompare(b.id)), [closedTrades, globalPnlTrades, orders, pnlNow, pnlScope]);
   const pnlScopedTrades = useMemo(() => selectedPnlDateKey ? pnlCalendarTrades.filter(trade => pnlDay(trade.closedAt) === selectedPnlDateKey) : pnlCalendarTrades, [pnlCalendarTrades, selectedPnlDateKey]);
-  const pnlDrilledTrades = useMemo(() => pnlDrill ? pnlScopedTrades.filter(trade => pnlDrill.ids.includes(trade.id)) : pnlScopedTrades, [pnlScopedTrades, pnlDrill]);
-  const pnlVisuals = useMemo(() => summarisePnl(pnlDrilledTrades), [pnlDrilledTrades]);
-  const visiblePnlTrades = useMemo(() => pnlDrilledTrades.filter(trade => pnlHistoryFilter === "all" || pnlOutcome(trade.netPnl) === pnlHistoryFilter), [pnlDrilledTrades, pnlHistoryFilter]);
+  const pnlDrilledTrades = useMemo(() => {
+    if (!pnlDrill) return pnlScopedTrades;
+    const ids = new Set(pnlDrill.ids);
+    return pnlScopedTrades.filter(trade => ids.has(trade.id));
+  }, [pnlScopedTrades, pnlDrill]);
+  const drilledReport = useMemo(() => pnlReportingTrades(pnlDrilledTrades, pnlScope.asset === "all"), [pnlDrilledTrades, pnlScope.asset]);
+  const pnlVisuals = useMemo(() => summarisePnl(drilledReport), [drilledReport]);
+  const reportedOutcomes = useMemo(() => new Map(drilledReport.map(t => [t.id, pnlOutcome(t.netPnl)])), [drilledReport]);
+  const visiblePnlTrades = useMemo(() => pnlDrilledTrades.filter(t => pnlHistoryFilter === "all" || reportedOutcomes.get(t.id) === pnlHistoryFilter), [pnlDrilledTrades, pnlHistoryFilter, reportedOutcomes]);
+  const visiblePnlSessions = useMemo(() => new Map(showPnlHistory ? pnlSessions(pnlReportingTrades(visiblePnlTrades, pnlScope.asset === "all")).map(s => [s.day, s]) : []), [visiblePnlTrades, pnlScope.asset, showPnlHistory]);
   const tradeSelectionScope = `${pnlOpen}:${selectedPnlDateKey}:${pnlHistoryFilter}:${JSON.stringify(pnlScope)}:${pnlDrill?.label ?? ""}:${pnlTab}`;
   const selectingTrades = tradeSelection?.scope === tradeSelectionScope;
   useTransientBack(Boolean(pnlDrill && pnlOpen), () => { setPnlDrill(null); setPnlTab("overview"); });
@@ -3383,7 +3413,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
         balance={balance}
         indiaFundsInUse={openPositions.reduce((sum, position) => sum + paperOrderCapitalValue(tradingUniverse.find(item => item.symbol === position.symbol)?.assetType, position.product, position.quantity, position.averagePrice), 0)}
         globalClosedCount={globalPnlTrades.length}
-        onOpenGlobalPnl={() => { setPnlScope({...DEFAULT_PNL_SCOPE, asset: "global"}); openNavigationSection("pnl"); }}
+        onOpenGlobalPnl={() => { openNavigationSection("pnl"); setPnlScope({...DEFAULT_PNL_SCOPE, asset: "global"}); }}
         globalWallet={globalTrading.account?.wallet ?? null}
         globalWalletError={globalTrading.error}
         globalAvailable={globalTrading.account ? availablePerpCash(globalTrading.account) : null}
@@ -3397,7 +3427,7 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
         openChangeToday={homeOpenDayChange}
         attention={[...positionAttention(openPositions,protections,orders),...(homeAlerts.ownerId===(user?.id??'local')?homeAlerts.items:[])].slice(0,3)}
         onAttention={(item:HomeAttention)=>{if(item.target.kind==='alerts'){setHomeAlertRequest({key:Date.now(),tab:item.target.tab,id:item.target.id});}else{setHomeOpen(false);setWorkspaceMode('trade');openPositionChart(item.target.symbol);setProduct(item.target.product);}}}
-        onOpenRealised={()=>{setPnlScope({...DEFAULT_PNL_SCOPE,period:'custom',start:pnlToday,end:pnlToday});setSelectedPnlDateKey(null);setPnlDrill(null);setPnlHistoryFilter('all');openNavigationSection('pnl');setPnlTab('trades');}}
+        onOpenRealised={() => { openNavigationSection("pnl"); setPnlScope({...DEFAULT_PNL_SCOPE, period: "today", asset: "india"}); setPnlTab("trades"); }}
         holdingsCount={holdings.length}
         openPositionsCount={openPositions.length}
         closedTradesCount={closedTrades.length}
@@ -3607,10 +3637,24 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
       )}
       {pnlOpen && (
         <div className="modal-backdrop navigation-page-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && window.innerWidth <= 760) setPnlOpen(false); }}>
-          <section className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
-            <PnlAnalytics globalReady={Boolean(globalTrading.account)} trades={pnlScopedTrades} calendarTrades={pnlCalendarTrades} orders={orders} scope={{ ...pnlScope, day: selectedPnlDateKey }} currency={pnlScope.asset === "global" ? "USD" : "INR"} now={clock?.getTime() ?? Date.now()} tab={pnlHistoryOnly ? "trades" : pnlTab} onTab={tab => { setPnlHistoryOnly(false); setPnlTab(tab); setTradeSelection(null); setPnlTradeMenuId(null); }} onScope={scope => { writePreference(PNL_SCOPE_KEY, scope); setPnlScope({ ...scope, day: null }); setSelectedPnlDateKey(scope.day ?? null); setPnlDrill(null); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} onSelect={(ids, label) => { setPnlDrill({ ids, label }); setPnlHistoryOnly(false); setPnlTab("trades"); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null); }} />
-            <div className="pnl-trade-list" ref={pnlTradeListRef} hidden={!pnlHistoryOnly && pnlTab !== "trades"}>
-              {pnlDrill && <div className="pnl-drill-filter"><span>{pnlDrill.label} · {pnlDrilledTrades.length} exits</span><button onClick={() => { setPnlDrill(null); setTradeSelection(null); }}>Clear chart selection</button></div>}
+          <section ref={pnlModalRef} className={`modal pnl-modal navigation-page ${pnlHistoryOnly ? "history-only" : ""}`} role="dialog" aria-modal="true" aria-label="Paper trading profit and loss" onMouseDown={(event) => event.stopPropagation()}>
+            <PnlAnalytics indiaReady={paperDataReady} globalReady={Boolean(globalTrading.account)} openMarks={pnlOpenMarks}
+              trades={pnlScopedTrades} calendarTrades={pnlCalendarTrades} orders={orders} scope={{...pnlScope, day: selectedPnlDateKey}}
+              currency={pnlScope.asset === "global" ? "USD" : "INR"} now={pnlNow} tab={pnlHistoryOnly ? "trades" : pnlTab}
+              onTab={tab => {
+                setPnlHistoryOnly(false); setPnlTab(tab); setPnlDrill(null); setTradeSelection(null); setPnlTradeMenuId(null);
+                pnlModalRef.current?.scrollTo({top: 0});
+              }}
+              onScope={scope => {
+                writePreference(PNL_SCOPE_KEY, scope); setPnlScope({...scope, day: null}); setSelectedPnlDateKey(scope.day ?? null);
+                setPnlDrill(null); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null);
+              }}
+              onSelect={(ids, label) => {
+                setPnlDrill({ids, label}); setPnlHistoryOnly(false); setPnlTab("trades"); setPnlHistoryFilter("all"); setTradeSelection(null); setPnlTradeMenuId(null);
+                requestAnimationFrame(() => pnlTradeListRef.current?.querySelector<HTMLElement>(".pnl-drill-filter")?.focus());
+              }}/>
+            {showPnlHistory && <div className="pnl-trade-list" ref={pnlTradeListRef}>
+              {pnlDrill && <div className="pnl-drill-filter" tabIndex={-1}><span>{pnlDrill.label} · {pnlDrilledTrades.length} {pnlDrilledTrades.length === 1 ? "exit" : "exits"}</span><button onClick={() => { setPnlDrill(null); setTradeSelection(null); }}>Clear chart selection</button></div>}
               {!!visiblePnlTrades.length && selectingTrades && <div className={`pnl-selection-toolbar ${selectingTrades ? "is-selecting" : ""}`}>
                 <div><b>{selectedTradeIds.length} selected</b><small>Choose records from one market at a time. Selecting another market starts a new selection.</small></div>
                 <button type="button" onClick={() => { setTradeSelection(null); setPnlTradeMenuId(null); }}>Done</button>
@@ -3618,11 +3662,14 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
               </div>}
               <div className="pnl-history-toolbar">
                 <div className="pnl-history-tabs" role="group" aria-label="Filter completed trades">
-                  {(["all", "profit", "loss"] as const).map((filter) => <button type="button" key={filter} className={pnlHistoryFilter === filter ? "active" : ""} aria-pressed={pnlHistoryFilter === filter} onClick={() => { setTradeSelection(null); setPnlHistoryFilter(filter); }}><span>{filter === "all" ? "All" : filter === "profit" ? "Profit" : "Loss"}</span><small>{filter === "all" ? pnlDrilledTrades.length : filter === "profit" ? pnlVisuals.wins : pnlVisuals.losses}</small></button>)}
+                  {(["all", "profit", "loss", "breakeven"] as const).map((filter, index) => <button type="button" key={filter} className={pnlHistoryFilter === filter ? "active" : ""} aria-pressed={pnlHistoryFilter === filter} onClick={() => { setTradeSelection(null); setPnlHistoryFilter(filter); }}><span>{["All", "Profit", "Loss", "Flat"][index]}</span><small>{[pnlDrilledTrades.length, pnlVisuals.wins, pnlVisuals.losses, pnlVisuals.breakevens][index]}</small></button>)}
                 </div>
                 {selectedPnlDateKey && <div className="pnl-history-filter"><b>{new Date(`${selectedPnlDateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</b><button type="button" onClick={() => { setSelectedPnlDateKey(null); setPnlDrill(null); }}>Clear selected day</button></div>}
               </div>
-              {visiblePnlTrades.map((trade) => {
+              {visiblePnlTrades.map((trade, index) => {
+                const day = pnlDay(trade.closedAt), session = visiblePnlSessions.get(day);
+                const newDay = index === 0 || pnlDay(visiblePnlTrades[index - 1].closedAt) !== day;
+                const outcome = reportedOutcomes.get(trade.id);
                 const globalTrade = isGlobalPnlTrade(trade);
                 const tradeMoney = globalTrade ? formatUsd : formatInr;
                 const menuOpen = !selectingTrades && pnlTradeMenuId === trade.id;
@@ -3635,9 +3682,12 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
                   .map((order, index) => orderTradeMarker(order, index === sourceOrders.length - 1 ? "EXIT" : "ENTRY"))
                   .filter((marker) => marker.time > 0);
                 return (
+                  <Fragment key={trade.id}>
+                  {newDay && <header className="pnl-ledger-date"><b>{day ? new Date(trade.closedAt).toLocaleDateString("en-IN", {timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric"}) : "Undated exits"}</b>
+                    {session && <span>{session.ids.length} {session.ids.length === 1 ? "exit" : "exits"} · {(pnlScope.asset === "global" ? formatUsd : formatInr)(session.net)}</span>}</header>}
                   <LongPressTradeRow onLongPress={() => { if (!selectedTradeIds.includes(trade.id)) toggleTradeSelection(trade.id); setPnlTradeMenuId(null); }} key={`${trade.id}-${trade.symbol}`} className={`pnl-trade-row ${menuOpen ? "selected" : ""} ${selectingTrades && selectedTradeIds.includes(trade.id) ? "batch-selected" : ""}`} role={selectingTrades ? "checkbox" : "button"} tabIndex={0} aria-checked={selectingTrades ? selectedTradeIds.includes(trade.id) : undefined} aria-label={selectingTrades ? `Select ${trade.symbol} trade, ${trade.quantity} units, ${trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN") : "legacy"}, ${tradeMoney(trade.netPnl)}` : `Open ${trade.symbol} entry and exit trade chart`} aria-expanded={selectingTrades ? undefined : menuOpen} onClick={() => selectingTrades ? toggleTradeSelection(trade.id) : setPnlTradeMenuId(menuOpen ? null : trade.id)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (selectingTrades) toggleTradeSelection(trade.id); else setPnlTradeMenuId(menuOpen ? null : trade.id); } }}>
-                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={pnlOutcome(trade.netPnl) === "profit" ? "win" : pnlOutcome(trade.netPnl) === "loss" ? "loss" : "flat"}>{pnlOutcome(trade.netPnl) === "profit" ? "WIN" : pnlOutcome(trade.netPnl) === "loss" ? "LOSS" : "FLAT"}</span>}
-                    <button type="button" className="stock-identity pnl-stock-chart-link" aria-label={selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} price chart`} title={selectingTrades ? undefined : `Open ${trade.symbol} price chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) toggleTradeSelection(trade.id); else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} size={36} /><span><b>{trade.symbol}<ChevronRight size={16} aria-hidden="true" /></b><small>{globalTrade ? "Global · USD" : "Indian · INR"} · {trade.product} · {trade.closedAt ? new Date(trade.closedAt).toLocaleDateString("en-IN") : "Legacy trade"}</small><em>{selectingTrades ? 'Select trade' : 'Open price chart'}</em></span></button>
+                    {selectingTrades ? <span className={`trade-selection-check ${selectedTradeIds.includes(trade.id) ? "checked" : ""}`} aria-hidden="true">{selectedTradeIds.includes(trade.id) && <Check size={17} strokeWidth={3} />}</span> : <span className={outcome === "profit" ? "win" : outcome === "loss" ? "loss" : "flat"}>{outcome === "profit" ? "WIN" : outcome === "loss" ? "LOSS" : "FLAT"}</span>}
+                    <button type="button" className="stock-identity pnl-stock-chart-link" aria-label={selectingTrades ? `Select ${trade.symbol} trade` : `Open ${trade.symbol} price chart`} title={selectingTrades ? undefined : `Open ${trade.symbol} price chart`} onClick={event => { event.stopPropagation(); if (selectingTrades) toggleTradeSelection(trade.id); else if (sourceOrders[0]) openPaperOrderChart(sourceOrders[0]); else openPositionChart(trade.symbol); }}><StockLogo symbol={trade.symbol} instrumentKey={sourceOrders[0]?.instrumentKey} underlyingKey={sourceOrders[0]?.underlyingKey} assetType={sourceOrders[0]?.assetType} size={36}/><span><b>{trade.symbol}<ChevronRight size={15} aria-hidden="true"/></b><small>{globalTrade ? "Global · USD" : "Indian · INR"} · {trade.product === "INTRADAY" ? "Intraday" : "Carry"}</small></span></button>
                     <TradeExecutionSummary trade={trade} exitOrder={paperOrdersById.get(trade.id)} currency={globalTrade ? "USD" : "INR"} status={paperOrdersById.get(trade.id) ? paperOrderStatusLabel(paperOrdersById.get(trade.id)!) : "Complete"} />
                     {menuOpen && <TradeReviewDialog symbol={trade.symbol} theme={theme} onClose={() => setPnlTradeMenuId(null)}>
                     <div className="pnl-review-executions"><span>Entry: {trade.openedAt ? new Date(trade.openedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Exit: {trade.closedAt ? new Date(trade.closedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Time unavailable"}</span><span>Fees: {tradeMoney(trade.charges)} · included in net P&amp;L</span></div>
@@ -3672,10 +3722,11 @@ export function TradingDashboard({ initialOptionBuilder }: { initialOptionBuilde
                     <div className="pnl-trade-actions"><small>{globalTrade ? 'Remove from P&L only. Wallet history is retained.' : 'Remove only an incorrect record.'}</small><button type="button" onClick={(event) => { event.stopPropagation(); setPnlTradeMenuId(null); setPendingDeleteIds([trade.id]); }}><Trash2 size={14} /> Delete trade</button><button type="button" onClick={() => { setPnlTradeMenuId(null); setTradeSelection({ scope: tradeSelectionScope, ids: [trade.id] }); }}>Select multiple</button></div>
                     </TradeReviewDialog>}
                   </LongPressTradeRow>
+                  </Fragment>
                 );
               })}
-              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades yet" : pnlHistoryFilter === "loss" ? "No losing trades" : "No completed trades yet"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
-            </div>
+              {!visiblePnlTrades.length && <div className="positions-empty"><Activity size={30} /><b>{selectedPnlDateKey ? "No completed trades on this date" : pnlHistoryFilter === "profit" ? "No profitable trades in this selection" : pnlHistoryFilter === "loss" ? "No losing trades in this selection" : pnlHistoryFilter === "breakeven" ? "No flat trades in this selection" : "No completed trades in this selection"}</b><span>{selectedPnlDateKey ? "Choose another calendar date or show all dates." : "Completed paper trades will appear here."}</span></div>}
+            </div>}
             {pendingDeletion && <TradeDeleteDialog trades={pendingDeletion.trades} error={pendingDeletion.error} global={deletingGlobalTrades} busy={deletingGlobalTrades && globalTrading.busy} onCancel={() => { if (!deletingGlobalTrades || !globalTrading.busy) setPendingDeleteIds(null); }} onConfirm={() => void confirmClosedTradeDeletion()} />}
           </section>
         </div>

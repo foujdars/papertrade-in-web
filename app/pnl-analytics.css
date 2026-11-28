@@ -158,3 +158,123 @@
   .pnl-market-summary > :is(div,button) { padding:10px 7px; }
   .pnl-review-heading h2 { font-size:20px; }
 }
+
+/* P&L report shared by the mobile app and the web dashboard. */
+.terminal-shell .pnl-report {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  --pnl-border: var(--line);
+}
+.terminal-shell .pnl-report > * { min-width: 0; margin: 0; }
+.pnl-report .pnl-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pnl-report .pnl-review-heading h2 { margin: 0; font-size: clamp(24px, 6vw, 32px); line-height: 1.2; letter-spacing: -.045em; font-weight: 680; }
+.pnl-report .pnl-date-picker .modern-select-trigger { min-height: 42px; padding: 0 10px; }
+.pnl-report .pnl-date-picker .modern-select-trigger > span { display: flex; align-items: center; gap: 6px; }
+.pnl-report .pnl-range-strip { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; }
+.pnl-range-strip button { min-width: 0; min-height: 42px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); font: inherit; font-size: 12px; font-weight: 550; cursor: pointer; }
+.pnl-range-strip button[aria-pressed="true"] { border-color: var(--purple); background: var(--purple-soft); color: var(--purple); }
+.pnl-report .pnl-net-card {
+  padding: 16px 18px 13px; border: 1px solid #373566; border-radius: 16px; background: linear-gradient(115deg,#222342 0%,#29264c 62%,#3b3066 100%); color: #fafaff;
+  box-shadow: 0 5px 14px #20213d15; overflow: hidden; font-variant-numeric: tabular-nums;
+}
+.pnl-net-heading, .pnl-net-heading > span:first-child, .pnl-net-period, .pnl-net-components button > span { display: flex; align-items: center; gap: 7px; }
+.pnl-net-heading { justify-content: space-between; font-size: 12px; font-weight: 600; }
+.pnl-net-heading > span:first-child svg { color: #c4baff; }
+.pnl-report-unit { color: #e0dafc; background: #ffffff13; border: 1px solid #c6bbff3d; font-size: 10px; padding: 4px 7px; border-radius: 7px; font-weight: 550; }
+.pnl-net-card .pnl-net-amount { display: block; margin-top: 6px; color: #fff; font-size: clamp(30px,8vw,44px); line-height: 1.13; font-weight: 680; letter-spacing: -.045em; overflow-wrap: anywhere; }
+.pnl-net-period { flex-wrap: wrap; color: #cecee4; font-size: 11px; margin-top: 4px; }
+.pnl-net-period button { color: #f1eaff; background: transparent; border: 0; text-decoration: underline; padding: 4px; cursor: pointer; }
+.pnl-net-components { display: grid; grid-template-columns: 1.15fr 1.05fr .85fr; gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid #ffffff29; }
+.pnl-net-components > :is(span,button) { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; font: inherit; font-size: 10px; color: #d4d2e9; }
+.pnl-net-components b { color: #fff; font-size: 14px; font-weight: 590; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.pnl-net-components button { min-height: 42px; margin: -4px 0; padding: 3px 0; border: 0; background: transparent; cursor: pointer; }
+.pnl-report .pnl-report-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pnl-report-filters .modern-select-trigger { min-height: 42px; }
+.pnl-report .pnl-view-tabs { display: grid; padding: 3px; gap: 3px; border-radius: 11px; background: var(--soft); }
+.pnl-report .pnl-view-tabs button { min-height: 40px; border-radius: 8px; font-size: 13px; }
+.terminal-shell .pnl-report .pnl-a-card { min-width: 0; padding: 15px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); }
+.pnl-report .pnl-a-card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin: 0 0 12px; }
+.pnl-report .pnl-a-card h3 { margin: 0; font-size: 17px; line-height: 1.3; letter-spacing: -.035em; }
+.pnl-plot-unit { color: var(--muted); font-size: 11px; }
+.pnl-chart-modes { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 3px; padding: 2px; background: var(--soft); border-radius: 9px; }
+.pnl-chart-modes button { min-width: 0; min-height: 37px; padding: 2px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 550; cursor: pointer; }
+.pnl-chart-modes button[aria-pressed="true"] { color: var(--ink); background: var(--surface); border-color: var(--line); box-shadow: 0 1px 3px #20213d12; }
+.pnl-report .pnl-line-chart > svg { margin-top: 10px; width: 100%; height: auto; }
+.pnl-report .pnl-line-chart svg text { font-size: 12px; font-variant-numeric: tabular-nums; }
+.pnl-report .pnl-chart-readout { padding: 7px 0 0; border-top: 1px solid var(--line); }
+.pnl-report .pnl-chart-readout span { font-size: 11px; }
+.pnl-report .pnl-chart-readout b { font-size: 15px; }
+.pnl-report .pnl-chart-readout button, .pnl-report .pnl-day-detail button { min-height: 42px; font-size: 12px; }
+.pnl-risk-detail, .pnl-outcome-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding-top: 11px; margin-top: 10px; border-top: 1px solid var(--line); }
+.pnl-risk-detail span, .pnl-outcome-stats span { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.pnl-risk-detail b, .pnl-outcome-stats b { color: var(--ink); font-size: 14px; }
+.pnl-risk-detail small { grid-column: 1/-1; color: var(--muted); }
+.pnl-outcome-track { display: flex; gap: 2px; height: 7px; overflow: hidden; border-radius: 20px; }
+.pnl-outcomes .win { background: var(--green); }.pnl-outcomes .loss { background: var(--red); }.pnl-outcomes .flat { background: var(--muted); }
+.pnl-outcome-links { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 7px; }
+.pnl-outcome-links button { min-height: 44px; padding: 4px 0; display: grid; gap: 3px; align-content: center; justify-items: start; border: 0; background: transparent; font: inherit; cursor: pointer; color: var(--ink); }
+.pnl-outcome-links span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
+.pnl-outcome-links i { width: 6px; height: 6px; border-radius: 100%; }
+.pnl-outcome-links b { font-size: 17px; }
+.pnl-outcome-links button:disabled { cursor: default; }
+.pnl-report .pnl-open-now { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0 12px; }
+.pnl-open-now summary, .pnl-open-now summary > span, .pnl-open-now li { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.pnl-open-now summary { min-height: 52px; cursor: pointer; }
+.pnl-open-now summary::after { content: "⌄"; color: var(--muted); }
+.pnl-open-now summary strong { margin-left: auto; }
+.pnl-open-now summary span span, .pnl-open-now li span { display: grid; gap: 3px; }
+.pnl-open-now summary b, .pnl-open-now li { font-size: 13px; }
+.pnl-open-now small, .pnl-open-now p { color: var(--muted); font-size: 11px; }
+.pnl-open-now ul { list-style: none; margin: 0; padding: 0; }.pnl-open-now li { border-top: 1px solid var(--line); padding: 8px 0; }
+.pnl-open-now p { margin: 4px 0 12px; }
+.pnl-market-split button { display: flex; align-items: center; width: 100%; min-height: 47px; padding: 8px 0; gap: 8px; border: 0; border-top: 1px solid var(--line); color: var(--ink); background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.pnl-market-split button > span { display: grid; gap: 3px; margin-right: auto; font-size: 13px; }.pnl-market-split small { font-size: 11px; color: var(--muted); }
+.pnl-report .pnl-report-note summary { display: flex; align-items: center; gap: 6px; min-height: 42px; font-size: 12px; }
+.pnl-report .pnl-report-note p { font-size: 12px; line-height: 1.5; }
+.pnl-report .pnl-empty-result { padding: 20px; text-align: center; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); }
+.pnl-empty-result > svg { color: var(--purple); }.pnl-empty-result h3 { margin: 6px 0; color: var(--ink); font-size: 16px; }.pnl-empty-result p { margin: 5px 0; font-size: 12px; }
+.pnl-empty-result button { padding: 5px 10px; min-height: 44px; color: var(--purple); border: 0; background: transparent; font: inherit; cursor: pointer; }
+.pnl-report .pnl-calendar-controls button { width: 35px; min-height: 42px; }.pnl-report .pnl-calendar-controls input { height: 40px; }
+.pnl-report .pnl-calendar-controls button:disabled { opacity: .35; }
+.pnl-report .pnl-calendar-day { min-height: 44px; }
+.pnl-report :is(button, input, summary, [tabindex="0"]):focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.pnl-net-card button:focus-visible { outline-color: #eee8ff; }
+.terminal-shell .pnl-modal .pnl-history-tabs { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.terminal-shell .pnl-modal .pnl-history-tabs button { min-height: 42px; gap: 3px; }
+.pnl-ledger-date { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 12px 0 2px; font-size: 12px; color: var(--ink); }
+.pnl-ledger-date span { font-size: 11px; color: var(--muted); }
+.pnl-fill-role { color: var(--muted); font-size: 11px; font-weight: 550; }
+.terminal-shell .pnl-modal .pnl-execution-pair { padding: 9px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+.terminal-shell .pnl-modal .pnl-execution-pair::before { content: none; }
+.terminal-shell .pnl-modal .pnl-execution-pair b { padding: 0; background: transparent; font-size: 10px; }
+.terminal-shell .pnl-modal .pnl-execution-pair strong { font-size: 13px; font-weight: 600; }
+.terminal-shell .pnl-modal .pnl-execution-pair small { font-size: 10px; }
+.terminal-shell .pnl-modal .pnl-trade-row:is(:hover,:focus-visible,:active) .pnl-execution-pair { background: transparent; box-shadow: none; }
+.pnl-report[data-view="trades"] .pnl-net-card, .pnl-report[data-view="insights"] .pnl-net-card { display: grid; grid-template-columns: 1fr auto; gap: 3px 7px; align-items: center; padding: 10px 13px; }
+.pnl-report:not([data-view="overview"]) .pnl-net-heading { justify-content: flex-start; flex-wrap: wrap; }.pnl-report:not([data-view="overview"]) .pnl-net-heading > span:first-child svg { display: none; }
+.pnl-report:not([data-view="overview"]) .pnl-net-amount { margin: 0; font-size: 21px; text-align: right; }.pnl-report:not([data-view="overview"]) .pnl-net-period { grid-column: 1/-1; }
+@media (max-width: 760px) {
+  .terminal-shell .pnl-report .pnl-view-tabs { position: static; }
+  .terminal-shell .pnl-report .pnl-finding-list { grid-template-columns: 1fr; gap: 0; }
+  .terminal-shell .pnl-report .pnl-finding-list > :is(button,div) { flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; min-height: 52px; }
+  .pnl-report .pnl-finding-figure { text-align: right; }
+  .pnl-report .pnl-insight-grid { grid-template-columns: 1fr; gap: 12px; }
+  .pnl-report .pnl-kicker { font-size: 10px; }
+  .terminal-shell .pnl-modal .pnl-stock-chart-link b { font-size: 14px; }
+  .terminal-shell .pnl-modal .pnl-stock-chart-link small, .terminal-shell .pnl-modal .pnl-card-result small { font-size: 10px; }
+}
+@media (min-width: 900px) {
+  .terminal-shell .pnl-analytics.pnl-report { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px 18px; align-items: start; }
+  .terminal-shell .pnl-analytics.pnl-report > * { grid-column: 1/-1; grid-row: auto; }
+  .terminal-shell .pnl-report .pnl-review-heading { grid-column: 1; grid-row: 1; }
+  .terminal-shell .pnl-report .pnl-range-strip { grid-column: 2; grid-row: 1; }
+  .terminal-shell .pnl-report .pnl-report-filters { grid-column: 1; }
+  .terminal-shell .pnl-report .pnl-view-tabs { grid-column: 2; position: static; }
+  .terminal-shell .pnl-report .pnl-performance-card { grid-column: 1; grid-row: span 2; }
+  .terminal-shell .pnl-report :is(.pnl-outcomes,.pnl-open-now) { grid-column: 2; }
+  .terminal-shell .pnl-report .pnl-calendar-card { grid-column: 1; }.terminal-shell .pnl-report .pnl-market-split { grid-column: 2; }
+}
+@media (max-width: 360px) {
+  .terminal-shell .pnl-report { gap: 9px; }.terminal-shell .pnl-report .pnl-a-card { padding: 11px; }
+  .pnl-report .pnl-net-card { padding: 13px; }.pnl-net-components b { font-size: 13px; }.pnl-report .pnl-plot-unit { font-size: 10px; }
+  .pnl-report .pnl-calendar-controls input { width: 105px; }
+}

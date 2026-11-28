@@ -53,12 +53,18 @@ export function getOrderCharges(order: PaperOrder) {
 export function buildClosedTrades(orders: PaperOrder[]) {
   const positions = new Map<string, OpenLeg>();
   const trades: ClosedPaperTrade[] = [];
-  const chronological = [...orders].sort((a, b) => orderTimestamp(a) - orderTimestamp(b) || Number(a.id) - Number(b.id));
+  const chronological = [...orders].sort((a, b) => {
+    const elapsed = orderTimestamp(a) - orderTimestamp(b);
+    if (elapsed) return elapsed;
+    const first = Number(a.id), second = Number(b.id);
+    return Number.isFinite(first) && Number.isFinite(second) ? first - second : a.id.localeCompare(b.id);
+  });
 
   for (const order of chronological) {
+    if (order.status && order.status !== "COMPLETE" || order.side !== "BUY" && order.side !== "SELL") continue;
     const direction = order.side === "BUY" ? 1 : -1;
-    const quantity = Math.max(0, order.quantity);
-    if (!quantity || !Number.isFinite(order.price)) continue;
+    const quantity = order.quantity;
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(order.price)) continue;
     const key = `${order.symbol}:${order.product ?? "INTRADAY"}`;
     const leg = positions.get(key) ?? { signedQuantity: 0, averagePrice: 0, entryCharges: 0, entryOrderIds: [], openedAt: orderTimestamp(order) };
     const orderCharges = getOrderCharges(order).total;
