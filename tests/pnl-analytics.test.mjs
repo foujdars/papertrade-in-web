@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_PNL_SCOPE, pnlDay, pnlOutcome, pnlBounds, validPnlDate, tradeAsset, filterPnlTrades, summarisePnl, pnlCurve, rollingPnl, pnlDistribution, groupPnl } from '../lib/pnl-analytics.ts';
+import { DEFAULT_PNL_SCOPE, pnlDay, pnlOutcome, pnlBounds, validPnlDate, tradeAsset, filterPnlTrades, summarisePnl, pnlCurve, pnlSessions, rollingPnl, pnlDistribution, groupPnl } from '../lib/pnl-analytics.ts';
 
 const now = Date.parse('2026-09-18T12:00:00+05:30');
 const make = (netPnl, i = 0, extra = {}) => ({ id: `t${i}`, symbol: 'TEST', product: 'INTRADAY', quantity: 1, entryPrice: 100, exitPrice: 100 + netPnl + 10, grossPnl: netPnl + 10, charges: 10, netPnl, openedAt: Date.parse('2026-09-01T09:30:00+05:30') + i * 86400000, closedAt: Date.parse('2026-09-01T10:30:00+05:30') + i * 86400000, direction: 'LONG', sourceOrderIds: [`entry${i}`, `exit${i}`], ...extra });
@@ -116,4 +116,53 @@ test('selected-day and product totals reconcile across both markets', async () =
   const chosen=filterPnlTrades(rows,[],{...DEFAULT_PNL_SCOPE,day:'2026-09-01',product:'INTRADAY'},now);
   assert.equal(chosen.length,2);assert.equal(summarisePnl(pnlReportingTrades(chosen,true)).net,100+2*fx);
   assert.equal(filterPnlTrades(rows,[],{...DEFAULT_PNL_SCOPE,day:'2026-09-03',asset:'global',product:'DELIVERY'},now).length,1);
+});
+
+test('today and seven days cross IST midnight and preserve saved range choices', async () => {
+  const {normalizePnlScope}=await import('../lib/interface-preferences.ts');
+  const midnight=Date.parse('2026-01-01T18:30:00Z');
+  for(const [period,start] of [['today','2026-01-02'],['7d','2025-12-27']]){
+    const scope=normalizePnlScope({period});
+    assert.equal(scope.period,period);
+    assert.deepEqual(pnlBounds(scope,midnight),{start,end:'2026-01-02',valid:true});
+  }
+  assert.equal(pnlOutcome(-0.005),'loss');
+  assert.equal(pnlOutcome(0.005),'profit');
+  assert.equal(pnlDay(Number.MAX_VALUE),'');
+  assert.equal(tradeAsset(make(5),new Map([['entry0',{instrumentKey:'MCX_FO|123'}]])),'fno');
+});
+
+test('daily sessions use IST, retain all exit IDs and fees, and preserve an active flat day', () => {
+  const stamp=Date.parse('2026-09-03T18:30:00Z');
+  const trades=[make(5,0,{closedAt:stamp+20}),make(-5,1,{closedAt:stamp}),make(2,2,{closedAt:stamp-1}),make(99,3,{closedAt:0})];
+  const sessions=pnlSessions(trades);
+  assert.deepEqual(sessions.map(s=>[s.day,s.net,s.fees]),[['2026-09-03',2,10],['2026-09-04',0,20]]);
+  assert.deepEqual(new Set(sessions[1].ids),new Set(['t0','t1']));
+  assert.equal(sessions[1].time,Date.parse('2026-09-04T12:00:00+05:30'));
+});
+
+test('current open marks use the selected ledger and every required quote',async()=>{
+  const {openPnlSummary,PNL_REPORTING_USD_INR:fx}=await import('../lib/pnl-reporting.ts');
+  const marks=[{symbol:'INFY',asset:'stocks',product:'DELIVERY',value:90},{symbol:'BTCUSD',asset:'global',product:'INTRADAY',value:-2},{symbol:'GOLD',asset:'fno',product:'DELIVERY',value:null}];
+  const all=openPnlSummary(marks,DEFAULT_PNL_SCOPE);
+  assert.equal(all.total,null);assert.equal(all.priced,2);assert.equal(all.positions.length,3);
+  assert.equal(openPnlSummary(marks.slice(0,2),DEFAULT_PNL_SCOPE).total,90-2*fx);
+  assert.equal(openPnlSummary(marks,{asset:'global',product:'all'}).total,-2);
+  assert.equal(openPnlSummary(marks,{asset:'stocks',product:'DELIVERY'}).total,90);
+  assert.equal(openPnlSummary(marks,{asset:'fno',product:'INTRADAY'}).positions.length,0);
+});
+
+test('same-tick Delta fills retain the execution order and allocated entry fee',async()=>{
+  const {globalClosedTrades}=await import('../lib/global-pnl.ts');
+  const fill={symbol:'BTCUSD',at:now,contracts:2,price:100,pnl:0,fee:4,detail:'Short'};
+  const [exit]=globalClosedTrades({events:[{...fill,id:'900:9',kind:'OPEN'},{...fill,id:'900:10',kind:'CLOSE',contracts:1,price:90,fee:1,pnl:10}]});
+  assert.equal(exit.entryPrice,100);assert.equal(exit.direction,'SHORT');assert.equal(exit.charges,3);assert.equal(exit.netPnl,7);
+});
+
+test('only filled Indian quantities contribute to closed P&L, including legacy fills without a status',async()=>{
+  const {buildClosedTrades}=await import('../lib/trade-analytics.ts');
+  const fill={symbol:'TCS',quantity:2,price:100,side:'BUY',createdAt:now,charges:{total:2}};
+  const rows=buildClosedTrades([{...fill,id:'bad',quantity:Infinity},{...fill,id:'pending',status:'PENDING'},{...fill,id:'legacy'}, {...fill,id:'filled-exit',side:'SELL',price:105,createdAt:now+1000}]);
+  assert.equal(rows.length,1);assert.equal(rows[0].grossPnl,10);assert.equal(rows[0].netPnl,6);
+  assert.deepEqual(rows[0].sourceOrderIds,['legacy','filled-exit']);
 });

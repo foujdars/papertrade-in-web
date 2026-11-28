@@ -10,7 +10,8 @@ const sideOf = (detail: string): "BUY" | "SELL" => /short/i.test(detail) ? "SELL
 function closes(events: Fill[], prefix: string): ClosedPaperTrade[] {
   const books = new Map<string, Lot[]>();
   const trades: ClosedPaperTrade[] = [];
-  for (const event of [...events].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))) {
+  // The engine appends fills in execution order, including multiple fills in one tick.
+  for (const event of [...events].sort((a, b) => a.at - b.at)) {
     const book = books.get(event.symbol) ?? [];
     books.set(event.symbol, book);
     if (event.kind === "OPEN") {
